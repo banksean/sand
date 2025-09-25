@@ -1,0 +1,68 @@
+package applecontainer
+
+import (
+	"reflect"
+	"testing"
+)
+
+func TestToFlags(t *testing.T) {
+	tests := map[string]struct {
+		s        any
+		expected []string
+	}{
+		"empty": {
+			s:        ManagementOptions{},
+			expected: nil,
+		},
+		"arch": {
+			s: ManagementOptions{
+				Arch: "arm64",
+			},
+			expected: []string{
+				"--arch", "arm64",
+			},
+		},
+		"arch and detach": {
+			s: ManagementOptions{
+				Arch:   "arm64",
+				Detach: true,
+			},
+			expected: []string{
+				"--arch", "arm64",
+				"--detach", // bools don't get a value, just include the flag name.
+			},
+		},
+		"logs": {
+			s: ContainerLogsOptions{
+				Boot: true,
+				N:    100,
+			},
+			expected: []string{
+				"--boot",
+				"-n", "100",
+			},
+		},
+		"env": {
+			s: ProcessOptions{
+				Env: map[string]string{
+					"a": "1",
+					"b": "2",
+					"d": "3",
+					"c": "4",
+				},
+			},
+			expected: []string{
+				"--env", "a=1,b=2,c=4,d=3",
+			},
+		},
+	}
+
+	for testName, testCase := range tests {
+		t.Run(testName, func(t *testing.T) {
+			got := ToArgs(testCase.s)
+			if !reflect.DeepEqual(got, testCase.expected) {
+				t.Errorf("got %v, want %v", got, testCase.expected)
+			}
+		})
+	}
+}
