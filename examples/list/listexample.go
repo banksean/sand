@@ -1,23 +1,28 @@
 package main
 
 import (
+	"context"
 	"fmt"
 
-	applecontainer "github.com/banksean/apple-container"
+	ac "github.com/banksean/apple-container"
 )
 
 func main() {
-	images, err := applecontainer.ListAllImages()
+	ctx := context.Background()
+
+	images, err := ac.Images.List(ctx)
 	if err != nil {
 		fmt.Println("Error listing images:", err)
 	}
 	for _, image := range images {
 		fmt.Printf("image: %v\n", image)
 	}
-	containers, err := applecontainer.ListAllContainers()
+
+	containers, err := ac.Containers.List(ctx)
 	if err != nil {
 		fmt.Println("Error listing containers:", err)
 	}
+
 	for _, container := range containers {
 		fmt.Printf("container: %v\n", container)
 	}

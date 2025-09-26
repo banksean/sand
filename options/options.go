@@ -1,4 +1,4 @@
-package applecontainer
+package options
 
 import (
 	"fmt"
@@ -8,27 +8,27 @@ import (
 	"strings"
 )
 
-// CreateContainerOptions are the options flags for the "container" cli commands dealing with container instances.
-type CreateContainerOptions struct {
+// CreateContainer are the options flags for the "container" cli commands dealing with container instances.
+type CreateContainer struct {
 	ProcessOptions
 	ResourceOptions
 	ManagementOptions
 }
 
-type ContainerLogsOptions struct {
+type ContainerLogs struct {
 	Boot   bool `flag:"--boot"`   // Display the boot log for the container instead of stdio
 	Follow bool `flag:"--follow"` // Follow log output
 	N      int  `flag:"-n"`       // Number of lines to show from the end of the logs. If not provided this will print all of the
 	Debug  bool `flag:"--debug"`  // Enable debug output [environment: CONTAINER_DEBUG]
 }
 
-type StartContainerOptions struct {
+type StartContainer struct {
 	Attach      bool `flag:"--attach"`      // Attach STDOUT/STDERR
 	Interactive bool `flag:"--interactive"` // Attach STDIN
 	Debug       bool `flag:"--debug"`       // Enable debug output [environment: CONTAINER_DEBUG]
 }
 
-type StopContainerOptions struct {
+type StopContainer struct {
 	All    bool   `flag:"--all"`    // Stop all running containers
 	Signal string `flag:"--signal"` // Signal to send the containers (default: SIGTERM)
 	Time   int    `flag:"--time"`   // Seconds to wait before killing the containers (default: 5)

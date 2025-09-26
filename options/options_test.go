@@ -1,4 +1,4 @@
-package applecontainer
+package options
 
 import (
 	"reflect"
@@ -33,7 +33,7 @@ func TestToFlags(t *testing.T) {
 			},
 		},
 		"logs": {
-			s: ContainerLogsOptions{
+			s: ContainerLogs{
 				Boot: true,
 				N:    100,
 			},

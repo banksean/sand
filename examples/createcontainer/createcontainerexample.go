@@ -7,14 +7,16 @@ import (
 	"fmt"
 	"time"
 
-	applecontainer "github.com/banksean/apple-container"
+	ac "github.com/banksean/apple-container"
+	"github.com/banksean/apple-container/options"
 )
 
 func main() {
+	ctx := context.Background()
 	fmt.Println("Creating container...")
-	id, err := applecontainer.CreateContainer(
-		applecontainer.CreateContainerOptions{
-			ManagementOptions: applecontainer.ManagementOptions{
+	id, err := ac.Containers.Create(ctx,
+		options.CreateContainer{
+			ManagementOptions: options.ManagementOptions{
 				Name: "applecontainer-demo",
 			},
 		},
@@ -23,7 +25,7 @@ func main() {
 		fmt.Printf("error: %v\n", err)
 		return
 	}
-	ctr, err := applecontainer.InspectContainer(id)
+	ctr, err := ac.Containers.Inspect(ctx, id)
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 		return
@@ -36,14 +38,14 @@ func main() {
 	fmt.Println("Newly created container:")
 	fmt.Println(string(ctrJSON))
 	fmt.Println("Starting container...")
-	id, err = applecontainer.StartContainer(applecontainer.StartContainerOptions{
+	id, err = ac.Containers.Start(ctx, options.StartContainer{
 		Debug: true,
 	}, id)
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 		return
 	}
-	ctr, err = applecontainer.InspectContainer(id)
+	ctr, err = ac.Containers.Inspect(ctx, id)
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 		return
@@ -57,9 +59,9 @@ func main() {
 	fmt.Println(string(ctrJSON))
 
 	timeout := 5 * time.Second
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel() // Ensure the context is canceled to release resources
-	logs, wait, err := applecontainer.ContainerLogs(ctx, applecontainer.ContainerLogsOptions{
+	logs, wait, err := ac.Containers.Logs(ctx, options.ContainerLogs{
 		Boot:   true,
 		Follow: true,
 	}, id)
@@ -90,7 +92,7 @@ func main() {
 	}
 
 	fmt.Println("Stopping container...")
-	id, err = applecontainer.StopContainer(applecontainer.StopContainerOptions{}, id)
+	id, err = ac.Containers.Stop(ctx, options.StopContainer{}, id)
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 		return

@@ -1,12 +1,17 @@
 package applecontainer
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os/exec"
 )
 
-func ListAllImages() ([]ImageEntry, error) {
+type images struct{}
+
+var Images images
+
+func (i *images) List(ctx context.Context) ([]ImageEntry, error) {
 	var images []ImageEntry
 
 	output, err := exec.Command("container", "image", "list", "--format", "json").Output()
@@ -20,7 +25,7 @@ func ListAllImages() ([]ImageEntry, error) {
 	return images, nil
 }
 
-func InspectImage(name string) ([]*ImageManifest, error) {
+func (i *images) Inspect(ctx context.Context, name string) ([]*ImageManifest, error) {
 	rawJSON, err := exec.Command("container", "image", "inspect", name).Output()
 	if err != nil {
 		return nil, err
