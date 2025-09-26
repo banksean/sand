@@ -8,6 +8,31 @@ import (
 	"strings"
 )
 
+type SystemStatus struct {
+	Prefix string `flag:"--prefix"` // Launchd prefix for services (default: com.apple.container.)
+	Debug  bool   `flag:"--debug"`  // Enable debug output [environment: CONTAINER_DEBUG]
+}
+
+type SystemStart struct {
+	AppRoot              string `flag:"--app-root"`               // Path to the root directory for application data
+	InstallRoot          string `flag:"--install-root"`           // Path to the root directory for application executables and plugins
+	EnableKernelIsntall  bool   `flag:"--enable-kernel-install"`  // Specify whether the default kernel should be installed or not (default: prompt user)
+	DisableKernelIsntall bool   `flag:"--disable-kernel-install"` // Specify whether the default kernel should be installed or not (default: prompt user)
+	Debug                bool   `flag:"--debug"`                  // Enable debug output [environment: CONTAINER_DEBUG]
+
+}
+
+type SystemStop struct {
+	Prefix string `flag:"--prefix"` // Launchd prefix for services (default: com.apple.container.)
+	Debug  bool   `flag:"--debug"`  // Enable debug output [environment: CONTAINER_DEBUG]
+}
+
+type SystemLogs struct {
+	Follow bool   `flag:"--follow"` // Follow log output
+	Last   string `flag:"--last"`   // Fetch logs starting from the specified time period (minus the current time); supported formats: m, h, d (default: 5m)
+	Debug  bool   `flag:"--debug"`  // Enable debug output [environment: CONTAINER_DEBUG]
+}
+
 // CreateContainer are the options flags for the "container" cli commands dealing with container instances.
 type CreateContainer struct {
 	ProcessOptions
