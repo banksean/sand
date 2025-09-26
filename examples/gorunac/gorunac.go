@@ -13,8 +13,8 @@ import (
 	"github.com/banksean/apple-container/options"
 )
 
-// runac works like "go run", but instead of building and executing a binary on
-// your host OS, it cross-compiles a linux binary and the runs the binary in an
+// gorunac works like "go run [...]", but instead of building and executing a binary on
+// your host OS, it cross-compiles a linux binary and then executes the binary in an
 // apple container.
 
 var (
@@ -26,10 +26,6 @@ func main() {
 	flag.Parse()
 	ctx := context.Background()
 
-	// TODO:
-	//
-	// - parse command line stuff so we can pass it to "go build" etc
-	// - cross-compile the binary to linux
 	bin, err := compile(flag.Args()...)
 	if err != nil {
 		fmt.Printf("compile error: %v\n", err)
@@ -39,7 +35,6 @@ func main() {
 		fmt.Printf("output binary name: %s\n", bin)
 	}
 
-	// - create or re-use an existing container
 	status, err := applecontainer.System.Status(ctx, options.SystemStatus{})
 	if err != nil {
 		fmt.Printf("container system status error: %v\n", err)
