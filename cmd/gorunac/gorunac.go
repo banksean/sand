@@ -24,46 +24,73 @@ var (
 
 func main() {
 	flag.Parse()
-	ctx := context.Background()
-
-	bin, err := compile(flag.Args()...)
-	if err != nil {
-		fmt.Printf("compile error: %v\n", err)
+	flag.Usage = func() {
+		fmt.Fprintln(os.Stderr, "This command cross-compiles a linux binary from go source on your Mac, and then excutes it inside a linux container")
+		fmt.Fprintf(os.Stderr, "Usage: %s <...stuff that you would normally put after `go run`>\n", os.Args[0])
+		flag.PrintDefaults()
+	}
+	if len(flag.Args()) == 0 {
+		flag.Usage()
 		os.Exit(1)
 	}
 	if *verbose {
-		fmt.Printf("output binary name: %s\n", bin)
+		fmt.Fprintf(os.Stderr, "args: %v\n", flag.Args())
+	}
+	ctx := context.Background()
+
+	compileArgs := []string{}
+	runArgs := []string{}
+	inRunArgs := false
+	for _, arg := range flag.Args() {
+		if arg == "--" {
+			inRunArgs = true
+			continue
+		}
+		if inRunArgs {
+			runArgs = append(runArgs, arg)
+		} else {
+			compileArgs = append(compileArgs, arg)
+		}
+	}
+	bin, err := compile(compileArgs...)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "compile error: %v\n", err)
+		os.Exit(1)
+	}
+	if *verbose {
+		fmt.Fprintf(os.Stderr, "output binary name: %s\n", bin)
 	}
 
 	status, err := applecontainer.System.Status(ctx, options.SystemStatus{})
 	if err != nil {
-		fmt.Printf("container system status error: %v\n", err)
-		fmt.Printf("You may need to run `container system start` and re-try this command\n")
+		fmt.Fprintf(os.Stderr, "container system status error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "You may need to run `container system start` and re-try this command\n")
 		os.Exit(1)
 	}
 	if *verbose {
-		fmt.Printf("container system status: %s\n", status)
+		fmt.Fprintf(os.Stderr, "container system status: %s\n", status)
 	}
 
-	err = run(bin)
+	err = run(bin, runArgs...)
 	if err != nil {
-		fmt.Printf("run error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "run error: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func run(bin string) error {
+func run(bin string, args ...string) error {
 	cwd, err := os.Getwd()
 	if err != nil {
 		if *verbose {
-			fmt.Printf("getting current working dir: %s\n", err)
+			fmt.Fprintf(os.Stderr, "getting current working dir: %s\n", err)
 		}
 		return err
 	}
-	cmd := exec.Command("container", []string{"run", "-it", "--rm", "--volume", cwd + ":/runac/dev", *imageName, "/runac/dev/bin/linux/" + bin}...)
+	cmd := exec.Command("container", append([]string{"run", "-it", "--rm", "--volume",
+		cwd + ":/gorunac/dev", *imageName, "/gorunac/dev/bin/linux/" + bin}, args...)...)
 	cmd.Env = os.Environ()
 	if *verbose {
-		fmt.Printf("container run command: %+v\n", cmd)
+		fmt.Fprintf(os.Stderr, "container run command: %+v\n", cmd)
 	}
 
 	// Connect subprocess stdio to parent process stdio
@@ -87,7 +114,7 @@ func compile(args ...string) (string, error) {
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		if *verbose {
-			fmt.Printf("go build error: %s\n", string(out))
+			fmt.Fprintf(os.Stderr, "go build error: %s\n", string(out))
 		}
 		return "", err
 	}
@@ -95,7 +122,7 @@ func compile(args ...string) (string, error) {
 	out, err = exec.Command("go", append([]string{"list", "-f", "{{.Target}}"}, args...)...).CombinedOutput()
 	if err != nil {
 		if *verbose {
-			fmt.Printf("go list error: %s\n", string(out))
+			fmt.Fprintf(os.Stderr, "go list error: %s\n", string(out))
 		}
 		return "", err
 	}
