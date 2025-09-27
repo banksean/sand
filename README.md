@@ -2,7 +2,13 @@
 
 # A Go package interface to apple's container commands
 
-This is a Go package containing some helper functions and types for use with apple's new container library.
+This Go package contains 
+- Commands `gorunac` and `gotestac`
+  - Quickly run and test go code inside lightweight linux containers, using apple's new container library. 
+  - Similar to `go run` and `go test`, they build executables from source code located on your MacOS host
+  - However, `gorunac` and `gotestac` cross-compile to linux, then mount those output files inside the linux containers and execute them there instead of the MacOS host. No container-side go toolchain is required.
+  - `gorunac` pipes stdio between host and container process.
+- Some helper functions and types for use with apple's new container library. `gorunac` and `gotestac` were written as demonstrations of how these packages can be used.
 
 ## Requirements
 - Only works on Apple hardware (of course).
