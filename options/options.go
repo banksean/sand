@@ -83,6 +83,16 @@ type StopContainer struct {
 	Debug bool `flag:"--debug"`
 }
 
+type RunContainer struct {
+	ProcessOptions
+	ResourceOptions
+	ManagementOptions
+	// Scheme is the scheme to use when connecting to the container registry (http, https, auto) (default: auto)
+	Scheme string `flag:"--scheme"`
+	// DisableProgressUpdates disables progress bar updates
+	DisableProgressUpdates bool `flag:"--disable-progress-updates"`
+}
+
 type ManagementOptions struct {
 	// Arch sets arch if image can target multiple architectures (default: arm64)
 	Arch string `flag:"--arch"`
