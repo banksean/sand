@@ -5,16 +5,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+
+	"github.com/banksean/apple-container/types"
 )
 
-type images struct{}
+type ImagesSvc struct{}
 
 // Images is a service interface to interact with apple container images.
-var Images images
+var Images ImagesSvc
 
 // List returns all images, or an error.
-func (i *images) List(ctx context.Context) ([]ImageEntry, error) {
-	var images []ImageEntry
+func (i *ImagesSvc) List(ctx context.Context) ([]types.ImageEntry, error) {
+	var images []types.ImageEntry
 
 	output, err := exec.Command("container", "image", "list", "--format", "json").Output()
 	if err != nil {
@@ -28,13 +30,13 @@ func (i *images) List(ctx context.Context) ([]ImageEntry, error) {
 }
 
 // Inspect returns details about the image with the given name, or an error.
-func (i *images) Inspect(ctx context.Context, name string) ([]*ImageManifest, error) {
+func (i *ImagesSvc) Inspect(ctx context.Context, name string) ([]*types.ImageManifest, error) {
 	rawJSON, err := exec.Command("container", "image", "inspect", name).Output()
 	if err != nil {
 		return nil, err
 	}
 
-	var entries []*ImageManifest
+	var entries []*types.ImageManifest
 	if err := json.Unmarshal([]byte(rawJSON), &entries); err != nil {
 		return nil, fmt.Errorf("failed to parse image JSON: %w", err)
 	}

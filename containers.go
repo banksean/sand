@@ -9,16 +9,17 @@ import (
 	"syscall"
 
 	"github.com/banksean/apple-container/options"
+	"github.com/banksean/apple-container/types"
 )
 
-type containers struct{}
+type ContainerSvc struct{}
 
 // Containers is a service interface to interact with apple containers.
-var Containers containers
+var Containers ContainerSvc
 
 // List returns all containers, or an error.
-func (c *containers) List(ctx context.Context) ([]Container, error) {
-	var containers []Container
+func (c *ContainerSvc) List(ctx context.Context) ([]types.Container, error) {
+	var containers []types.Container
 	cmd := exec.CommandContext(ctx, "container", "list", "--all", "--format", "json")
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	output, err := cmd.Output()
@@ -34,7 +35,7 @@ func (c *containers) List(ctx context.Context) ([]Container, error) {
 }
 
 // Inspect returns details about the requested container IDs, or an error.
-func (c *containers) Inspect(ctx context.Context, id ...string) ([]Container, error) {
+func (c *ContainerSvc) Inspect(ctx context.Context, id ...string) ([]types.Container, error) {
 	cmd := exec.CommandContext(ctx, "container", append([]string{"inspect"}, id...)...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
@@ -42,7 +43,7 @@ func (c *containers) Inspect(ctx context.Context, id ...string) ([]Container, er
 	if err != nil {
 		return nil, err
 	}
-	ret := []Container{}
+	ret := []types.Container{}
 	if err := json.Unmarshal(rawJSON, &ret); err != nil {
 		return nil, err
 	}
@@ -50,7 +51,7 @@ func (c *containers) Inspect(ctx context.Context, id ...string) ([]Container, er
 }
 
 // Logs returns an io.ReadCloser for streaming log output and a wait func that blocks on the command's completion, or an error.
-func (c *containers) Logs(ctx context.Context, opts options.ContainerLogs, id string) (io.ReadCloser, func() error, error) {
+func (c *ContainerSvc) Logs(ctx context.Context, opts options.ContainerLogs, id string) (io.ReadCloser, func() error, error) {
 	args := options.ToArgs(opts)
 	args = append([]string{"logs"}, append(args, id)...)
 	cmd := exec.CommandContext(ctx, "container", args...)
@@ -70,7 +71,7 @@ func (c *containers) Logs(ctx context.Context, opts options.ContainerLogs, id st
 }
 
 // Create creates a new container with the given options, name and init args. It returns the ID of the new container instance.
-func (c *containers) Create(ctx context.Context, opts options.CreateContainer, imageName string, initArgs []string) (string, error) {
+func (c *ContainerSvc) Create(ctx context.Context, opts options.CreateContainer, imageName string, initArgs []string) (string, error) {
 	args := options.ToArgs(opts)
 	args = append([]string{"create"}, append(args, imageName)...)
 	cmd := exec.Command("container", append(args, initArgs...)...)
@@ -82,7 +83,7 @@ func (c *containers) Create(ctx context.Context, opts options.CreateContainer, i
 }
 
 // Start starts a container instance with a given ID. It returns the start command output, or an error.
-func (c *containers) Start(ctx context.Context, opts options.StartContainer, id string) (string, error) {
+func (c *ContainerSvc) Start(ctx context.Context, opts options.StartContainer, id string) (string, error) {
 	args := options.ToArgs(opts)
 	args = append([]string{"start"}, append(args, id)...)
 	cmd := exec.Command("container", args...)
@@ -94,7 +95,7 @@ func (c *containers) Start(ctx context.Context, opts options.StartContainer, id 
 }
 
 // Stop stops a container instance with a given ID. It returns the stop command output, or an error.
-func (c *containers) Stop(ctx context.Context, opts options.StopContainer, id string) (string, error) {
+func (c *ContainerSvc) Stop(ctx context.Context, opts options.StopContainer, id string) (string, error) {
 	args := options.ToArgs(opts)
 	args = append([]string{"stop"}, append(args, id)...)
 	cmd := exec.Command("container", args...)

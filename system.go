@@ -10,13 +10,13 @@ import (
 	"github.com/banksean/apple-container/options"
 )
 
-type system struct{}
+type SystemSvc struct{}
 
 // System is a service interface to interact with the apple container system.
-var System system
+var System SystemSvc
 
 // Status returns the output of `container system status`, or an error.
-func (s *system) Status(ctx context.Context, opts options.SystemStatus) (string, error) {
+func (s *SystemSvc) Status(ctx context.Context, opts options.SystemStatus) (string, error) {
 	args := options.ToArgs(opts)
 	cmd := exec.Command("container", append([]string{"system", "status"}, args...)...)
 	output, err := cmd.Output()
@@ -27,7 +27,7 @@ func (s *system) Status(ctx context.Context, opts options.SystemStatus) (string,
 }
 
 // Start starts the container system. It returns the output of the command, or an error.
-func (s *system) Start(ctx context.Context, opts options.SystemStart) (string, error) {
+func (s *SystemSvc) Start(ctx context.Context, opts options.SystemStart) (string, error) {
 	args := options.ToArgs(opts)
 	cmd := exec.Command("container", append([]string{"system", "start"}, args...)...)
 	output, err := cmd.Output()
@@ -38,7 +38,7 @@ func (s *system) Start(ctx context.Context, opts options.SystemStart) (string, e
 }
 
 // Stop stops the container system. It returns the output of the command, or an error.
-func (s *system) Stop(ctx context.Context, opts options.SystemStop) (string, error) {
+func (s *SystemSvc) Stop(ctx context.Context, opts options.SystemStop) (string, error) {
 	args := options.ToArgs(opts)
 	cmd := exec.Command("container", append([]string{"system", "stop"}, args...)...)
 	output, err := cmd.Output()
@@ -49,7 +49,7 @@ func (s *system) Stop(ctx context.Context, opts options.SystemStop) (string, err
 }
 
 // Logs returns an io.ReadCloser for streaming log output and a wait func that blocks on the command's completion, or an error.
-func (s *system) Logs(ctx context.Context, opts options.SystemLogs) (io.ReadCloser, func() error, error) {
+func (s *SystemSvc) Logs(ctx context.Context, opts options.SystemLogs) (io.ReadCloser, func() error, error) {
 	args := options.ToArgs(opts)
 	cmd := exec.CommandContext(ctx, "container", append([]string{"system", "logs"}, args...)...)
 	// This Setpgid business is basically PTSD-induced superstition learned through Linux debugging nightmares.
