@@ -1,4 +1,5 @@
-package applecontainer
+// package types defines structs for unmashaling the output from various `container` commands.
+package types
 
 import "time"
 
