@@ -74,7 +74,7 @@ func (c *ContainerSvc) Logs(ctx context.Context, opts options.ContainerLogs, id 
 func (c *ContainerSvc) Create(ctx context.Context, opts options.CreateContainer, imageName string, initArgs []string) (string, error) {
 	args := options.ToArgs(opts)
 	args = append([]string{"create"}, append(args, imageName)...)
-	cmd := exec.Command("container", append(args, initArgs...)...)
+	cmd := exec.CommandContext(ctx, "container", append(args, initArgs...)...)
 	output, err := cmd.Output()
 	if err != nil {
 		return "", err
@@ -86,7 +86,7 @@ func (c *ContainerSvc) Create(ctx context.Context, opts options.CreateContainer,
 func (c *ContainerSvc) Start(ctx context.Context, opts options.StartContainer, id string) (string, error) {
 	args := options.ToArgs(opts)
 	args = append([]string{"start"}, append(args, id)...)
-	cmd := exec.Command("container", args...)
+	cmd := exec.CommandContext(ctx, "container", args...)
 	output, err := cmd.Output()
 	if err != nil {
 		return "", err
@@ -98,10 +98,28 @@ func (c *ContainerSvc) Start(ctx context.Context, opts options.StartContainer, i
 func (c *ContainerSvc) Stop(ctx context.Context, opts options.StopContainer, id string) (string, error) {
 	args := options.ToArgs(opts)
 	args = append([]string{"stop"}, append(args, id)...)
-	cmd := exec.Command("container", args...)
+	cmd := exec.CommandContext(ctx, "container", args...)
 	output, err := cmd.Output()
 	if err != nil {
 		return "", err
 	}
 	return strings.TrimSpace(string(output)), nil
+}
+
+// Run runs a command in a container instance with a given ID.
+func (c *ContainerSvc) Run(ctx context.Context, opts options.RunContainer, imageName, command string, env []string, stdin io.Reader, stdout, stderr io.Writer, cmdArgs ...string) (func() error, error) {
+	args := options.ToArgs(opts)
+	args = append(args, append([]string{imageName, command}, cmdArgs...)...)
+	cmd := exec.CommandContext(ctx, "container", append([]string{"run"}, args...)...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Env = env
+	cmd.Stdin = stdin
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
+
+	if err := cmd.Start(); err != nil {
+		return nil, err
+	}
+
+	return cmd.Wait, nil
 }

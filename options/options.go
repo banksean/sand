@@ -172,8 +172,15 @@ type ProcessOptions struct {
 func ToArgs(s any) []string {
 	var ret []string
 	st := reflect.TypeOf(s)
+	sv := reflect.ValueOf(s)
 	for i := range st.NumField() {
 		field := st.Field(i)
+		fv := sv.Field(i)
+		if field.Anonymous && field.Type.Kind() == reflect.Struct {
+			fvi := fv.Interface()
+			ret = append(ret, ToArgs(fvi)...)
+			continue
+		}
 		flagTag, ok := field.Tag.Lookup("flag")
 		if !ok {
 			continue
@@ -186,9 +193,8 @@ func ToArgs(s any) []string {
 				keepZero = true
 			}
 		}
-		sv := reflect.ValueOf(s)
-		fv := sv.Field(i)
 		v := reflect.ValueOf(fv.Interface())
+
 		if !keepZero && v.IsZero() {
 			continue
 		}

@@ -55,6 +55,22 @@ func TestToFlags(t *testing.T) {
 				"--env", "a=1,b=2,c=4,d=3",
 			},
 		},
+		"container run": {
+			s: RunContainer{
+				ProcessOptions: ProcessOptions{
+					Interactive: true,
+				},
+				ManagementOptions: ManagementOptions{
+					Remove: true,
+					Volume: "/foo/bar:/gorunac/dev",
+				},
+			},
+			expected: []string{
+				"--interactive",
+				"--remove",
+				"--volume", "/foo/bar:/gorunac/dev",
+			},
+		},
 	}
 
 	for testName, testCase := range tests {

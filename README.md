@@ -8,9 +8,9 @@ This is a Go package containing some helper functions and types for use with app
 - Only works on Apple hardware (of course).
 - Install [`apple-container`](https://github.com/apple/container) first, since these helper functions just shell out to it. 
 
-## `gorunac` command
+## `gorunac` and `gotestac` commands
 
-This command is similar to `go run`, but it runs your go command inside a lightweight linux container, using [apple/container](https://github.com/apple/container).
+The `gorunac` command is similar to `go run`, but it runs your go command inside a lightweight linux container, using [apple/container](https://github.com/apple/container).
 
 - cross-compiles a linux binary from go source on your Mac
   - build on your host OS, using the Go toolchain already installed on your Mac
@@ -20,6 +20,8 @@ This command is similar to `go run`, but it runs your go command inside a lightw
 - mounts a volume at `/gorunac/dev` in the container, pointed at the current working directory on your MacOS host machine
 - executes `/gorunac/dev/bin/linux/{binary}` in the container, passing any extra flags that appear after `--` to `{binary}`
 - stdin/stdout/stderr are routed to/from the host OS's gorunac process to the container's `{binary}` process
+
+Similar to `gorunac`, `gotestac` will run unit tests in a linux container after cross-compiling the test binaries first on your MacOS host.  Note: `gotestac` is a fairly naive test runner (more of a proof-of-concept). It starts a new container instance for each test binary invocation, and it runs all of them in series.
 
 ## `gorunac` examples
 
@@ -58,3 +60,42 @@ Hostname: 5df8b394-f231-429f-be31-060e1d94f418
 
 Note that when you run from source using `gorunac`, it builds the binary entirely on your MacOS host, so the only file that it needs to expose to the container is the resulting statically linked binary.
 
+## `gotestac` examples
+
+```sh
+# First, run all the tests on the MacOS host and see that they pass:
+
+>go test ./... -count 1
+?       sketch.dev/browser      [no test files]
+ok      sketch.dev/claudetool   0.692s
+ok      sketch.dev/claudetool/bashkit   0.524s
+[...]
+ok      sketch.dev/loop 3.420s
+ok      sketch.dev/loop/server  4.272s
+ok      sketch.dev/loop/server/gzhandler        2.752s
+?       sketch.dev/mcp  [no test files]
+ok      sketch.dev/skabandclient        3.512s
+
+# Now run the same tests in linux containers using gotestac, and see that some tests fail in that environment but not on the MacOS host:
+
+>go install github.com/banksean/apple-container/cmd/gotestac
+>gotestac ./...
+Running ant.test...
+PASS                             
+Running bashkit.test...          
+PASS                             
+Running browse.test...           
+2025/09/27 20:47:37 Browser closed
+2025/09/27 20:47:37 Browser closed
+2025/09/27 20:47:37 Browser closed
+--- FAIL: TestBrowserInitialization (0.00s)
+    browse_test.go:121: Failed to initialize browser: failed to start browser (please apt get chromium or equivalent): exec: "google-chrome": executable file not found in $PATH
+2025/09/27 20:47:37 Browser closed
+--- FAIL: TestNavigateTool (0.00s)
+    browse_test.go:177: Error running navigate tool: failed to start browser (please apt get chromium or equivalent): exec: "google-chrome": executable file 
+...
+Running skabandclient.test...    
+PASS                             
+Running sketch.test...           
+PASS
+```

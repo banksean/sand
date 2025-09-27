@@ -70,14 +70,14 @@ func main() {
 		fmt.Fprintf(os.Stderr, "container system status: %s\n", status)
 	}
 
-	err = run(bin, runArgs...)
+	err = run(ctx, bin, runArgs...)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "run error: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func run(bin string, args ...string) error {
+func run(ctx context.Context, bin string, args ...string) error {
 	cwd, err := os.Getwd()
 	if err != nil {
 		if *verbose {
@@ -85,23 +85,24 @@ func run(bin string, args ...string) error {
 		}
 		return err
 	}
-	cmd := exec.Command("container", append([]string{"run", "-it", "--rm", "--volume",
-		cwd + ":/gorunac/dev", *imageName, "/gorunac/dev/bin/linux/" + bin}, args...)...)
-	cmd.Env = os.Environ()
-	if *verbose {
-		fmt.Fprintf(os.Stderr, "container run command: %+v\n", cmd)
-	}
+	wait, err := applecontainer.Containers.Run(ctx, options.RunContainer{
+		ProcessOptions: options.ProcessOptions{
+			Interactive: true,
+		},
+		ManagementOptions: options.ManagementOptions{
+			Remove: true,
+			Volume: cwd + ":/gorunac/dev",
+		},
+	}, *imageName, "/gorunac/dev/bin/linux/"+bin, os.Environ(), os.Stdin, os.Stdout, os.Stderr, args...)
 
-	// Connect subprocess stdio to parent process stdio
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	err = cmd.Run()
 	if err != nil {
+		if *verbose {
+			fmt.Fprintf(os.Stderr, "getting running command in container: %s\n", err)
+		}
 		return err
 	}
-	return nil
+
+	return wait()
 }
 
 func compile(args ...string) (string, error) {

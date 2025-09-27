@@ -92,7 +92,7 @@ func main() {
 	}
 	ctx := context.Background()
 
-	compileArgs := []string{}
+	compileArgs := flag.Args()
 	runArgs := []string{}
 	inRunArgs := false
 	for _, arg := range unknownFlags {
@@ -122,14 +122,14 @@ func main() {
 		fmt.Fprintf(os.Stderr, "container system status: %s\n", status)
 	}
 
-	err = run(runArgs...)
+	err = runTests(ctx, runArgs...)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "run error: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func run(args ...string) error {
+func runTests(ctx context.Context, args ...string) error {
 	cwd, err := os.Getwd()
 	if err != nil {
 		if *verbose {
@@ -146,20 +146,25 @@ func run(args ...string) error {
 		if d.IsDir() {
 			return nil
 		}
-		fmt.Println(path)
-		cmd := exec.Command("container", append([]string{"run", "-it", "--rm", "--volume",
-			cwd + ":/gotestac/dev", *imageName, "/gotestac/dev/testbin/linux/" + path}, args...)...)
-		cmd.Env = os.Environ()
-		if *verbose {
-			fmt.Fprintf(os.Stderr, "container run command: %+v\n", cmd)
+		fmt.Printf("Running %s...\n", path)
+		wait, err := applecontainer.Containers.Run(ctx, options.RunContainer{
+			ManagementOptions: options.ManagementOptions{
+				Remove: true,
+				Volume: cwd + ":/gorunac/dev",
+			},
+		}, *imageName, "/gorunac/dev/testbin/linux/"+path, os.Environ(), os.Stdin, os.Stdout, os.Stderr, args...)
+
+		if err != nil {
+			if *verbose {
+				fmt.Fprintf(os.Stderr, "getting running command in container: %s\n", err)
+			}
+			fmt.Fprintf(os.Stderr, "error running %s: %v\n", path, err)
 		}
-
-		// Connect subprocess stdio to parent process stdio
-		cmd.Stdin = os.Stdin
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-
-		return cmd.Run()
+		err = wait()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error waiting for %s to complete: %v\n", path, err)
+		}
+		return nil
 	})
 
 	return err
@@ -171,7 +176,7 @@ func compile(args ...string) error {
 	cmd.Env = append(cmd.Env, "GOOS=linux")
 	cmd.Env = append(cmd.Env, "GOARCH=arm64")
 	if *verbose {
-		fmt.Fprintf(os.Stderr, "cmd: %+v\n", cmd)
+		fmt.Fprintf(os.Stderr, "compile cmd: %+v\n", cmd)
 	}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
