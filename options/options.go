@@ -9,28 +9,40 @@ import (
 )
 
 type SystemStatus struct {
-	Prefix string `flag:"--prefix"` // Launchd prefix for services (default: com.apple.container.)
-	Debug  bool   `flag:"--debug"`  // Enable debug output [environment: CONTAINER_DEBUG]
+	// Prefix is the launchd prefix for services (default: com.apple.container.)
+	Prefix string `flag:"--prefix"`
+	// Debug enables debug output [environment: CONTAINER_DEBUG]
+	Debug  bool   `flag:"--debug"`
 }
 
 type SystemStart struct {
-	AppRoot              string `flag:"--app-root"`               // Path to the root directory for application data
-	InstallRoot          string `flag:"--install-root"`           // Path to the root directory for application executables and plugins
-	EnableKernelIsntall  bool   `flag:"--enable-kernel-install"`  // Specify whether the default kernel should be installed or not (default: prompt user)
-	DisableKernelIsntall bool   `flag:"--disable-kernel-install"` // Specify whether the default kernel should be installed or not (default: prompt user)
-	Debug                bool   `flag:"--debug"`                  // Enable debug output [environment: CONTAINER_DEBUG]
+	// AppRoot is the path to the root directory for application data
+	AppRoot              string `flag:"--app-root"`
+	// InstallRoot is the path to the root directory for application executables and plugins
+	InstallRoot          string `flag:"--install-root"`
+	// EnableKernelIsntall specifies whether the default kernel should be installed or not (default: prompt user)
+	EnableKernelIsntall  bool   `flag:"--enable-kernel-install"`
+	// DisableKernelIsntall specifies whether the default kernel should be installed or not (default: prompt user)
+	DisableKernelIsntall bool   `flag:"--disable-kernel-install"`
+	// Debug enables debug output [environment: CONTAINER_DEBUG]
+	Debug                bool   `flag:"--debug"`
 
 }
 
 type SystemStop struct {
-	Prefix string `flag:"--prefix"` // Launchd prefix for services (default: com.apple.container.)
-	Debug  bool   `flag:"--debug"`  // Enable debug output [environment: CONTAINER_DEBUG]
+	// Prefix is the launchd prefix for services (default: com.apple.container.)
+	Prefix string `flag:"--prefix"`
+	// Debug enables debug output [environment: CONTAINER_DEBUG]
+	Debug  bool   `flag:"--debug"`
 }
 
 type SystemLogs struct {
-	Follow bool   `flag:"--follow"` // Follow log output
-	Last   string `flag:"--last"`   // Fetch logs starting from the specified time period (minus the current time); supported formats: m, h, d (default: 5m)
-	Debug  bool   `flag:"--debug"`  // Enable debug output [environment: CONTAINER_DEBUG]
+	// Follow enables following log output
+	Follow bool   `flag:"--follow"`
+	// Last specifies fetching logs starting from the specified time period (minus the current time); supported formats: m, h, d (default: 5m)
+	Last   string `flag:"--last"`
+	// Debug enables debug output [environment: CONTAINER_DEBUG]
+	Debug  bool   `flag:"--debug"`
 }
 
 // CreateContainer are the options flags for the "container" cli commands dealing with container instances.
@@ -41,65 +53,109 @@ type CreateContainer struct {
 }
 
 type ContainerLogs struct {
-	Boot   bool `flag:"--boot"`   // Display the boot log for the container instead of stdio
-	Follow bool `flag:"--follow"` // Follow log output
-	N      int  `flag:"-n"`       // Number of lines to show from the end of the logs. If not provided this will print all of the
-	Debug  bool `flag:"--debug"`  // Enable debug output [environment: CONTAINER_DEBUG]
+	// Boot displays the boot log for the container instead of stdio
+	Boot   bool `flag:"--boot"`
+	// Follow enables following log output
+	Follow bool `flag:"--follow"`
+	// N is the number of lines to show from the end of the logs. If not provided this will print all of the logs
+	N      int  `flag:"-n"`
+	// Debug enables debug output [environment: CONTAINER_DEBUG]
+	Debug  bool `flag:"--debug"`
 }
 
 type StartContainer struct {
-	Attach      bool `flag:"--attach"`      // Attach STDOUT/STDERR
-	Interactive bool `flag:"--interactive"` // Attach STDIN
-	Debug       bool `flag:"--debug"`       // Enable debug output [environment: CONTAINER_DEBUG]
+	// Attach enables attaching STDOUT/STDERR
+	Attach      bool `flag:"--attach"`
+	// Interactive enables attaching STDIN
+	Interactive bool `flag:"--interactive"`
+	// Debug enables debug output [environment: CONTAINER_DEBUG]
+	Debug       bool `flag:"--debug"`
 }
 
 type StopContainer struct {
-	All    bool   `flag:"--all"`    // Stop all running containers
-	Signal string `flag:"--signal"` // Signal to send the containers (default: SIGTERM)
-	Time   int    `flag:"--time"`   // Seconds to wait before killing the containers (default: 5)
-	Debug  bool   `flag:"--debug"`  // Enable debug output [environment: CONTAINER_DEBUG]
+	// All stops all running containers
+	All    bool   `flag:"--all"`
+	// Signal is the signal to send the containers (default: SIGTERM)
+	Signal string `flag:"--signal"`
+	// Time is the seconds to wait before killing the containers (default: 5)
+	Time   int    `flag:"--time"`
+	// Debug enables debug output [environment: CONTAINER_DEBUG]
+	Debug  bool   `flag:"--debug"`
 }
 
 type ManagementOptions struct {
-	Arch           string            `flag:"--arch"`           // Set arch if image can target multiple architectures (default: arm64)
-	CIDFile        string            `flag:"--cidfile"`        // Write the container ID to the path provided
-	Detach         bool              `flag:"--detach"`         // Run the container and detach from the process
-	DNS            string            `flag:"--dns"`            // DNS nameserver IP address
-	DNSDomain      string            `flag:"--dns-domain"`     // Default DNS domain
-	DNSOption      string            `flag:"--dns-option"`     // DNS options
-	DNSSearch      string            `flag:"--dns-search"`     // DNS search domains
-	Entrypoint     string            `flag:"--entrypoint"`     // Override the entrypoint of the image
-	Kernel         string            `flag:"--kernel"`         // Set a custom kernel path
-	Label          map[string]string `flag:"--label"`          // Add a key=value label to the container
-	Mount          string            `flag:"--mount"`          // Add a mount to the container (format: type=<>,source=<>,target=<>,readonly)
-	Name           string            `flag:"--name"`           // Use the specified name as the container ID
-	Netowrk        string            `flag:"--network"`        // Attach the container to a network
-	NoDNS          bool              `flag:"--no-dns"`         // Do not configure DNS in the container
-	OS             string            `flag:"--os"`             // Set OS if image can target multiple operating systems (default: linux)
-	Publish        string            `flag:"--publish"`        // Publish a port from container to host (format: [host-ip:]host-port:container-port[/protocol])
-	Platform       string            `flag:"--platform"`       // Platform for the image if it's multi-platform. This takes precedence over --os and --arch
-	PublishSocket  string            `flag:"--publish-socket"` // Publish a socket from container to host (format: host_path:container_path)
-	Remove         bool              `flag:"--remove"`         // Remove the container after it stops
-	SSH            bool              `flag:"--ssh"`            // Forward SSH agent socket to container
-	TmpFS          string            `flag:"--tmpfs"`          // Add a tmpfs mount to the container at the given path
-	Volume         string            `flag:"--volume"`         // Bind mount a volume into the container
-	Virtualization bool              `flag:"--virtualization"` // Expose virtualization capabilities to the container (requires host and guest support)
+	// Arch sets arch if image can target multiple architectures (default: arm64)
+	Arch           string            `flag:"--arch"`
+	// CIDFile writes the container ID to the path provided
+	CIDFile        string            `flag:"--cidfile"`
+	// Detach runs the container and detaches from the process
+	Detach         bool              `flag:"--detach"`
+	// DNS is the DNS nameserver IP address
+	DNS            string            `flag:"--dns"`
+	// DNSDomain is the default DNS domain
+	DNSDomain      string            `flag:"--dns-domain"`
+	// DNSOption specifies DNS options
+	DNSOption      string            `flag:"--dns-option"`
+	// DNSSearch specifies DNS search domains
+	DNSSearch      string            `flag:"--dns-search"`
+	// Entrypoint overrides the entrypoint of the image
+	Entrypoint     string            `flag:"--entrypoint"`
+	// Kernel sets a custom kernel path
+	Kernel         string            `flag:"--kernel"`
+	// Label adds a key=value label to the container
+	Label          map[string]string `flag:"--label"`
+	// Mount adds a mount to the container (format: type=<>,source=<>,target=<>,readonly)
+	Mount          string            `flag:"--mount"`
+	// Name uses the specified name as the container ID
+	Name           string            `flag:"--name"`
+	// Netowrk attaches the container to a network
+	Netowrk        string            `flag:"--network"`
+	// NoDNS disables DNS configuration in the container
+	NoDNS          bool              `flag:"--no-dns"`
+	// OS sets OS if image can target multiple operating systems (default: linux)
+	OS             string            `flag:"--os"`
+	// Publish publishes a port from container to host (format: [host-ip:]host-port:container-port[/protocol])
+	Publish        string            `flag:"--publish"`
+	// Platform is the platform for the image if it's multi-platform. This takes precedence over --os and --arch
+	Platform       string            `flag:"--platform"`
+	// PublishSocket publishes a socket from container to host (format: host_path:container_path)
+	PublishSocket  string            `flag:"--publish-socket"`
+	// Remove removes the container after it stops
+	Remove         bool              `flag:"--remove"`
+	// SSH forwards SSH agent socket to container
+	SSH            bool              `flag:"--ssh"`
+	// TmpFS adds a tmpfs mount to the container at the given path
+	TmpFS          string            `flag:"--tmpfs"`
+	// Volume bind mounts a volume into the container
+	Volume         string            `flag:"--volume"`
+	// Virtualization exposes virtualization capabilities to the container (requires host and guest support)
+	Virtualization bool              `flag:"--virtualization"`
 }
 
 type ResourceOptions struct {
-	CPUs   int    `flag:"--cpus"`   // Number of CPUs to allocate to the container
-	Memory string `flag:"--memory"` // Amount of memory (1MiByte granularity), with optional K, M, G, T, or P suffix
+	// CPUs is the number of CPUs to allocate to the container
+	CPUs   int    `flag:"--cpus"`
+	// Memory is the amount of memory (1MiByte granularity), with optional K, M, G, T, or P suffix
+	Memory string `flag:"--memory"`
 }
 
 type ProcessOptions struct {
-	Env         map[string]string `flag:"--env"`         // Set environment variables (format: key=value)
-	EnvFile     string            `flag:"--env-file"`    // Read in a file of environment variables (key=value format, ignores # comments and blank lines)
-	GID         string            `flag:"--gid"`         // Set the group ID for the process
-	Interactive bool              `flag:"--interactive"` // Keep the standard input open even if not attached
-	TTY         bool              `flag:"--tty"`         // Open a TTY with the process
-	User        string            `flag:"--user"`        // Set the user for the process (format: name|uid[:gid])
-	UID         string            `flag:"--uid"`         // Set the user ID for the process
-	WorkDir     string            `flag:"--workdir"`     // Set the initial working directory inside the container
+	// Env sets environment variables (format: key=value)
+	Env         map[string]string `flag:"--env"`
+	// EnvFile reads in a file of environment variables (key=value format, ignores # comments and blank lines)
+	EnvFile     string            `flag:"--env-file"`
+	// GID sets the group ID for the process
+	GID         string            `flag:"--gid"`
+	// Interactive keeps the standard input open even if not attached
+	Interactive bool              `flag:"--interactive"`
+	// TTY opens a TTY with the process
+	TTY         bool              `flag:"--tty"`
+	// User sets the user for the process (format: name|uid[:gid])
+	User        string            `flag:"--user"`
+	// UID sets the user ID for the process
+	UID         string            `flag:"--uid"`
+	// WorkDir sets the initial working directory inside the container
+	WorkDir     string            `flag:"--workdir"`
 }
 
 // ToArgs creates an array of strings that you can pass to exec.Command(...) as CLI args.

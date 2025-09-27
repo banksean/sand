@@ -13,8 +13,10 @@ import (
 
 type containers struct{}
 
+// Containers is a service interface to interact with apple containers.
 var Containers containers
 
+// List returns all containers, or an error.
 func (c *containers) List(ctx context.Context) ([]Container, error) {
 	var containers []Container
 	cmd := exec.CommandContext(ctx, "container", "list", "--all", "--format", "json")
@@ -31,6 +33,7 @@ func (c *containers) List(ctx context.Context) ([]Container, error) {
 	return containers, nil
 }
 
+// Inspect returns details about the requested container IDs, or an error.
 func (c *containers) Inspect(ctx context.Context, id ...string) ([]Container, error) {
 	cmd := exec.CommandContext(ctx, "container", append([]string{"inspect"}, id...)...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
@@ -46,6 +49,7 @@ func (c *containers) Inspect(ctx context.Context, id ...string) ([]Container, er
 	return ret, nil
 }
 
+// Logs returns an io.ReadCloser for streaming log output and a wait func that blocks on the command's completion, or an error.
 func (c *containers) Logs(ctx context.Context, opts options.ContainerLogs, id string) (io.ReadCloser, func() error, error) {
 	args := options.ToArgs(opts)
 	args = append([]string{"logs"}, append(args, id)...)
@@ -65,6 +69,7 @@ func (c *containers) Logs(ctx context.Context, opts options.ContainerLogs, id st
 	return out, cmd.Wait, nil
 }
 
+// Create creates a new container with the given options, name and init args. It returns the ID of the new container instance.
 func (c *containers) Create(ctx context.Context, opts options.CreateContainer, imageName string, initArgs []string) (string, error) {
 	args := options.ToArgs(opts)
 	args = append([]string{"create"}, append(args, imageName)...)
@@ -76,7 +81,7 @@ func (c *containers) Create(ctx context.Context, opts options.CreateContainer, i
 	return strings.TrimSpace(string(output)), nil
 }
 
-// TODO: make id variadic
+// Start starts a container instance with a given ID. It returns the start command output, or an error.
 func (c *containers) Start(ctx context.Context, opts options.StartContainer, id string) (string, error) {
 	args := options.ToArgs(opts)
 	args = append([]string{"start"}, append(args, id)...)
@@ -88,7 +93,7 @@ func (c *containers) Start(ctx context.Context, opts options.StartContainer, id 
 	return strings.TrimSpace(string(output)), nil
 }
 
-// TODO: make id variadic
+// Stop stops a container instance with a given ID. It returns the stop command output, or an error.
 func (c *containers) Stop(ctx context.Context, opts options.StopContainer, id string) (string, error) {
 	args := options.ToArgs(opts)
 	args = append([]string{"stop"}, append(args, id)...)

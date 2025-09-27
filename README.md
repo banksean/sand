@@ -1,3 +1,5 @@
+[![Go Reference](https://pkg.go.dev/badge/github.com/banksean/apple-container.svg)](https://pkg.go.dev/github.com/banksean/apple-container)
+
 # A Go package interface to apple's container commands
 
 This is a Go package containing some helper functions and types for use with apple's new container library.

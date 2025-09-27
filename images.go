@@ -9,8 +9,10 @@ import (
 
 type images struct{}
 
+// Images is a service interface to interact with apple container images.
 var Images images
 
+// List returns all images, or an error.
 func (i *images) List(ctx context.Context) ([]ImageEntry, error) {
 	var images []ImageEntry
 
@@ -25,6 +27,7 @@ func (i *images) List(ctx context.Context) ([]ImageEntry, error) {
 	return images, nil
 }
 
+// Inspect returns details about the image with the given name, or an error.
 func (i *images) Inspect(ctx context.Context, name string) ([]*ImageManifest, error) {
 	rawJSON, err := exec.Command("container", "image", "inspect", name).Output()
 	if err != nil {
