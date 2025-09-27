@@ -52,7 +52,7 @@ func TestToFlags(t *testing.T) {
 				},
 			},
 			expected: []string{
-				"--env", "a=1,b=2,c=4,d=3,asdasde",
+				"--env", "a=1,b=2,c=4,d=3",
 			},
 		},
 	}
