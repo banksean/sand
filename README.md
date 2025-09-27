@@ -22,7 +22,7 @@ The `gorunac` command is similar to `go run`, but it runs your go command inside
   - build on your host OS, using the Go toolchain already installed on your Mac
   - static binary means you do not need to have a go toolchain or anything else pre-installed in your container in order to run the binary
 - writes binary output to `./bin/linux/{binary}` on your host OS
-- creates a new container instance using a specified image (`ghcr.io/linuxcontainers/alpine:latest` by default)
+- creates a new container instance using a specified image (the `--image` flag value is `ghcr.io/linuxcontainers/alpine:latest` by default, but most linux OCI images should work)
 - mounts a volume at `/gorunac/dev` in the container, pointed at the current working directory on your MacOS host machine
 - executes `/gorunac/dev/bin/linux/{binary}` in the container, passing any extra flags that appear after `--` to `{binary}`
 - stdin/stdout/stderr are routed to/from the host OS's gorunac process to the container's `{binary}` process
