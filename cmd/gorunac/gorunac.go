@@ -1,3 +1,6 @@
+// gorunac works like "go run [...]", but instead of building and executing a binary on
+// your MacOS host, it cross-compiles a linux binary and then executes the binary in an
+// apple linux container.
 package main
 
 import (
@@ -12,10 +15,6 @@ import (
 	applecontainer "github.com/banksean/apple-container"
 	"github.com/banksean/apple-container/options"
 )
-
-// gorunac works like "go run [...]", but instead of building and executing a binary on
-// your host OS, it cross-compiles a linux binary and then executes the binary in an
-// apple container.
 
 var (
 	verbose   = flag.Bool("verbose", false, "verbose output")
