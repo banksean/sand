@@ -83,6 +83,13 @@ type StopContainer struct {
 	Debug bool `flag:"--debug"`
 }
 
+type DeleteContainer struct {
+	// Force forces the removal of one or more running containers
+	Force bool `flag:"--force"`
+	// All removes all containers
+	All bool `flag:"--all"`
+}
+
 type RunContainer struct {
 	ProcessOptions
 	ResourceOptions
@@ -91,6 +98,11 @@ type RunContainer struct {
 	Scheme string `flag:"--scheme"`
 	// DisableProgressUpdates disables progress bar updates
 	DisableProgressUpdates bool `flag:"--disable-progress-updates"`
+}
+
+// ExecContainer runs a new command in a running container.
+type ExecContainer struct {
+	ProcessOptions
 }
 
 type ManagementOptions struct {

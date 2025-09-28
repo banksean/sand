@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"time"
 
 	ac "github.com/banksean/apple-container"
@@ -37,7 +38,7 @@ func main() {
 	}
 	fmt.Println("Newly created container:")
 	fmt.Println(string(ctrJSON))
-	fmt.Println("Starting container...")
+	fmt.Printf("Starting container %s...\n", id)
 	id, err = ac.Containers.Start(ctx, options.StartContainer{
 		Debug: true,
 	}, id)
@@ -55,13 +56,13 @@ func main() {
 		fmt.Printf("error: %v\n", err)
 		return
 	}
-	fmt.Println("Newly started container:")
+	fmt.Printf("Newly started container %s:\n", id)
 	fmt.Println(string(ctrJSON))
 
 	timeout := 5 * time.Second
-	ctx, cancel := context.WithTimeout(ctx, timeout)
+	ctxLogs, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel() // Ensure the context is canceled to release resources
-	logs, wait, err := ac.Containers.Logs(ctx, options.ContainerLogs{
+	logs, waitLogs, err := ac.Containers.Logs(ctxLogs, options.ContainerLogs{
 		Boot:   true,
 		Follow: true,
 	}, id)
@@ -71,7 +72,7 @@ func main() {
 	}
 	defer logs.Close()
 
-	fmt.Printf("Scanning container logs, with a %v timeout...\n", timeout)
+	fmt.Printf("Scanning container %s logs, with a %v timeout...\n", id, timeout)
 	go func() {
 		logScanner := bufio.NewScanner(logs)
 		for logScanner.Scan() {
@@ -82,8 +83,8 @@ func main() {
 		}
 	}()
 
-	if err := wait(); err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
+	if err := waitLogs(); err != nil {
+		if ctxLogs.Err() == context.DeadlineExceeded {
 			fmt.Printf("%v timeout expired\n", timeout)
 		} else {
 			fmt.Printf("wait error: %v\n", err)
@@ -91,11 +92,36 @@ func main() {
 		}
 	}
 
-	fmt.Println("Stopping container...")
+	fmt.Printf("Executinging `ls` in container %s:\n", id)
+
+	ctxExec, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	waitExec, err := ac.Containers.Exec(ctxExec, options.ExecContainer{}, id, "ls", os.Environ(), os.Stdin, os.Stdout, os.Stderr)
+
+	if err := waitExec(); err != nil {
+		if ctxExec.Err() == context.DeadlineExceeded {
+			fmt.Printf("%v timeout expired\n", timeout)
+		} else {
+			fmt.Printf("wait error: %v\n", err)
+			return
+		}
+
+	}
+
+	fmt.Printf("Stopping container %s...\n", id)
 	id, err = ac.Containers.Stop(ctx, options.StopContainer{}, id)
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 		return
 	}
 	fmt.Printf("Container %s stopped\n", id)
+
+	fmt.Printf("Deleting container %s...\n", id)
+	id, err = ac.Containers.Delete(ctx, options.DeleteContainer{}, id)
+	if err != nil {
+		fmt.Printf("error: %v\n", err)
+		return
+	}
+	fmt.Printf("Container %s deleted\n", id)
+
 }
