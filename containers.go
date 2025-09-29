@@ -79,7 +79,7 @@ func (c *ContainerSvc) Create(ctx context.Context, opts options.CreateContainer,
 	args := options.ToArgs(opts)
 	args = append([]string{"create"}, append(args, imageName)...)
 	cmd := exec.CommandContext(ctx, "container", append(args, initArgs...)...)
-	slog.InfoContext(ctx, "ContainerSvc.Create", "cmd", cmd)
+	slog.InfoContext(ctx, "ContainerSvc.Create", "cmd", strings.Join(cmd.Args, " "))
 	output, err := cmd.Output()
 	if err != nil {
 		return string(output), err
@@ -92,6 +92,7 @@ func (c *ContainerSvc) Start(ctx context.Context, opts options.StartContainer, i
 	args := options.ToArgs(opts)
 	args = append([]string{"start"}, append(args, id)...)
 	cmd := exec.CommandContext(ctx, "container", args...)
+	slog.InfoContext(ctx, "ContainerSvc.Start", "cmd", strings.Join(cmd.Args, " "))
 	output, err := cmd.Output()
 	if err != nil {
 		return "", err
@@ -101,9 +102,11 @@ func (c *ContainerSvc) Start(ctx context.Context, opts options.StartContainer, i
 
 // Stop stops a container instance with a given ID. It returns the stop command output, or an error.
 func (c *ContainerSvc) Stop(ctx context.Context, opts options.StopContainer, id string) (string, error) {
+	slog.InfoContext(ctx, "ContainerSvc.Stop", "opts", opts, "id", id)
 	args := options.ToArgs(opts)
 	args = append([]string{"stop"}, append(args, id)...)
 	cmd := exec.CommandContext(ctx, "container", args...)
+	slog.InfoContext(ctx, "ContainerSvc.Stop", "cmd", strings.Join(cmd.Args, " "))
 	output, err := cmd.Output()
 	if err != nil {
 		return "", err
@@ -116,6 +119,7 @@ func (c *ContainerSvc) Delete(ctx context.Context, opts options.DeleteContainer,
 	args := options.ToArgs(opts)
 	args = append([]string{"delete"}, append(args, id)...)
 	cmd := exec.CommandContext(ctx, "container", args...)
+	slog.InfoContext(ctx, "ContainerSvc.Delete", "cmd", strings.Join(cmd.Args, " "))
 	output, err := cmd.Output()
 	if err != nil {
 		return "", err
@@ -128,6 +132,7 @@ func (c *ContainerSvc) Run(ctx context.Context, opts options.RunContainer, image
 	args := options.ToArgs(opts)
 	args = append(args, append([]string{imageName, command}, cmdArgs...)...)
 	cmd := exec.CommandContext(ctx, "container", append([]string{"run"}, args...)...)
+	slog.InfoContext(ctx, "ContainerSvc.Run", "cmd", strings.Join(cmd.Args, " "))
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Env = env
 	cmd.Stdin = stdin
@@ -146,10 +151,12 @@ func (c *ContainerSvc) Exec(ctx context.Context, opts options.ExecContainer, con
 	args := options.ToArgs(opts)
 	args = append(args, append([]string{containerID, command}, cmdArgs...)...)
 	cmd := exec.CommandContext(ctx, "container", append([]string{"exec"}, args...)...)
-	slog.InfoContext(ctx, "ContainerSvc.Exec", "cmd", cmd)
+	slog.InfoContext(ctx, "ContainerSvc.Exec", "cmd", strings.Join(cmd.Args, " "))
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Env = env
-	if term.IsTerminal(int(stdin.(*os.File).Fd())) {
+	checkTerminal := false
+	stdinFile, ok := stdin.(*os.File)
+	if !checkTerminal || (ok && term.IsTerminal(int(stdinFile.Fd()))) {
 		slog.InfoContext(ctx, "ContainerSvc.Exec: normal terminal passthrough")
 
 		cmd.Stdin = stdin
@@ -175,5 +182,10 @@ func (c *ContainerSvc) Exec(ctx context.Context, opts options.ExecContainer, con
 		go io.Copy(stderr, ptmx)
 	}
 
-	return cmd.Wait, nil
+	return func() error {
+		slog.InfoContext(ctx, "ContainerSvc.Exec wait")
+		err := cmd.Wait()
+		slog.ErrorContext(ctx, "ContainerSvc.Exec wait", "error", err)
+		return err
+	}, nil
 }
