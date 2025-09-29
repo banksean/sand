@@ -8,7 +8,6 @@ import (
 	"flag"
 	"fmt"
 	"io/fs"
-	"log"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -18,10 +17,13 @@ import (
 	applecontainer "github.com/banksean/apple-container"
 	"github.com/banksean/apple-container/options"
 	"github.com/banksean/apple-container/pool"
+	"golang.org/x/sync/errgroup"
 )
 
 var (
-	imageName = flag.String("image", "ghcr.io/linuxcontainers/alpine:latest", "container image")
+	imageName         = flag.String("image", "ghcr.io/linuxcontainers/alpine:latest", "container image")
+	containerPoolSize = flag.Int("poolsize", 1, "maximum number of containers to keep in the container pool")
+	logLevelStr       = flag.String("loglevel", "error", "Set the logging level (debug, info, warn, error)")
 )
 
 func separateFlags() (knownArgs []string, unknownFlags []string) {
@@ -61,6 +63,28 @@ func separateFlags() (knownArgs []string, unknownFlags []string) {
 	return knownArgs, unknownFlags
 }
 
+func initSlog() {
+	var level slog.Level
+	switch *logLevelStr {
+	case "debug":
+		level = slog.LevelDebug
+	case "info":
+		level = slog.LevelInfo
+	case "warn":
+		level = slog.LevelWarn
+	case "error":
+		level = slog.LevelError
+	default:
+		level = slog.LevelInfo // Default to info if invalid
+	}
+
+	// Create a new logger with a JSON handler writing to standard error
+	logger := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+		Level: level,
+	}))
+	slog.SetDefault(logger)
+}
+
 func main() {
 	// Separate known and unknown flags
 	knownArgs, unknownFlags := separateFlags()
@@ -88,6 +112,7 @@ func main() {
 		flag.Usage()
 		os.Exit(1)
 	}
+	initSlog()
 	ctx := context.Background()
 	slog.InfoContext(ctx, "main", "args", flag.Args())
 
@@ -160,7 +185,7 @@ func newTestContainer(ctx context.Context, cwd string) (string, error) {
 
 func initContainerPool(ctx context.Context, cwd string) (*pool.ContainerPool, error) {
 	slog.InfoContext(ctx, "initContainerPool", "cwd", cwd)
-	ret, err := pool.NewContainerPool(ctx, 4, func(ctx context.Context) (*pool.PooledContainer, error) {
+	ret, err := pool.NewContainerPool(ctx, *containerPoolSize, func(ctx context.Context) (*pool.PooledContainer, error) {
 		id, err := newTestContainer(ctx, cwd)
 		if err != nil {
 			return nil, err
@@ -188,38 +213,50 @@ func runTests(ctx context.Context, args ...string) error {
 		slog.ErrorContext(ctx, "runTests initializing container pool", "error", err)
 		return err
 	}
+	eg := &errgroup.Group{}
+	eg.SetLimit(*containerPoolSize)
+
 	err = fs.WalkDir(fileSystem, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
-			log.Fatal(err)
+			slog.ErrorContext(ctx, "runTests fs.WalkDir", "error", err)
+			return err
 		}
 		if d.IsDir() {
 			return nil
 		}
-		pooledCtr, err := containerPool.Acquire(ctx)
-		if err != nil {
-			return err
-		}
-		id := pooledCtr.ID
-		slog.InfoContext(ctx, "runTests executing in container", "path", path, "id", id)
-		wait, err := applecontainer.Containers.Exec(ctx,
-			options.ExecContainer{}, id,
-			"/gorunac/dev/testbin/linux/"+path,
-			os.Environ(), os.Stdin, os.Stdout, os.Stderr, args...)
+		eg.Go(func() error {
+			pooledCtr, err := containerPool.Acquire(ctx)
+			if err != nil {
+				return err
+			}
+			id := pooledCtr.ID
+			slog.InfoContext(ctx, "runTests executing in container", "path", path, "id", id)
+			wait, err := applecontainer.Containers.Exec(ctx,
+				options.ExecContainer{}, id,
+				"/gorunac/dev/testbin/linux/"+path,
+				os.Environ(), os.Stdin, os.Stdout, os.Stderr, args...)
 
-		if err != nil {
-			slog.ErrorContext(ctx, "runTests container Exec", "id", id, "path", path, "error", err)
-		}
-		err = wait()
-		if err != nil {
-			slog.ErrorContext(ctx, "runTests waiting for Exec to complete", "id", id, "path", path, "error", err)
-		}
-		containerPool.Release(ctx, pooledCtr)
+			if err != nil {
+				slog.ErrorContext(ctx, "runTests container Exec", "id", id, "path", path, "error", err)
+			}
+			err = wait()
+			if err != nil {
+				slog.ErrorContext(ctx, "runTests waiting for Exec to complete", "id", id, "path", path, "error", err)
+			}
+			containerPool.Release(ctx, pooledCtr)
+			return nil
+		})
 		return nil
 	})
 
 	if err != nil {
 		slog.ErrorContext(ctx, "runTests fs.WalkDir", "error", err)
 	}
+
+	if err := eg.Wait(); err != nil {
+		slog.ErrorContext(ctx, "runTest eg.Wait", "error", err)
+	}
+
 	ctx, done := context.WithTimeout(ctx, time.Second*20)
 	defer done()
 	return containerPool.Shutdown(ctx)

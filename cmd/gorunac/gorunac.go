@@ -7,6 +7,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,9 +18,31 @@ import (
 )
 
 var (
-	verbose   = flag.Bool("verbose", false, "verbose output")
-	imageName = flag.String("image", "ghcr.io/linuxcontainers/alpine:latest", "container image")
+	imageName   = flag.String("image", "ghcr.io/linuxcontainers/alpine:latest", "container image")
+	logLevelStr = flag.String("loglevel", "error", "Set the logging level (debug, info, warn, error)")
 )
+
+func initSlog() {
+	var level slog.Level
+	switch *logLevelStr {
+	case "debug":
+		level = slog.LevelDebug
+	case "info":
+		level = slog.LevelInfo
+	case "warn":
+		level = slog.LevelWarn
+	case "error":
+		level = slog.LevelError
+	default:
+		level = slog.LevelInfo // Default to info if invalid
+	}
+
+	// Create a new logger with a JSON handler writing to standard error
+	logger := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+		Level: level,
+	}))
+	slog.SetDefault(logger)
+}
 
 func main() {
 	flag.Parse()
@@ -32,10 +55,9 @@ func main() {
 		flag.Usage()
 		os.Exit(1)
 	}
-	if *verbose {
-		fmt.Fprintf(os.Stderr, "args: %v\n", flag.Args())
-	}
+	initSlog()
 	ctx := context.Background()
+	slog.InfoContext(ctx, "main", "args", flag.Args())
 
 	compileArgs := []string{}
 	runArgs := []string{}
@@ -51,28 +73,26 @@ func main() {
 			compileArgs = append(compileArgs, arg)
 		}
 	}
-	bin, err := compile(compileArgs...)
+	bin, err := compile(ctx, compileArgs...)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "compile error: %v\n", err)
+		slog.ErrorContext(ctx, "main compile", "error", err)
 		os.Exit(1)
 	}
-	if *verbose {
-		fmt.Fprintf(os.Stderr, "output binary name: %s\n", bin)
-	}
+	slog.InfoContext(ctx, "main", "bin", bin)
 
 	status, err := applecontainer.System.Status(ctx, options.SystemStatus{})
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "container system status error: %v\n", err)
+		slog.ErrorContext(ctx, "main system status", "error", err)
 		fmt.Fprintf(os.Stderr, "You may need to run `container system start` and re-try this command\n")
 		os.Exit(1)
 	}
-	if *verbose {
-		fmt.Fprintf(os.Stderr, "container system status: %s\n", status)
-	}
+
+	slog.InfoContext(ctx, "main container system", "status", status)
 
 	err = run(ctx, bin, runArgs...)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "run error: %v\n", err)
+		slog.ErrorContext(ctx, "main run", "error", err)
+
 		os.Exit(1)
 	}
 }
@@ -80,9 +100,7 @@ func main() {
 func run(ctx context.Context, bin string, args ...string) error {
 	cwd, err := os.Getwd()
 	if err != nil {
-		if *verbose {
-			fmt.Fprintf(os.Stderr, "getting current working dir: %s\n", err)
-		}
+		slog.ErrorContext(ctx, "run getting current working dir", "error", err)
 		return err
 	}
 	wait, err := applecontainer.Containers.Run(ctx, options.RunContainer{
@@ -96,34 +114,28 @@ func run(ctx context.Context, bin string, args ...string) error {
 	}, *imageName, "/gorunac/dev/bin/linux/"+bin, os.Environ(), os.Stdin, os.Stdout, os.Stderr, args...)
 
 	if err != nil {
-		if *verbose {
-			fmt.Fprintf(os.Stderr, "getting running command in container: %s\n", err)
-		}
+		slog.ErrorContext(ctx, "getting running command in container", "error", err)
 		return err
 	}
 
 	return wait()
 }
 
-func compile(args ...string) (string, error) {
-	cmd := exec.Command("go", append([]string{"build", "-o", "./bin/linux/"}, args...)...)
+func compile(ctx context.Context, args ...string) (string, error) {
+	cmd := exec.CommandContext(ctx, "go", append([]string{"build", "-o", "./bin/linux/"}, args...)...)
 	cmd.Env = os.Environ()
 	cmd.Env = append(cmd.Env, "GOOS=linux")
 	cmd.Env = append(cmd.Env, "GOARCH=arm64")
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		if *verbose {
-			fmt.Fprintf(os.Stderr, "go build error: %s\n", string(out))
-		}
+		slog.ErrorContext(ctx, "compile go build", "error", err, "out", string(out))
 		return "", err
 	}
 
 	out, err = exec.Command("go", append([]string{"list", "-f", "{{.Target}}"}, args...)...).CombinedOutput()
 	if err != nil {
-		if *verbose {
-			fmt.Fprintf(os.Stderr, "go list error: %s\n", string(out))
-		}
+		slog.ErrorContext(ctx, "compile go list", "error", err, "out", string(out))
 		return "", err
 	}
 	binPath := strings.TrimSpace(string(out))
