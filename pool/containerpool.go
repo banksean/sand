@@ -2,7 +2,8 @@ package pool
 
 import (
 	"context"
-	"fmt"
+	"errors"
+	"log/slog"
 	"sync"
 )
 
@@ -21,8 +22,8 @@ type ContainerPool struct {
 	Stop        func(ctx context.Context, pc *PooledContainer)
 }
 
-// NewConnectionPool creates a new container pool
-func NewConnectionPool(ctx context.Context, maxSize int, newFunc func(ctx context.Context) (*PooledContainer, error), stopFunc func(ctx context.Context, pc *PooledContainer)) (*ContainerPool, error) {
+// NewContainerPool creates a new container pool
+func NewContainerPool(ctx context.Context, maxSize int, newFunc func(ctx context.Context) (*PooledContainer, error), stopFunc func(ctx context.Context, pc *PooledContainer)) (*ContainerPool, error) {
 	pool := make(chan *PooledContainer, maxSize)
 	for i := 0; i < maxSize/2; i++ { // Initialize with some containers
 		pc, err := newFunc(ctx)
@@ -41,16 +42,18 @@ func NewConnectionPool(ctx context.Context, maxSize int, newFunc func(ctx contex
 	}, nil
 }
 
+var ErrPoolIsClosing = errors.New("pool is shutting down")
+
 // Acquire gets a container from the pool
 func (cp *ContainerPool) Acquire(ctx context.Context) (*PooledContainer, error) {
 	cp.mu.Lock()
 	defer cp.mu.Unlock()
 	if cp.closing {
-		return nil, fmt.Errorf("cannot acquire pooled container because the pool is shutting down")
+		return nil, ErrPoolIsClosing
 	}
 	select {
 	case conn := <-cp.pool:
-		fmt.Printf("Acquired existing container %s\n", conn.ID)
+		slog.InfoContext(ctx, "ContainerPool.Acquire returning existing container", "container_id", conn.ID)
 		return conn, nil
 	default:
 		if len(cp.pool) < cp.maxSize {
@@ -59,29 +62,29 @@ func (cp *ContainerPool) Acquire(ctx context.Context) (*PooledContainer, error) 
 			if err != nil {
 				return nil, err
 			}
-			fmt.Printf("Created and acquired new container %s\n", newConn.ID)
+			slog.InfoContext(ctx, "ContainerPool.Acquire created and acquired new container", "container_id", newConn.ID)
 			return newConn, nil
 		}
 		// Block until a container is available.
 		conn := <-cp.pool
-		fmt.Printf("Acquired existing container %s after waiting\n", conn.ID)
+		slog.InfoContext(ctx, "ContainerPool.Acquire returning existing container after waiting", "container_id", conn.ID)
 		return conn, nil
 	}
 }
 
 // Release returns a container to the pool
-func (cp *ContainerPool) Release(conn *PooledContainer) {
+func (cp *ContainerPool) Release(ctx context.Context, conn *PooledContainer) {
 	// Optional: perform container validation/health checks before releasing
 	cp.pool <- conn
-	fmt.Printf("Released container %s\n", conn.ID)
+	slog.InfoContext(ctx, "ContainerPool.Release", "container_id", conn.ID)
 }
 
 // Remove removes a container from the pool and returns the new size of the pool.
-func (cp *ContainerPool) Remove(conn *PooledContainer) int {
+func (cp *ContainerPool) Remove(ctx context.Context, conn *PooledContainer) int {
 	cp.mu.Lock()
 	defer cp.mu.Unlock()
 	cp.currentSize--
-	fmt.Printf("Removed container %s, current pool size: %d\n", conn.ID, cp.currentSize)
+	slog.InfoContext(ctx, "ContainerPool.Remove", "container_id", conn.ID, "new_pool_size", cp.currentSize)
 	return cp.currentSize
 }
 
@@ -98,7 +101,7 @@ func (cp *ContainerPool) Shutdown(ctx context.Context) error {
 		select {
 		case conn := <-cp.pool:
 			cp.Stop(ctx, conn)
-			if cp.Remove(conn) == 0 {
+			if cp.Remove(ctx, conn) == 0 {
 				return nil
 			}
 		case <-ctx.Done():

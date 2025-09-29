@@ -4,12 +4,12 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"flag"
 	"fmt"
 	"io/fs"
 	"log"
+	"log/slog"
 	"os"
 	"os/exec"
 	"strings"
@@ -21,7 +21,6 @@ import (
 )
 
 var (
-	verbose   = flag.Bool("verbose", false, "verbose output")
 	imageName = flag.String("image", "ghcr.io/linuxcontainers/alpine:latest", "container image")
 )
 
@@ -76,8 +75,7 @@ func main() {
 
 	// Now parse normally - this will only see declared flags
 	flag.Parse()
-	verboseVal := flag.Lookup("verbose").Value.(flag.Getter).Get().(bool)
-	verbose = &verboseVal
+
 	imageNameVal := flag.Lookup("image").Value.(flag.Getter).Get().(string)
 	imageName = &imageNameVal
 
@@ -90,10 +88,8 @@ func main() {
 		flag.Usage()
 		os.Exit(1)
 	}
-	if *verbose {
-		fmt.Fprintf(os.Stderr, "args: %v\n", flag.Args())
-	}
 	ctx := context.Background()
+	slog.InfoContext(ctx, "main", "args", flag.Args())
 
 	compileArgs := flag.Args()
 	runArgs := []string{}
@@ -109,25 +105,24 @@ func main() {
 			compileArgs = append(compileArgs, arg)
 		}
 	}
-	err := compile(compileArgs...)
+	err := compileTests(ctx, compileArgs...)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "compile error: %v\n", err)
+		slog.ErrorContext(ctx, "main compile", "error", err)
 		os.Exit(1)
 	}
 
 	status, err := applecontainer.System.Status(ctx, options.SystemStatus{})
 	if err != nil {
+		slog.ErrorContext(ctx, "main container system status", "error", err)
 		fmt.Fprintf(os.Stderr, "container system status error: %v\n", err)
 		fmt.Fprintf(os.Stderr, "You may need to run `container system start` and re-try this command\n")
 		os.Exit(1)
 	}
-	if *verbose {
-		fmt.Fprintf(os.Stderr, "container system status: %s\n", status)
-	}
+	slog.InfoContext(ctx, "main container system", "status", status)
 
 	err = runTests(ctx, runArgs...)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "run error: %v\n", err)
+		slog.ErrorContext(ctx, "main runTests", "error", err)
 		os.Exit(1)
 	}
 }
@@ -143,74 +138,29 @@ func newTestContainer(ctx context.Context, cwd string) (string, error) {
 		},
 		*imageName, []string{"infinity"})
 	if err != nil {
-		if *verbose {
-			fmt.Fprintf(os.Stderr, "creating container %s: %s\n", id, err)
-		}
+		slog.ErrorContext(ctx, "newTestContainer create container", "id", id, "error", err)
 		return "", err
 	}
-	log.Printf("initContainerPool.New: %s", id)
+
 	out, err := applecontainer.Containers.Start(ctx, options.StartContainer{}, id)
 	if err != nil {
-		if *verbose {
-			fmt.Fprintf(os.Stderr, "starting container %s: %s\n%s\n", id, err, out)
-		}
+		slog.ErrorContext(ctx, "newTestContainer start container", "id", id, "out", out, "error", err)
 		return "", err
 	}
-	if *verbose {
-		fmt.Fprintf(os.Stderr, "container id %s started. Output:\n%s\n", id, out)
-	}
-
-	timeout := 5 * time.Second
-	ctxLogs, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	logReader, logWait, err := applecontainer.Containers.Logs(ctxLogs, options.ContainerLogs{Boot: true}, id)
-	if err != nil {
-		if *verbose {
-			fmt.Fprintf(os.Stderr, "getting container logs %s: %s\n", id, err)
-		}
-		return "", err
-	}
-	defer logWait()
-
-	if *verbose {
-		fmt.Printf("Scanning container %s logs, with a %v timeout...\n", id, timeout)
-		go func() {
-			logScanner := bufio.NewScanner(logReader)
-			for logScanner.Scan() {
-				fmt.Printf("Log line: %s\n", logScanner.Text())
-			}
-			if logScanner.Err() != nil {
-				fmt.Printf("logScanner error: %v\n", err)
-			}
-		}()
-	}
-	if err := logWait(); err != nil {
-		if ctxLogs.Err() == context.DeadlineExceeded {
-			fmt.Printf("%v timeout expired\n", timeout)
-		} else {
-			fmt.Printf("wait error: %v\n", err)
-			return "", err
-		}
-	}
+	slog.InfoContext(ctx, "newTestContainer started", "id", id, "out", out)
 
 	status, err := applecontainer.Containers.Inspect(ctx, id)
 	if err != nil {
-		if *verbose {
-			fmt.Fprintf(os.Stderr, "inspecting container %s: %s\n", id, err)
-		}
+		slog.ErrorContext(ctx, "newTestContainer inspect", "id", id, "error", err)
 		return "", err
 	}
-	if *verbose {
-		fmt.Printf("Container status:\n%+v\n", status)
-	}
+	slog.InfoContext(ctx, "newTestContainer succeess", "id", id, "status", status)
 	return id, nil
-
 }
 
 func initContainerPool(ctx context.Context, cwd string) (*pool.ContainerPool, error) {
-	log.Printf("initContainerPool %s", cwd)
-	ret, err := pool.NewConnectionPool(ctx, 4, func(ctx context.Context) (*pool.PooledContainer, error) {
+	slog.InfoContext(ctx, "initContainerPool", "cwd", cwd)
+	ret, err := pool.NewContainerPool(ctx, 4, func(ctx context.Context) (*pool.PooledContainer, error) {
 		id, err := newTestContainer(ctx, cwd)
 		if err != nil {
 			return nil, err
@@ -221,9 +171,7 @@ func initContainerPool(ctx context.Context, cwd string) (*pool.ContainerPool, er
 		return pc, nil
 	}, func(ctx context.Context, pc *pool.PooledContainer) {
 		out, err := applecontainer.Containers.Stop(ctx, options.StopContainer{}, pc.ID)
-		if err != nil {
-			fmt.Printf("container stop error: %v\n%s\n", err, out)
-		}
+		slog.InfoContext(ctx, "container stop", "id", pc.ID, "error", err, "out", out)
 	})
 	return ret, err
 }
@@ -231,17 +179,13 @@ func initContainerPool(ctx context.Context, cwd string) (*pool.ContainerPool, er
 func runTests(ctx context.Context, args ...string) error {
 	cwd, err := os.Getwd()
 	if err != nil {
-		if *verbose {
-			fmt.Fprintf(os.Stderr, "getting current working dir: %s\n", err)
-		}
+		slog.ErrorContext(ctx, "runTests getting current working dir", "args", args, "error", err)
 		return err
 	}
 	fileSystem := os.DirFS(cwd + "/testbin/linux")
 	containerPool, err := initContainerPool(ctx, cwd)
 	if err != nil {
-		if *verbose {
-			fmt.Fprintf(os.Stderr, "initializing container pool: %s\n", err)
-		}
+		slog.ErrorContext(ctx, "runTests initializing container pool", "error", err)
 		return err
 	}
 	err = fs.WalkDir(fileSystem, ".", func(path string, d fs.DirEntry, err error) error {
@@ -256,47 +200,40 @@ func runTests(ctx context.Context, args ...string) error {
 			return err
 		}
 		id := pooledCtr.ID
-		fmt.Printf("Executing %s in container %s...\n", path, id)
+		slog.InfoContext(ctx, "runTests executing in container", "path", path, "id", id)
 		wait, err := applecontainer.Containers.Exec(ctx,
 			options.ExecContainer{}, id,
 			"/gorunac/dev/testbin/linux/"+path,
 			os.Environ(), os.Stdin, os.Stdout, os.Stderr, args...)
 
 		if err != nil {
-			if *verbose {
-				fmt.Fprintf(os.Stderr, "getting running command in container: %s\n", err)
-			}
-			fmt.Fprintf(os.Stderr, "error running %s: %v\n", path, err)
+			slog.ErrorContext(ctx, "runTests container Exec", "id", id, "path", path, "error", err)
 		}
 		err = wait()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "error waiting for %s to complete: %v\n", path, err)
+			slog.ErrorContext(ctx, "runTests waiting for Exec to complete", "id", id, "path", path, "error", err)
 		}
-		containerPool.Release(pooledCtr)
+		containerPool.Release(ctx, pooledCtr)
 		return nil
 	})
 
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "fs.WalkDir: %v", err)
+		slog.ErrorContext(ctx, "runTests fs.WalkDir", "error", err)
 	}
 	ctx, done := context.WithTimeout(ctx, time.Second*20)
 	defer done()
 	return containerPool.Shutdown(ctx)
 }
 
-func compile(args ...string) error {
-	cmd := exec.Command("go", append([]string{"test", "-c", "-o", "./testbin/linux/"}, args...)...)
+func compileTests(ctx context.Context, args ...string) error {
+	cmd := exec.CommandContext(ctx, "go", append([]string{"test", "-c", "-o", "./testbin/linux/"}, args...)...)
 	cmd.Env = os.Environ()
 	cmd.Env = append(cmd.Env, "GOOS=linux")
 	cmd.Env = append(cmd.Env, "GOARCH=arm64")
-	if *verbose {
-		fmt.Fprintf(os.Stderr, "compile cmd: %+v\n", cmd)
-	}
+	slog.InfoContext(ctx, "compile", "cmd", cmd)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		if *verbose {
-			fmt.Fprintf(os.Stderr, "go test -c error: %s\n", string(out))
-		}
+		slog.ErrorContext(ctx, "compile go test -c", "error", err, "out", string(out))
 		return err
 	}
 
