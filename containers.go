@@ -4,12 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"log/slog"
+	"os"
 	"os/exec"
 	"strings"
 	"syscall"
 
 	"github.com/banksean/apple-container/options"
 	"github.com/banksean/apple-container/types"
+	"github.com/creack/pty"
+	"golang.org/x/term"
 )
 
 type ContainerSvc struct{}
@@ -75,9 +79,10 @@ func (c *ContainerSvc) Create(ctx context.Context, opts options.CreateContainer,
 	args := options.ToArgs(opts)
 	args = append([]string{"create"}, append(args, imageName)...)
 	cmd := exec.CommandContext(ctx, "container", append(args, initArgs...)...)
+	slog.InfoContext(ctx, "ContainerSvc.Create", "cmd", cmd)
 	output, err := cmd.Output()
 	if err != nil {
-		return "", err
+		return string(output), err
 	}
 	return strings.TrimSpace(string(output)), nil
 }
@@ -141,14 +146,33 @@ func (c *ContainerSvc) Exec(ctx context.Context, opts options.ExecContainer, con
 	args := options.ToArgs(opts)
 	args = append(args, append([]string{containerID, command}, cmdArgs...)...)
 	cmd := exec.CommandContext(ctx, "container", append([]string{"exec"}, args...)...)
+	slog.InfoContext(ctx, "ContainerSvc.Exec", "cmd", cmd)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Env = env
-	cmd.Stdin = stdin
-	cmd.Stdout = stdout
-	cmd.Stderr = stderr
+	if term.IsTerminal(int(stdin.(*os.File).Fd())) {
+		slog.InfoContext(ctx, "ContainerSvc.Exec: normal terminal passthrough")
 
-	if err := cmd.Start(); err != nil {
-		return nil, err
+		cmd.Stdin = stdin
+		cmd.Stdout = stdout
+		cmd.Stderr = stderr
+		if err := cmd.Start(); err != nil {
+			return nil, err
+		}
+	} else {
+		slog.InfoContext(ctx, "ContainerSvc.Exec: using pseudo-terminal")
+
+		ptmx, err := pty.Start(cmd)
+		if err != nil {
+			return nil, err
+		}
+		defer ptmx.Close()
+
+		// Copy data between stdin/stdout and the pty
+		go io.Copy(ptmx, stdin)
+		go io.Copy(stdout, ptmx)
+		// Writing stderr and stdout to the same place is probably a bad idea,
+		// but we don't have anywhere else to send it at the moment.
+		go io.Copy(stderr, ptmx)
 	}
 
 	return cmd.Wait, nil
