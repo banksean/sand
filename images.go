@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os/exec"
-	"strings"
+	"syscall"
 
 	"github.com/banksean/apple-container/options"
 	"github.com/banksean/apple-container/types"
@@ -20,7 +21,7 @@ var Images ImagesSvc
 func (i *ImagesSvc) List(ctx context.Context) ([]types.ImageEntry, error) {
 	var images []types.ImageEntry
 
-	output, err := exec.Command("container", "image", "list", "--format", "json").Output()
+	output, err := exec.CommandContext(ctx, "container", "image", "list", "--format", "json").Output()
 	if err != nil {
 		return nil, err
 	}
@@ -33,7 +34,7 @@ func (i *ImagesSvc) List(ctx context.Context) ([]types.ImageEntry, error) {
 
 // Inspect returns details about the image with the given name, or an error.
 func (i *ImagesSvc) Inspect(ctx context.Context, name string) ([]*types.ImageManifest, error) {
-	rawJSON, err := exec.Command("container", "image", "inspect", name).Output()
+	rawJSON, err := exec.CommandContext(ctx, "container", "image", "inspect", name).Output()
 	if err != nil {
 		return nil, err
 	}
@@ -48,13 +49,29 @@ func (i *ImagesSvc) Inspect(ctx context.Context, name string) ([]*types.ImageMan
 	return entries, nil
 }
 
-// Build builds an image.
-func (i *ImagesSvc) Build(ctx context.Context, opts options.BuildOptions) (string, error) {
+// Build builds an image. TODO: Since this can take a while, make it stream the command output
+// similar to how ContainerSvc.Logs works.
+func (i *ImagesSvc) Build(ctx context.Context, opts options.BuildOptions) (io.ReadCloser, io.ReadCloser, func() error, error) {
 	args := options.ToArgs(opts)
-	cmd := exec.Command("container", append([]string{"build"}, args...)...)
-	output, err := cmd.Output()
+	cmd := exec.CommandContext(ctx, "container", append([]string{"build"}, args...)...)
+
+	// This Setpgid business is basically PTSD-induced superstition learned through Linux debugging nightmares.
+	// It may not be necessary on MacOS at all.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+
+	outPipe, err := cmd.StdoutPipe()
 	if err != nil {
-		return "", err
+		return nil, nil, nil, err
 	}
-	return strings.TrimSpace(string(output)), nil
+
+	errPipe, err := cmd.StderrPipe()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	if err := cmd.Start(); err != nil {
+		return nil, nil, nil, err
+	}
+
+	return outPipe, errPipe, cmd.Wait, nil
 }

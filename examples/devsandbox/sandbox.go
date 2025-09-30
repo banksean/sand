@@ -15,6 +15,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"flag"
 	"fmt"
@@ -28,6 +29,17 @@ import (
 	ac "github.com/banksean/apple-container"
 	"github.com/banksean/apple-container/options"
 	"github.com/google/uuid"
+)
+
+const defaultImageName = "claude-code-sandbox"
+
+var (
+	rm          = flag.Bool("rm", true, "remove the container on exit")
+	attachTo    = flag.String("attach", "", "sandbox ID to re-connect to")
+	imageName   = flag.String("image", defaultImageName, "name of container image to use")
+	shellCmd    = flag.String("shell", "/bin/zsh", "shell command to exec in the container")
+	logLevelStr = flag.String("loglevel", "error", "Set the logging level (debug, info, warn, error)")
+	logFile     = flag.String("log", "", "location of log file (leave empty for a random tmp/ path)")
 )
 
 type SandBoxer struct {
@@ -126,8 +138,8 @@ func (sb *SandBox) createContainer(ctx context.Context) error {
 				Name:   "sandbox-" + sb.id,
 				Remove: *rm,
 				Mount: []string{
+					fmt.Sprintf(`type=bind,source=%s/.claude,target=/home/node/.claude,readonly`, os.Getenv("HOME")),
 					fmt.Sprintf(`type=bind,source=%s,target=/app`, sb.sandboxWorkDir),
-					fmt.Sprintf(`type=bind,source=%s/.claude,target=/home/node,readonly`, os.Getenv("HOME")),
 				},
 			},
 		},
@@ -167,26 +179,38 @@ func (sb *SandBox) shellExec(ctx context.Context, shellCmd string, stdin io.Read
 	return wait()
 }
 
-var (
-	rm          = flag.Bool("rm", true, "remove the container on exit")
-	attachTo    = flag.String("attach", "", "sandbox ID to re-connect to")
-	imageName   = flag.String("image", "claude-code-sandbox:latest", "name of container image to use")
-	shellCmd    = flag.String("shell", "/bin/sh", "shell command to exec in the container")
-	logLevelStr = flag.String("loglevel", "error", "Set the logging level (debug, info, warn, error)")
-	logFile     = flag.String("log", "", "location of log file (leave empty for a random tmp/ path)")
-)
-
-func buildClaudeCodeSandboxImage(ctx context.Context) error {
-	// TODO: make sure these containers have access to whatever configuration and credentials exist for claude code on the host OS.
-	out, err := ac.Images.Build(ctx, options.BuildOptions{
+func buildDefaultImage(ctx context.Context) error {
+	outLogs, errLogs, wait, err := ac.Images.Build(ctx, options.BuildOptions{
 		File: "./examples/devsandbox/Dockerfile",
-		Tag:  "claude-code-sandbox",
+		Tag:  defaultImageName,
 	})
 	if err != nil {
-		slog.ErrorContext(ctx, "buildSandboxImage: Images.Build", "error", err, "out", out)
+		slog.ErrorContext(ctx, "buildSandboxImage: Images.Build", "error", err)
 		return err
 	}
-	return nil
+	defer outLogs.Close()
+
+	go func() {
+		logScanner := bufio.NewScanner(outLogs)
+		for logScanner.Scan() {
+			slog.InfoContext(ctx, "buildDefaultImage", "stdout", logScanner.Text())
+		}
+		if logScanner.Err() != nil {
+			slog.ErrorContext(ctx, "buildDefaultImage", "error", err)
+		}
+	}()
+
+	go func() {
+		logScanner := bufio.NewScanner(errLogs)
+		for logScanner.Scan() {
+			slog.InfoContext(ctx, "buildDefaultImage", "stderr", logScanner.Text())
+		}
+		if logScanner.Err() != nil {
+			slog.ErrorContext(ctx, "buildDefaultImage", "error", err)
+		}
+	}()
+
+	return wait()
 }
 
 func checkForImage(ctx context.Context, imageName string) error {
@@ -194,7 +218,10 @@ func checkForImage(ctx context.Context, imageName string) error {
 	manifests, err := ac.Images.Inspect(ctx, imageName)
 	if err != nil {
 		slog.ErrorContext(ctx, "buildSandboxImage: Images.Build", "error", err, "manifests", len(manifests))
-		return err
+		if imageName != defaultImageName {
+			return err
+		}
+		return buildDefaultImage(ctx)
 	}
 	if len(manifests) == 0 {
 		return fmt.Errorf("no images named %s ", imageName)
