@@ -83,6 +83,13 @@ type StopContainer struct {
 	Debug bool `flag:"--debug"`
 }
 
+type KillContainer struct {
+	// All kills all running containers
+	All bool `flag:"--all"`
+	// Signal is the signal to send the containers (default: SIGTERM)
+	Signal string `flag:"--signal"`
+}
+
 type DeleteContainer struct {
 	// Force forces the removal of one or more running containers
 	Force bool `flag:"--force"`

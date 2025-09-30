@@ -190,3 +190,17 @@ func (c *ContainerSvc) Exec(ctx context.Context, opts options.ExecContainer, con
 		return err
 	}, nil
 }
+
+// Kill kills containers
+func (c *ContainerSvc) Kill(ctx context.Context, opts options.KillContainer, id ...string) (string, error) {
+	slog.InfoContext(ctx, "ContainerSvc.Kill", "opts", opts, "id", id)
+	args := options.ToArgs(opts)
+	args = append([]string{"kill"}, append(args, id...)...)
+	cmd := exec.CommandContext(ctx, "container", args...)
+	slog.InfoContext(ctx, "ContainerSvc.Kill", "cmd", strings.Join(cmd.Args, " "))
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(output)), nil
+}

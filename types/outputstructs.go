@@ -4,12 +4,12 @@ package types
 import "time"
 
 type Container struct {
-	Networks      []interface{} `json:"networks"`
-	Status        string        `json:"status"`
-	Configuration Configuration `json:"configuration"`
+	Networks      []interface{}   `json:"networks"`
+	Status        string          `json:"status"`
+	Configuration ContainerConfig `json:"configuration"`
 }
 
-type Configuration struct {
+type ContainerConfig struct {
 	PublishedSockets []interface{}          `json:"publishedSockets"`
 	Sysctls          map[string]interface{} `json:"sysctls"`
 	Mounts           []Mount                `json:"mounts"`
@@ -19,7 +19,7 @@ type Configuration struct {
 	PublishedPorts   []interface{}          `json:"publishedPorts"`
 	InitProcess      InitProcess            `json:"initProcess"`
 	DNS              DNS                    `json:"dns"`
-	Networks         []Network              `json:"networks"`
+	Networks         []ContainerNetwork     `json:"networks"`
 	ID               string                 `json:"id"`
 	RuntimeHandler   string                 `json:"runtimeHandler"`
 	SSH              bool                   `json:"ssh"`
@@ -72,7 +72,7 @@ type DNS struct {
 	SearchDomains []string `json:"searchDomains"`
 }
 
-type Network struct {
+type ContainerNetwork struct {
 	Options map[string]string `json:"options"`
 	Network string            `json:"network"`
 }
@@ -106,27 +106,27 @@ type ImageDescriptor struct {
 }
 
 type ImageManifest struct {
-	Variants []Variant `json:"variants"`
-	Name     string    `json:"name"`
-	Index    Index     `json:"index"`
+	Variants []ImageVariant `json:"variants"`
+	Name     string         `json:"name"`
+	Index    Index          `json:"index"`
 }
 
-type Variant struct {
-	Size     int      `json:"size"`
-	Config   Config   `json:"config"`
-	Platform Platform `json:"platform"`
+type ImageVariant struct {
+	Size     int                `json:"size"`
+	Config   ImageVariantConfig `json:"config"`
+	Platform Platform           `json:"platform"`
 }
 
-type Config struct {
-	Config       ContainerConfig `json:"config"`
-	Rootfs       Rootfs          `json:"rootfs"`
-	History      []HistoryEntry  `json:"history"`
-	Architecture string          `json:"architecture"`
-	Created      time.Time       `json:"created"`
-	OS           string          `json:"os"`
+type ImageVariantConfig struct {
+	Config       ImageVariantContainerConfig `json:"config"`
+	Rootfs       Rootfs                      `json:"rootfs"`
+	History      []HistoryEntry              `json:"history"`
+	Architecture string                      `json:"architecture"`
+	Created      time.Time                   `json:"created"`
+	OS           string                      `json:"os"`
 }
 
-type ContainerConfig struct {
+type ImageVariantContainerConfig struct {
 	Cmd        []string          `json:"Cmd,omitempty"`
 	WorkingDir string            `json:"WorkingDir,omitempty"`
 	Labels     map[string]string `json:"Labels,omitempty"`
@@ -150,4 +150,21 @@ type Index struct {
 	Digest      string            `json:"digest"`
 	MediaType   string            `json:"mediaType"`
 	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
+type Network struct {
+	ID     string        `json:"id"`
+	State  string        `json:"state"`
+	Status NetworkStatus `json:"status"`
+	Config NetworkConfig `json:"config"`
+}
+
+type NetworkConfig struct {
+	ID   string `json:"id"`
+	Mode string `json:"mode"`
+}
+
+type NetworkStatus struct {
+	Address string `json:"address"`
+	Gateway string `json:"gateway"`
 }

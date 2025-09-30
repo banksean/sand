@@ -15,11 +15,21 @@ type SystemSvc struct{}
 // System is a service interface to interact with the apple container system.
 var System SystemSvc
 
+// Version returns the version string for the "container" command, or an error.
+func (s *SystemSvc) Version(ctx context.Context) (string, error) {
+	cmd := exec.CommandContext(ctx, "container", "--verison")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(output)), nil
+}
+
 // Status returns the output of `container system status`, or an error.
 func (s *SystemSvc) Status(ctx context.Context, opts options.SystemStatus) (string, error) {
 	args := options.ToArgs(opts)
-	cmd := exec.Command("container", append([]string{"system", "status"}, args...)...)
-	output, err := cmd.Output()
+	cmd := exec.CommandContext(ctx, "container", append([]string{"system", "status"}, args...)...)
+	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", err
 	}
@@ -29,8 +39,8 @@ func (s *SystemSvc) Status(ctx context.Context, opts options.SystemStatus) (stri
 // Start starts the container system. It returns the output of the command, or an error.
 func (s *SystemSvc) Start(ctx context.Context, opts options.SystemStart) (string, error) {
 	args := options.ToArgs(opts)
-	cmd := exec.Command("container", append([]string{"system", "start"}, args...)...)
-	output, err := cmd.Output()
+	cmd := exec.CommandContext(ctx, "container", append([]string{"system", "start"}, args...)...)
+	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", err
 	}
@@ -40,8 +50,8 @@ func (s *SystemSvc) Start(ctx context.Context, opts options.SystemStart) (string
 // Stop stops the container system. It returns the output of the command, or an error.
 func (s *SystemSvc) Stop(ctx context.Context, opts options.SystemStop) (string, error) {
 	args := options.ToArgs(opts)
-	cmd := exec.Command("container", append([]string{"system", "stop"}, args...)...)
-	output, err := cmd.Output()
+	cmd := exec.CommandContext(ctx, "container", append([]string{"system", "stop"}, args...)...)
+	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", err
 	}
