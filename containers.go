@@ -80,7 +80,7 @@ func (c *ContainerSvc) Create(ctx context.Context, opts options.CreateContainer,
 	args = append([]string{"create"}, append(args, imageName)...)
 	cmd := exec.CommandContext(ctx, "container", append(args, initArgs...)...)
 	slog.InfoContext(ctx, "ContainerSvc.Create", "cmd", strings.Join(cmd.Args, " "))
-	output, err := cmd.Output()
+	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return string(output), err
 	}

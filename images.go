@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"strings"
 
+	"github.com/banksean/apple-container/options"
 	"github.com/banksean/apple-container/types"
 )
 
@@ -44,4 +46,15 @@ func (i *ImagesSvc) Inspect(ctx context.Context, name string) ([]*types.ImageMan
 		return nil, fmt.Errorf("no image entries found in inspect output")
 	}
 	return entries, nil
+}
+
+// Build builds an image.
+func (i *ImagesSvc) Build(ctx context.Context, opts options.BuildOptions) (string, error) {
+	args := options.ToArgs(opts)
+	cmd := exec.Command("container", append([]string{"build"}, args...)...)
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(output)), nil
 }

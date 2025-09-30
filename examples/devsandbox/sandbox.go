@@ -23,9 +23,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	ac "github.com/banksean/apple-container"
 	"github.com/banksean/apple-container/options"
+	"github.com/google/uuid"
 )
 
 type SandBoxer struct {
@@ -43,7 +45,7 @@ func NewSandBoxer(cloneRoot, imageName string) *SandBoxer {
 }
 
 func (sb *SandBoxer) NewSandbox(ctx context.Context, hostWorkDir string) (*SandBox, error) {
-	id := fmt.Sprintf("%d", len(sb.sandBoxes))
+	id := uuid.NewString()
 	if err := sb.cloneWorkDir(ctx, id, hostWorkDir); err != nil {
 		return nil, err
 	}
@@ -82,11 +84,23 @@ func (sb *SandBoxer) Cleanup(ctx context.Context, sbox *SandBox) error {
 // cloneWorkDir creates a recursive, copy-on-write copy of hostWorkDir, under the sandboxer's root directory.
 // "cp -c" uses APFS's clonefile(2) function to make the destination dir contents be COW.
 func (sb *SandBoxer) cloneWorkDir(ctx context.Context, id, hostWorkDir string) error {
+	os.MkdirAll(filepath.Join(sb.cloneRoot, "/", id), 0750)
 	cmd := exec.CommandContext(ctx, "cp", "-Rc", hostWorkDir, filepath.Join(sb.cloneRoot, "/", id))
-	slog.InfoContext(ctx, "cloneWorkDir", "cmd", cmd.Args)
+	slog.InfoContext(ctx, "cloneWorkDir", "cmd", strings.Join(cmd.Args, " "))
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		slog.InfoContext(ctx, "cloneWorkDir", "error", err, "output", output)
+		return err
+	}
+	return nil
+}
+
+func (sb *SandBoxer) cloneDotClaude(ctx context.Context, id, hostWorkDir string) error {
+	cmd := exec.CommandContext(ctx, "cp", "-Rc", filepath.Join(os.Getenv("HOME"), ".claude"), filepath.Join(sb.cloneRoot, "/", id+".claude"))
+	slog.InfoContext(ctx, "cloneDotClaude", "cmd", cmd.Args)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		slog.InfoContext(ctx, "cloneDotClaude", "error", err, "output", output)
 		return err
 	}
 	return nil
@@ -111,7 +125,10 @@ func (sb *SandBox) createContainer(ctx context.Context) error {
 			ManagementOptions: options.ManagementOptions{
 				Name:   "sandbox-" + sb.id,
 				Remove: *rm,
-				Mount:  fmt.Sprintf(`type=bind,source=%s,target=/app`, sb.sandboxWorkDir),
+				Mount: []string{
+					fmt.Sprintf(`type=bind,source=%s,target=/app`, sb.sandboxWorkDir),
+					fmt.Sprintf(`type=bind,source=%s/.claude,target=/home/node,readonly`, os.Getenv("HOME")),
+				},
 			},
 		},
 		sb.imageName, nil)
@@ -151,13 +168,39 @@ func (sb *SandBox) shellExec(ctx context.Context, shellCmd string, stdin io.Read
 }
 
 var (
-	rm          = flag.Bool("rm", false, "remove the container on exit")
+	rm          = flag.Bool("rm", true, "remove the container on exit")
 	attachTo    = flag.String("attach", "", "sandbox ID to re-connect to")
-	imageName   = flag.String("image", "ghcr.io/linuxcontainers/alpine:latest", "name of container image to use")
+	imageName   = flag.String("image", "claude-code-sandbox:latest", "name of container image to use")
 	shellCmd    = flag.String("shell", "/bin/sh", "shell command to exec in the container")
 	logLevelStr = flag.String("loglevel", "error", "Set the logging level (debug, info, warn, error)")
 	logFile     = flag.String("log", "", "location of log file (leave empty for a random tmp/ path)")
 )
+
+func buildClaudeCodeSandboxImage(ctx context.Context) error {
+	// TODO: make sure these containers have access to whatever configuration and credentials exist for claude code on the host OS.
+	out, err := ac.Images.Build(ctx, options.BuildOptions{
+		File: "./examples/devsandbox/Dockerfile",
+		Tag:  "claude-code-sandbox",
+	})
+	if err != nil {
+		slog.ErrorContext(ctx, "buildSandboxImage: Images.Build", "error", err, "out", out)
+		return err
+	}
+	return nil
+}
+
+func checkForImage(ctx context.Context, imageName string) error {
+	// TODO: make sure these containers have access to whatever configuration and credentials exist for claude code on the host OS.
+	manifests, err := ac.Images.Inspect(ctx, imageName)
+	if err != nil {
+		slog.ErrorContext(ctx, "buildSandboxImage: Images.Build", "error", err, "manifests", len(manifests))
+		return err
+	}
+	if len(manifests) == 0 {
+		return fmt.Errorf("no images named %s ", imageName)
+	}
+	return nil
+}
 
 func initSlog() {
 	var level slog.Level
@@ -201,6 +244,11 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	if err := checkForImage(ctx, *imageName); err != nil {
+		slog.ErrorContext(ctx, "checkForImage", "error", err)
+		os.Exit(1)
+	}
 
 	sber := NewSandBoxer(
 		filepath.Join(os.Getenv("HOME"), "sandboxen"),

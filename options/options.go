@@ -127,7 +127,7 @@ type ManagementOptions struct {
 	// Label adds a key=value label to the container
 	Label map[string]string `flag:"--label"`
 	// Mount adds a mount to the container (format: type=<>,source=<>,target=<>,readonly)
-	Mount string `flag:"--mount"`
+	Mount []string `flag:"--mount"`
 	// Name uses the specified name as the container ID
 	Name string `flag:"--name"`
 	// Netowrk attaches the container to a network
@@ -178,6 +178,37 @@ type ProcessOptions struct {
 	UID string `flag:"--uid"`
 	// WorkDir sets the initial working directory inside the container
 	WorkDir string `flag:"--workdir"`
+}
+
+type BuildOptions struct {
+	// CPUs is the number of CPUs to allocate to the container (default: 2)
+	CPUs int `flag:"--cpus"`
+	// Memory is the amount of memory in bytes, kilobytes (K), megabytes (M), or gigabytes (G) for the container, with MB granularity (default: 2048MB)
+	Memory string `flag:"--memory"`
+	// BuildArg sets build-time variables (format: key=value)
+	BuildArg map[string]string `flag:"--build-arg"`
+	// File is the path to Dockerfile (default: Dockerfile)
+	File string `flag:"--file"`
+	// Label sets a label (format: key=value)
+	Label map[string]string `flag:"--label"`
+	// NoCache disables cache usage
+	NoCache bool `flag:"--no-cache"`
+	// Output is the output configuration for the build (default: type=oci)
+	Output string `flag:"--output"`
+	// Platform adds the platform to the build
+	Platform string `flag:"--platform"`
+	// OS adds the OS type to the build
+	OS string `flag:"--os"`
+	// Arch adds the architecture type to the build
+	Arch string `flag:"--arch"`
+	// Progress is the progress type - one of [auto|plain|tty] (default: auto)
+	Progress string `flag:"--progress"`
+	// VsockPort is the builder-shim vsock port (default: 8088)
+	VsockPort int `flag:"--vsock-port"`
+	// Tag is the name for the built image
+	Tag string `flag:"--tag"`
+	// Target sets the target build stage
+	Target string `flag:"--target"`
 }
 
 // ToArgs creates an array of strings that you can pass to exec.Command(...) as CLI args.
