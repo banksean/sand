@@ -65,7 +65,7 @@ func (sb *SandBoxer) AttachSandbox(ctx context.Context, id string) (*SandBox, er
 		hostWorkDir:    "", // we don't know this any more.
 		sandboxWorkDir: filepath.Join(sb.cloneRoot, id),
 		imageName:      sb.imageName,
-		containerID:    id,
+		containerID:    "sandbox-" + id,
 	}
 
 	return ret, nil
