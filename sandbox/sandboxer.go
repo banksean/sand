@@ -84,7 +84,9 @@ func (sb *SandBoxer) Cleanup(ctx context.Context, sbox *SandBox) error {
 // cloneWorkDir creates a recursive, copy-on-write copy of hostWorkDir, under the sandboxer's root directory.
 // "cp -c" uses APFS's clonefile(2) function to make the destination dir contents be COW.
 func (sb *SandBoxer) cloneWorkDir(ctx context.Context, id, hostWorkDir string) error {
-	os.MkdirAll(filepath.Join(sb.cloneRoot, "/", id), 0750)
+	if err := os.MkdirAll(filepath.Join(sb.cloneRoot), 0750); err != nil {
+		return err
+	}
 	cmd := exec.CommandContext(ctx, "cp", "-Rc", hostWorkDir, filepath.Join(sb.cloneRoot, "/", id))
 	slog.InfoContext(ctx, "cloneWorkDir", "cmd", strings.Join(cmd.Args, " "))
 	output, err := cmd.CombinedOutput()

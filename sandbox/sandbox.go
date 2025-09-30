@@ -36,7 +36,8 @@ func (sb *SandBox) CreateContainer(ctx context.Context) error {
 				Name:   "sandbox-" + sb.id,
 				Remove: true, // TODO: make this a field on either SandBox or SandBoxer so we can set it on the cli via flags.
 				Mount: []string{
-					fmt.Sprintf(`type=bind,source=%s/.claude,target=/home/node/.claude,readonly`, os.Getenv("HOME")),
+					// TODO: figure out how to clone these settings into the container and actually have them work.
+					// fmt.Sprintf(`type=bind,source=%s/.claude,target=/home/node/.claude,readonly`, os.Getenv("HOME")),
 					fmt.Sprintf(`type=bind,source=%s,target=/app`, sb.sandboxWorkDir),
 				},
 			},
