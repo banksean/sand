@@ -1,5 +1,4 @@
 # TODO: tune this to work more seamlessly with macOS, user settings etc
-# - add go toolchain
 # - add git config user.name/email from host
 # - add ssh keys from host
 # - add gh auth from host
@@ -12,6 +11,8 @@ ARG TZ
 ENV TZ="$TZ"
 
 ARG CLAUDE_CODE_VERSION=latest
+# TODO: get this from a build arg, passed in from sandboxer, based on whatever is in the cloned dir's go.mod
+ARG GO_VERSION=1.24.1
 
 # Install basic development tools and iptables/ipset
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -34,6 +35,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   nano \
   vim \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Install Go toolchain
+RUN ARCH=$(dpkg --print-architecture) && \
+  case "$ARCH" in \
+    amd64) GO_ARCH="amd64" ;; \
+    arm64) GO_ARCH="arm64" ;; \
+    *) echo "Unsupported architecture: $ARCH" && exit 1 ;; \
+  esac && \
+  wget "https://go.dev/dl/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz" && \
+  tar -C /usr/local -xzf "go${GO_VERSION}.linux-${GO_ARCH}.tar.gz" && \
+  rm "go${GO_VERSION}.linux-${GO_ARCH}.tar.gz"
+
+# Add Go to PATH
+ENV PATH=$PATH:/usr/local/go/bin
+ENV GOPATH=/home/node/go
+ENV PATH=$PATH:$GOPATH/bin
 
 # Ensure default node user has access to /usr/local/share
 RUN mkdir -p /usr/local/share/npm-global && \
