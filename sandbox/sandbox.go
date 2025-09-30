@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
 
 	ac "github.com/banksean/apple-container"
 	"github.com/banksean/apple-container/options"
@@ -35,10 +36,21 @@ func (sb *SandBox) CreateContainer(ctx context.Context) error {
 			ManagementOptions: options.ManagementOptions{
 				Name:   "sandbox-" + sb.id,
 				Remove: true, // TODO: make this a field on either SandBox or SandBoxer so we can set it on the cli via flags.
+				// Mounting the host user's entire home dir readonly is overkill here, since what we really want is to
+				// mount "~/.gitconfig:/home/node/.gitconfig:ro" but when I try to do that here, it fails with:
+				// 	"Error Domain=VZErrorDomain Code=2 "A directory sharing device configuration is invalid."
+				// 	UserInfo={NSLocalizedFailure=Invalid virtual machine configuration.,
+				//	NSLocalizedFailureReason=A directory sharing device configuration is invalid.,
+				// 	NSUnderlyingError=0xa6507c060 {Error Domain=NSPOSIXErrorDomain Code=20 "Not a directory"}}"
+
+				//Volume: fmt.Sprintf(`%s:/home/hostuserhome:ro`, home), // ro makes it readonly
+
+				// Mounting an entirely new home dir doesn't really do what we want either.
+				//Volume: fmt.Sprintf(`%s:/home/node`, filepath.Join(sb.sandboxWorkDir, "home")),
 				Mount: []string{
 					// TODO: figure out how to clone these settings into the container and actually have them work.
 					// fmt.Sprintf(`type=bind,source=%s/.claude,target=/home/node/.claude,readonly`, os.Getenv("HOME")),
-					fmt.Sprintf(`type=bind,source=%s,target=/app`, sb.sandboxWorkDir),
+					fmt.Sprintf(`type=bind,source=%s,target=/app`, filepath.Join(sb.sandboxWorkDir, "app")),
 				},
 			},
 		},

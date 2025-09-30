@@ -84,16 +84,33 @@ func (sb *SandBoxer) Cleanup(ctx context.Context, sbox *SandBox) error {
 // cloneWorkDir creates a recursive, copy-on-write copy of hostWorkDir, under the sandboxer's root directory.
 // "cp -c" uses APFS's clonefile(2) function to make the destination dir contents be COW.
 func (sb *SandBoxer) cloneWorkDir(ctx context.Context, id, hostWorkDir string) error {
-	if err := os.MkdirAll(filepath.Join(sb.cloneRoot), 0750); err != nil {
+	if err := os.MkdirAll(filepath.Join(sb.cloneRoot, id), 0750); err != nil {
 		return err
 	}
-	cmd := exec.CommandContext(ctx, "cp", "-Rc", hostWorkDir, filepath.Join(sb.cloneRoot, "/", id))
+	cmd := exec.CommandContext(ctx, "cp", "-Rc", hostWorkDir, filepath.Join(sb.cloneRoot, "/", id, "app"))
 	slog.InfoContext(ctx, "cloneWorkDir", "cmd", strings.Join(cmd.Args, " "))
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		slog.InfoContext(ctx, "cloneWorkDir", "error", err, "output", output)
 		return err
 	}
+	return nil
+}
+
+// This is not used - and probably shouldn't be.  Need to re-think how to get various user config details into the container.
+func (sb *SandBoxer) cloneHomeDirStuff(ctx context.Context, id, hostWorkDir string) error {
+	if err := os.MkdirAll(filepath.Join(sb.cloneRoot, id, "home"), 0750); err != nil {
+		return err
+	}
+	home := os.Getenv("HOME")
+	cmd := exec.CommandContext(ctx, "cp", "-Rc", filepath.Join(home, ".gitconfig"), filepath.Join(sb.cloneRoot, "/", id, "home", ".gitconfig"))
+	slog.InfoContext(ctx, "cloneHomeDirStuff", "cmd", strings.Join(cmd.Args, " "))
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		slog.InfoContext(ctx, "cloneHomeDirStuff", "error", err, "output", output)
+		return err
+	}
+
 	return nil
 }
 

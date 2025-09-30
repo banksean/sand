@@ -93,7 +93,7 @@ func (c *ContainerSvc) Start(ctx context.Context, opts options.StartContainer, i
 	args = append([]string{"start"}, append(args, id)...)
 	cmd := exec.CommandContext(ctx, "container", args...)
 	slog.InfoContext(ctx, "ContainerSvc.Start", "cmd", strings.Join(cmd.Args, " "))
-	output, err := cmd.Output()
+	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", err
 	}

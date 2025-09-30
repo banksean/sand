@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"path/filepath"
 
 	"github.com/banksean/apple-container/sandbox"
 )
@@ -30,12 +29,13 @@ const (
 )
 
 var (
-	attachTo    = flag.String("attach", "", "sandbox ID to re-connect to")
-	imageName   = flag.String("image", sandbox.DefaultImageName, "name of container image to use")
-	dockerFile  = flag.String("dockerfile", DefaultDockerFile, "location of docker file to build the image locally")
-	shellCmd    = flag.String("shell", "/bin/zsh", "shell command to exec in the container")
-	logLevelStr = flag.String("loglevel", "error", "Set the logging level (debug, info, warn, error)")
-	logFile     = flag.String("log", "", "location of log file (leave empty for a random tmp/ path)")
+	attachTo         = flag.String("attach", "", "sandbox ID to re-connect to")
+	sandboxCloneRoot = flag.String("sandboxen", "/tmp/sandboxen", "root dir to store sandbox data")
+	imageName        = flag.String("image", sandbox.DefaultImageName, "name of container image to use")
+	dockerFile       = flag.String("dockerfile", DefaultDockerFile, "location of docker file to build the image locally")
+	shellCmd         = flag.String("shell", "/bin/zsh", "shell command to exec in the container")
+	logLevelStr      = flag.String("loglevel", "error", "Set the logging level (debug, info, warn, error)")
+	logFile          = flag.String("log", "", "location of log file (leave empty for a random tmp/ path)")
 )
 
 func initSlog() {
@@ -82,7 +82,7 @@ func main() {
 	defer cancel()
 
 	sber := sandbox.NewSandBoxer(
-		filepath.Join(os.Getenv("HOME"), "sandboxen"),
+		*sandboxCloneRoot,
 		*imageName,
 		*dockerFile,
 	)
