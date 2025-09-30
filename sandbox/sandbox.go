@@ -16,6 +16,9 @@ const (
 	DefaultImageName = "claude-code-sandbox"
 )
 
+// SandBox connects a local container instance to a dedicated, persistent local storage volume.
+// Dedicated local storage volumes are visible to the host OS, regardless of the current state of the container.
+// We can "revive" a SandBox by starting a new container that mounts a previously-used local storage volume
 type SandBox struct {
 	id          string
 	containerID string

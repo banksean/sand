@@ -58,6 +58,7 @@ func (sb *SandBoxer) NewSandbox(ctx context.Context, hostWorkDir string) (*SandB
 	return ret, nil
 }
 
+// AttachSandbox re-connects to an existing container and sandboxWorkDir instead of creating a new one.
 func (sb *SandBoxer) AttachSandbox(ctx context.Context, id string) (*SandBox, error) {
 	slog.InfoContext(ctx, "SandBoxer.AttachSandbox", "id", id)
 	ret := &SandBox{
