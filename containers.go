@@ -152,7 +152,6 @@ func (c *ContainerSvc) Exec(ctx context.Context, opts options.ExecContainer, con
 	args = append(args, append([]string{containerID, command}, cmdArgs...)...)
 	cmd := exec.CommandContext(ctx, "container", append([]string{"exec"}, args...)...)
 	slog.InfoContext(ctx, "ContainerSvc.Exec", "cmd", strings.Join(cmd.Args, " "))
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Env = env
 	checkTerminal := false
 	stdinFile, ok := stdin.(*os.File)
@@ -185,7 +184,9 @@ func (c *ContainerSvc) Exec(ctx context.Context, opts options.ExecContainer, con
 	return func() error {
 		slog.InfoContext(ctx, "ContainerSvc.Exec wait")
 		err := cmd.Wait()
-		slog.ErrorContext(ctx, "ContainerSvc.Exec wait", "error", err)
+		if err != nil {
+			slog.ErrorContext(ctx, "ContainerSvc.Exec wait", "error", err)
+		}
 		return err
 	}, nil
 }

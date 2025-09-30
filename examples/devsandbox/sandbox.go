@@ -1,14 +1,16 @@
-// command sandbox creates and lanuches a containerized sandobx dev environment.
+// command devsandbox manages containerized dev sandobx environments on MacOS
 //
-// On startup, it:
-// - creates a copy-on-write clone of the current working directory in ~/sandboxen/${id} on the MacOS host
-// - creates a new container instance with ~/sandboxen/${id} mounted to /app in the container, using bind-mode
-// - starts the container
-// - execs a shell in the container and connects this process's stdio to that shell in the container
+// On startup, devsandbox will:
+// - if --attach=${id} is not set:
+//   - choose a new unused ${id}
+//   - create a new copy-on-write clone of the current working directory in ~/sandboxen/${id} on the MacOS host
+//   - create a new container instance with name ${id} and ~/sandboxen/${id} mounted to /app in the container, using bind-mode
+// - start container named ${id}
+// - exec a shell in the container and connect this process's stdio to that shell in the container
 //
-// On shut down, it:
-// - stops the container
-// - deletes the container
+// On exit, devsandbox will
+// - stop the container named ${id}
+// - if --rm is set, delete the container
 
 package main
 
@@ -20,32 +22,24 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
-	"os/signal"
 	"path/filepath"
-	"strings"
-	"syscall"
-	"time"
 
 	ac "github.com/banksean/apple-container"
 	"github.com/banksean/apple-container/options"
 )
 
-/*
-HOST_WORKDIR is the directory from which we are working, on the host machine's filesystem.
-SANDBOX_ROOT is a directory on the host machine's filesystem where we will store the sandboxes' roots.
-SANDBOX_ID is an opaque identifier for a sandbox, e.g. a GUID
-CONTAINER_IMAGE is the container image name, e.g. ghcr.io/linuxcontainers/alpine:latest
-
-Steps to create a sandbox:
-cp -Rc $HOST_WORKDIR $SANDBOX_ROOT/$SANDBOX_ID
-container create --interactive --tty --mount type=bind,source=$SANDBOX_ROOT/$SANDBOX_ID,target=/app \
-	--remove --name sandbox-$SANDBOX_ID $CONTAINER_IMAGE
-*/
-
 type SandBoxer struct {
-	sandboxHostRootDir string
-	sandBoxes          map[string]*SandBox
-	imageName          string
+	cloneRoot string
+	sandBoxes map[string]*SandBox
+	imageName string
+}
+
+func NewSandBoxer(cloneRoot, imageName string) *SandBoxer {
+	return &SandBoxer{
+		cloneRoot: cloneRoot,
+		sandBoxes: map[string]*SandBox{},
+		imageName: imageName,
+	}
 }
 
 func (sb *SandBoxer) NewSandbox(ctx context.Context, hostWorkDir string) (*SandBox, error) {
@@ -57,9 +51,23 @@ func (sb *SandBoxer) NewSandbox(ctx context.Context, hostWorkDir string) (*SandB
 	ret := &SandBox{
 		id:             id,
 		hostWorkDir:    hostWorkDir,
-		sandboxWorkDir: filepath.Join(sb.sandboxHostRootDir, id),
+		sandboxWorkDir: filepath.Join(sb.cloneRoot, id),
 		imageName:      sb.imageName,
 	}
+	sb.sandBoxes[id] = ret
+	return ret, nil
+}
+
+func (sb *SandBoxer) AttachSandbox(ctx context.Context, id string) (*SandBox, error) {
+	slog.InfoContext(ctx, "SandBoxer.AttachSandbox", "id", id)
+	ret := &SandBox{
+		id:             id,
+		hostWorkDir:    "", // we don't know this any more.
+		sandboxWorkDir: filepath.Join(sb.cloneRoot, id),
+		imageName:      sb.imageName,
+		containerID:    id,
+	}
+
 	return ret, nil
 }
 
@@ -74,7 +82,7 @@ func (sb *SandBoxer) Cleanup(ctx context.Context, sbox *SandBox) error {
 // cloneWorkDir creates a recursive, copy-on-write copy of hostWorkDir, under the sandboxer's root directory.
 // "cp -c" uses APFS's clonefile(2) function to make the destination dir contents be COW.
 func (sb *SandBoxer) cloneWorkDir(ctx context.Context, id, hostWorkDir string) error {
-	cmd := exec.CommandContext(ctx, "cp", "-Rc", hostWorkDir, filepath.Join(sb.sandboxHostRootDir, "/", id))
+	cmd := exec.CommandContext(ctx, "cp", "-Rc", hostWorkDir, filepath.Join(sb.cloneRoot, "/", id))
 	slog.InfoContext(ctx, "cloneWorkDir", "cmd", cmd.Args)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -102,7 +110,7 @@ func (sb *SandBox) createContainer(ctx context.Context) error {
 			},
 			ManagementOptions: options.ManagementOptions{
 				Name:   "sandbox-" + sb.id,
-				Remove: true,
+				Remove: *rm,
 				Mount:  fmt.Sprintf(`type=bind,source=%s,target=/app`, sb.sandboxWorkDir),
 			},
 		},
@@ -125,97 +133,7 @@ func (sb *SandBox) startContainer(ctx context.Context) error {
 	return nil
 }
 
-// Just print out a pasteable shell command to connect to this sandbox.
-func (sb *SandBox) shellPrint(ctx context.Context, shellCmd string, stdin io.Reader, stdout, stderr io.Writer) error {
-	execOpts :=
-		options.ExecContainer{
-			ProcessOptions: options.ProcessOptions{
-				Interactive: true,
-				TTY:         true,
-				WorkDir:     "/app",
-			},
-		}
-	fmt.Printf("container exec %s %s %s\n", strings.Join(options.ToArgs(execOpts), " "), sb.containerID, shellCmd)
-	select {
-	case <-time.After(time.Hour):
-	case <-ctx.Done():
-	}
-
-	return nil
-}
-
-// TODO: fix the stdio-related hanging issue
 func (sb *SandBox) shellExec(ctx context.Context, shellCmd string, stdin io.Reader, stdout, stderr io.Writer) error {
-	// bufIn := bufio.NewReader(stdin)
-	// bufOut := bufio.NewWriter(stdout)
-	// bufErr := bufio.NewWriter(stderr)
-
-	// Create a pipe to monitor stdin
-	if true {
-		prIn, pwIn := io.Pipe()
-		prOut, pwOut := io.Pipe()
-		prErr, pwErr := io.Pipe()
-
-		// Monitor stdin in a goroutine
-		// TODO: replace this with buffered IO. I suspect that is how this debug logging managed to fix stdin handling.
-		go func() {
-			defer pwIn.Close()
-			buf := make([]byte, 1024)
-			for {
-				n, err := stdin.Read(buf)
-				if err != nil {
-					if err != io.EOF {
-						slog.ErrorContext(ctx, "stdin read error", "error", err)
-					}
-					return
-				}
-				if _, err := pwIn.Write(buf[:n]); err != nil {
-					slog.ErrorContext(ctx, "stdin write error", "error", err)
-					return
-				}
-			}
-		}()
-
-		go func() {
-			defer pwOut.Close()
-			buf := make([]byte, 1024)
-			for {
-				n, err := prOut.Read(buf)
-				if err != nil {
-					if err != io.EOF {
-						slog.ErrorContext(ctx, "stdout read error", "error", err)
-					}
-					return
-				}
-				if _, err := stdout.Write(buf[:n]); err != nil {
-					slog.ErrorContext(ctx, "stdout write error", "error", err)
-					return
-				}
-			}
-		}()
-
-		go func() {
-			defer pwErr.Close()
-			buf := make([]byte, 1024)
-			for {
-				n, err := prErr.Read(buf)
-				if err != nil {
-					if err != io.EOF {
-						slog.ErrorContext(ctx, "stderr read error", "error", err)
-					}
-					return
-				}
-				if _, err := stderr.Write(buf[:n]); err != nil {
-					slog.ErrorContext(ctx, "stderr write error", "error", err)
-					return
-				}
-			}
-		}()
-
-		stdin = prIn
-		// stdout = pwOut
-		// stderr = pwErr
-	}
 	wait, err := ac.Containers.Exec(ctx,
 		options.ExecContainer{
 			ProcessOptions: options.ProcessOptions{
@@ -225,24 +143,16 @@ func (sb *SandBox) shellExec(ctx context.Context, shellCmd string, stdin io.Read
 			},
 		}, sb.containerID, shellCmd, os.Environ(), stdin, stdout, stderr)
 	if err != nil {
+		slog.ErrorContext(ctx, "shell: ac.Containers.Exec", "error", err)
 		return err
 	}
-	slog.InfoContext(ctx, "shell: waiting for Exec to finish")
-	errCh := make(chan error)
-	go func() {
-		errCh <- wait()
-	}()
-	select {
-	case <-ctx.Done():
-		slog.InfoContext(ctx, "shell: context canceled")
-		return ctx.Err()
-	case err := <-errCh:
-		slog.InfoContext(ctx, "shell: errCh", "error", err)
-		return err
-	}
+
+	return wait()
 }
 
 var (
+	rm          = flag.Bool("rm", false, "remove the container on exit")
+	attachTo    = flag.String("attach", "", "sandbox ID to re-connect to")
 	imageName   = flag.String("image", "ghcr.io/linuxcontainers/alpine:latest", "name of container image to use")
 	shellCmd    = flag.String("shell", "/bin/sh", "shell command to exec in the container")
 	logLevelStr = flag.String("loglevel", "error", "Set the logging level (debug, info, warn, error)")
@@ -288,53 +198,49 @@ func initSlog() {
 func main() {
 	flag.Parse()
 	initSlog()
+
 	ctx, cancel := context.WithCancel(context.Background())
-	sber := &SandBoxer{
-		sandboxHostRootDir: filepath.Join(os.Getenv("HOME"), "sandboxen"),
-		imageName:          *imageName,
-	}
+	defer cancel()
+
+	sber := NewSandBoxer(
+		filepath.Join(os.Getenv("HOME"), "sandboxen"),
+		*imageName,
+	)
+
 	cwd, err := os.Getwd()
 	if err != nil {
 		slog.ErrorContext(ctx, "os.Getwd", "error", err)
 		os.Exit(1)
 	}
-	sbox, err := sber.NewSandbox(ctx, cwd)
-	if err != nil {
-		slog.ErrorContext(ctx, "sber.NewSandbox", "error", err)
-		os.Exit(1)
-	}
-
-	// Create a channel to receive OS signals
-	sigChan := make(chan os.Signal, 1)
-	// Register the channel to receive SIGINT (Ctrl+C) and SIGTERM
-	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
-
-	// Start a goroutine to handle the signal
-	go func() {
-		sig := <-sigChan
-		slog.InfoContext(ctx, "Received signal; performing cleanup", "sig", sig)
-
-		if err := sber.Cleanup(ctx, sbox); err != nil {
-			slog.ErrorContext(ctx, "sber.Cleanup", "error", err)
+	var sbox *SandBox
+	if *attachTo == "" {
+		sbox, err = sber.NewSandbox(ctx, cwd)
+		if err != nil {
+			slog.ErrorContext(ctx, "sber.NewSandbox", "error", err)
+			os.Exit(1)
 		}
-		slog.InfoContext(ctx, "Cleanup complete. Exiting.")
-		cancel()
-		os.Exit(1)
-	}()
 
-	// Now create and start the container, then exec the shell command and attach stdio to it:
-	if err := sbox.createContainer(ctx); err != nil {
-		slog.ErrorContext(ctx, "sbox.createContainer", "error", err)
-		os.Exit(1)
+		slog.InfoContext(ctx, "main: sbox.createContainer")
+		if err := sbox.createContainer(ctx); err != nil {
+			slog.ErrorContext(ctx, "sbox.createContainer", "error", err)
+			os.Exit(1)
+		}
+	} else {
+		sbox, err = sber.AttachSandbox(ctx, *attachTo)
+		if err != nil {
+			slog.ErrorContext(ctx, "sber.AttachSandbox", "error", err)
+			os.Exit(1)
+		}
 	}
 
+	slog.InfoContext(ctx, "main: sbox.startContainer")
 	if err := sbox.startContainer(ctx); err != nil {
 		slog.ErrorContext(ctx, "sbox.startContainer", "error", err)
 		os.Exit(1)
 	}
 
 	slog.InfoContext(ctx, "main: sbox.shell starting")
-	if err := sbox.shellPrint(ctx, *shellCmd, os.Stdin, os.Stdout, os.Stderr); err != nil {
+	if err := sbox.shellExec(ctx, *shellCmd, os.Stdin, os.Stdout, os.Stderr); err != nil {
 		slog.ErrorContext(ctx, "sbox.shell", "error", err)
 	}
 
