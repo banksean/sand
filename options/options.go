@@ -246,7 +246,14 @@ func ToArgs(s any) []string {
 		}
 		flagValue := ""
 		fieldKind := field.Type.Kind()
-		if fieldKind == reflect.Map {
+		if fieldKind == reflect.Array || fieldKind == reflect.Slice {
+			for i := 0; i < fv.Len(); i++ {
+				av := fv.Index(i)
+				ret = append(ret, flagName)
+				ret = append(ret, fmt.Sprintf("%v", av))
+			}
+			continue
+		} else if fieldKind == reflect.Map {
 			mapVals := []string{}
 			m := v.Interface().(map[string]string)
 			keyIter := maps.Keys(m)
