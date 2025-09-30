@@ -15,219 +15,28 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"flag"
 	"fmt"
-	"io"
 	"log/slog"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 
-	ac "github.com/banksean/apple-container"
-	"github.com/banksean/apple-container/options"
-	"github.com/google/uuid"
+	"github.com/banksean/apple-container/sandbox"
 )
 
-const defaultImageName = "claude-code-sandbox"
+const (
+	DefaultDockerFile = "./examples/devsandbox/Dockerfile"
+)
 
 var (
-	rm          = flag.Bool("rm", true, "remove the container on exit")
 	attachTo    = flag.String("attach", "", "sandbox ID to re-connect to")
-	imageName   = flag.String("image", defaultImageName, "name of container image to use")
+	imageName   = flag.String("image", sandbox.DefaultImageName, "name of container image to use")
+	dockerFile  = flag.String("dockerfile", DefaultDockerFile, "location of docker file to build the image locally")
 	shellCmd    = flag.String("shell", "/bin/zsh", "shell command to exec in the container")
 	logLevelStr = flag.String("loglevel", "error", "Set the logging level (debug, info, warn, error)")
 	logFile     = flag.String("log", "", "location of log file (leave empty for a random tmp/ path)")
 )
-
-type SandBoxer struct {
-	cloneRoot string
-	sandBoxes map[string]*SandBox
-	imageName string
-}
-
-func NewSandBoxer(cloneRoot, imageName string) *SandBoxer {
-	return &SandBoxer{
-		cloneRoot: cloneRoot,
-		sandBoxes: map[string]*SandBox{},
-		imageName: imageName,
-	}
-}
-
-func (sb *SandBoxer) NewSandbox(ctx context.Context, hostWorkDir string) (*SandBox, error) {
-	id := uuid.NewString()
-	if err := sb.cloneWorkDir(ctx, id, hostWorkDir); err != nil {
-		return nil, err
-	}
-
-	ret := &SandBox{
-		id:             id,
-		hostWorkDir:    hostWorkDir,
-		sandboxWorkDir: filepath.Join(sb.cloneRoot, id),
-		imageName:      sb.imageName,
-	}
-	sb.sandBoxes[id] = ret
-	return ret, nil
-}
-
-func (sb *SandBoxer) AttachSandbox(ctx context.Context, id string) (*SandBox, error) {
-	slog.InfoContext(ctx, "SandBoxer.AttachSandbox", "id", id)
-	ret := &SandBox{
-		id:             id,
-		hostWorkDir:    "", // we don't know this any more.
-		sandboxWorkDir: filepath.Join(sb.cloneRoot, id),
-		imageName:      sb.imageName,
-		containerID:    "sandbox-" + id,
-	}
-
-	return ret, nil
-}
-
-func (sb *SandBoxer) Cleanup(ctx context.Context, sbox *SandBox) error {
-	out, err := ac.Containers.Stop(ctx, options.StopContainer{}, sbox.containerID)
-	if err != nil {
-		slog.ErrorContext(ctx, "SandBoxer.Cleanup", "error", err, "out", out)
-	}
-	return nil
-}
-
-// cloneWorkDir creates a recursive, copy-on-write copy of hostWorkDir, under the sandboxer's root directory.
-// "cp -c" uses APFS's clonefile(2) function to make the destination dir contents be COW.
-func (sb *SandBoxer) cloneWorkDir(ctx context.Context, id, hostWorkDir string) error {
-	os.MkdirAll(filepath.Join(sb.cloneRoot, "/", id), 0750)
-	cmd := exec.CommandContext(ctx, "cp", "-Rc", hostWorkDir, filepath.Join(sb.cloneRoot, "/", id))
-	slog.InfoContext(ctx, "cloneWorkDir", "cmd", strings.Join(cmd.Args, " "))
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		slog.InfoContext(ctx, "cloneWorkDir", "error", err, "output", output)
-		return err
-	}
-	return nil
-}
-
-func (sb *SandBoxer) cloneDotClaude(ctx context.Context, id, hostWorkDir string) error {
-	cmd := exec.CommandContext(ctx, "cp", "-Rc", filepath.Join(os.Getenv("HOME"), ".claude"), filepath.Join(sb.cloneRoot, "/", id+".claude"))
-	slog.InfoContext(ctx, "cloneDotClaude", "cmd", cmd.Args)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		slog.InfoContext(ctx, "cloneDotClaude", "error", err, "output", output)
-		return err
-	}
-	return nil
-}
-
-type SandBox struct {
-	id          string
-	containerID string
-	// hostWorkDir is the origin of the sandbox, from which we clone its contents
-	hostWorkDir    string
-	sandboxWorkDir string
-	imageName      string
-}
-
-func (sb *SandBox) createContainer(ctx context.Context) error {
-	containerID, err := ac.Containers.Create(ctx,
-		options.CreateContainer{
-			ProcessOptions: options.ProcessOptions{
-				Interactive: true,
-				TTY:         true,
-			},
-			ManagementOptions: options.ManagementOptions{
-				Name:   "sandbox-" + sb.id,
-				Remove: *rm,
-				Mount: []string{
-					fmt.Sprintf(`type=bind,source=%s/.claude,target=/home/node/.claude,readonly`, os.Getenv("HOME")),
-					fmt.Sprintf(`type=bind,source=%s,target=/app`, sb.sandboxWorkDir),
-				},
-			},
-		},
-		sb.imageName, nil)
-	if err != nil {
-		slog.ErrorContext(ctx, "createContainer", "error", err, "output", containerID)
-		return err
-	}
-	sb.containerID = containerID
-	return nil
-}
-
-func (sb *SandBox) startContainer(ctx context.Context) error {
-	output, err := ac.Containers.Start(ctx, options.StartContainer{}, sb.containerID)
-	if err != nil {
-		slog.ErrorContext(ctx, "startContainer", "error", err, "output", output)
-		return err
-	}
-	slog.InfoContext(ctx, "startContainer succeeded", "output", output)
-	return nil
-}
-
-func (sb *SandBox) shellExec(ctx context.Context, shellCmd string, stdin io.Reader, stdout, stderr io.Writer) error {
-	wait, err := ac.Containers.Exec(ctx,
-		options.ExecContainer{
-			ProcessOptions: options.ProcessOptions{
-				Interactive: true,
-				TTY:         true,
-				WorkDir:     "/app",
-			},
-		}, sb.containerID, shellCmd, os.Environ(), stdin, stdout, stderr)
-	if err != nil {
-		slog.ErrorContext(ctx, "shell: ac.Containers.Exec", "error", err)
-		return err
-	}
-
-	return wait()
-}
-
-func buildDefaultImage(ctx context.Context) error {
-	outLogs, errLogs, wait, err := ac.Images.Build(ctx, options.BuildOptions{
-		File: "./examples/devsandbox/Dockerfile",
-		Tag:  defaultImageName,
-	})
-	if err != nil {
-		slog.ErrorContext(ctx, "buildSandboxImage: Images.Build", "error", err)
-		return err
-	}
-	defer outLogs.Close()
-
-	go func() {
-		logScanner := bufio.NewScanner(outLogs)
-		for logScanner.Scan() {
-			slog.InfoContext(ctx, "buildDefaultImage", "stdout", logScanner.Text())
-		}
-		if logScanner.Err() != nil {
-			slog.ErrorContext(ctx, "buildDefaultImage", "error", err)
-		}
-	}()
-
-	go func() {
-		logScanner := bufio.NewScanner(errLogs)
-		for logScanner.Scan() {
-			slog.InfoContext(ctx, "buildDefaultImage", "stderr", logScanner.Text())
-		}
-		if logScanner.Err() != nil {
-			slog.ErrorContext(ctx, "buildDefaultImage", "error", err)
-		}
-	}()
-
-	return wait()
-}
-
-func checkForImage(ctx context.Context, imageName string) error {
-	// TODO: make sure these containers have access to whatever configuration and credentials exist for claude code on the host OS.
-	manifests, err := ac.Images.Inspect(ctx, imageName)
-	if err != nil {
-		slog.ErrorContext(ctx, "buildSandboxImage: Images.Build", "error", err, "manifests", len(manifests))
-		if imageName != defaultImageName {
-			return err
-		}
-		return buildDefaultImage(ctx)
-	}
-	if len(manifests) == 0 {
-		return fmt.Errorf("no images named %s ", imageName)
-	}
-	return nil
-}
 
 func initSlog() {
 	var level slog.Level
@@ -272,22 +81,24 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	if err := checkForImage(ctx, *imageName); err != nil {
-		slog.ErrorContext(ctx, "checkForImage", "error", err)
-		os.Exit(1)
-	}
-
-	sber := NewSandBoxer(
+	sber := sandbox.NewSandBoxer(
 		filepath.Join(os.Getenv("HOME"), "sandboxen"),
 		*imageName,
+		*dockerFile,
 	)
+
+	if err := sber.Init(ctx); err != nil {
+		slog.ErrorContext(ctx, "sber.Init", "error", err)
+		os.Exit(1)
+	}
 
 	cwd, err := os.Getwd()
 	if err != nil {
 		slog.ErrorContext(ctx, "os.Getwd", "error", err)
 		os.Exit(1)
 	}
-	var sbox *SandBox
+
+	var sbox *sandbox.SandBox
 	if *attachTo == "" {
 		sbox, err = sber.NewSandbox(ctx, cwd)
 		if err != nil {
@@ -296,7 +107,7 @@ func main() {
 		}
 
 		slog.InfoContext(ctx, "main: sbox.createContainer")
-		if err := sbox.createContainer(ctx); err != nil {
+		if err := sbox.CreateContainer(ctx); err != nil {
 			slog.ErrorContext(ctx, "sbox.createContainer", "error", err)
 			os.Exit(1)
 		}
@@ -309,13 +120,13 @@ func main() {
 	}
 
 	slog.InfoContext(ctx, "main: sbox.startContainer")
-	if err := sbox.startContainer(ctx); err != nil {
+	if err := sbox.StartContainer(ctx); err != nil {
 		slog.ErrorContext(ctx, "sbox.startContainer", "error", err)
 		os.Exit(1)
 	}
 
 	slog.InfoContext(ctx, "main: sbox.shell starting")
-	if err := sbox.shellExec(ctx, *shellCmd, os.Stdin, os.Stdout, os.Stderr); err != nil {
+	if err := sbox.ShellExec(ctx, *shellCmd, os.Stdin, os.Stdout, os.Stderr); err != nil {
 		slog.ErrorContext(ctx, "sbox.shell", "error", err)
 	}
 
