@@ -15,6 +15,11 @@ import (
 	"github.com/google/uuid"
 )
 
+var (
+	// Clone these from ~/ into the container's /hosthome directory.
+	rcFiles = []string{".gitconfig", ".p10k.zsh", ".ssh"}
+)
+
 type SandBoxer struct {
 	cloneRoot       string
 	sandBoxes       map[string]*SandBox
@@ -45,6 +50,10 @@ func (sb *SandBoxer) NewSandbox(ctx context.Context, hostWorkDir string) (*SandB
 	slog.InfoContext(ctx, "SandBoxer.NewSandbox", "hostWorkDir", hostWorkDir, "id", id)
 
 	if err := sb.cloneWorkDir(ctx, id, hostWorkDir); err != nil {
+		return nil, err
+	}
+
+	if err := sb.cloneHomeDirStuff(ctx, id); err != nil {
 		return nil, err
 	}
 
@@ -98,18 +107,39 @@ func (sb *SandBoxer) cloneWorkDir(ctx context.Context, id, hostWorkDir string) e
 	return nil
 }
 
-// This is not used - and probably shouldn't be.  Need to re-think how to get various user config details into the container.
-func (sb *SandBoxer) cloneHomeDirStuff(ctx context.Context, id, hostWorkDir string) error {
+// Clone various known user config settings from $HOME into $cloneRoot/$id/hosthome/...
+// TODO: fix this to work with symlinks (e.g. .zshrc -> code/dotfiles/zsh/.zshrc)
+func (sb *SandBoxer) cloneHomeDirStuff(ctx context.Context, id string) error {
 	if err := os.MkdirAll(filepath.Join(sb.cloneRoot, id, "home"), 0750); err != nil {
 		return err
 	}
 	home := os.Getenv("HOME")
-	cmd := exec.CommandContext(ctx, "cp", "-Rc", filepath.Join(home, ".gitconfig"), filepath.Join(sb.cloneRoot, "/", id, "home", ".gitconfig"))
-	slog.InfoContext(ctx, "cloneHomeDirStuff", "cmd", strings.Join(cmd.Args, " "))
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		slog.InfoContext(ctx, "cloneHomeDirStuff", "error", err, "output", output)
-		return err
+
+	for _, rcFile := range rcFiles {
+		path := filepath.Join(home, rcFile)
+		info, err := os.Lstat(path)
+		if err != nil {
+			continue
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			resolvedTarget, err := os.Readlink(path)
+			if err != nil {
+				slog.InfoContext(ctx, "cloneHomeDirStuff", "error", err)
+				continue
+			}
+			slog.InfoContext(ctx, "cloneHomeDirStuff", "path", path, "resolvedTarget", resolvedTarget)
+			path = resolvedTarget
+			if !filepath.IsAbs(path) {
+				path = filepath.Join(home, path)
+			}
+		}
+		cmd := exec.CommandContext(ctx, "cp", "-Rc", path, filepath.Join(sb.cloneRoot, "/", id, "home", rcFile))
+		slog.InfoContext(ctx, "cloneHomeDirStuff", "cmd", strings.Join(cmd.Args, " "))
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			slog.InfoContext(ctx, "cloneHomeDirStuff", "error", err, "output", output)
+			return err
+		}
 	}
 
 	return nil

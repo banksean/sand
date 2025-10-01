@@ -6,7 +6,9 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 
 	ac "github.com/banksean/apple-container"
 	"github.com/banksean/apple-container/options"
@@ -38,10 +40,11 @@ func (sb *SandBox) CreateContainer(ctx context.Context) error {
 			},
 			ManagementOptions: options.ManagementOptions{
 				Name:   "sandbox-" + sb.id,
+				SSH:    true,
 				Remove: true, // TODO: make this a field on either SandBox or SandBoxer so we can set it on the cli via flags.
 				Mount: []string{
-					// TODO: figure out how to clone these settings into the container and actually have them work.
-					// fmt.Sprintf(`type=bind,source=%s/.claude,target=/home/node/.claude,readonly`, os.Getenv("HOME")),
+					// TODO: copy shit out of /hosthome into the default user's home directory after the container starts up.
+					fmt.Sprintf(`type=bind,source=%s,target=/hosthome`, filepath.Join(sb.sandboxWorkDir, "home")),
 					fmt.Sprintf(`type=bind,source=%s,target=/app`, filepath.Join(sb.sandboxWorkDir, "app")),
 				},
 			},
@@ -62,7 +65,25 @@ func (sb *SandBox) StartContainer(ctx context.Context) error {
 		slog.ErrorContext(ctx, "startContainer", "error", err, "output", output)
 		return err
 	}
+	if err := sb.initHomeDir(ctx); err != nil {
+		slog.ErrorContext(ctx, "startContainer", "error", err)
+		return err
+	}
 	slog.InfoContext(ctx, "startContainer succeeded", "output", output)
+	return nil
+}
+
+func (sb *SandBox) initHomeDir(ctx context.Context) error {
+	for _, rcFile := range rcFiles {
+		cmd := exec.CommandContext(ctx, "container", "exec", sb.containerID, "cp", "-r", "/hosthome/"+rcFile, "/home/node/"+rcFile)
+		slog.InfoContext(ctx, "initHomeDir", "cmd", strings.Join(cmd.Args, " "))
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			slog.ErrorContext(ctx, "initHomeDir", "error", err, "out", out)
+			return err
+		}
+		slog.InfoContext(ctx, "initHomeDir", "out", out)
+	}
 	return nil
 }
 

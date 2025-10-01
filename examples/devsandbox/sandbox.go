@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 
 	"github.com/banksean/apple-container/sandbox"
 )
@@ -62,6 +63,10 @@ func initSlog() {
 			panic(err)
 		}
 	} else {
+		logDir := filepath.Dir(*logFile)
+		if err := os.MkdirAll(logDir, 0755); err != nil {
+			panic(err)
+		}
 		f, err = os.OpenFile(*logFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 		if err != nil {
 			panic(err)
