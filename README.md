@@ -1,6 +1,6 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/banksean/apple-container.svg)](https://pkg.go.dev/github.com/banksean/apple-container)
 
-# A Go package interface to apple's container commands
+# A Go interface to apple's container commands
 
 This Go package contains 
 - Commands `gorunac` and `gotestac`
