@@ -6,9 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 
 	ac "github.com/banksean/apple-container"
 	"github.com/banksean/apple-container/options"
@@ -75,9 +73,7 @@ func (sb *SandBox) StartContainer(ctx context.Context) error {
 
 func (sb *SandBox) initHomeDir(ctx context.Context) error {
 	for _, rcFile := range rcFiles {
-		cmd := exec.CommandContext(ctx, "container", "exec", sb.containerID, "cp", "-r", "/hosthome/"+rcFile, "/home/node/"+rcFile)
-		slog.InfoContext(ctx, "initHomeDir", "cmd", strings.Join(cmd.Args, " "))
-		out, err := cmd.CombinedOutput()
+		out, err := ac.Containers.Exec(ctx, options.ExecContainer{}, sb.containerID, "cp", nil, "-r", "/hosthome/"+rcFile, "/home/node/"+rcFile)
 		if err != nil {
 			slog.ErrorContext(ctx, "initHomeDir", "error", err, "out", out)
 			return err
@@ -89,7 +85,7 @@ func (sb *SandBox) initHomeDir(ctx context.Context) error {
 
 // ShellExec executes a command in the container. The container must be in state "running".
 func (sb *SandBox) ShellExec(ctx context.Context, shellCmd string, stdin io.Reader, stdout, stderr io.Writer) error {
-	wait, err := ac.Containers.Exec(ctx,
+	wait, err := ac.Containers.ExecStream(ctx,
 		options.ExecContainer{
 			ProcessOptions: options.ProcessOptions{
 				Interactive: true,

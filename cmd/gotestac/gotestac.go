@@ -231,7 +231,7 @@ func runTests(ctx context.Context, args ...string) error {
 			}
 			id := pooledCtr.ID
 			slog.InfoContext(ctx, "runTests executing in container", "path", path, "id", id)
-			wait, err := applecontainer.Containers.Exec(ctx,
+			wait, err := applecontainer.Containers.ExecStream(ctx,
 				options.ExecContainer{}, id,
 				"/gorunac/dev/testbin/linux/"+path,
 				os.Environ(), os.Stdin, os.Stdout, os.Stderr, args...)

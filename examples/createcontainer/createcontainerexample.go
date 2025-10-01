@@ -96,7 +96,7 @@ func main() {
 
 	ctxExec, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	waitExec, err := ac.Containers.Exec(ctxExec, options.ExecContainer{}, id, "ls", os.Environ(), os.Stdin, os.Stdout, os.Stderr)
+	waitExec, err := ac.Containers.ExecStream(ctxExec, options.ExecContainer{}, id, "ls", os.Environ(), os.Stdin, os.Stdout, os.Stderr)
 
 	if err := waitExec(); err != nil {
 		if ctxExec.Err() == context.DeadlineExceeded {

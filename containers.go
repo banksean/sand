@@ -146,8 +146,20 @@ func (c *ContainerSvc) Run(ctx context.Context, opts options.RunContainer, image
 	return cmd.Wait, nil
 }
 
-// Exec executes a command in a running container instance.
-func (c *ContainerSvc) Exec(ctx context.Context, opts options.ExecContainer, containerID, command string, env []string, stdin io.Reader, stdout, stderr io.Writer, cmdArgs ...string) (func() error, error) {
+func (c *ContainerSvc) Exec(ctx context.Context, opts options.ExecContainer, containerID, command string, env []string, cmdArgs ...string) (string, error) {
+	cmd := exec.CommandContext(ctx, "container", append([]string{"exec", containerID, command}, cmdArgs...)...)
+	slog.InfoContext(ctx, "ContainerSvc.Exec", "cmd", strings.Join(cmd.Args, " "))
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		slog.ErrorContext(ctx, "ContainerSvc.Exec", "error", err, "out", out)
+		return "", err
+	}
+
+	return string(out), nil
+}
+
+// ExecStream executes a command in a running container instance, with stdio streams.
+func (c *ContainerSvc) ExecStream(ctx context.Context, opts options.ExecContainer, containerID, command string, env []string, stdin io.Reader, stdout, stderr io.Writer, cmdArgs ...string) (func() error, error) {
 	args := options.ToArgs(opts)
 	args = append(args, append([]string{containerID, command}, cmdArgs...)...)
 	cmd := exec.CommandContext(ctx, "container", append([]string{"exec"}, args...)...)
