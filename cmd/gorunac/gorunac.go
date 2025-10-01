@@ -80,7 +80,7 @@ func main() {
 	}
 	slog.InfoContext(ctx, "main", "bin", bin)
 
-	status, err := applecontainer.System.Status(ctx, options.SystemStatus{})
+	status, err := applecontainer.System.Status(ctx, nil)
 	if err != nil {
 		slog.ErrorContext(ctx, "main system status", "error", err)
 		fmt.Fprintf(os.Stderr, "You may need to run `container system start` and re-try this command\n")
@@ -103,7 +103,7 @@ func run(ctx context.Context, bin string, args ...string) error {
 		slog.ErrorContext(ctx, "run getting current working dir", "error", err)
 		return err
 	}
-	wait, err := applecontainer.Containers.Run(ctx, options.RunContainer{
+	wait, err := applecontainer.Containers.Run(ctx, &options.RunContainer{
 		ProcessOptions: options.ProcessOptions{
 			Interactive: true,
 		},

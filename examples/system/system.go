@@ -13,14 +13,14 @@ import (
 func main() {
 	ctx := context.Background()
 	fmt.Println("Starting container system...")
-	res, err := applecontainer.System.Start(ctx, options.SystemStart{Debug: true})
+	res, err := applecontainer.System.Start(ctx, &options.SystemStart{Debug: true})
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 	}
 	fmt.Printf("container system start output:\n%s\n", res)
 
 	fmt.Println("Starting container system...")
-	res, err = applecontainer.System.Status(ctx, options.SystemStatus{Debug: true})
+	res, err = applecontainer.System.Status(ctx, &options.SystemStatus{Debug: true})
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 	}
@@ -29,7 +29,7 @@ func main() {
 	timeout := 5 * time.Second
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel() // Ensure the context is canceled to release resources
-	logs, wait, err := applecontainer.System.Logs(ctx, options.SystemLogs{
+	logs, wait, err := applecontainer.System.Logs(ctx, &options.SystemLogs{
 		Follow: true,
 	})
 	if err != nil {
@@ -59,7 +59,7 @@ func main() {
 	}
 
 	fmt.Println("Stopping container system...")
-	res, err = applecontainer.System.Stop(ctx, options.SystemStop{Debug: true})
+	res, err = applecontainer.System.Stop(ctx, &options.SystemStop{Debug: true})
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 	}

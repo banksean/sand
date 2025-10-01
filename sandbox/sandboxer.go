@@ -84,7 +84,7 @@ func (sb *SandBoxer) AttachSandbox(ctx context.Context, id string) (*SandBox, er
 func (sb *SandBoxer) Cleanup(ctx context.Context, sbox *SandBox) error {
 	slog.InfoContext(ctx, "SandBoxer.Cleanup", "id", sbox.id)
 
-	out, err := ac.Containers.Stop(ctx, options.StopContainer{}, sbox.containerID)
+	out, err := ac.Containers.Stop(ctx, nil, sbox.containerID)
 	if err != nil {
 		slog.ErrorContext(ctx, "SandBoxer.Cleanup", "error", err, "out", out)
 	}
@@ -146,7 +146,7 @@ func (sb *SandBoxer) cloneHomeDirStuff(ctx context.Context, id string) error {
 }
 
 func (sb *SandBoxer) buildDefaultImage(ctx context.Context) error {
-	outLogs, errLogs, wait, err := ac.Images.Build(ctx, options.BuildOptions{
+	outLogs, errLogs, wait, err := ac.Images.Build(ctx, &options.BuildOptions{
 		File:     sb.dockerFile,
 		Tag:      DefaultImageName,
 		BuildArg: map[string]string{"USERNAME": sb.sandboxUsername},

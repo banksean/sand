@@ -31,7 +31,7 @@ type SandBox struct {
 // CreateContainer creates a new container instance. The container image must exist.
 func (sb *SandBox) CreateContainer(ctx context.Context) error {
 	containerID, err := ac.Containers.Create(ctx,
-		options.CreateContainer{
+		&options.CreateContainer{
 			ProcessOptions: options.ProcessOptions{
 				Interactive: true,
 				TTY:         true,
@@ -58,7 +58,7 @@ func (sb *SandBox) CreateContainer(ctx context.Context) error {
 
 // StartContainer starts a container instance. The container must exist, and it should not be in the "running" state.
 func (sb *SandBox) StartContainer(ctx context.Context) error {
-	output, err := ac.Containers.Start(ctx, options.StartContainer{}, sb.containerID)
+	output, err := ac.Containers.Start(ctx, nil, sb.containerID)
 	if err != nil {
 		slog.ErrorContext(ctx, "startContainer", "error", err, "output", output)
 		return err
@@ -73,7 +73,7 @@ func (sb *SandBox) StartContainer(ctx context.Context) error {
 
 func (sb *SandBox) initHomeDir(ctx context.Context) error {
 	for _, rcFile := range rcFiles {
-		out, err := ac.Containers.Exec(ctx, options.ExecContainer{}, sb.containerID, "cp", nil, "-r", "/hosthome/"+rcFile, "/home/node/"+rcFile)
+		out, err := ac.Containers.Exec(ctx, nil, sb.containerID, "cp", nil, "-r", "/hosthome/"+rcFile, "/home/node/"+rcFile)
 		if err != nil {
 			slog.ErrorContext(ctx, "initHomeDir", "error", err, "out", out)
 			return err
@@ -86,7 +86,7 @@ func (sb *SandBox) initHomeDir(ctx context.Context) error {
 // ShellExec executes a command in the container. The container must be in state "running".
 func (sb *SandBox) ShellExec(ctx context.Context, shellCmd string, stdin io.Reader, stdout, stderr io.Writer) error {
 	wait, err := ac.Containers.ExecStream(ctx,
-		options.ExecContainer{
+		&options.ExecContainer{
 			ProcessOptions: options.ProcessOptions{
 				Interactive: true,
 				TTY:         true,

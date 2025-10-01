@@ -219,16 +219,23 @@ type BuildOptions struct {
 }
 
 // ToArgs creates an array of strings that you can pass to exec.Command(...) as CLI args.
-func ToArgs(s any) []string {
+func ToArgs[T any](s *T) []string {
+	if s == nil {
+		s = new(T)
+	}
 	var ret []string
-	st := reflect.TypeOf(s)
-	sv := reflect.ValueOf(s)
+	st := reflect.TypeOf(*s)
+	sv := reflect.ValueOf(*s)
+	if st.Kind() == reflect.Pointer {
+		sv = reflect.Indirect(sv)
+		st = sv.Type()
+	}
 	for i := range st.NumField() {
 		field := st.Field(i)
 		fv := sv.Field(i)
 		if field.Anonymous && field.Type.Kind() == reflect.Struct {
 			fvi := fv.Interface()
-			ret = append(ret, ToArgs(fvi)...)
+			ret = append(ret, ToArgs(&fvi)...)
 			continue
 		}
 		flagTag, ok := field.Tag.Lookup("flag")

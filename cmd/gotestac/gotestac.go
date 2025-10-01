@@ -136,7 +136,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	status, err := applecontainer.System.Status(ctx, options.SystemStatus{})
+	status, err := applecontainer.System.Status(ctx, nil)
 	if err != nil {
 		slog.ErrorContext(ctx, "main container system status", "error", err)
 		fmt.Fprintf(os.Stderr, "container system status error: %v\n", err)
@@ -154,7 +154,7 @@ func main() {
 
 func newTestContainer(ctx context.Context, cwd string) (string, error) {
 	id, err := applecontainer.Containers.Create(ctx,
-		options.CreateContainer{
+		&options.CreateContainer{
 			ManagementOptions: options.ManagementOptions{
 				Detach:     true,
 				Entrypoint: "sleep", // keep the container running
@@ -167,7 +167,7 @@ func newTestContainer(ctx context.Context, cwd string) (string, error) {
 		return "", err
 	}
 
-	out, err := applecontainer.Containers.Start(ctx, options.StartContainer{}, id)
+	out, err := applecontainer.Containers.Start(ctx, nil, id)
 	if err != nil {
 		slog.ErrorContext(ctx, "newTestContainer start container", "id", id, "out", out, "error", err)
 		return "", err
@@ -195,7 +195,7 @@ func initContainerPool(ctx context.Context, cwd string) (*pool.ContainerPool, er
 		}
 		return pc, nil
 	}, func(ctx context.Context, pc *pool.PooledContainer) {
-		out, err := applecontainer.Containers.Stop(ctx, options.StopContainer{}, pc.ID)
+		out, err := applecontainer.Containers.Stop(ctx, nil, pc.ID)
 		slog.InfoContext(ctx, "container stop", "id", pc.ID, "error", err, "out", out)
 	})
 	return ret, err
@@ -232,7 +232,7 @@ func runTests(ctx context.Context, args ...string) error {
 			id := pooledCtr.ID
 			slog.InfoContext(ctx, "runTests executing in container", "path", path, "id", id)
 			wait, err := applecontainer.Containers.ExecStream(ctx,
-				options.ExecContainer{}, id,
+				nil, id,
 				"/gorunac/dev/testbin/linux/"+path,
 				os.Environ(), os.Stdin, os.Stdout, os.Stderr, args...)
 

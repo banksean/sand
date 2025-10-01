@@ -16,7 +16,7 @@ func main() {
 	ctx := context.Background()
 	fmt.Println("Creating container...")
 	id, err := ac.Containers.Create(ctx,
-		options.CreateContainer{
+		&options.CreateContainer{
 			ManagementOptions: options.ManagementOptions{
 				Name: "applecontainer-demo",
 			},
@@ -39,7 +39,7 @@ func main() {
 	fmt.Println("Newly created container:")
 	fmt.Println(string(ctrJSON))
 	fmt.Printf("Starting container %s...\n", id)
-	id, err = ac.Containers.Start(ctx, options.StartContainer{
+	id, err = ac.Containers.Start(ctx, &options.StartContainer{
 		Debug: true,
 	}, id)
 	if err != nil {
@@ -62,7 +62,7 @@ func main() {
 	timeout := 5 * time.Second
 	ctxLogs, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel() // Ensure the context is canceled to release resources
-	logs, waitLogs, err := ac.Containers.Logs(ctxLogs, options.ContainerLogs{
+	logs, waitLogs, err := ac.Containers.Logs(ctxLogs, &options.ContainerLogs{
 		Boot:   true,
 		Follow: true,
 	}, id)
@@ -96,7 +96,7 @@ func main() {
 
 	ctxExec, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	waitExec, err := ac.Containers.ExecStream(ctxExec, options.ExecContainer{}, id, "ls", os.Environ(), os.Stdin, os.Stdout, os.Stderr)
+	waitExec, err := ac.Containers.ExecStream(ctxExec, nil, id, "ls", os.Environ(), os.Stdin, os.Stdout, os.Stderr)
 
 	if err := waitExec(); err != nil {
 		if ctxExec.Err() == context.DeadlineExceeded {
@@ -109,7 +109,7 @@ func main() {
 	}
 
 	fmt.Printf("Stopping container %s...\n", id)
-	id, err = ac.Containers.Stop(ctx, options.StopContainer{}, id)
+	id, err = ac.Containers.Stop(ctx, nil, id)
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 		return
@@ -117,7 +117,7 @@ func main() {
 	fmt.Printf("Container %s stopped\n", id)
 
 	fmt.Printf("Deleting container %s...\n", id)
-	id, err = ac.Containers.Delete(ctx, options.DeleteContainer{}, id)
+	id, err = ac.Containers.Delete(ctx, nil, id)
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 		return

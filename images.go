@@ -51,7 +51,7 @@ func (i *ImagesSvc) Inspect(ctx context.Context, name string) ([]*types.ImageMan
 
 // Build builds an image. TODO: Since this can take a while, make it stream the command output
 // similar to how ContainerSvc.Logs works.
-func (i *ImagesSvc) Build(ctx context.Context, opts options.BuildOptions) (io.ReadCloser, io.ReadCloser, func() error, error) {
+func (i *ImagesSvc) Build(ctx context.Context, opts *options.BuildOptions) (io.ReadCloser, io.ReadCloser, func() error, error) {
 	args := options.ToArgs(opts)
 	cmd := exec.CommandContext(ctx, "container", append([]string{"build"}, args...)...)
 

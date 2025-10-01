@@ -11,11 +11,11 @@ func TestToFlags(t *testing.T) {
 		expected []string
 	}{
 		"empty": {
-			s:        ManagementOptions{},
+			s:        &ManagementOptions{},
 			expected: nil,
 		},
 		"arch": {
-			s: ManagementOptions{
+			s: &ManagementOptions{
 				Arch: "arm64",
 			},
 			expected: []string{
@@ -23,7 +23,7 @@ func TestToFlags(t *testing.T) {
 			},
 		},
 		"arch and detach": {
-			s: ManagementOptions{
+			s: &ManagementOptions{
 				Arch:   "arm64",
 				Detach: true,
 			},
@@ -33,7 +33,7 @@ func TestToFlags(t *testing.T) {
 			},
 		},
 		"logs": {
-			s: ContainerLogs{
+			s: &ContainerLogs{
 				Boot: true,
 				N:    100,
 			},
@@ -43,7 +43,7 @@ func TestToFlags(t *testing.T) {
 			},
 		},
 		"env": {
-			s: ProcessOptions{
+			s: &ProcessOptions{
 				Env: map[string]string{
 					"a": "1",
 					"b": "2",
@@ -56,7 +56,7 @@ func TestToFlags(t *testing.T) {
 			},
 		},
 		"container run": {
-			s: RunContainer{
+			s: &RunContainer{
 				ProcessOptions: ProcessOptions{
 					Interactive: true,
 				},
@@ -72,7 +72,7 @@ func TestToFlags(t *testing.T) {
 			},
 		},
 		"create container": {
-			s: CreateContainer{
+			s: &CreateContainer{
 				ManagementOptions: ManagementOptions{
 					Mount: []string{
 						"type=bind,source=/Users/seanmccullough/sandboxen/59edaa35-1cbb-4914-a478-606ae706f324,target=/app",
@@ -89,7 +89,8 @@ func TestToFlags(t *testing.T) {
 
 	for testName, testCase := range tests {
 		t.Run(testName, func(t *testing.T) {
-			got := ToArgs(testCase.s)
+			s := testCase.s
+			got := ToArgs(&s)
 			if !reflect.DeepEqual(got, testCase.expected) {
 				t.Errorf("got %v, want %v", got, testCase.expected)
 			}

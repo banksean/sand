@@ -55,7 +55,7 @@ func (c *ContainerSvc) Inspect(ctx context.Context, id ...string) ([]types.Conta
 }
 
 // Logs returns an io.ReadCloser for streaming log output and a wait func that blocks on the command's completion, or an error.
-func (c *ContainerSvc) Logs(ctx context.Context, opts options.ContainerLogs, id string) (io.ReadCloser, func() error, error) {
+func (c *ContainerSvc) Logs(ctx context.Context, opts *options.ContainerLogs, id string) (io.ReadCloser, func() error, error) {
 	args := options.ToArgs(opts)
 	args = append([]string{"logs"}, append(args, id)...)
 	cmd := exec.CommandContext(ctx, "container", args...)
@@ -75,7 +75,7 @@ func (c *ContainerSvc) Logs(ctx context.Context, opts options.ContainerLogs, id 
 }
 
 // Create creates a new container with the given options, name and init args. It returns the ID of the new container instance.
-func (c *ContainerSvc) Create(ctx context.Context, opts options.CreateContainer, imageName string, initArgs []string) (string, error) {
+func (c *ContainerSvc) Create(ctx context.Context, opts *options.CreateContainer, imageName string, initArgs []string) (string, error) {
 	args := options.ToArgs(opts)
 	args = append([]string{"create"}, append(args, imageName)...)
 	cmd := exec.CommandContext(ctx, "container", append(args, initArgs...)...)
@@ -88,7 +88,7 @@ func (c *ContainerSvc) Create(ctx context.Context, opts options.CreateContainer,
 }
 
 // Start starts a container instance with a given ID. It returns the start command output, or an error.
-func (c *ContainerSvc) Start(ctx context.Context, opts options.StartContainer, id string) (string, error) {
+func (c *ContainerSvc) Start(ctx context.Context, opts *options.StartContainer, id string) (string, error) {
 	args := options.ToArgs(opts)
 	args = append([]string{"start"}, append(args, id)...)
 	cmd := exec.CommandContext(ctx, "container", args...)
@@ -101,7 +101,7 @@ func (c *ContainerSvc) Start(ctx context.Context, opts options.StartContainer, i
 }
 
 // Stop stops a container instance with a given ID. It returns the stop command output, or an error.
-func (c *ContainerSvc) Stop(ctx context.Context, opts options.StopContainer, id string) (string, error) {
+func (c *ContainerSvc) Stop(ctx context.Context, opts *options.StopContainer, id string) (string, error) {
 	slog.InfoContext(ctx, "ContainerSvc.Stop", "opts", opts, "id", id)
 	args := options.ToArgs(opts)
 	args = append([]string{"stop"}, append(args, id)...)
@@ -115,7 +115,7 @@ func (c *ContainerSvc) Stop(ctx context.Context, opts options.StopContainer, id 
 }
 
 // Delete deletes a container instance with a given ID. It returns the delete command output, or an error.
-func (c *ContainerSvc) Delete(ctx context.Context, opts options.DeleteContainer, id string) (string, error) {
+func (c *ContainerSvc) Delete(ctx context.Context, opts *options.DeleteContainer, id string) (string, error) {
 	args := options.ToArgs(opts)
 	args = append([]string{"delete"}, append(args, id)...)
 	cmd := exec.CommandContext(ctx, "container", args...)
@@ -128,7 +128,7 @@ func (c *ContainerSvc) Delete(ctx context.Context, opts options.DeleteContainer,
 }
 
 // Run runs a command in a new container instance based on the given image.
-func (c *ContainerSvc) Run(ctx context.Context, opts options.RunContainer, imageName, command string, env []string, stdin io.Reader, stdout, stderr io.Writer, cmdArgs ...string) (func() error, error) {
+func (c *ContainerSvc) Run(ctx context.Context, opts *options.RunContainer, imageName, command string, env []string, stdin io.Reader, stdout, stderr io.Writer, cmdArgs ...string) (func() error, error) {
 	args := options.ToArgs(opts)
 	args = append(args, append([]string{imageName, command}, cmdArgs...)...)
 	cmd := exec.CommandContext(ctx, "container", append([]string{"run"}, args...)...)
@@ -146,7 +146,7 @@ func (c *ContainerSvc) Run(ctx context.Context, opts options.RunContainer, image
 	return cmd.Wait, nil
 }
 
-func (c *ContainerSvc) Exec(ctx context.Context, opts options.ExecContainer, containerID, command string, env []string, cmdArgs ...string) (string, error) {
+func (c *ContainerSvc) Exec(ctx context.Context, opts *options.ExecContainer, containerID, command string, env []string, cmdArgs ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, "container", append([]string{"exec", containerID, command}, cmdArgs...)...)
 	slog.InfoContext(ctx, "ContainerSvc.Exec", "cmd", strings.Join(cmd.Args, " "))
 	out, err := cmd.CombinedOutput()
@@ -159,7 +159,7 @@ func (c *ContainerSvc) Exec(ctx context.Context, opts options.ExecContainer, con
 }
 
 // ExecStream executes a command in a running container instance, with stdio streams.
-func (c *ContainerSvc) ExecStream(ctx context.Context, opts options.ExecContainer, containerID, command string, env []string, stdin io.Reader, stdout, stderr io.Writer, cmdArgs ...string) (func() error, error) {
+func (c *ContainerSvc) ExecStream(ctx context.Context, opts *options.ExecContainer, containerID, command string, env []string, stdin io.Reader, stdout, stderr io.Writer, cmdArgs ...string) (func() error, error) {
 	args := options.ToArgs(opts)
 	args = append(args, append([]string{containerID, command}, cmdArgs...)...)
 	cmd := exec.CommandContext(ctx, "container", append([]string{"exec"}, args...)...)
@@ -204,7 +204,7 @@ func (c *ContainerSvc) ExecStream(ctx context.Context, opts options.ExecContaine
 }
 
 // Kill kills containers
-func (c *ContainerSvc) Kill(ctx context.Context, opts options.KillContainer, id ...string) (string, error) {
+func (c *ContainerSvc) Kill(ctx context.Context, opts *options.KillContainer, id ...string) (string, error) {
 	slog.InfoContext(ctx, "ContainerSvc.Kill", "opts", opts, "id", id)
 	args := options.ToArgs(opts)
 	args = append([]string{"kill"}, append(args, id...)...)
