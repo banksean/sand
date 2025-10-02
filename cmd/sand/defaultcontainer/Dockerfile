@@ -1,10 +1,4 @@
 # TODO: tune this to work more seamlessly with macOS, user settings etc
-# - add git config user.name/email from host
-# - add ssh keys from host
-# - add gh auth from host
-# - add zshrc, bashrc, other shell niceties from host
-# - add vscode server for remote containers
-# - allow passing in user name as build arg and create that user in container, set as default user
 FROM node:20
 
 ARG TZ

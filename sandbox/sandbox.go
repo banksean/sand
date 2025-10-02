@@ -42,6 +42,7 @@ func (sb *SandBox) CreateContainer(ctx context.Context) error {
 				Remove: true, // TODO: make this a field on either SandBox or SandBoxer so we can set it on the cli via flags.
 				Mount: []string{
 					// TODO: mount image-independent config files etc into the default user's home directory after the container starts up.
+					fmt.Sprintf(`type=bind,source=%s,target=/root/.claude,readonly`, filepath.Join(os.Getenv("HOME"), ".claude")),
 					fmt.Sprintf(`type=bind,source=%s,target=/app`, filepath.Join(sb.sandboxWorkDir, "app")),
 				},
 			},
