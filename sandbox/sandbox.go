@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	DefaultImageName = "claude-code-sandbox"
+	DefaultImageName = "sandbox"
 )
 
 // SandBox connects a local container instance to a dedicated, persistent local storage volume.

@@ -17,7 +17,7 @@ import (
 
 var (
 	// Clone these from ~/ into the container's /hosthome directory.
-	rcFiles = []string{".gitconfig", ".p10k.zsh", ".ssh"}
+	rcFiles = []string{".gitconfig", ".p10k.zsh"}
 )
 
 type SandBoxer struct {

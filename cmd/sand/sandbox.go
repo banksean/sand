@@ -22,18 +22,21 @@ import (
 	"os"
 	"path/filepath"
 
+	_ "embed"
+
 	"github.com/banksean/apple-container/sandbox"
 )
 
-const (
-	DefaultDockerFile = "./examples/devsandbox/Dockerfile"
+var (
+	//go:embed Dockerfile
+	defaultDockerFile string
 )
 
 var (
 	attachTo         = flag.String("attach", "", "sandbox ID to re-connect to")
 	sandboxCloneRoot = flag.String("sandboxen", "/tmp/sandboxen", "root dir to store sandbox data")
 	imageName        = flag.String("image", sandbox.DefaultImageName, "name of container image to use")
-	dockerFile       = flag.String("dockerfile", DefaultDockerFile, "location of docker file to build the image locally")
+	dockerFile       = flag.String("dockerfile", "", "location of docker file from which to build the image locally. Uses an embedded dockerfile if unset.")
 	shellCmd         = flag.String("shell", "/bin/zsh", "shell command to exec in the container")
 	logLevelStr      = flag.String("loglevel", "error", "Set the logging level (debug, info, warn, error)")
 	logFile          = flag.String("log", "", "location of log file (leave empty for a random tmp/ path)")
@@ -86,10 +89,30 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	df := *dockerFile
+	if df == "" {
+		slog.InfoContext(ctx, "main: unpacking embedded dockerfile")
+		// build the container from the default dockerfile
+		f, err := os.OpenFile("/tmp/sandbox-dockerfile", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+		if err != nil {
+			panic(err)
+		}
+		n, err := f.WriteString(defaultDockerFile)
+		if err != nil {
+			panic(err)
+		}
+		if n != len(defaultDockerFile) {
+			panic(fmt.Sprintf("Failed to write default docker file. Should have written %d bytes, but wrote %d instead\n", len(defaultDockerFile), n))
+		}
+		f.Close()
+		// TODO: name this file after the hash of its contents.
+		df = "/tmp/sandbox-dockerfile"
+		slog.InfoContext(ctx, "main: done unpacking embedded dockerfile")
+	}
 	sber := sandbox.NewSandBoxer(
 		*sandboxCloneRoot,
 		*imageName,
-		*dockerFile,
+		df,
 	)
 
 	if err := sber.Init(ctx); err != nil {
