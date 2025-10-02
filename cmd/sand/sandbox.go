@@ -16,6 +16,7 @@ package main
 
 import (
 	"context"
+	"embed"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -28,15 +29,15 @@ import (
 )
 
 var (
-	//go:embed Dockerfile
-	defaultDockerFile string
+	//go:embed defaultcontainer/*
+	defaultContainer embed.FS
 )
 
 var (
 	attachTo         = flag.String("attach", "", "sandbox ID to re-connect to")
 	sandboxCloneRoot = flag.String("sandboxen", "/tmp/sandboxen", "root dir to store sandbox data")
 	imageName        = flag.String("image", sandbox.DefaultImageName, "name of container image to use")
-	dockerFile       = flag.String("dockerfile", "", "location of docker file from which to build the image locally. Uses an embedded dockerfile if unset.")
+	dockerFileDir    = flag.String("dockerdir", "", "location of directory with docker file from which to build the image locally. Uses an embedded dockerfile if unset.")
 	shellCmd         = flag.String("shell", "/bin/zsh", "shell command to exec in the container")
 	logLevelStr      = flag.String("loglevel", "error", "Set the logging level (debug, info, warn, error)")
 	logFile          = flag.String("log", "", "location of log file (leave empty for a random tmp/ path)")
@@ -89,25 +90,20 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	df := *dockerFile
+	df := *dockerFileDir
 	if df == "" {
-		slog.InfoContext(ctx, "main: unpacking embedded dockerfile")
-		// build the container from the default dockerfile
-		f, err := os.OpenFile("/tmp/sandbox-dockerfile", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
-		if err != nil {
+		slog.InfoContext(ctx, "main: unpacking embedded container build files")
+		// TODO: name this dir using a content hash of defaultContainer.
+		df = "/tmp/sandbox-container-build"
+		os.RemoveAll(df)
+		if err := os.MkdirAll(df, 0755); err != nil {
 			panic(err)
 		}
-		n, err := f.WriteString(defaultDockerFile)
-		if err != nil {
+		if err := os.CopyFS(df, defaultContainer); err != nil {
 			panic(err)
 		}
-		if n != len(defaultDockerFile) {
-			panic(fmt.Sprintf("Failed to write default docker file. Should have written %d bytes, but wrote %d instead\n", len(defaultDockerFile), n))
-		}
-		f.Close()
-		// TODO: name this file after the hash of its contents.
-		df = "/tmp/sandbox-dockerfile"
 		slog.InfoContext(ctx, "main: done unpacking embedded dockerfile")
+		df = filepath.Join(df, "defaultcontainer")
 	}
 	sber := sandbox.NewSandBoxer(
 		*sandboxCloneRoot,

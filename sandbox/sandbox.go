@@ -41,8 +41,7 @@ func (sb *SandBox) CreateContainer(ctx context.Context) error {
 				SSH:    true,
 				Remove: true, // TODO: make this a field on either SandBox or SandBoxer so we can set it on the cli via flags.
 				Mount: []string{
-					// TODO: copy shit out of /hosthome into the default user's home directory after the container starts up.
-					fmt.Sprintf(`type=bind,source=%s,target=/hosthome`, filepath.Join(sb.sandboxWorkDir, "home")),
+					// TODO: mount image-independent config files etc into the default user's home directory after the container starts up.
 					fmt.Sprintf(`type=bind,source=%s,target=/app`, filepath.Join(sb.sandboxWorkDir, "app")),
 				},
 			},
@@ -63,23 +62,7 @@ func (sb *SandBox) StartContainer(ctx context.Context) error {
 		slog.ErrorContext(ctx, "startContainer", "error", err, "output", output)
 		return err
 	}
-	if err := sb.initHomeDir(ctx); err != nil {
-		slog.ErrorContext(ctx, "startContainer", "error", err)
-		return err
-	}
 	slog.InfoContext(ctx, "startContainer succeeded", "output", output)
-	return nil
-}
-
-func (sb *SandBox) initHomeDir(ctx context.Context) error {
-	for _, rcFile := range rcFiles {
-		out, err := ac.Containers.Exec(ctx, nil, sb.containerID, "cp", nil, "-r", "/hosthome/"+rcFile, "/home/node/"+rcFile)
-		if err != nil {
-			slog.ErrorContext(ctx, "initHomeDir", "error", err, "out", out)
-			return err
-		}
-		slog.InfoContext(ctx, "initHomeDir", "out", out)
-	}
 	return nil
 }
 

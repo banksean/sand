@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"os/exec"
+	"strings"
 	"syscall"
 
 	"github.com/banksean/apple-container/options"
@@ -51,9 +53,11 @@ func (i *ImagesSvc) Inspect(ctx context.Context, name string) ([]*types.ImageMan
 
 // Build builds an image. TODO: Since this can take a while, make it stream the command output
 // similar to how ContainerSvc.Logs works.
-func (i *ImagesSvc) Build(ctx context.Context, opts *options.BuildOptions) (io.ReadCloser, io.ReadCloser, func() error, error) {
+func (i *ImagesSvc) Build(ctx context.Context, dockerFileDir string, opts *options.BuildOptions) (io.ReadCloser, io.ReadCloser, func() error, error) {
 	args := options.ToArgs(opts)
 	cmd := exec.CommandContext(ctx, "container", append([]string{"build"}, args...)...)
+	cmd.Dir = dockerFileDir
+	slog.InfoContext(ctx, "ImagesSvc.Build", "cmd.Dir", cmd.Dir, "cmd", strings.Join(cmd.Args, " "))
 
 	// This Setpgid business is basically PTSD-induced superstition learned through Linux debugging nightmares.
 	// It may not be necessary on MacOS at all.
