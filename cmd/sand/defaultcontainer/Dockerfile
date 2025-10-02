@@ -34,6 +34,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   jq \
   nano \
   vim \
+  openssh-client \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install Go toolchain
@@ -70,6 +71,13 @@ ENV DEVCONTAINER=true
 # Create workspace and config directories and set permissions
 RUN mkdir -p /workspace /home/node/.claude && \
   chown -R node:node /workspace /home/node/.claude
+
+# Configure SSH for GitHub authentication
+RUN mkdir -p /root/.ssh && \
+  chmod 700 /root/.ssh && \
+  ssh-keyscan github.com >> /root/.ssh/known_hosts && \
+  echo "Host github.com\n\tPubkeyAuthentication yes" > /root/.ssh/config && \
+  chmod 600 /root/.ssh/config
 
 WORKDIR /workspace
 
