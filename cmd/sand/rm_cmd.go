@@ -30,6 +30,9 @@ func (rm *RmCmd) Run(cctx *Context) error {
 	if err != nil {
 		return err
 	}
+	if sbx == nil {
+		return nil
+	}
 	if err := sber.Cleanup(ctx, sbx); err != nil {
 		return err
 	}
