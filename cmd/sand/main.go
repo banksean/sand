@@ -12,21 +12,16 @@ type Context struct {
 	LogFile   string
 	LogLevel  string
 	CloneRoot string
-	DNSDomain string
 }
 
 type CLI struct {
 	LogFile   string `default:"/tmp/sand/log" help:"location of log file (leave empty for a random tmp/ path)"`
 	LogLevel  string `default:"info" help:"the logging level (debug, info, warn, error)"`
 	CloneRoot string `default:"/tmp/sand/boxen" help:"root dir to store sandbox clones of working directories"`
-	DNSDomain string `default:"" help:"dns domain for sandbox network"`
 
 	Shell ShellCmd `cmd:"" help:"create or revive a sandbox and shell into its container"`
 	Ls    LsCmd    `cmd:"" help:"list sandboxes"`
-
-	Rm struct {
-		Paths []string `arg:"" name:"path" help:"Paths to remove." type:"path"`
-	} `cmd:"" help:"remove sandbox"`
+	Rm    RmCmd    `cmd:"" help:"remove sandbox"`
 }
 
 func (c *CLI) initSlog() {

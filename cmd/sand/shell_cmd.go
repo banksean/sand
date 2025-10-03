@@ -60,7 +60,7 @@ func (sc *ShellCmd) Run(cctx *Context) error {
 			return err
 		}
 		if sbox == nil { // Create a new sandbox with this ID
-			sbox, err = sber.NewSandbox(ctx, sc.ID, cwd, sc.ImageName, sc.DockerFileDir, cctx.DNSDomain)
+			sbox, err = sber.NewSandbox(ctx, sc.ID, cwd, sc.ImageName, sc.DockerFileDir)
 			if err != nil {
 				slog.ErrorContext(ctx, "sber.NewSandbox", "error", err)
 				return err
@@ -68,7 +68,7 @@ func (sc *ShellCmd) Run(cctx *Context) error {
 		}
 	} else { // Create a new sandbox with a random ID
 		sc.ID = uuid.NewString()
-		sbox, err = sber.NewSandbox(ctx, sc.ID, cwd, sc.ImageName, sc.DockerFileDir, cctx.DNSDomain)
+		sbox, err = sber.NewSandbox(ctx, sc.ID, cwd, sc.ImageName, sc.DockerFileDir)
 		if err != nil {
 			slog.ErrorContext(ctx, "sber.NewSandbox", "error", err)
 			return err

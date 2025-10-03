@@ -35,7 +35,7 @@ func (sb *SandBoxer) EnsureDefaultImage(ctx context.Context, imageName, dockerfi
 	return nil
 }
 
-func (sb *SandBoxer) NewSandbox(ctx context.Context, id, hostWorkDir, imageName, dockerFileDir, dnsDomain string) (*Sandbox, error) {
+func (sb *SandBoxer) NewSandbox(ctx context.Context, id, hostWorkDir, imageName, dockerFileDir string) (*Sandbox, error) {
 	slog.InfoContext(ctx, "SandBoxer.NewSandbox", "hostWorkDir", hostWorkDir, "id", id)
 
 	if err := sb.cloneWorkDir(ctx, id, hostWorkDir); err != nil {
@@ -47,7 +47,6 @@ func (sb *SandBoxer) NewSandbox(ctx context.Context, id, hostWorkDir, imageName,
 		HostOriginDir:  hostWorkDir,
 		SandboxWorkDir: filepath.Join(sb.cloneRoot, id),
 		ImageName:      imageName,
-		DNSDomain:      dnsDomain,
 	}
 	sb.sandBoxes[id] = ret
 	return ret, nil
@@ -129,6 +128,9 @@ func (sb *SandBoxer) Cleanup(ctx context.Context, sbox *Sandbox) error {
 		slog.ErrorContext(ctx, "SandBoxer Containers.Delete", "error", err, "out", out)
 	}
 
+	if err := os.RemoveAll(sb.cloneRoot); err != nil {
+		return err
+	}
 	return nil
 }
 
