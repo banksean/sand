@@ -8,6 +8,15 @@ import (
 	"github.com/alecthomas/kong"
 )
 
+type DocCmd struct{}
+
+func (m *DocCmd) Run() error {
+	var cli CLI
+
+	ctx := kong.Parse(&cli, kong.Help(MarkdownHelpPrinter))
+	return ctx.PrintUsage(false)
+}
+
 // MarkdownHelpPrinter is a kong.HelpPrinter that formats help output as markdown.
 func MarkdownHelpPrinter(options kong.HelpOptions, ctx *kong.Context) error {
 	w := ctx.Stdout
@@ -19,7 +28,7 @@ func MarkdownHelpPrinter(options kong.HelpOptions, ctx *kong.Context) error {
 	root := ctx.Model.Node
 
 	// Print main title
-	fmt.Fprintf(w, "# %s\n\n", ctx.Model.Name)
+	fmt.Fprintf(w, "# `%s` command flags and subcommands\n\n", ctx.Model.Name)
 
 	// Print app-level description if available
 	if root.Help != "" && !options.NoAppSummary {
