@@ -21,7 +21,8 @@ type CLI struct {
 
 	Shell ShellCmd `cmd:"" help:"create or revive a sandbox and shell into its container"`
 	Ls    LsCmd    `cmd:"" help:"list sandboxes"`
-	Rm    RmCmd    `cmd:"" help:"remove sandbox"`
+	Rm    RmCmd    `cmd:"" help:"remove sandbox container and its clone directory"`
+	Stop  StopCmd  `cmd:"" help:"stop sandbox container"`
 }
 
 func (c *CLI) initSlog() {
