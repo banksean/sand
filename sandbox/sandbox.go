@@ -31,10 +31,12 @@ type Sandbox struct {
 	SandboxWorkDir string
 	// ImageName is the name of the container image
 	ImageName string
+	// DNSDomain is the dns domain for the sandbox's network
+	DNSDomain string
 }
 
 func (sb *Sandbox) GetContainer(ctx context.Context) (*types.Container, error) {
-	ctrs, err := ac.Containers.Inspect(ctx, "sandbox-"+sb.ID)
+	ctrs, err := ac.Containers.Inspect(ctx, sb.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -53,9 +55,10 @@ func (sb *Sandbox) CreateContainer(ctx context.Context) error {
 				TTY:         true,
 			},
 			ManagementOptions: options.ManagementOptions{
-				Name:   "sandbox-" + sb.ID,
-				SSH:    true,
-				Remove: false,
+				Name:      sb.ID,
+				SSH:       true,
+				DNSDomain: sb.DNSDomain,
+				Remove:    false,
 				Mount: []string{
 					// TODO: mount other image-independent config files etc into the default user's home directory after the container starts up.
 					fmt.Sprintf(`type=bind,source=%s,target=/root/.claude,readonly`, filepath.Join(os.Getenv("HOME"), ".claude")),

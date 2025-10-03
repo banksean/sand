@@ -3,6 +3,7 @@ package sandbox
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"log/slog"
@@ -34,7 +35,7 @@ func (sb *SandBoxer) EnsureDefaultImage(ctx context.Context, imageName, dockerfi
 	return nil
 }
 
-func (sb *SandBoxer) NewSandbox(ctx context.Context, id, hostWorkDir, imageName, dockerFileDir string) (*Sandbox, error) {
+func (sb *SandBoxer) NewSandbox(ctx context.Context, id, hostWorkDir, imageName, dockerFileDir, dnsDomain string) (*Sandbox, error) {
 	slog.InfoContext(ctx, "SandBoxer.NewSandbox", "hostWorkDir", hostWorkDir, "id", id)
 
 	if err := sb.cloneWorkDir(ctx, id, hostWorkDir); err != nil {
@@ -46,6 +47,7 @@ func (sb *SandBoxer) NewSandbox(ctx context.Context, id, hostWorkDir, imageName,
 		HostOriginDir:  hostWorkDir,
 		SandboxWorkDir: filepath.Join(sb.cloneRoot, id),
 		ImageName:      imageName,
+		DNSDomain:      dnsDomain,
 	}
 	sb.sandBoxes[id] = ret
 	return ret, nil
@@ -57,7 +59,7 @@ func (sb *SandBoxer) AttachSandbox(ctx context.Context, id string) (*Sandbox, er
 	ret := &Sandbox{
 		ID:             id,
 		SandboxWorkDir: filepath.Join(sb.cloneRoot, id),
-		ContainerID:    "sandbox-" + id,
+		ContainerID:    id,
 		HostOriginDir:  "", // we don't know this any more since we don't store it anywhere
 		ImageName:      "",
 	}
@@ -86,6 +88,32 @@ func (sb *SandBoxer) List(ctx context.Context) ([]Sandbox, error) {
 		return nil
 	})
 	return ret, err
+}
+
+func (sb *SandBoxer) Get(ctx context.Context, id string) (*Sandbox, error) {
+	dir := filepath.Join(sb.cloneRoot, id)
+	slog.InfoContext(ctx, "SandBoxer.Get", "id", id)
+	f, err := os.Stat(dir)
+	if err != nil {
+		slog.ErrorContext(ctx, "SandBoxer.Get", "error", err)
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if !f.IsDir() {
+		return nil, fmt.Errorf("path exists but is not a directory: %s", dir)
+	}
+
+	ret := &Sandbox{
+		ID:             id,
+		SandboxWorkDir: filepath.Join(sb.cloneRoot, id),
+		ContainerID:    id,
+		HostOriginDir:  "", // we don't know this any more since we don't store it anywhere
+		ImageName:      "",
+	}
+	slog.InfoContext(ctx, "SandBoxer.Get", "ret", ret)
+	return ret, nil
 }
 
 func (sb *SandBoxer) Cleanup(ctx context.Context, sbox *Sandbox) error {

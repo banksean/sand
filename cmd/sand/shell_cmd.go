@@ -53,15 +53,22 @@ func (sc *ShellCmd) Run(cctx *Context) error {
 	}
 
 	var sbox *sandbox.Sandbox
-	if sc.ID != "" { // Revive an existing sandbox or reconnect to a running sandbox
-		sbox, err = sber.AttachSandbox(ctx, sc.ID)
+
+	if sc.ID != "" {
+		sbox, err = sber.Get(ctx, sc.ID) // Try to connect to an existing sandbo with this ID
 		if err != nil {
-			slog.ErrorContext(ctx, "sber.AttachSandbox", "error", err)
 			return err
 		}
-	} else { // Create a new sandbox
+		if sbox == nil { // Create a new sandbox with this ID
+			sbox, err = sber.NewSandbox(ctx, sc.ID, cwd, sc.ImageName, sc.DockerFileDir, cctx.DNSDomain)
+			if err != nil {
+				slog.ErrorContext(ctx, "sber.NewSandbox", "error", err)
+				return err
+			}
+		}
+	} else { // Create a new sandbox with a random ID
 		sc.ID = uuid.NewString()
-		sbox, err = sber.NewSandbox(ctx, sc.ID, cwd, sc.ImageName, sc.DockerFileDir)
+		sbox, err = sber.NewSandbox(ctx, sc.ID, cwd, sc.ImageName, sc.DockerFileDir, cctx.DNSDomain)
 		if err != nil {
 			slog.ErrorContext(ctx, "sber.NewSandbox", "error", err)
 			return err
