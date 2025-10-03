@@ -4,7 +4,12 @@ package types
 import "time"
 
 type Container struct {
-	Networks      []interface{}   `json:"networks"`
+	Networks []struct {
+		Hostname string `json:"hostname"`
+		Network  string `json:"network"`
+		Address  string `json:"address"`
+		Gateway  string `json:"gateway"`
+	} `json:"networks"`
 	Status        string          `json:"status"`
 	Configuration ContainerConfig `json:"configuration"`
 }

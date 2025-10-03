@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -106,6 +107,16 @@ func (sc *ShellCmd) Run(cctx *Context) error {
 			slog.ErrorContext(ctx, "sbox.startContainer", "error", err)
 			return err
 		}
+		// Get the container again to get the full struct details filled out now that it's running.
+		ctr, err = sbox.GetContainer(ctx)
+		if err != nil || ctr == nil {
+			slog.ErrorContext(ctx, "sbox.GetContainer", "error", err, "ctr", ctr)
+			return err
+		}
+	}
+
+	for _, n := range ctr.Networks {
+		fmt.Printf("container hostname: %s\n", n.Hostname)
 	}
 
 	slog.InfoContext(ctx, "main: sbox.shell starting")
