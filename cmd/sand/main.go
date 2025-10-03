@@ -23,6 +23,7 @@ type CLI struct {
 	CloneRoot string `default:"/tmp/sand/boxen" help:"root dir to store sandbox clones of working directories"`
 
 	Shell ShellCmd `cmd:"" help:"create or revive a sandbox and shell into its container"`
+	Exec  ExecCmd  `cmd:"" help:"execute a single command in a sanbox"`
 	Ls    LsCmd    `cmd:"" help:"list sandboxes"`
 	Rm    RmCmd    `cmd:"" help:"remove sandbox container and its clone directory"`
 	Stop  StopCmd  `cmd:"" help:"stop sandbox container"`

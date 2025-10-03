@@ -11,15 +11,15 @@ import (
 	"github.com/google/uuid"
 )
 
-type ShellCmd struct {
-	ImageName     string `default:"sandbox" type:"image-name" help:"name of container image to use"`
-	DockerFileDir string `help:"location of directory with docker file from which to build the image locally. Uses an embedded dockerfile if unset."`
-	Shell         string `default:"/bin/zsh" help:"shell command to exec in the container"`
-	Rm            bool   `help:"remove the sandbox after the shell terminates"`
-	ID            string `arg:"" optional:"" help:"ID of the sandbox to create, or re-attach to"`
+type ExecCmd struct {
+	ImageName     string   `default:"sandbox" type:"image-name" help:"name of container image to use"`
+	DockerFileDir string   `help:"location of directory with docker file from which to build the image locally. Uses an embedded dockerfile if unset."`
+	Rm            bool     `help:"remove the sandbox after the exec terminates"`
+	ID            string   `optionl:"" help:"ID of the sandbox to create, or re-attach to"`
+	Arg           []string `arg:"" passthrough:"" help:"command args to exec in the container"`
 }
 
-func (sc *ShellCmd) Run(cctx *Context) error {
+func (sc *ExecCmd) Run(cctx *Context) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -99,7 +99,7 @@ func (sc *ShellCmd) Run(cctx *Context) error {
 		}
 	}
 
-	slog.InfoContext(ctx, "ShellCmd.Run", "ctr", ctr)
+	slog.InfoContext(ctx, "ExecCmd.Run", "ctr", ctr)
 
 	if ctr.Status != "running" {
 		slog.InfoContext(ctx, "main: sbox.startContainer")
@@ -115,23 +115,25 @@ func (sc *ShellCmd) Run(cctx *Context) error {
 		}
 	}
 
-	for _, n := range ctr.Networks {
-		fmt.Printf("container hostname: %s\n", n.Hostname)
+	slog.InfoContext(ctx, "main: sbox.exec starting")
+
+	args := []string{}
+	if len(sc.Arg) > 1 {
+		args = sc.Arg[1:]
 	}
-
-	slog.InfoContext(ctx, "main: sbox.shell starting")
-
-	if err := sbox.Shell(ctx, sc.Shell, cctx.Keychain, os.Stdin, os.Stdout, os.Stderr); err != nil {
-		slog.ErrorContext(ctx, "sbox.shell", "error", err)
+	out, err := sbox.Exec(ctx, sc.Arg[0], nil, args...)
+	if err != nil {
+		slog.ErrorContext(ctx, "sbox.exec", "error", err)
 	}
 
 	if sc.Rm {
-		slog.InfoContext(ctx, "sbox.shell finished, cleaning up...")
+		slog.InfoContext(ctx, "sbox.exec finished, cleaning up...")
 		if err := sber.Cleanup(ctx, sbox); err != nil {
 			slog.ErrorContext(ctx, "sber.Cleanup", "error", err)
 		}
 
 		slog.InfoContext(ctx, "Cleanup complete. Exiting.")
 	}
+	fmt.Printf("%s\n", out)
 	return nil
 }

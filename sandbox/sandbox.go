@@ -86,8 +86,8 @@ func (sb *Sandbox) StartContainer(ctx context.Context) error {
 	return nil
 }
 
-// ShellExec executes a command in the container. The container must be in state "running".
-func (sb *Sandbox) ShellExec(ctx context.Context, shellCmd string, env map[string]string, stdin io.Reader, stdout, stderr io.Writer) error {
+// Shell executes a command in the container. The container must be in state "running".
+func (sb *Sandbox) Shell(ctx context.Context, shellCmd string, env map[string]string, stdin io.Reader, stdout, stderr io.Writer) error {
 	wait, err := ac.Containers.ExecStream(ctx,
 		&options.ExecContainer{
 			ProcessOptions: options.ProcessOptions{
@@ -103,4 +103,23 @@ func (sb *Sandbox) ShellExec(ctx context.Context, shellCmd string, env map[strin
 	}
 
 	return wait()
+}
+
+// Exec executes a command in the container. The container must be in state "running".
+func (sb *Sandbox) Exec(ctx context.Context, shellCmd string, env map[string]string, args ...string) (string, error) {
+	output, err := ac.Containers.Exec(ctx,
+		&options.ExecContainer{
+			ProcessOptions: options.ProcessOptions{
+				Interactive: false,
+				TTY:         true,
+				WorkDir:     "/app",
+				Env:         env,
+			},
+		}, sb.ContainerID, shellCmd, os.Environ(), args...)
+	if err != nil {
+		slog.ErrorContext(ctx, "shell: ac.Containers.Exec", "error", err)
+		return "", err
+	}
+
+	return output, nil
 }

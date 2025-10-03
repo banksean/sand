@@ -147,7 +147,9 @@ func (c *ContainerSvc) Run(ctx context.Context, opts *options.RunContainer, imag
 }
 
 func (c *ContainerSvc) Exec(ctx context.Context, opts *options.ExecContainer, containerID, command string, env []string, cmdArgs ...string) (string, error) {
-	cmd := exec.CommandContext(ctx, "container", append([]string{"exec", containerID, command}, cmdArgs...)...)
+	args := options.ToArgs(opts)
+	args = append(args, append([]string{containerID, command}, cmdArgs...)...)
+	cmd := exec.CommandContext(ctx, "container", append([]string{"exec"}, args...)...)
 	slog.InfoContext(ctx, "ContainerSvc.Exec", "cmd", strings.Join(cmd.Args, " "))
 	out, err := cmd.CombinedOutput()
 	if err != nil {
