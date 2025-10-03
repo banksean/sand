@@ -78,8 +78,33 @@ func (c *CredsCmd) Run(cctx *Context) error {
 	return nil
 }
 
+// hasHelpMdFlag checks if --help-md is in the command-line arguments
+func hasHelpMdFlag() bool {
+	for _, arg := range os.Args {
+		if arg == "--help-md" {
+			return true
+		}
+	}
+	return false
+}
+
 func main() {
 	var cli CLI
+
+	// Check for --help-md flag and convert it to --help
+	if hasHelpMdFlag() {
+		// Replace --help-md with --help in os.Args
+		for i, arg := range os.Args {
+			if arg == "--help-md" {
+				os.Args[i] = "--help"
+				break
+			}
+		}
+		ctx := kong.Parse(&cli, kong.Help(MarkdownHelpPrinter))
+		ctx.FatalIfErrorf(ctx.PrintUsage(false))
+		os.Exit(0)
+	}
+
 	ctx := kong.Parse(&cli)
 	cli.initSlog()
 
