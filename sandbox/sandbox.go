@@ -61,7 +61,7 @@ func (sb *Sandbox) CreateContainer(ctx context.Context) error {
 				Remove:    false,
 				Mount: []string{
 					// TODO: mount other image-independent config files etc into the default user's home directory after the container starts up.
-					fmt.Sprintf(`type=bind,source=%s,target=/root/.claude,readonly`, filepath.Join(os.Getenv("HOME"), ".claude")),
+					fmt.Sprintf(`type=bind,source=%s,target=/root/.claude`, filepath.Join(sb.SandboxWorkDir, ".claude")),
 					fmt.Sprintf(`type=bind,source=%s,target=/app`, filepath.Join(sb.SandboxWorkDir, "app")),
 				},
 			},
@@ -87,13 +87,14 @@ func (sb *Sandbox) StartContainer(ctx context.Context) error {
 }
 
 // ShellExec executes a command in the container. The container must be in state "running".
-func (sb *Sandbox) ShellExec(ctx context.Context, shellCmd string, stdin io.Reader, stdout, stderr io.Writer) error {
+func (sb *Sandbox) ShellExec(ctx context.Context, shellCmd string, env map[string]string, stdin io.Reader, stdout, stderr io.Writer) error {
 	wait, err := ac.Containers.ExecStream(ctx,
 		&options.ExecContainer{
 			ProcessOptions: options.ProcessOptions{
 				Interactive: true,
 				TTY:         true,
 				WorkDir:     "/app",
+				Env:         env,
 			},
 		}, sb.ContainerID, shellCmd, os.Environ(), stdin, stdout, stderr)
 	if err != nil {

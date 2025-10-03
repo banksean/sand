@@ -14,6 +14,7 @@ import (
 
 	ac "github.com/banksean/apple-container"
 	"github.com/banksean/apple-container/options"
+	"github.com/zalando/go-keyring"
 )
 
 type SandBoxer struct {
@@ -39,6 +40,10 @@ func (sb *SandBoxer) NewSandbox(ctx context.Context, id, hostWorkDir, imageName,
 	slog.InfoContext(ctx, "SandBoxer.NewSandbox", "hostWorkDir", hostWorkDir, "id", id)
 
 	if err := sb.cloneWorkDir(ctx, id, hostWorkDir); err != nil {
+		return nil, err
+	}
+
+	if err := sb.cloneClaudeDir(ctx, id); err != nil {
 		return nil, err
 	}
 
@@ -147,6 +152,43 @@ func (sb *SandBoxer) cloneWorkDir(ctx context.Context, id, hostWorkDir string) e
 		slog.InfoContext(ctx, "cloneWorkDir", "error", err, "output", output)
 		return err
 	}
+	return nil
+}
+
+func (sb *SandBoxer) cloneClaudeDir(ctx context.Context, id string) error {
+	if err := os.MkdirAll(filepath.Join(sb.cloneRoot, id), 0750); err != nil {
+		return err
+	}
+	cloneClaude := filepath.Join(sb.cloneRoot, "/", id, ".claude")
+	dotClaude := filepath.Join(os.Getenv("HOME"), ".claude")
+	if _, err := os.Stat(dotClaude); errors.Is(err, os.ErrNotExist) {
+		f, err := os.Create(cloneClaude)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		return nil
+	}
+	cmd := exec.CommandContext(ctx, "cp", "-Rc", dotClaude, cloneClaude)
+	slog.InfoContext(ctx, "cloneClaudeDir", "cmd", strings.Join(cmd.Args, " "))
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		slog.InfoContext(ctx, "cloneClaudeDir", "error", err, "output", output)
+		return err
+	}
+	key, err := keyring.Get("Claude Code-credentials", os.Getenv("USER"))
+	if err != nil {
+		return nil
+	}
+	credsFile, err := os.Create(filepath.Join(cloneClaude, ".credentials.json"))
+	if err != nil {
+		return err
+	}
+	defer credsFile.Close()
+	if _, err := credsFile.Write([]byte(key)); err != nil {
+		return err
+	}
+
 	return nil
 }
 

@@ -120,7 +120,8 @@ func (sc *ShellCmd) Run(cctx *Context) error {
 	}
 
 	slog.InfoContext(ctx, "main: sbox.shell starting")
-	if err := sbox.ShellExec(ctx, sc.Shell, os.Stdin, os.Stdout, os.Stderr); err != nil {
+
+	if err := sbox.ShellExec(ctx, sc.Shell, cctx.Keychain, os.Stdin, os.Stdout, os.Stderr); err != nil {
 		slog.ErrorContext(ctx, "sbox.shell", "error", err)
 	}
 

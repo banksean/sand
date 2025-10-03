@@ -1,17 +1,20 @@
 package main
 
 import (
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 
 	"github.com/alecthomas/kong"
+	"github.com/zalando/go-keyring"
 )
 
 type Context struct {
 	LogFile   string
 	LogLevel  string
 	CloneRoot string
+	Keychain  map[string]string
 }
 
 type CLI struct {
@@ -23,6 +26,7 @@ type CLI struct {
 	Ls    LsCmd    `cmd:"" help:"list sandboxes"`
 	Rm    RmCmd    `cmd:"" help:"remove sandbox container and its clone directory"`
 	Stop  StopCmd  `cmd:"" help:"stop sandbox container"`
+	Creds CredsCmd `cmd:""`
 }
 
 func (c *CLI) initSlog() {
@@ -66,14 +70,29 @@ func (c *CLI) initSlog() {
 	slog.Info("slog initialized")
 }
 
+type CredsCmd struct{}
+
+func (c *CredsCmd) Run(cctx *Context) error {
+	fmt.Printf("%+v\n", cctx.Keychain)
+	return nil
+}
+
 func main() {
 	var cli CLI
 	ctx := kong.Parse(&cli)
 	cli.initSlog()
-	err := ctx.Run(&Context{
+
+	keychain := map[string]string{}
+	key, err := keyring.Get("Claude Code-credentials", os.Getenv("USER"))
+	if err == nil {
+		keychain["CLAUDE_CREDENTIALS"] = key
+	}
+
+	err = ctx.Run(&Context{
 		LogFile:   cli.LogFile,
 		LogLevel:  cli.LogLevel,
 		CloneRoot: cli.CloneRoot,
+		Keychain:  keychain,
 	})
 	ctx.FatalIfErrorf(err)
 }
