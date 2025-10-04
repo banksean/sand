@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	applecontainer "github.com/banksean/apple-container"
-	"github.com/banksean/apple-container/sandbox"
 )
 
 type StopCmd struct {
@@ -19,20 +18,16 @@ func (sc *StopCmd) Run(cctx *Context) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	sber := sandbox.NewSandBoxer(
-		cctx.CloneRoot,
-	)
-
 	ids := []string{}
 	if !sc.All {
-		sbox, err := sber.Get(ctx, sc.ID)
+		sbox, err := cctx.sber.Get(ctx, sc.ID)
 		if err != nil {
 			return err
 		}
 
 		ids = append(ids, sbox.ContainerID)
 	} else {
-		bxs, err := sber.List(ctx)
+		bxs, err := cctx.sber.List(ctx)
 		if err != nil {
 			return err
 		}

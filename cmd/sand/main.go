@@ -8,12 +8,14 @@ import (
 	"path/filepath"
 
 	"github.com/alecthomas/kong"
+	"github.com/banksean/apple-container/sandbox"
 )
 
 type Context struct {
 	LogFile   string
 	LogLevel  string
 	CloneRoot string
+	sber      *sandbox.SandBoxer
 }
 
 type CLI struct {
@@ -87,10 +89,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	sber := sandbox.NewSandBoxer(cli.CloneRoot, os.Stderr)
 	err := ctx.Run(&Context{
 		LogFile:   cli.LogFile,
 		LogLevel:  cli.LogLevel,
 		CloneRoot: cli.CloneRoot,
+		sber:      sber,
 	})
 	ctx.FatalIfErrorf(err)
 }

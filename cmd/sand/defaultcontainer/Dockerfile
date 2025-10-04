@@ -103,10 +103,7 @@ RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/
   -a "source /usr/share/doc/fzf/examples/key-bindings.zsh" \
   -a "source /usr/share/doc/fzf/examples/completion.zsh" \
   -a "export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhistory/.bash_history" \
-  -a 'source ~/.p10k.zsh'
- 
-ADD .zshrc /root
-ADD .p10k.zsh /root
+  -a '[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh'
 
 # Install Claude
 RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}

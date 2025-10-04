@@ -6,8 +6,6 @@ import (
 	"log/slog"
 	"os"
 	"sync"
-
-	"github.com/banksean/apple-container/sandbox"
 )
 
 type RmCmd struct {
@@ -20,10 +18,6 @@ func (rm *RmCmd) Run(cctx *Context) error {
 	defer cancel()
 	slog.InfoContext(ctx, "RmCmd", "run", *rm)
 
-	sber := sandbox.NewSandBoxer(
-		cctx.CloneRoot,
-	)
-
 	cwd, err := os.Getwd()
 	if err != nil {
 		slog.ErrorContext(ctx, "os.Getwd", "error", err)
@@ -33,7 +27,7 @@ func (rm *RmCmd) Run(cctx *Context) error {
 	if !rm.All {
 		ids = append(ids, rm.ID)
 	} else {
-		bxs, err := sber.List(ctx)
+		bxs, err := cctx.sber.List(ctx)
 		if err != nil {
 			return err
 		}
@@ -42,7 +36,7 @@ func (rm *RmCmd) Run(cctx *Context) error {
 		}
 	}
 
-	slog.InfoContext(ctx, "RmCmd.Run", "sber", sber, "cwd", cwd)
+	slog.InfoContext(ctx, "RmCmd.Run", "sber", cctx.sber, "cwd", cwd)
 
 	var wg sync.WaitGroup
 	errChan := make(chan error, len(ids))
@@ -51,7 +45,7 @@ func (rm *RmCmd) Run(cctx *Context) error {
 		wg.Add(1)
 		go func(id string) {
 			defer wg.Done()
-			sbx, err := sber.Get(ctx, id)
+			sbx, err := cctx.sber.Get(ctx, id)
 			if err != nil {
 				errChan <- err
 				return
@@ -59,7 +53,7 @@ func (rm *RmCmd) Run(cctx *Context) error {
 			if sbx == nil {
 				return
 			}
-			if err := sber.Cleanup(ctx, sbx); err != nil {
+			if err := cctx.sber.Cleanup(ctx, sbx); err != nil {
 				errChan <- err
 				return
 			}

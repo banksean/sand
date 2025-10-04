@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-
-	"github.com/banksean/apple-container/sandbox"
 )
 
 type LsCmd struct {
@@ -16,17 +14,13 @@ func (ls *LsCmd) Run(cctx *Context) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	sber := sandbox.NewSandBoxer(
-		cctx.CloneRoot,
-	)
-
 	cwd, err := os.Getwd()
 	if err != nil {
 		slog.ErrorContext(ctx, "os.Getwd", "error", err)
 		return err
 	}
-	slog.InfoContext(ctx, "LsCmd.Run", "sber", sber, "cwd", cwd)
-	list, err := sber.List(ctx)
+	slog.InfoContext(ctx, "LsCmd.Run", "sber", cctx.sber, "cwd", cwd)
+	list, err := cctx.sber.List(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "sber.List", "error", err)
 		return err

@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"log/slog"
 	"os"
@@ -17,14 +18,16 @@ import (
 )
 
 type SandBoxer struct {
-	cloneRoot string
-	sandBoxes map[string]*Sandbox
+	cloneRoot      string
+	sandBoxes      map[string]*Sandbox
+	terminalWriter io.Writer
 }
 
-func NewSandBoxer(cloneRoot string) *SandBoxer {
+func NewSandBoxer(cloneRoot string, terminalWriter io.Writer) *SandBoxer {
 	return &SandBoxer{
-		cloneRoot: cloneRoot,
-		sandBoxes: map[string]*Sandbox{},
+		cloneRoot:      cloneRoot,
+		sandBoxes:      map[string]*Sandbox{},
+		terminalWriter: terminalWriter,
 	}
 }
 
@@ -42,13 +45,11 @@ func (sb *SandBoxer) NewSandbox(ctx context.Context, id, hostWorkDir, imageName,
 		return nil, err
 	}
 
-	if err := sb.cloneGitconfig(ctx, id); err != nil {
-		return nil, err
-	}
 	if err := sb.cloneClaudeDir(ctx, id); err != nil {
 		return nil, err
 	}
-	if err := sb.cloneClaudeJSON(ctx, id); err != nil {
+
+	if err := sb.cloneDotfiles(ctx, id); err != nil {
 		return nil, err
 	}
 
@@ -185,56 +186,71 @@ func (sb *SandBoxer) cloneClaudeDir(ctx context.Context, id string) error {
 	return nil
 }
 
-func (sb *SandBoxer) cloneClaudeJSON(ctx context.Context, id string) error {
+func (sb *SandBoxer) cloneDotfiles(ctx context.Context, id string) error {
+	dotfiles := []string{
+		".claude.json",
+		".gitconfig",
+		".p10k.zsh",
+		".zshrc",
+	}
 	if err := os.MkdirAll(filepath.Join(sb.cloneRoot, id, "dotfiles"), 0750); err != nil {
 		return err
 	}
-	cloneClaudeJSON := filepath.Join(sb.cloneRoot, "/", id, "dotfiles", ".claude.json")
-	dotClaudeJSON := filepath.Join(os.Getenv("HOME"), ".claude.json")
-	if _, err := os.Stat(dotClaudeJSON); errors.Is(err, os.ErrNotExist) {
-		f, err := os.Create(cloneClaudeJSON)
+	for _, dotfile := range dotfiles {
+		clone := filepath.Join(sb.cloneRoot, "/", id, "dotfiles", dotfile)
+		original := filepath.Join(os.Getenv("HOME"), dotfile)
+		fi, err := os.Lstat(original)
+		if errors.Is(err, os.ErrNotExist) {
+			f, err := os.Create(clone)
+			if err != nil {
+				return err
+			}
+			f.Close()
+			continue
+		}
+		if fi.Mode()&os.ModeSymlink != 0 {
+			destination, err := os.Readlink(original)
+			if err != nil {
+				slog.ErrorContext(ctx, "SandBoxer.cloneDotfiles error reading symbolic link", "original", original, "error", err)
+				continue
+			}
+			if !filepath.IsAbs(destination) {
+				destination = filepath.Join(os.Getenv("HOME"), destination)
+			}
+			// Now verify that the file that the symlink points to actually exists.
+			_, err = os.Lstat(destination)
+			if errors.Is(err, os.ErrNotExist) {
+				slog.ErrorContext(ctx, "SandBoxer.cloneDotfiles symbolic link points to nonexistent file",
+					"original", original, "destination", destination, "error", err)
+				f, err := os.Create(clone)
+				if err != nil {
+					return err
+				}
+				f.Close()
+				continue
+			}
+			slog.ErrorContext(ctx, "SandBoxer.cloneDotfiles resolved symbolic link",
+				"original", original, "destination", destination)
+			original = destination
+		}
+		cmd := exec.CommandContext(ctx, "cp", "-Rc", original, clone)
+		slog.InfoContext(ctx, "cloneDotfiles", "cmd", strings.Join(cmd.Args, " "))
+		output, err := cmd.CombinedOutput()
 		if err != nil {
+			slog.InfoContext(ctx, "cloneDotfiles", "error", err, "output", output)
 			return err
 		}
-		defer f.Close()
-		return nil
-	}
-	cmd := exec.CommandContext(ctx, "cp", "-Rc", dotClaudeJSON, cloneClaudeJSON)
-	slog.InfoContext(ctx, "cloneGitconfig", "cmd", strings.Join(cmd.Args, " "))
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		slog.InfoContext(ctx, "cloneGitconfig", "error", err, "output", output)
-		return err
-	}
-
-	return nil
-}
-func (sb *SandBoxer) cloneGitconfig(ctx context.Context, id string) error {
-	if err := os.MkdirAll(filepath.Join(sb.cloneRoot, id, "dotfiles"), 0750); err != nil {
-		return err
-	}
-	cloneGitconfig := filepath.Join(sb.cloneRoot, "/", id, "dotfiles", ".gitconfig")
-	dotGitconfig := filepath.Join(os.Getenv("HOME"), ".gitconfig")
-	if _, err := os.Stat(dotGitconfig); errors.Is(err, os.ErrNotExist) {
-		f, err := os.Create(cloneGitconfig)
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-		return nil
-	}
-	cmd := exec.CommandContext(ctx, "cp", "-Rc", dotGitconfig, cloneGitconfig)
-	slog.InfoContext(ctx, "cloneGitconfig", "cmd", strings.Join(cmd.Args, " "))
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		slog.InfoContext(ctx, "cloneGitconfig", "error", err, "output", output)
-		return err
 	}
 
 	return nil
 }
 
 func (sb *SandBoxer) buildDefaultImage(ctx context.Context, dockerFileDir, sandboxUsername string) error {
+	slog.InfoContext(ctx, "SandBoxer.buildDefaultImage", "dockerFileDir", dockerFileDir, "sandboxUsername", sandboxUsername)
+	if sb.terminalWriter != nil {
+		fmt.Fprintln(sb.terminalWriter, "This may take a while, but we only do it once: building default container image...")
+	}
+
 	outLogs, errLogs, wait, err := ac.Images.Build(ctx, dockerFileDir,
 		&options.BuildOptions{
 			Tag:      DefaultImageName,
@@ -249,6 +265,9 @@ func (sb *SandBoxer) buildDefaultImage(ctx context.Context, dockerFileDir, sandb
 	go func() {
 		logScanner := bufio.NewScanner(outLogs)
 		for logScanner.Scan() {
+			if sb.terminalWriter != nil {
+				fmt.Fprintln(sb.terminalWriter, logScanner.Text())
+			}
 			slog.InfoContext(ctx, "buildDefaultImage", "stdout", logScanner.Text())
 		}
 		if logScanner.Err() != nil {
@@ -259,14 +278,20 @@ func (sb *SandBoxer) buildDefaultImage(ctx context.Context, dockerFileDir, sandb
 	go func() {
 		logScanner := bufio.NewScanner(errLogs)
 		for logScanner.Scan() {
-			slog.InfoContext(ctx, "buildDefaultImage", "stderr", logScanner.Text())
+			if sb.terminalWriter != nil {
+				fmt.Fprintln(sb.terminalWriter, logScanner.Text())
+			}
+			slog.ErrorContext(ctx, "buildDefaultImage", "stderr", logScanner.Text())
 		}
 		if logScanner.Err() != nil {
 			slog.ErrorContext(ctx, "buildDefaultImage", "error", err)
 		}
 	}()
-
-	return wait()
+	err = wait()
+	if sb.terminalWriter != nil && err != nil {
+		fmt.Fprint(sb.terminalWriter, "\n\nDone building default container image.\n\n")
+	}
+	return err
 }
 
 func (sb *SandBoxer) checkForImage(ctx context.Context, imageName, dockerfileDir, sandboxUsername string) error {

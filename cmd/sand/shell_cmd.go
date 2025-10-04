@@ -39,11 +39,7 @@ func (sc *ShellCmd) Run(cctx *Context) error {
 		sc.DockerFileDir = filepath.Join(sc.DockerFileDir, "defaultcontainer")
 	}
 
-	sber := sandbox.NewSandBoxer(
-		cctx.CloneRoot,
-	)
-
-	if err := sber.EnsureDefaultImage(ctx, sc.ImageName, sc.DockerFileDir, "root"); err != nil {
+	if err := cctx.sber.EnsureDefaultImage(ctx, sc.ImageName, sc.DockerFileDir, "root"); err != nil {
 		slog.ErrorContext(ctx, "sber.Init", "error", err)
 		return err
 	}
@@ -59,12 +55,12 @@ func (sc *ShellCmd) Run(cctx *Context) error {
 	var sbox *sandbox.Sandbox
 
 	if sc.ID != "" {
-		sbox, err = sber.Get(ctx, sc.ID) // Try to connect to an existing sandbo with this ID
+		sbox, err = cctx.sber.Get(ctx, sc.ID) // Try to connect to an existing sandbo with this ID
 		if err != nil {
 			return err
 		}
 		if sbox == nil { // Create a new sandbox with this ID
-			sbox, err = sber.NewSandbox(ctx, sc.ID, sc.CloneFromDir, sc.ImageName, sc.DockerFileDir)
+			sbox, err = cctx.sber.NewSandbox(ctx, sc.ID, sc.CloneFromDir, sc.ImageName, sc.DockerFileDir)
 			if err != nil {
 				slog.ErrorContext(ctx, "sber.NewSandbox", "error", err)
 				return err
@@ -72,7 +68,7 @@ func (sc *ShellCmd) Run(cctx *Context) error {
 		}
 	} else { // Create a new sandbox with a random ID
 		sc.ID = uuid.NewString()
-		sbox, err = sber.NewSandbox(ctx, sc.ID, sc.CloneFromDir, sc.ImageName, sc.DockerFileDir)
+		sbox, err = cctx.sber.NewSandbox(ctx, sc.ID, sc.CloneFromDir, sc.ImageName, sc.DockerFileDir)
 		if err != nil {
 			slog.ErrorContext(ctx, "sber.NewSandbox", "error", err)
 			return err
@@ -132,7 +128,7 @@ func (sc *ShellCmd) Run(cctx *Context) error {
 
 	if sc.Rm {
 		slog.InfoContext(ctx, "sbox.shell finished, cleaning up...")
-		if err := sber.Cleanup(ctx, sbox); err != nil {
+		if err := cctx.sber.Cleanup(ctx, sbox); err != nil {
 			slog.ErrorContext(ctx, "sber.Cleanup", "error", err)
 		}
 
