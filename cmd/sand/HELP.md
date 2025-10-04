@@ -2,6 +2,8 @@
 
 Manage lightweight linux container sandboxes on MacOS.
 
+Requires apple container CLI: https://github.com/apple/container/releases/tag/0.5.0
+
 ## Global Flags
 
 - `-h, --help` - Show context-sensitive help.
@@ -78,8 +80,12 @@ stop sandbox container
 **Usage:**
 
 ```
-sand stop [ID]
+sand stop [flags] [ID]
 ```
+
+**Flags:**
+
+- `--all` - stop all sandboxes
 
 ## `sand doc`
 

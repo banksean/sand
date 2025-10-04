@@ -79,7 +79,9 @@ func (c *CredsCmd) Run(cctx *Context) error {
 	return nil
 }
 
-const description = `Manage lightweight linux container sandboxes on MacOS.`
+const description = `Manage lightweight linux container sandboxes on MacOS.
+
+Requires apple container CLI: https://github.com/apple/container/releases/tag/` + appleContainerVersion
 
 func main() {
 	var cli CLI
@@ -90,7 +92,7 @@ func main() {
 
 	if err := verifyPrerequisites(context.Background()); err != nil {
 		fmt.Fprintf(os.Stderr, "Prerequisites check failed: %v\n", err.Error())
-		fmt.Fprintf(os.Stderr, "You may need to install Apple's `container` command from the releases published at https://github.com/apple/container/releases")
+		fmt.Fprintf(os.Stderr, "You may need to install Apple's `container` command from the releases published at https://github.com/apple/container/releases/tag/"+appleContainerVersion)
 		os.Exit(1)
 	}
 

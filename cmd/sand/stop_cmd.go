@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 
 	applecontainer "github.com/banksean/apple-container"
@@ -9,7 +10,8 @@ import (
 )
 
 type StopCmd struct {
-	ID string `arg:"" optional:"" help:"ID of the sandbox to stop"`
+	ID  string `arg:"" optional:"" help:"ID of the sandbox to stop"`
+	All bool   `help:"stop all sandboxes"`
 }
 
 func (sc *StopCmd) Run(cctx *Context) error {
@@ -19,15 +21,32 @@ func (sc *StopCmd) Run(cctx *Context) error {
 	sber := sandbox.NewSandBoxer(
 		cctx.CloneRoot,
 	)
-	sbox, err := sber.Get(ctx, sc.ID)
-	if err != nil {
-		return err
+
+	ids := []string{}
+	if !sc.All {
+		sbox, err := sber.Get(ctx, sc.ID)
+		if err != nil {
+			return err
+		}
+
+		ids = append(ids, sbox.ContainerID)
+	} else {
+		bxs, err := sber.List(ctx)
+		if err != nil {
+			return err
+		}
+		for _, bx := range bxs {
+			ids = append(ids, bx.ContainerID)
+		}
 	}
 
-	out, err := applecontainer.Containers.Stop(ctx, nil, sbox.ContainerID)
-	if err != nil {
-		slog.ErrorContext(ctx, "StopCmd Containers.Stop", "error", err, "out", out)
-		return err
+	for _, containerID := range ids {
+		out, err := applecontainer.Containers.Stop(ctx, nil, containerID)
+		if err != nil {
+			slog.ErrorContext(ctx, "StopCmd Containers.Stop", "error", err, "out", out)
+			return err
+		}
+		fmt.Printf("%s\t%s\n", containerID, out)
 	}
 
 	return nil
