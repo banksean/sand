@@ -2,7 +2,9 @@ package applecontainer
 
 import (
 	"context"
+	"fmt"
 	"io"
+	"log/slog"
 	"os/exec"
 	"strings"
 	"syscall"
@@ -17,10 +19,11 @@ var System SystemSvc
 
 // Version returns the version string for the "container" command, or an error.
 func (s *SystemSvc) Version(ctx context.Context) (string, error) {
-	cmd := exec.CommandContext(ctx, "container", "--verison")
+	cmd := exec.CommandContext(ctx, "container", "system", "--version")
+	slog.InfoContext(ctx, "SystemSvc.Version", "cmd", strings.Join(cmd.Args, " "))
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("%w: %s", err, strings.TrimSpace(string(output)))
 	}
 	return strings.TrimSpace(string(output)), nil
 }

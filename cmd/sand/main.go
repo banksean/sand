@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
@@ -86,6 +87,12 @@ func main() {
 	ctx := kong.Parse(&cli,
 		kong.Description(description))
 	cli.initSlog()
+
+	if err := verifyPrerequisites(context.Background()); err != nil {
+		fmt.Fprintf(os.Stderr, "Prerequisites check failed: %v\n", err.Error())
+		fmt.Fprintf(os.Stderr, "You may need to install Apple's `container` command from the releases published at https://github.com/apple/container/releases")
+		os.Exit(1)
+	}
 
 	keychain := map[string]string{}
 	key, err := keyring.Get("Claude Code-credentials", os.Getenv("USER"))
