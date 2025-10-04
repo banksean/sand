@@ -138,7 +138,7 @@ func (sb *SandBoxer) Cleanup(ctx context.Context, sbox *Sandbox) error {
 		slog.ErrorContext(ctx, "SandBoxer Containers.Delete", "error", err, "out", out)
 	}
 
-	if err := os.RemoveAll(sb.cloneRoot); err != nil {
+	if err := os.RemoveAll(sbox.SandboxWorkDir); err != nil {
 		return err
 	}
 	return nil
