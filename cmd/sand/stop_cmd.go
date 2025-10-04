@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync"
 
 	applecontainer "github.com/banksean/apple-container"
 	"github.com/banksean/apple-container/sandbox"
@@ -40,13 +41,29 @@ func (sc *StopCmd) Run(cctx *Context) error {
 		}
 	}
 
+	var wg sync.WaitGroup
+	errChan := make(chan error, len(ids))
+
 	for _, containerID := range ids {
-		out, err := applecontainer.Containers.Stop(ctx, nil, containerID)
-		if err != nil {
-			slog.ErrorContext(ctx, "StopCmd Containers.Stop", "error", err, "out", out)
-			return err
-		}
-		fmt.Printf("%s\t%s\n", containerID, out)
+		wg.Add(1)
+		go func(containerID string) {
+			defer wg.Done()
+			out, err := applecontainer.Containers.Stop(ctx, nil, containerID)
+			if err != nil {
+				slog.ErrorContext(ctx, "StopCmd Containers.Stop", "error", err, "out", out)
+				errChan <- err
+				return
+			}
+			fmt.Printf("%s\t%s\n", containerID, out)
+		}(containerID)
+	}
+
+	wg.Wait()
+	close(errChan)
+
+	// Return the first error if any occurred
+	for err := range errChan {
+		return err
 	}
 
 	return nil

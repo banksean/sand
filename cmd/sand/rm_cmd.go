@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"sync"
 
 	"github.com/banksean/apple-container/sandbox"
 )
@@ -42,18 +43,36 @@ func (rm *RmCmd) Run(cctx *Context) error {
 	}
 
 	slog.InfoContext(ctx, "RmCmd.Run", "sber", sber, "cwd", cwd)
+
+	var wg sync.WaitGroup
+	errChan := make(chan error, len(ids))
+
 	for _, id := range ids {
-		sbx, err := sber.Get(ctx, id)
-		if err != nil {
-			return err
-		}
-		if sbx == nil {
-			return nil
-		}
-		if err := sber.Cleanup(ctx, sbx); err != nil {
-			return err
-		}
-		fmt.Printf("%s\n", id)
+		wg.Add(1)
+		go func(id string) {
+			defer wg.Done()
+			sbx, err := sber.Get(ctx, id)
+			if err != nil {
+				errChan <- err
+				return
+			}
+			if sbx == nil {
+				return
+			}
+			if err := sber.Cleanup(ctx, sbx); err != nil {
+				errChan <- err
+				return
+			}
+			fmt.Printf("%s\n", id)
+		}(id)
+	}
+
+	wg.Wait()
+	close(errChan)
+
+	// Return the first error if any occurred
+	for err := range errChan {
+		return err
 	}
 
 	return nil
