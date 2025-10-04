@@ -124,7 +124,9 @@ func (sc *ShellCmd) Run(cctx *Context) error {
 
 	slog.InfoContext(ctx, "main: sbox.shell starting")
 
-	if err := sbox.Shell(ctx, sc.Shell, cctx.Keychain, os.Stdin, os.Stdout, os.Stderr); err != nil {
+	env := getEnv()
+
+	if err := sbox.Shell(ctx, sc.Shell, env, os.Stdin, os.Stdout, os.Stderr); err != nil {
 		slog.ErrorContext(ctx, "sbox.shell", "error", err)
 	}
 
@@ -137,4 +139,15 @@ func (sc *ShellCmd) Run(cctx *Context) error {
 		slog.InfoContext(ctx, "Cleanup complete. Exiting.")
 	}
 	return nil
+}
+
+func getEnv() map[string]string {
+	var ret map[string]string
+	ccoat := os.Getenv("CLAUDE_CODE_OAUTH_TOKEN")
+
+	if ccoat != "" {
+		ret = make(map[string]string)
+		ret["CLAUDE_CODE_OAUTH_TOKEN"] = ccoat
+	}
+	return ret
 }

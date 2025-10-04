@@ -8,14 +8,12 @@ import (
 	"path/filepath"
 
 	"github.com/alecthomas/kong"
-	"github.com/zalando/go-keyring"
 )
 
 type Context struct {
 	LogFile   string
 	LogLevel  string
 	CloneRoot string
-	Keychain  map[string]string
 }
 
 type CLI struct {
@@ -72,13 +70,6 @@ func (c *CLI) initSlog() {
 	slog.Info("slog initialized")
 }
 
-type CredsCmd struct{}
-
-func (c *CredsCmd) Run(cctx *Context) error {
-	fmt.Printf("%+v\n", cctx.Keychain)
-	return nil
-}
-
 const description = `Manage lightweight linux container sandboxes on MacOS.
 
 Requires apple container CLI: https://github.com/apple/container/releases/tag/` + appleContainerVersion
@@ -96,17 +87,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	keychain := map[string]string{}
-	key, err := keyring.Get("Claude Code-credentials", os.Getenv("USER"))
-	if err == nil {
-		keychain["CLAUDE_CREDENTIALS"] = key
-	}
-
-	err = ctx.Run(&Context{
+	err := ctx.Run(&Context{
 		LogFile:   cli.LogFile,
 		LogLevel:  cli.LogLevel,
 		CloneRoot: cli.CloneRoot,
-		Keychain:  keychain,
 	})
 	ctx.FatalIfErrorf(err)
 }

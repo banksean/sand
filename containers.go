@@ -166,12 +166,12 @@ func (c *ContainerSvc) ExecStream(ctx context.Context, opts *options.ExecContain
 	args := options.ToArgs(opts)
 	args = append(args, append([]string{containerID, command}, cmdArgs...)...)
 	cmd := exec.CommandContext(ctx, "container", append([]string{"exec"}, args...)...)
-	slog.InfoContext(ctx, "ContainerSvc.Exec", "cmd", strings.Join(cmd.Args, " "))
+	slog.InfoContext(ctx, "ContainerSvc.ExecStream", "cmd", strings.Join(cmd.Args, " "))
 	cmd.Env = env
 	checkTerminal := false
 	stdinFile, ok := stdin.(*os.File)
 	if !checkTerminal || (ok && term.IsTerminal(int(stdinFile.Fd()))) {
-		slog.InfoContext(ctx, "ContainerSvc.Exec: normal terminal passthrough")
+		slog.InfoContext(ctx, "ContainerSvc.ExecStream: normal terminal passthrough")
 
 		cmd.Stdin = stdin
 		cmd.Stdout = stdout
@@ -180,7 +180,7 @@ func (c *ContainerSvc) ExecStream(ctx context.Context, opts *options.ExecContain
 			return nil, err
 		}
 	} else {
-		slog.InfoContext(ctx, "ContainerSvc.Exec: using pseudo-terminal")
+		slog.InfoContext(ctx, "ContainerSvc.ExecStream: using pseudo-terminal")
 
 		ptmx, err := pty.Start(cmd)
 		if err != nil {

@@ -62,7 +62,6 @@ func (sb *Sandbox) CreateContainer(ctx context.Context) error {
 				Mount: []string{
 					// TODO: mount other image-independent config files etc into the default user's home directory after the container starts up.
 					fmt.Sprintf(`type=bind,source=%s,target=/dotfiles,readonly`, filepath.Join(sb.SandboxWorkDir, "dotfiles")),
-					fmt.Sprintf(`type=bind,source=%s,target=/root/.claude`, filepath.Join(sb.SandboxWorkDir, ".claude")),
 					fmt.Sprintf(`type=bind,source=%s,target=/app`, filepath.Join(sb.SandboxWorkDir, "app")),
 				},
 			},
@@ -83,6 +82,7 @@ func (sb *Sandbox) StartContainer(ctx context.Context) error {
 		slog.ErrorContext(ctx, "startContainer", "error", err, "output", output)
 		return err
 	}
+	// At startup, copy whatever is in /dotfiles into the root user's home directory.
 	cpOut, err := sb.Exec(ctx, "cp", nil, "-r", "/dotfiles/.", "/root/.")
 	if err != nil {
 		slog.ErrorContext(ctx, "Sandbox.StartContainer", "error", err, "cpOut", cpOut)
@@ -94,6 +94,7 @@ func (sb *Sandbox) StartContainer(ctx context.Context) error {
 
 // Shell executes a command in the container. The container must be in state "running".
 func (sb *Sandbox) Shell(ctx context.Context, shellCmd string, env map[string]string, stdin io.Reader, stdout, stderr io.Writer) error {
+	slog.InfoContext(ctx, "Sandbox.Shell", "env", env)
 	wait, err := ac.Containers.ExecStream(ctx,
 		&options.ExecContainer{
 			ProcessOptions: options.ProcessOptions{

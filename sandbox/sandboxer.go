@@ -14,7 +14,6 @@ import (
 
 	ac "github.com/banksean/apple-container"
 	"github.com/banksean/apple-container/options"
-	"github.com/zalando/go-keyring"
 )
 
 type SandBoxer struct {
@@ -43,10 +42,13 @@ func (sb *SandBoxer) NewSandbox(ctx context.Context, id, hostWorkDir, imageName,
 		return nil, err
 	}
 
+	if err := sb.cloneGitconfig(ctx, id); err != nil {
+		return nil, err
+	}
 	if err := sb.cloneClaudeDir(ctx, id); err != nil {
 		return nil, err
 	}
-	if err := sb.cloneGitconfig(ctx, id); err != nil {
+	if err := sb.cloneClaudeJSON(ctx, id); err != nil {
 		return nil, err
 	}
 
@@ -162,7 +164,7 @@ func (sb *SandBoxer) cloneClaudeDir(ctx context.Context, id string) error {
 	if err := os.MkdirAll(filepath.Join(sb.cloneRoot, id), 0750); err != nil {
 		return err
 	}
-	cloneClaude := filepath.Join(sb.cloneRoot, "/", id, ".claude")
+	cloneClaude := filepath.Join(sb.cloneRoot, "/", id, "dotfiles")
 	dotClaude := filepath.Join(os.Getenv("HOME"), ".claude")
 	if _, err := os.Stat(dotClaude); errors.Is(err, os.ErrNotExist) {
 		f, err := os.Create(cloneClaude)
@@ -176,25 +178,37 @@ func (sb *SandBoxer) cloneClaudeDir(ctx context.Context, id string) error {
 	slog.InfoContext(ctx, "cloneClaudeDir", "cmd", strings.Join(cmd.Args, " "))
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		slog.InfoContext(ctx, "cloneClaudeDir", "error", err, "output", output)
-		return err
-	}
-	key, err := keyring.Get("Claude Code-credentials", os.Getenv("USER"))
-	if err != nil {
-		return nil
-	}
-	credsFile, err := os.Create(filepath.Join(cloneClaude, ".credentials.json"))
-	if err != nil {
-		return err
-	}
-	defer credsFile.Close()
-	if _, err := credsFile.Write([]byte(key)); err != nil {
+		slog.InfoContext(ctx, "cloneClaudeDir", "error", err, "output", string(output))
 		return err
 	}
 
 	return nil
 }
 
+func (sb *SandBoxer) cloneClaudeJSON(ctx context.Context, id string) error {
+	if err := os.MkdirAll(filepath.Join(sb.cloneRoot, id, "dotfiles"), 0750); err != nil {
+		return err
+	}
+	cloneClaudeJSON := filepath.Join(sb.cloneRoot, "/", id, "dotfiles", ".claude.json")
+	dotClaudeJSON := filepath.Join(os.Getenv("HOME"), ".claude.json")
+	if _, err := os.Stat(dotClaudeJSON); errors.Is(err, os.ErrNotExist) {
+		f, err := os.Create(cloneClaudeJSON)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		return nil
+	}
+	cmd := exec.CommandContext(ctx, "cp", "-Rc", dotClaudeJSON, cloneClaudeJSON)
+	slog.InfoContext(ctx, "cloneGitconfig", "cmd", strings.Join(cmd.Args, " "))
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		slog.InfoContext(ctx, "cloneGitconfig", "error", err, "output", output)
+		return err
+	}
+
+	return nil
+}
 func (sb *SandBoxer) cloneGitconfig(ctx context.Context, id string) error {
 	if err := os.MkdirAll(filepath.Join(sb.cloneRoot, id, "dotfiles"), 0750); err != nil {
 		return err
