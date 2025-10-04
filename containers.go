@@ -41,6 +41,7 @@ func (c *ContainerSvc) List(ctx context.Context) ([]types.Container, error) {
 // Inspect returns details about the requested container IDs, or an error.
 func (c *ContainerSvc) Inspect(ctx context.Context, id ...string) ([]types.Container, error) {
 	cmd := exec.CommandContext(ctx, "container", append([]string{"inspect"}, id...)...)
+	slog.InfoContext(ctx, "ContainerSvc.Inspect", "cmd", strings.Join(cmd.Args, " "))
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 	rawJSON, err := cmd.Output()

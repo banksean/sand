@@ -9,7 +9,7 @@ import (
 	applecontainer "github.com/banksean/apple-container"
 )
 
-const expectedContainerVersion = "container CLI version 0.4.1"
+const expectedContainerVersion = "container CLI version 0.5.0"
 
 func verifyPrerequisites(ctx context.Context) error {
 	version, err := applecontainer.System.Version(ctx)
