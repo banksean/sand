@@ -61,6 +61,7 @@ func (sb *Sandbox) CreateContainer(ctx context.Context) error {
 				Remove:    false,
 				Mount: []string{
 					// TODO: mount other image-independent config files etc into the default user's home directory after the container starts up.
+					fmt.Sprintf(`type=bind,source=%s,target=/dotfiles,readonly`, filepath.Join(sb.SandboxWorkDir, "dotfiles")),
 					fmt.Sprintf(`type=bind,source=%s,target=/root/.claude`, filepath.Join(sb.SandboxWorkDir, ".claude")),
 					fmt.Sprintf(`type=bind,source=%s,target=/app`, filepath.Join(sb.SandboxWorkDir, "app")),
 				},
@@ -81,6 +82,11 @@ func (sb *Sandbox) StartContainer(ctx context.Context) error {
 	if err != nil {
 		slog.ErrorContext(ctx, "startContainer", "error", err, "output", output)
 		return err
+	}
+	cpOut, err := sb.Exec(ctx, "cp", nil, "-r", "/dotfiles/.", "/root/.")
+	if err != nil {
+		slog.ErrorContext(ctx, "Sandbox.StartContainer", "error", err, "cpOut", cpOut)
+		//return err
 	}
 	slog.InfoContext(ctx, "startContainer succeeded", "output", output)
 	return nil

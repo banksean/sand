@@ -46,6 +46,9 @@ func (sb *SandBoxer) NewSandbox(ctx context.Context, id, hostWorkDir, imageName,
 	if err := sb.cloneClaudeDir(ctx, id); err != nil {
 		return nil, err
 	}
+	if err := sb.cloneGitconfig(ctx, id); err != nil {
+		return nil, err
+	}
 
 	ret := &Sandbox{
 		ID:             id,
@@ -186,6 +189,31 @@ func (sb *SandBoxer) cloneClaudeDir(ctx context.Context, id string) error {
 	}
 	defer credsFile.Close()
 	if _, err := credsFile.Write([]byte(key)); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (sb *SandBoxer) cloneGitconfig(ctx context.Context, id string) error {
+	if err := os.MkdirAll(filepath.Join(sb.cloneRoot, id, "dotfiles"), 0750); err != nil {
+		return err
+	}
+	cloneGitconfig := filepath.Join(sb.cloneRoot, "/", id, "dotfiles", ".gitconfig")
+	dotGitconfig := filepath.Join(os.Getenv("HOME"), ".gitconfig")
+	if _, err := os.Stat(dotGitconfig); errors.Is(err, os.ErrNotExist) {
+		f, err := os.Create(cloneGitconfig)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		return nil
+	}
+	cmd := exec.CommandContext(ctx, "cp", "-Rc", dotGitconfig, cloneGitconfig)
+	slog.InfoContext(ctx, "cloneGitconfig", "cmd", strings.Join(cmd.Args, " "))
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		slog.InfoContext(ctx, "cloneGitconfig", "error", err, "output", output)
 		return err
 	}
 

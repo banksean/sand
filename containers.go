@@ -154,7 +154,7 @@ func (c *ContainerSvc) Exec(ctx context.Context, opts *options.ExecContainer, co
 	slog.InfoContext(ctx, "ContainerSvc.Exec", "cmd", strings.Join(cmd.Args, " "))
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		slog.ErrorContext(ctx, "ContainerSvc.Exec", "error", err, "out", out)
+		slog.ErrorContext(ctx, "ContainerSvc.Exec", "error", err, "out", string(out))
 		return "", err
 	}
 
