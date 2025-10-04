@@ -18,9 +18,9 @@ type Context struct {
 }
 
 type CLI struct {
-	LogFile   string `default:"/tmp/sand/log" help:"location of log file (leave empty for a random tmp/ path)"`
-	LogLevel  string `default:"info" help:"the logging level (debug, info, warn, error)"`
-	CloneRoot string `default:"/tmp/sand/boxen" help:"root dir to store sandbox clones of working directories"`
+	LogFile   string `default:"/tmp/sand/log" placeholder:"<log-file-path>" help:"location of log file (leave empty for a random tmp/ path)"`
+	LogLevel  string `default:"info" placeholder:"<debug|info|warn|error>" help:"the logging level (debug, info, warn, error)"`
+	CloneRoot string `default:"/tmp/sand/boxen" placeholder:"<clone-root-dir>" help:"root dir to store sandbox clones of working directories"`
 
 	Shell ShellCmd `cmd:"" help:"create or revive a sandbox and shell into its container"`
 	Exec  ExecCmd  `cmd:"" help:"execute a single command in a sanbox"`

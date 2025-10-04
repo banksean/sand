@@ -12,10 +12,10 @@ import (
 )
 
 type ExecCmd struct {
-	ImageName     string   `default:"sandbox" type:"image-name" help:"name of container image to use"`
-	DockerFileDir string   `help:"location of directory with docker file from which to build the image locally. Uses an embedded dockerfile if unset."`
+	ImageName     string   `default:"sandbox" placeholder:"<container-image-name>" help:"name of container image to use"`
+	DockerFileDir string   `placeholder:"<docker-file-dir>" help:"location of directory with docker file from which to build the image locally. Uses an embedded dockerfile if unset."`
 	Rm            bool     `help:"remove the sandbox after the exec terminates"`
-	ID            string   `optionl:"" help:"ID of the sandbox to create, or re-attach to"`
+	ID            string   `optionl:"" placeholder:"<sandbox-id>" help:"ID of the sandbox to create, or re-attach to"`
 	Arg           []string `arg:"" passthrough:"" help:"command args to exec in the container"`
 }
 

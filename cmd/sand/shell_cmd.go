@@ -12,9 +12,9 @@ import (
 )
 
 type ShellCmd struct {
-	ImageName     string `default:"sandbox" type:"image-name" help:"name of container image to use"`
-	DockerFileDir string `help:"location of directory with docker file from which to build the image locally. Uses an embedded dockerfile if unset."`
-	Shell         string `default:"/bin/zsh" help:"shell command to exec in the container"`
+	ImageName     string `default:"sandbox" placeholder:"<container-image-name>" help:"name of container image to use"`
+	DockerFileDir string `placeholder:"<docker-file-dir>" help:"location of directory with docker file from which to build the image locally. Uses an embedded dockerfile if unset."`
+	Shell         string `default:"/bin/zsh" placeholder:"<shell-command>" help:"shell command to exec in the container"`
 	Rm            bool   `help:"remove the sandbox after the shell terminates"`
 	ID            string `arg:"" optional:"" help:"ID of the sandbox to create, or re-attach to"`
 }

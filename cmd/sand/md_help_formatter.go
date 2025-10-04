@@ -39,7 +39,7 @@ func MarkdownHelpPrinter(options kong.HelpOptions, ctx *kong.Context) error {
 	printGlobalFlags(w, ctx)
 
 	// Print all commands recursively
-	fmt.Fprintf(w, "## Commands\n\n")
+	fmt.Fprintf(w, "## Subommands\n\n")
 	printCommands(w, ctx, root, ctx.Model.Name, 2)
 
 	return nil
@@ -120,7 +120,7 @@ func printFlag(w io.Writer, flag *kong.Flag) {
 
 	// Add type info if not a boolean
 	if !flag.IsBool() {
-		flagSig.WriteString(fmt.Sprintf(" _%s_", flag.FormatPlaceHolder()))
+		flagSig.WriteString(fmt.Sprintf(" _`%s`_", flag.FormatPlaceHolder()))
 	}
 
 	fmt.Fprintf(w, "- %s", flagSig.String())
