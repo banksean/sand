@@ -11,7 +11,7 @@ Requires apple container CLI: https://github.com/apple/container/releases/tag/0.
 - `--log-level` _`<debug|info|warn|error>`_ - the logging level (debug, info, warn, error) (default: `info`)
 - `--clone-root` _`<clone-root-dir>`_ - root dir to store sandbox clones of working directories (default: `/tmp/sand/boxen`)
 
-## Subommands
+## Subcommands
 
 ## `sand shell`
 

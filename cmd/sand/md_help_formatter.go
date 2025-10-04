@@ -39,7 +39,7 @@ func MarkdownHelpPrinter(options kong.HelpOptions, ctx *kong.Context) error {
 	printGlobalFlags(w, ctx)
 
 	// Print all commands recursively
-	fmt.Fprintf(w, "## Subommands\n\n")
+	fmt.Fprintf(w, "## Subcommands\n\n")
 	printCommands(w, ctx, root, ctx.Model.Name, 2)
 
 	return nil
