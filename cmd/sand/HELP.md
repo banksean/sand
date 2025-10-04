@@ -1,4 +1,6 @@
-# `sand` command flags and subcommands
+# `sand` command reference
+
+Manage lightweight linux container sandboxes on MacOS.
 
 ## Global Flags
 
@@ -24,6 +26,7 @@ sand shell [flags] [ID]
 - `--image-name` _`<container-image-name>`_ - name of container image to use (default: `sandbox`)
 - `--docker-file-dir` _`<docker-file-dir>`_ - location of directory with docker file from which to build the image locally. Uses an embedded dockerfile if unset.
 - `--shell` _`<shell-command>`_ - shell command to exec in the container (default: `/bin/zsh`)
+- `--clone-from-dir` _`<project-dir>`_ - directory to clone into the sandbox. Defaults to current working directory, if unset.
 - `--rm` - remove the sandbox after the shell terminates
 
 ## `sand exec`
@@ -41,6 +44,7 @@ sand exec [flags] <ARG>...
 - `--image-name` _`<container-image-name>`_ - name of container image to use (default: `sandbox`)
 - `--docker-file-dir` _`<docker-file-dir>`_ - location of directory with docker file from which to build the image locally. Uses an embedded dockerfile if unset.
 - `--rm` - remove the sandbox after the exec terminates
+- `--clone-from-dir` _`<project-dir>`_ - directory to clone into the sandbox. Defaults to current working directory, if unset.
 - `--id` _`<sandbox-id>`_ - ID of the sandbox to create, or re-attach to
 
 ## `sand ls`

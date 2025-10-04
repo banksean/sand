@@ -15,6 +15,7 @@ type ExecCmd struct {
 	ImageName     string   `default:"sandbox" placeholder:"<container-image-name>" help:"name of container image to use"`
 	DockerFileDir string   `placeholder:"<docker-file-dir>" help:"location of directory with docker file from which to build the image locally. Uses an embedded dockerfile if unset."`
 	Rm            bool     `help:"remove the sandbox after the exec terminates"`
+	CloneFromDir  string   `placeholder:"<project-dir>" help:"directory to clone into the sandbox. Defaults to current working directory, if unset."`
 	ID            string   `optionl:"" placeholder:"<sandbox-id>" help:"ID of the sandbox to create, or re-attach to"`
 	Arg           []string `arg:"" passthrough:"" help:"command args to exec in the container"`
 }
@@ -52,6 +53,9 @@ func (sc *ExecCmd) Run(cctx *Context) error {
 		slog.ErrorContext(ctx, "os.Getwd", "error", err)
 		return err
 	}
+	if sc.CloneFromDir == "" {
+		sc.CloneFromDir = cwd
+	}
 
 	var sbox *sandbox.Sandbox
 
@@ -61,7 +65,7 @@ func (sc *ExecCmd) Run(cctx *Context) error {
 			return err
 		}
 		if sbox == nil { // Create a new sandbox with this ID
-			sbox, err = sber.NewSandbox(ctx, sc.ID, cwd, sc.ImageName, sc.DockerFileDir)
+			sbox, err = sber.NewSandbox(ctx, sc.ID, sc.CloneFromDir, sc.ImageName, sc.DockerFileDir)
 			if err != nil {
 				slog.ErrorContext(ctx, "sber.NewSandbox", "error", err)
 				return err
@@ -69,7 +73,7 @@ func (sc *ExecCmd) Run(cctx *Context) error {
 		}
 	} else { // Create a new sandbox with a random ID
 		sc.ID = uuid.NewString()
-		sbox, err = sber.NewSandbox(ctx, sc.ID, cwd, sc.ImageName, sc.DockerFileDir)
+		sbox, err = sber.NewSandbox(ctx, sc.ID, sc.CloneFromDir, sc.ImageName, sc.DockerFileDir)
 		if err != nil {
 			slog.ErrorContext(ctx, "sber.NewSandbox", "error", err)
 			return err

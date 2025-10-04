@@ -13,7 +13,7 @@ type DocCmd struct{}
 func (m *DocCmd) Run() error {
 	var cli CLI
 
-	ctx := kong.Parse(&cli, kong.Help(MarkdownHelpPrinter))
+	ctx := kong.Parse(&cli, kong.Help(MarkdownHelpPrinter), kong.Description(description))
 	return ctx.PrintUsage(false)
 }
 
@@ -28,7 +28,7 @@ func MarkdownHelpPrinter(options kong.HelpOptions, ctx *kong.Context) error {
 	root := ctx.Model.Node
 
 	// Print main title
-	fmt.Fprintf(w, "# `%s` command flags and subcommands\n\n", ctx.Model.Name)
+	fmt.Fprintf(w, "# `%s` command reference\n\n", ctx.Model.Name)
 
 	// Print app-level description if available
 	if root.Help != "" && !options.NoAppSummary {

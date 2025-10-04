@@ -78,10 +78,13 @@ func (c *CredsCmd) Run(cctx *Context) error {
 	return nil
 }
 
+const description = `Manage lightweight linux container sandboxes on MacOS.`
+
 func main() {
 	var cli CLI
 
-	ctx := kong.Parse(&cli)
+	ctx := kong.Parse(&cli,
+		kong.Description(description))
 	cli.initSlog()
 
 	keychain := map[string]string{}
