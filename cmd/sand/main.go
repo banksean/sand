@@ -23,7 +23,8 @@ type CLI struct {
 	LogLevel  string `default:"info" placeholder:"<debug|info|warn|error>" help:"the logging level (debug, info, warn, error)"`
 	CloneRoot string `default:"/tmp/sand/boxen" placeholder:"<clone-root-dir>" help:"root dir to store sandbox clones of working directories"`
 
-	Shell   ShellCmd   `cmd:"" help:"create or revive a sandbox and shell into its container"`
+	New     NewCmd     `cmd:"" help:"create a new sandbox and shell into its container"`
+	Shell   ShellCmd   `cmd:"" help:"shell into a sandbox container (and start the container, if necessary)"`
 	Exec    ExecCmd    `cmd:"" help:"execute a single command in a sanbox"`
 	Ls      LsCmd      `cmd:"" help:"list sandboxes"`
 	Rm      RmCmd      `cmd:"" help:"remove sandbox container and its clone directory"`

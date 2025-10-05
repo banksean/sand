@@ -13,14 +13,14 @@ Requires apple container CLI: https://github.com/apple/container/releases/tag/0.
 
 ## Subcommands
 
-## `sand shell`
+## `sand new`
 
-create or revive a sandbox and shell into its container
+create a new sandbox and shell into its container
 
 **Usage:**
 
 ```
-sand shell [flags] [ID]
+sand new [flags] [ID]
 ```
 
 **Flags:**
@@ -30,8 +30,23 @@ sand shell [flags] [ID]
 - `-s, --shell` _`<shell-command>`_ - shell command to exec in the container (default: `/bin/zsh`)
 - `-c, --clone-from-dir` _`<project-dir>`_ - directory to clone into the sandbox. Defaults to current working directory, if unset.
 - `-e, --env-file` _`STRING`_ - path to env file to use when creating a new shell
-- `-b, --branch` - create a git branch named after the sandbox id
+- `-b, --branch` - create a new git branch inside the sandbox _container_ (not on your host workdir)
 - `--rm` - remove the sandbox after the shell terminates
+
+## `sand shell`
+
+shell into a sandbox container (and start the container, if necessary)
+
+**Usage:**
+
+```
+sand shell [flags] [ID]
+```
+
+**Flags:**
+
+- `-s, --shell` _`<shell-command>`_ - shell command to exec in the container (default: `/bin/zsh`)
+- `-e, --env-file` _`STRING`_ - path to env file to use when creating a new shell
 
 ## `sand exec`
 

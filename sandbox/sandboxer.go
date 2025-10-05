@@ -154,6 +154,7 @@ func (sb *SandBoxer) Cleanup(ctx context.Context, sbox *Sandbox) error {
 // cloneWorkDir creates a recursive, copy-on-write copy of hostWorkDir, under the sandboxer's root directory.
 // "cp -c" uses APFS's clonefile(2) function to make the destination dir contents be COW.
 func (sb *SandBoxer) cloneWorkDir(ctx context.Context, id, hostWorkDir string) error {
+	sb.userMsg(ctx, "Cloning "+hostWorkDir)
 	if err := os.MkdirAll(filepath.Join(sb.cloneRoot, id), 0750); err != nil {
 		return err
 	}
@@ -193,6 +194,7 @@ func (sb *SandBoxer) cloneClaudeDir(ctx context.Context, id string) error {
 }
 
 func (sb *SandBoxer) cloneDotfiles(ctx context.Context, id string) error {
+	sb.userMsg(ctx, "Cloning dotfiles...")
 	dotfiles := []string{
 		".claude.json",
 		".gitconfig",
@@ -253,9 +255,7 @@ func (sb *SandBoxer) cloneDotfiles(ctx context.Context, id string) error {
 
 func (sb *SandBoxer) buildDefaultImage(ctx context.Context, dockerFileDir, sandboxUsername string) error {
 	slog.InfoContext(ctx, "SandBoxer.buildDefaultImage", "dockerFileDir", dockerFileDir, "sandboxUsername", sandboxUsername)
-	if sb.terminalWriter != nil {
-		fmt.Fprintln(sb.terminalWriter, "This may take a while, but we only do it once: building default container image...")
-	}
+	sb.userMsg(ctx, "This may take a while, but we only do it once: building default container image...")
 
 	outLogs, errLogs, wait, err := ac.Images.Build(ctx, dockerFileDir,
 		&options.BuildOptions{
@@ -271,9 +271,7 @@ func (sb *SandBoxer) buildDefaultImage(ctx context.Context, dockerFileDir, sandb
 	go func() {
 		logScanner := bufio.NewScanner(outLogs)
 		for logScanner.Scan() {
-			if sb.terminalWriter != nil {
-				fmt.Fprintln(sb.terminalWriter, logScanner.Text())
-			}
+			sb.userMsg(ctx, logScanner.Text())
 			slog.InfoContext(ctx, "buildDefaultImage", "stdout", logScanner.Text())
 		}
 		if logScanner.Err() != nil {
@@ -284,9 +282,7 @@ func (sb *SandBoxer) buildDefaultImage(ctx context.Context, dockerFileDir, sandb
 	go func() {
 		logScanner := bufio.NewScanner(errLogs)
 		for logScanner.Scan() {
-			if sb.terminalWriter != nil {
-				fmt.Fprintln(sb.terminalWriter, logScanner.Text())
-			}
+			sb.userMsg(ctx, logScanner.Text())
 			slog.ErrorContext(ctx, "buildDefaultImage", "stderr", logScanner.Text())
 		}
 		if logScanner.Err() != nil {
@@ -294,8 +290,8 @@ func (sb *SandBoxer) buildDefaultImage(ctx context.Context, dockerFileDir, sandb
 		}
 	}()
 	err = wait()
-	if sb.terminalWriter != nil && err != nil {
-		fmt.Fprint(sb.terminalWriter, "\n\nDone building default container image.\n\n")
+	if err == nil {
+		sb.userMsg(ctx, "\n\nDone building default container image.\n\n")
 	}
 	return err
 }
@@ -313,4 +309,12 @@ func (sb *SandBoxer) checkForImage(ctx context.Context, imageName, dockerfileDir
 		return fmt.Errorf("no images named %s ", imageName)
 	}
 	return nil
+}
+
+func (sb *SandBoxer) userMsg(ctx context.Context, msg string) {
+	if sb.terminalWriter == nil {
+		slog.DebugContext(ctx, "userMsg (no terminalWriter)", "msg", msg)
+		return
+	}
+	fmt.Fprintln(sb.terminalWriter, msg)
 }
