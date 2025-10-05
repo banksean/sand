@@ -85,12 +85,18 @@ func (sb *Sandbox) StartContainer(ctx context.Context) error {
 		slog.ErrorContext(ctx, "startContainer", "error", err, "output", output)
 		return err
 	}
+
+	// TODO: move these to a separate "on first container start for this sandbox" lifecycle state.
+	// We probably do not want to clobber doftile changes that the user may have made previously
+	// in this sandbox's filesystem.
+
 	// At startup, copy whatever is in /dotfiles into the root user's home directory.
 	cpOut, err := sb.Exec(ctx, "cp", "-r", "/dotfiles/.", "/root/.")
 	if err != nil {
-		slog.ErrorContext(ctx, "Sandbox.StartContainer", "error", err, "cpOut", cpOut)
-		//return err
+		slog.ErrorContext(ctx, "Sandbox.StartContainer: copying dotfiles", "error", err, "cpOut", cpOut)
 	}
+	// TODO: run "git gc" or "git repack"? Or do that *before* cloning?
+
 	slog.InfoContext(ctx, "startContainer succeeded", "output", output)
 	return nil
 }

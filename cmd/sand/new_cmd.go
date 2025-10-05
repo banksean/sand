@@ -57,7 +57,7 @@ func (c *NewCmd) Run(cctx *Context) error {
 	var sbox *sandbox.Sandbox
 
 	if c.ID != "" {
-		sbox, err = cctx.sber.Get(ctx, c.ID) // Try to connect to an existing sandbo with this ID
+		sbox, err = cctx.sber.Get(ctx, c.ID) // Try to connect to an existing sandbox with this ID
 		if err != nil {
 			return err
 		}
