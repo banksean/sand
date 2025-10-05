@@ -102,14 +102,16 @@ func (sb *Sandbox) StartContainer(ctx context.Context) error {
 }
 
 // Shell executes a command in the container. The container must be in state "running".
-func (sb *Sandbox) Shell(ctx context.Context, shellCmd string, stdin io.Reader, stdout, stderr io.Writer) error {
+func (sb *Sandbox) Shell(ctx context.Context, env map[string]string, shellCmd string, stdin io.Reader, stdout, stderr io.Writer) error {
 	slog.InfoContext(ctx, "Sandbox.Shell", "shellCmd", shellCmd)
+
 	wait, err := ac.Containers.ExecStream(ctx,
 		&options.ExecContainer{
 			ProcessOptions: options.ProcessOptions{
 				Interactive: true,
 				TTY:         true,
 				WorkDir:     "/app",
+				Env:         env,
 				EnvFile:     sb.EnvFile,
 			},
 		}, sb.ContainerID, shellCmd, os.Environ(), stdin, stdout, stderr)

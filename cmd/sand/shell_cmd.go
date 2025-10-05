@@ -66,13 +66,15 @@ func (c *ShellCmd) Run(cctx *Context) error {
 		}
 	}
 
-	for _, n := range ctr.Networks {
-		fmt.Printf("container hostname: %s\n", n.Hostname)
+	hostname := getContainerHostname(ctr)
+	env := map[string]string{
+		"HOSTNAME": hostname,
 	}
+	fmt.Printf("container hostname: %s\n", hostname)
 
 	slog.InfoContext(ctx, "main: sbox.shell starting")
 
-	if err := sbox.Shell(ctx, c.Shell, os.Stdin, os.Stdout, os.Stderr); err != nil {
+	if err := sbox.Shell(ctx, env, c.Shell, os.Stdin, os.Stdout, os.Stderr); err != nil {
 		slog.ErrorContext(ctx, "sbox.shell", "error", err)
 	}
 

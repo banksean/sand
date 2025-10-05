@@ -116,9 +116,11 @@ func (c *NewCmd) Run(cctx *Context) error {
 		}
 	}
 
-	for _, n := range ctr.Networks {
-		fmt.Printf("container hostname: %s\n", n.Hostname)
+	hostname := getContainerHostname(ctr)
+	env := map[string]string{
+		"HOSTNAME": hostname,
 	}
+	fmt.Printf("container hostname: %s\n", hostname)
 
 	slog.InfoContext(ctx, "main: sbox.new starting")
 
@@ -129,7 +131,7 @@ func (c *NewCmd) Run(cctx *Context) error {
 			slog.ErrorContext(ctx, "sbox.new git checkout", "error", err, "out", out)
 		}
 	}
-	if err := sbox.Shell(ctx, c.Shell, os.Stdin, os.Stdout, os.Stderr); err != nil {
+	if err := sbox.Shell(ctx, env, c.Shell, os.Stdin, os.Stdout, os.Stderr); err != nil {
 		slog.ErrorContext(ctx, "sbox.new", "error", err)
 	}
 
