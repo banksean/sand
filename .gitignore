@@ -1,5 +1,6 @@
 bin
 testbin
 .env
+.env.*
 .claude
 .claude.json

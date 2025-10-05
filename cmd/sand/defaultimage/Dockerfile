@@ -107,3 +107,9 @@ RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/
 
 # Install Claude
 RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}
+
+# Clone sketch repository and build
+RUN git clone https://github.com/boldsoftware/sketch.git /tmp/sketch && \
+  cd /tmp/sketch && \
+  make all && \
+  mv embedded/sketch-linux/sketch-linux-arm64 /usr/local/bin/sketch

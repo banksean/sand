@@ -21,6 +21,6 @@ import (
 )
 
 var (
-	//go:embed defaultcontainer/*
-	defaultContainer embed.FS
+	//go:embed defaultimage/*
+	defaultImageFS embed.FS
 )

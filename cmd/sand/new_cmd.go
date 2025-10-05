@@ -34,11 +34,11 @@ func (c *NewCmd) Run(cctx *Context) error {
 		if err := os.MkdirAll(c.DockerFileDir, 0755); err != nil {
 			return err
 		}
-		if err := os.CopyFS(c.DockerFileDir, defaultContainer); err != nil {
+		if err := os.CopyFS(c.DockerFileDir, defaultImageFS); err != nil {
 			return err
 		}
 		slog.InfoContext(ctx, "main: done unpacking embedded dockerfile")
-		c.DockerFileDir = filepath.Join(c.DockerFileDir, "defaultcontainer")
+		c.DockerFileDir = filepath.Join(c.DockerFileDir, "defaultimage")
 	}
 
 	if err := cctx.sber.EnsureDefaultImage(ctx, c.ImageName, c.DockerFileDir, "root"); err != nil {
