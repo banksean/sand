@@ -16,14 +16,11 @@ On your macOS host machine, run:
 
 Follow the directions to do the browser copy-and-paste dance, and then save that token value somewhere (e.g. your `~/.env` file).
 
-## Run `sand shell` and then run `claude` in the container
+## Run `sand shell --env-file .env` and then run `claude` in the container
 
-Make sure you have _exported_ the `CLAUDE_CODE_OAUTH_TOKEN` environment variable before you run `sand` (otherwise `sand` can't pass it on to the container)
 
 ```sh
-[macos host shell] % export CLAUDE_CODE_OAUTH_TOKEN=sk-ant-...
-
-[macos host shell] % sand shell 
+[macos host shell] % sand shell --env-file .env
 
 # ... container starts up ...
 
