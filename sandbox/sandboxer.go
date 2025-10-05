@@ -170,16 +170,16 @@ const (
 // "cp -c" uses APFS's clonefile(2) function to make the destination dir contents be COW.
 // Git stuff:
 // Set up bi-drectional "remotes" to link the two checkouts:
-// - in cloneRoot/id/app, remote "clonedfrom" -> hostWorkDir
-// - in hostWorkDir, remote "sandbox-<id>" -> cloneRoot/id/app
-// TODO: clean up these remotes when removing sandboxes.
+// - in cloneRoot/id/app, remote "origin-host-workdir" -> hostWorkDir
+// - in hostWorkDir, remote "sandbox-clone-<id>" -> cloneRoot/id/app
 // TODO: figure out how to deal with the inconsistency that the container's /app dir checkout now
 // has remotes that point to host filesystem paths, not container filesystem paths.  This means
-// "git fetch clonedfrom" works on the *host* OS, but not from inside the container.
-// TODO: Verify that we only need to run this "git fetch clonedfrom" command once, when we
-// create the clone.  It looks like this is the case, but I need to verify that.
-// If it *isn't* the case, then we need to give the container some way to ask something running
-// in the host OS to run the "git fetch clonedfrom" command in the cloneWorkDir on its behalf.
+// "git fetch clonedfrom" works on the *host* OS, but not from inside the container, since those paths
+// only exist on the host OS.
+// We need to give the container some way to ask *something* that's running
+// in the host OS to run the "git fetch clonedfrom" command in the cloneWorkDir
+// on the container's behalf. This will update the sandbox clone's git checkout to reflect the latest
+// contents of the host machine's working directory.
 func (sb *SandBoxer) cloneWorkDir(ctx context.Context, id, hostWorkDir string) error {
 	sb.userMsg(ctx, "Cloning "+hostWorkDir)
 	if err := os.MkdirAll(filepath.Join(sb.cloneRoot, id), 0750); err != nil {
