@@ -153,18 +153,49 @@ func (sb *SandBoxer) Cleanup(ctx context.Context, sbox *Sandbox) error {
 
 // cloneWorkDir creates a recursive, copy-on-write copy of hostWorkDir, under the sandboxer's root directory.
 // "cp -c" uses APFS's clonefile(2) function to make the destination dir contents be COW.
+// Git stuff:
+// Set up bi-drectional "remotes" to link the two checkouts:
+// - in cloneRoot/id/app, remote "clonedfrom" -> hostWorkDir
+// - in hostWorkDir, remote "sandbox-<id>" -> cloneRoot/id/app
+// TODO: clean up these remotes when removing sandboxes.
+// TODO: figure out how to deal with the inconsistency that the container's /app dir checkout now
+// has remotes that point to host filesystem paths, not container filesystem paths.  This means
+// "git fetch clonedfrom" works on the *host* OS, but not from inside the container.
+// So if we want to let the agent see how it's changes differ from the host workdir, we have to
+// let the agent ask something in the host OS to run the "git fetch clonedfrom" command in the
+// cloneWorkDir on its behalf.
 func (sb *SandBoxer) cloneWorkDir(ctx context.Context, id, hostWorkDir string) error {
 	sb.userMsg(ctx, "Cloning "+hostWorkDir)
 	if err := os.MkdirAll(filepath.Join(sb.cloneRoot, id), 0750); err != nil {
 		return err
 	}
-	cmd := exec.CommandContext(ctx, "cp", "-Rc", hostWorkDir, filepath.Join(sb.cloneRoot, "/", id, "app"))
-	slog.InfoContext(ctx, "cloneWorkDir", "cmd", strings.Join(cmd.Args, " "))
-	output, err := cmd.CombinedOutput()
+	hostCloneDir := filepath.Join(sb.cloneRoot, "/", id, "app")
+	cpCmd := exec.CommandContext(ctx, "cp", "-Rc", hostWorkDir, hostCloneDir)
+	slog.InfoContext(ctx, "cloneWorkDir cpCmd", "cmd", strings.Join(cpCmd.Args, " "))
+	output, err := cpCmd.CombinedOutput()
 	if err != nil {
-		slog.InfoContext(ctx, "cloneWorkDir", "error", err, "output", output)
+		slog.InfoContext(ctx, "cloneWorkDir cpCmd", "error", err, "output", output)
 		return err
 	}
+
+	gitRemoteCloneToWorkDirCmd := exec.CommandContext(ctx, "git", "remote", "add", "clonedfrom", hostWorkDir)
+	gitRemoteCloneToWorkDirCmd.Dir = hostCloneDir
+	slog.InfoContext(ctx, "cloneWorkDir gitRemoteCloneToWorkDirCmd", "cmd", strings.Join(gitRemoteCloneToWorkDirCmd.Args, " "))
+	output, err = gitRemoteCloneToWorkDirCmd.CombinedOutput()
+	if err != nil {
+		slog.InfoContext(ctx, "cloneWorkDir gitRemoteCloneToWorkDirCmd", "error", err, "output", output)
+		return err
+	}
+
+	gitRemoteWorkDirToCloneCmd := exec.CommandContext(ctx, "git", "remote", "add", "clonedfrom", hostWorkDir)
+	gitRemoteWorkDirToCloneCmd.Dir = hostWorkDir
+	slog.InfoContext(ctx, "cloneWorkDir gitRemoteWorkDirToCloneCmd", "cmd", strings.Join(gitRemoteWorkDirToCloneCmd.Args, " "))
+	output, err = gitRemoteWorkDirToCloneCmd.CombinedOutput()
+	if err != nil {
+		slog.InfoContext(ctx, "cloneWorkDir gitRemoteWorkDirToCloneCmd", "error", err, "output", output)
+		return err
+	}
+
 	return nil
 }
 
