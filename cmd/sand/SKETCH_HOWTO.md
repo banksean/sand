@@ -16,12 +16,15 @@ On your macOS host machine edit a `.env` file (in your project directory, or you
 ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-## Run `sand` 
+## Run `sand new --env-file .env` and then run `sketch` in the container
 ```sh
 
 [macos host shell] % sand new --env-file .env
 
 # ... container starts up ...
+
+# --unsafe, because we're already in a sandbox container.
+# --ska-band-addr="" so that sketch uses the ANTHROPIC_API_KEY you've provided.
 
 [linux container shell] % sketch --unsafe --addr 0.0.0.0:80 --ska-band-addr=""
 

@@ -16,11 +16,11 @@ On your macOS host machine, run:
 
 Follow the directions to do the browser copy-and-paste dance, and then save that token value somewhere (e.g. your `~/.env` file).
 
-## Run `sand shell --env-file .env` and then run `claude` in the container
+## Run `sand new --env-file .env` and then run `claude` in the container
 
 
 ```sh
-[macos host shell] % sand shell --env-file .env
+[macos host shell] % sand new --env-file .env
 
 # ... container starts up ...
 
