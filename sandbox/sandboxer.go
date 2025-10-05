@@ -38,7 +38,10 @@ func (sb *SandBoxer) EnsureDefaultImage(ctx context.Context, imageName, dockerfi
 	return nil
 }
 
-func (sb *SandBoxer) NewSandbox(ctx context.Context, id, hostWorkDir, imageName, dockerFileDir string) (*Sandbox, error) {
+// NewSandbox creates a new sandbox based on a clone of hostWorkDir.
+// TODO: clone envFile, if it exists, into sb.cloneRoot/id/env, so every command exec'd in that sandbox container
+// uses the same env file, even if the original .env file has changed on the host machine.
+func (sb *SandBoxer) NewSandbox(ctx context.Context, id, hostWorkDir, imageName, dockerFileDir, envFile string) (*Sandbox, error) {
 	slog.InfoContext(ctx, "SandBoxer.NewSandbox", "hostWorkDir", hostWorkDir, "id", id)
 
 	if err := sb.cloneWorkDir(ctx, id, hostWorkDir); err != nil {
@@ -58,12 +61,14 @@ func (sb *SandBoxer) NewSandbox(ctx context.Context, id, hostWorkDir, imageName,
 		HostOriginDir:  hostWorkDir,
 		SandboxWorkDir: filepath.Join(sb.cloneRoot, id),
 		ImageName:      imageName,
+		EnvFile:        envFile,
 	}
 	sb.sandBoxes[id] = ret
 	return ret, nil
 }
 
 // AttachSandbox re-connects to an existing container and sandboxWorkDir instead of creating a new one.
+// TODO: persist all the struct fields somewhere since we can't reconstruct them from the clone dir alone.
 func (sb *SandBoxer) AttachSandbox(ctx context.Context, id string) (*Sandbox, error) {
 	slog.InfoContext(ctx, "SandBoxer.AttachSandbox", "id", id)
 	ret := &Sandbox{
@@ -115,6 +120,7 @@ func (sb *SandBoxer) Get(ctx context.Context, id string) (*Sandbox, error) {
 		return nil, fmt.Errorf("path exists but is not a directory: %s", dir)
 	}
 
+	// TODO: deserialize this struct from some persistent storage, even if it's just a json file.
 	ret := &Sandbox{
 		ID:             id,
 		SandboxWorkDir: filepath.Join(sb.cloneRoot, id),

@@ -17,6 +17,7 @@ type ExecCmd struct {
 	Rm            bool     `help:"remove the sandbox after the exec terminates"`
 	CloneFromDir  string   `placeholder:"<project-dir>" help:"directory to clone into the sandbox. Defaults to current working directory, if unset."`
 	ID            string   `optionl:"" placeholder:"<sandbox-id>" help:"ID of the sandbox to create, or re-attach to"`
+	EnvFile       string   `placholder:"<file-path>" help:"path to env file to use when creating a new shell"`
 	Arg           []string `arg:"" passthrough:"" help:"command args to exec in the container"`
 }
 
@@ -61,7 +62,7 @@ func (sc *ExecCmd) Run(cctx *Context) error {
 			return err
 		}
 		if sbox == nil { // Create a new sandbox with this ID
-			sbox, err = cctx.sber.NewSandbox(ctx, sc.ID, sc.CloneFromDir, sc.ImageName, sc.DockerFileDir)
+			sbox, err = cctx.sber.NewSandbox(ctx, sc.ID, sc.CloneFromDir, sc.ImageName, sc.DockerFileDir, sc.EnvFile)
 			if err != nil {
 				slog.ErrorContext(ctx, "sber.NewSandbox", "error", err)
 				return err
@@ -69,7 +70,7 @@ func (sc *ExecCmd) Run(cctx *Context) error {
 		}
 	} else { // Create a new sandbox with a random ID
 		sc.ID = uuid.NewString()
-		sbox, err = cctx.sber.NewSandbox(ctx, sc.ID, sc.CloneFromDir, sc.ImageName, sc.DockerFileDir)
+		sbox, err = cctx.sber.NewSandbox(ctx, sc.ID, sc.CloneFromDir, sc.ImageName, sc.DockerFileDir, sc.EnvFile)
 		if err != nil {
 			slog.ErrorContext(ctx, "sber.NewSandbox", "error", err)
 			return err
@@ -121,7 +122,7 @@ func (sc *ExecCmd) Run(cctx *Context) error {
 	if len(sc.Arg) > 1 {
 		args = sc.Arg[1:]
 	}
-	out, err := sbox.Exec(ctx, sc.Arg[0], nil, args...)
+	out, err := sbox.Exec(ctx, sc.Arg[0], args...)
 	if err != nil {
 		slog.ErrorContext(ctx, "sbox.exec", "error", err)
 	}

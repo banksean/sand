@@ -11,13 +11,16 @@ import (
 	"github.com/google/uuid"
 )
 
+// TODO: split this into "new" and "attach"
 type ShellCmd struct {
 	ImageName     string `default:"sandbox" placeholder:"<container-image-name>" help:"name of container image to use"`
 	DockerFileDir string `placeholder:"<docker-file-dir>" help:"location of directory with docker file from which to build the image locally. Uses an embedded dockerfile if unset."`
 	Shell         string `default:"/bin/zsh" placeholder:"<shell-command>" help:"shell command to exec in the container"`
 	CloneFromDir  string `placeholder:"<project-dir>" help:"directory to clone into the sandbox. Defaults to current working directory, if unset."`
+	EnvFile       string `placholder:"<file-path>" help:"path to env file to use when creating a new shell"`
 	Rm            bool   `help:"remove the sandbox after the shell terminates"`
 	ID            string `arg:"" optional:"" help:"ID of the sandbox to create, or re-attach to"`
+	Branch        bool   `help:"create a git branch named after the sandbox id"`
 }
 
 func (sc *ShellCmd) Run(cctx *Context) error {
@@ -60,7 +63,7 @@ func (sc *ShellCmd) Run(cctx *Context) error {
 			return err
 		}
 		if sbox == nil { // Create a new sandbox with this ID
-			sbox, err = cctx.sber.NewSandbox(ctx, sc.ID, sc.CloneFromDir, sc.ImageName, sc.DockerFileDir)
+			sbox, err = cctx.sber.NewSandbox(ctx, sc.ID, sc.CloneFromDir, sc.ImageName, sc.DockerFileDir, sc.EnvFile)
 			if err != nil {
 				slog.ErrorContext(ctx, "sber.NewSandbox", "error", err)
 				return err
@@ -68,7 +71,7 @@ func (sc *ShellCmd) Run(cctx *Context) error {
 		}
 	} else { // Create a new sandbox with a random ID
 		sc.ID = uuid.NewString()
-		sbox, err = cctx.sber.NewSandbox(ctx, sc.ID, sc.CloneFromDir, sc.ImageName, sc.DockerFileDir)
+		sbox, err = cctx.sber.NewSandbox(ctx, sc.ID, sc.CloneFromDir, sc.ImageName, sc.DockerFileDir, sc.EnvFile)
 		if err != nil {
 			slog.ErrorContext(ctx, "sber.NewSandbox", "error", err)
 			return err
@@ -120,9 +123,14 @@ func (sc *ShellCmd) Run(cctx *Context) error {
 
 	slog.InfoContext(ctx, "main: sbox.shell starting")
 
-	env := getEnv()
-
-	if err := sbox.Shell(ctx, sc.Shell, env, os.Stdin, os.Stdout, os.Stderr); err != nil {
+	if sc.Branch {
+		// Create and check out a git branch inside the container, named after the sandbox id
+		out, err := sbox.Exec(ctx, "git", "checkout", "-b", sbox.ContainerID)
+		if err != nil {
+			slog.ErrorContext(ctx, "sbox.shell git checkout", "error", err, "out", out)
+		}
+	}
+	if err := sbox.Shell(ctx, sc.Shell, os.Stdin, os.Stdout, os.Stderr); err != nil {
 		slog.ErrorContext(ctx, "sbox.shell", "error", err)
 	}
 
@@ -135,15 +143,4 @@ func (sc *ShellCmd) Run(cctx *Context) error {
 		slog.InfoContext(ctx, "Cleanup complete. Exiting.")
 	}
 	return nil
-}
-
-func getEnv() map[string]string {
-	var ret map[string]string
-	ccoat := os.Getenv("CLAUDE_CODE_OAUTH_TOKEN")
-
-	if ccoat != "" {
-		ret = make(map[string]string)
-		ret["CLAUDE_CODE_OAUTH_TOKEN"] = ccoat
-	}
-	return ret
 }

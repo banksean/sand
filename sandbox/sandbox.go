@@ -33,6 +33,8 @@ type Sandbox struct {
 	ImageName string
 	// DNSDomain is the dns domain for the sandbox's network
 	DNSDomain string
+	// EnvFile is the host filesystem path to the env file to use when executing commands in the container
+	EnvFile string
 }
 
 func (sb *Sandbox) GetContainer(ctx context.Context) (*types.Container, error) {
@@ -53,6 +55,7 @@ func (sb *Sandbox) CreateContainer(ctx context.Context) error {
 			ProcessOptions: options.ProcessOptions{
 				Interactive: true,
 				TTY:         true,
+				EnvFile:     sb.EnvFile,
 			},
 			ManagementOptions: options.ManagementOptions{
 				Name:      sb.ID,
@@ -83,7 +86,7 @@ func (sb *Sandbox) StartContainer(ctx context.Context) error {
 		return err
 	}
 	// At startup, copy whatever is in /dotfiles into the root user's home directory.
-	cpOut, err := sb.Exec(ctx, "cp", nil, "-r", "/dotfiles/.", "/root/.")
+	cpOut, err := sb.Exec(ctx, "cp", "-r", "/dotfiles/.", "/root/.")
 	if err != nil {
 		slog.ErrorContext(ctx, "Sandbox.StartContainer", "error", err, "cpOut", cpOut)
 		//return err
@@ -93,15 +96,15 @@ func (sb *Sandbox) StartContainer(ctx context.Context) error {
 }
 
 // Shell executes a command in the container. The container must be in state "running".
-func (sb *Sandbox) Shell(ctx context.Context, shellCmd string, env map[string]string, stdin io.Reader, stdout, stderr io.Writer) error {
-	slog.InfoContext(ctx, "Sandbox.Shell", "env", env)
+func (sb *Sandbox) Shell(ctx context.Context, shellCmd string, stdin io.Reader, stdout, stderr io.Writer) error {
+	slog.InfoContext(ctx, "Sandbox.Shell", "shellCmd", shellCmd)
 	wait, err := ac.Containers.ExecStream(ctx,
 		&options.ExecContainer{
 			ProcessOptions: options.ProcessOptions{
 				Interactive: true,
 				TTY:         true,
 				WorkDir:     "/app",
-				Env:         env,
+				EnvFile:     sb.EnvFile,
 			},
 		}, sb.ContainerID, shellCmd, os.Environ(), stdin, stdout, stderr)
 	if err != nil {
@@ -113,14 +116,14 @@ func (sb *Sandbox) Shell(ctx context.Context, shellCmd string, env map[string]st
 }
 
 // Exec executes a command in the container. The container must be in state "running".
-func (sb *Sandbox) Exec(ctx context.Context, shellCmd string, env map[string]string, args ...string) (string, error) {
+func (sb *Sandbox) Exec(ctx context.Context, shellCmd string, args ...string) (string, error) {
 	output, err := ac.Containers.Exec(ctx,
 		&options.ExecContainer{
 			ProcessOptions: options.ProcessOptions{
 				Interactive: false,
 				TTY:         true,
 				WorkDir:     "/app",
-				Env:         env,
+				EnvFile:     sb.EnvFile,
 			},
 		}, sb.ContainerID, shellCmd, os.Environ(), args...)
 	if err != nil {
