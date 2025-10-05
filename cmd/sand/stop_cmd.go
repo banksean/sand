@@ -11,7 +11,7 @@ import (
 
 type StopCmd struct {
 	ID  string `arg:"" optional:"" help:"ID of the sandbox to stop"`
-	All bool   `help:"stop all sandboxes"`
+	All bool   `short:"a" help:"stop all sandboxes"`
 }
 
 func (sc *StopCmd) Run(cctx *Context) error {

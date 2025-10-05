@@ -7,8 +7,7 @@ import (
 	"os"
 )
 
-type LsCmd struct {
-}
+type LsCmd struct{}
 
 func (ls *LsCmd) Run(cctx *Context) error {
 	ctx, cancel := context.WithCancel(context.Background())

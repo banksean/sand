@@ -25,10 +25,12 @@ sand shell [flags] [ID]
 
 **Flags:**
 
-- `--image-name` _`<container-image-name>`_ - name of container image to use (default: `sandbox`)
-- `--docker-file-dir` _`<docker-file-dir>`_ - location of directory with docker file from which to build the image locally. Uses an embedded dockerfile if unset.
-- `--shell` _`<shell-command>`_ - shell command to exec in the container (default: `/bin/zsh`)
-- `--clone-from-dir` _`<project-dir>`_ - directory to clone into the sandbox. Defaults to current working directory, if unset.
+- `-i, --image-name` _`<container-image-name>`_ - name of container image to use (default: `sandbox`)
+- `-d, --docker-file-dir` _`<docker-file-dir>`_ - location of directory with docker file from which to build the image locally. Uses an embedded dockerfile if unset.
+- `-s, --shell` _`<shell-command>`_ - shell command to exec in the container (default: `/bin/zsh`)
+- `-c, --clone-from-dir` _`<project-dir>`_ - directory to clone into the sandbox. Defaults to current working directory, if unset.
+- `-e, --env-file` _`STRING`_ - path to env file to use when creating a new shell
+- `-b, --branch` - create a git branch named after the sandbox id
 - `--rm` - remove the sandbox after the shell terminates
 
 ## `sand exec`
@@ -38,16 +40,16 @@ execute a single command in a sanbox
 **Usage:**
 
 ```
-sand exec [flags] <ARG>...
+sand exec [flags] <ID> <ARG>...
 ```
 
 **Flags:**
 
-- `--image-name` _`<container-image-name>`_ - name of container image to use (default: `sandbox`)
-- `--docker-file-dir` _`<docker-file-dir>`_ - location of directory with docker file from which to build the image locally. Uses an embedded dockerfile if unset.
-- `--rm` - remove the sandbox after the exec terminates
-- `--clone-from-dir` _`<project-dir>`_ - directory to clone into the sandbox. Defaults to current working directory, if unset.
-- `--id` _`<sandbox-id>`_ - ID of the sandbox to create, or re-attach to
+- `-i, --image-name` _`<container-image-name>`_ - name of container image to use (default: `sandbox`)
+- `-d, --docker-file-dir` _`<docker-file-dir>`_ - location of directory with docker file from which to build the image locally. Uses an embedded dockerfile if unset.
+- `-c, --clone-from-dir` _`<project-dir>`_ - directory to clone into the sandbox. Defaults to current working directory, if unset.
+- `-e, --env-file` _`STRING`_ - path to env file to use when creating a new shell
+- `--rm` - remove the sandbox after the shell terminates
 
 ## `sand ls`
 
@@ -71,7 +73,7 @@ sand rm [flags] [ID]
 
 **Flags:**
 
-- `--all` - remove all sandboxes
+- `-a, --all` - remove all sandboxes
 
 ## `sand stop`
 
@@ -85,7 +87,7 @@ sand stop [flags] [ID]
 
 **Flags:**
 
-- `--all` - stop all sandboxes
+- `-a, --all` - stop all sandboxes
 
 ## `sand doc`
 
@@ -95,5 +97,15 @@ print complete command help formatted as markdown
 
 ```
 sand doc
+```
+
+## `sand version`
+
+print version infomation about this command
+
+**Usage:**
+
+```
+sand version
 ```
 

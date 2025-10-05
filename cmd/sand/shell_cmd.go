@@ -13,14 +13,14 @@ import (
 
 // TODO: split this into "new" and "attach"
 type ShellCmd struct {
-	ImageName     string `default:"sandbox" placeholder:"<container-image-name>" help:"name of container image to use"`
-	DockerFileDir string `placeholder:"<docker-file-dir>" help:"location of directory with docker file from which to build the image locally. Uses an embedded dockerfile if unset."`
-	Shell         string `default:"/bin/zsh" placeholder:"<shell-command>" help:"shell command to exec in the container"`
-	CloneFromDir  string `placeholder:"<project-dir>" help:"directory to clone into the sandbox. Defaults to current working directory, if unset."`
-	EnvFile       string `placholder:"<file-path>" help:"path to env file to use when creating a new shell"`
+	ImageName     string `short:"i" default:"sandbox" placeholder:"<container-image-name>" help:"name of container image to use"`
+	DockerFileDir string `short:"d" placeholder:"<docker-file-dir>" help:"location of directory with docker file from which to build the image locally. Uses an embedded dockerfile if unset."`
+	Shell         string `short:"s" default:"/bin/zsh" placeholder:"<shell-command>" help:"shell command to exec in the container"`
+	CloneFromDir  string `short:"c" placeholder:"<project-dir>" help:"directory to clone into the sandbox. Defaults to current working directory, if unset."`
+	EnvFile       string `short:"e" placholder:"<file-path>" help:"path to env file to use when creating a new shell"`
+	Branch        bool   `short:"b" help:"create a git branch named after the sandbox id"`
 	Rm            bool   `help:"remove the sandbox after the shell terminates"`
 	ID            string `arg:"" optional:"" help:"ID of the sandbox to create, or re-attach to"`
-	Branch        bool   `help:"create a git branch named after the sandbox id"`
 }
 
 func (sc *ShellCmd) Run(cctx *Context) error {

@@ -12,12 +12,12 @@ import (
 )
 
 type ExecCmd struct {
-	ImageName     string   `default:"sandbox" placeholder:"<container-image-name>" help:"name of container image to use"`
-	DockerFileDir string   `placeholder:"<docker-file-dir>" help:"location of directory with docker file from which to build the image locally. Uses an embedded dockerfile if unset."`
-	Rm            bool     `help:"remove the sandbox after the exec terminates"`
-	CloneFromDir  string   `placeholder:"<project-dir>" help:"directory to clone into the sandbox. Defaults to current working directory, if unset."`
-	ID            string   `optionl:"" placeholder:"<sandbox-id>" help:"ID of the sandbox to create, or re-attach to"`
-	EnvFile       string   `placholder:"<file-path>" help:"path to env file to use when creating a new shell"`
+	ImageName     string   `short:"i" default:"sandbox" placeholder:"<container-image-name>" help:"name of container image to use"`
+	DockerFileDir string   `short:"d" placeholder:"<docker-file-dir>" help:"location of directory with docker file from which to build the image locally. Uses an embedded dockerfile if unset."`
+	CloneFromDir  string   `short:"c" placeholder:"<project-dir>" help:"directory to clone into the sandbox. Defaults to current working directory, if unset."`
+	EnvFile       string   `short:"e" placholder:"<file-path>" help:"path to env file to use when creating a new shell"`
+	Rm            bool     `help:"remove the sandbox after the shell terminates"`
+	ID            string   `arg:"" help:"ID of the sandbox to create, or re-attach to"`
 	Arg           []string `arg:"" passthrough:"" help:"command args to exec in the container"`
 }
 

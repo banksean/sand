@@ -10,7 +10,7 @@ import (
 
 type RmCmd struct {
 	ID  string `arg:"" optional:"" help:"ID of the sandbox to remove"`
-	All bool   `help:"remove all sandboxes"`
+	All bool   `short:"a" help:"remove all sandboxes"`
 }
 
 func (rm *RmCmd) Run(cctx *Context) error {
