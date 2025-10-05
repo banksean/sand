@@ -197,10 +197,10 @@ func (c *ContainerSvc) ExecStream(ctx context.Context, opts *options.ExecContain
 	}
 
 	return func() error {
-		slog.InfoContext(ctx, "ContainerSvc.Exec wait")
+		slog.InfoContext(ctx, "ContainerSvc.ExecStream wait")
 		err := cmd.Wait()
 		if err != nil {
-			slog.ErrorContext(ctx, "ContainerSvc.Exec wait", "error", err)
+			slog.ErrorContext(ctx, "ContainerSvc.ExecStream wait", "error", err)
 		}
 		return err
 	}, nil

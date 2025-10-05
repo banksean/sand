@@ -14,13 +14,13 @@ type StopCmd struct {
 	All bool   `short:"a" help:"stop all sandboxes"`
 }
 
-func (sc *StopCmd) Run(cctx *Context) error {
+func (c *StopCmd) Run(cctx *Context) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	ids := []string{}
-	if !sc.All {
-		sbox, err := cctx.sber.Get(ctx, sc.ID)
+	if !c.All {
+		sbox, err := cctx.sber.Get(ctx, c.ID)
 		if err != nil {
 			return err
 		}

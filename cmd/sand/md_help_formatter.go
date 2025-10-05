@@ -10,7 +10,7 @@ import (
 
 type DocCmd struct{}
 
-func (m *DocCmd) Run() error {
+func (c *DocCmd) Run() error {
 	var cli CLI
 
 	ctx := kong.Parse(&cli, kong.Help(MarkdownHelpPrinter), kong.Description(description))

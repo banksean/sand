@@ -9,7 +9,7 @@ import (
 
 type LsCmd struct{}
 
-func (ls *LsCmd) Run(cctx *Context) error {
+func (c *LsCmd) Run(cctx *Context) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

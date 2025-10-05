@@ -21,26 +21,26 @@ type ExecCmd struct {
 	Arg           []string `arg:"" passthrough:"" help:"command args to exec in the container"`
 }
 
-func (sc *ExecCmd) Run(cctx *Context) error {
+func (c *ExecCmd) Run(cctx *Context) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	if sc.DockerFileDir == "" {
+	if c.DockerFileDir == "" {
 		slog.InfoContext(ctx, "main: unpacking embedded container build files")
 		// TODO: name this dir using a content hash of defaultContainer.
-		sc.DockerFileDir = "/tmp/sandbox-container-build"
-		os.RemoveAll(sc.DockerFileDir)
-		if err := os.MkdirAll(sc.DockerFileDir, 0755); err != nil {
+		c.DockerFileDir = "/tmp/sandbox-container-build"
+		os.RemoveAll(c.DockerFileDir)
+		if err := os.MkdirAll(c.DockerFileDir, 0755); err != nil {
 			return err
 		}
-		if err := os.CopyFS(sc.DockerFileDir, defaultContainer); err != nil {
+		if err := os.CopyFS(c.DockerFileDir, defaultContainer); err != nil {
 			return err
 		}
 		slog.InfoContext(ctx, "main: done unpacking embedded dockerfile")
-		sc.DockerFileDir = filepath.Join(sc.DockerFileDir, "defaultcontainer")
+		c.DockerFileDir = filepath.Join(c.DockerFileDir, "defaultcontainer")
 	}
 
-	if err := cctx.sber.EnsureDefaultImage(ctx, sc.ImageName, sc.DockerFileDir, "root"); err != nil {
+	if err := cctx.sber.EnsureDefaultImage(ctx, c.ImageName, c.DockerFileDir, "root"); err != nil {
 		slog.ErrorContext(ctx, "sber.Init", "error", err)
 		return err
 	}
@@ -50,27 +50,27 @@ func (sc *ExecCmd) Run(cctx *Context) error {
 		slog.ErrorContext(ctx, "os.Getwd", "error", err)
 		return err
 	}
-	if sc.CloneFromDir == "" {
-		sc.CloneFromDir = cwd
+	if c.CloneFromDir == "" {
+		c.CloneFromDir = cwd
 	}
 
 	var sbox *sandbox.Sandbox
 
-	if sc.ID != "" {
-		sbox, err = cctx.sber.Get(ctx, sc.ID) // Try to connect to an existing sandbo with this ID
+	if c.ID != "" {
+		sbox, err = cctx.sber.Get(ctx, c.ID) // Try to connect to an existing sandbo with this ID
 		if err != nil {
 			return err
 		}
 		if sbox == nil { // Create a new sandbox with this ID
-			sbox, err = cctx.sber.NewSandbox(ctx, sc.ID, sc.CloneFromDir, sc.ImageName, sc.DockerFileDir, sc.EnvFile)
+			sbox, err = cctx.sber.NewSandbox(ctx, c.ID, c.CloneFromDir, c.ImageName, c.DockerFileDir, c.EnvFile)
 			if err != nil {
 				slog.ErrorContext(ctx, "sber.NewSandbox", "error", err)
 				return err
 			}
 		}
 	} else { // Create a new sandbox with a random ID
-		sc.ID = uuid.NewString()
-		sbox, err = cctx.sber.NewSandbox(ctx, sc.ID, sc.CloneFromDir, sc.ImageName, sc.DockerFileDir, sc.EnvFile)
+		c.ID = uuid.NewString()
+		sbox, err = cctx.sber.NewSandbox(ctx, c.ID, c.CloneFromDir, c.ImageName, c.DockerFileDir, c.EnvFile)
 		if err != nil {
 			slog.ErrorContext(ctx, "sber.NewSandbox", "error", err)
 			return err
@@ -119,15 +119,15 @@ func (sc *ExecCmd) Run(cctx *Context) error {
 	slog.InfoContext(ctx, "main: sbox.exec starting")
 
 	args := []string{}
-	if len(sc.Arg) > 1 {
-		args = sc.Arg[1:]
+	if len(c.Arg) > 1 {
+		args = c.Arg[1:]
 	}
-	out, err := sbox.Exec(ctx, sc.Arg[0], args...)
+	out, err := sbox.Exec(ctx, c.Arg[0], args...)
 	if err != nil {
 		slog.ErrorContext(ctx, "sbox.exec", "error", err)
 	}
 
-	if sc.Rm {
+	if c.Rm {
 		slog.InfoContext(ctx, "sbox.exec finished, cleaning up...")
 		if err := cctx.sber.Cleanup(ctx, sbox); err != nil {
 			slog.ErrorContext(ctx, "sber.Cleanup", "error", err)

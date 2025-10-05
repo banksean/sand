@@ -13,10 +13,10 @@ type RmCmd struct {
 	All bool   `short:"a" help:"remove all sandboxes"`
 }
 
-func (rm *RmCmd) Run(cctx *Context) error {
+func (c *RmCmd) Run(cctx *Context) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	slog.InfoContext(ctx, "RmCmd", "run", *rm)
+	slog.InfoContext(ctx, "RmCmd", "run", *c)
 
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -24,8 +24,8 @@ func (rm *RmCmd) Run(cctx *Context) error {
 		return err
 	}
 	ids := []string{}
-	if !rm.All {
-		ids = append(ids, rm.ID)
+	if !c.All {
+		ids = append(ids, c.ID)
 	} else {
 		bxs, err := cctx.sber.List(ctx)
 		if err != nil {

@@ -15,7 +15,7 @@ var (
 
 type VersionCmd struct{}
 
-func (v *VersionCmd) Run(cctx *Context) error {
+func (c *VersionCmd) Run(cctx *Context) error {
 	fmt.Printf("Git Repository: %s\n", GitRepo)
 	fmt.Printf("Git Branch: %s\n", GitBranch)
 	fmt.Printf("Git Commit: %s\n", GitCommit)
