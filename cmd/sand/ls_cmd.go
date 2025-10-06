@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"text/tabwriter"
 )
 
 type LsCmd struct{}
@@ -24,7 +25,8 @@ func (c *LsCmd) Run(cctx *Context) error {
 		slog.ErrorContext(ctx, "sber.List", "error", err)
 		return err
 	}
-
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(w, "SANDBOX ID\tSTATUS\tCONTAINER ID\tORIGIN DIR\tSANDBOX DIR\tIMAGE NAME\t")
 	for _, sbox := range list {
 		ctr, err := sbox.GetContainer(ctx)
 		if err != nil {
@@ -34,7 +36,8 @@ func (c *LsCmd) Run(cctx *Context) error {
 		if ctr != nil {
 			status = ctr.Status
 		}
-		fmt.Printf("%s\t%s\t%s\t%s\n", sbox.ID, status, sbox.HostOriginDir, sbox.ImageName)
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t\n", sbox.ID, status, sbox.ContainerID, sbox.HostOriginDir, sbox.SandboxWorkDir, sbox.ImageName)
 	}
+	w.Flush()
 	return nil
 }
