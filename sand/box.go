@@ -17,10 +17,10 @@ const (
 	DefaultImageName = "sandbox"
 )
 
-// Sandbox connects a local container instance to a dedicated, persistent local storage volume.
+// Box connects a local container instance to a dedicated, persistent local storage volume.
 // Dedicated local storage volumes are visible to the host OS, regardless of the current state of the container.
-// We can "revive" a Sandbox by starting a new container that mounts a previously-used local storage volume
-type Sandbox struct {
+// We can "revive" a Box by starting a new container that mounts a previously-used local storage volume
+type Box struct {
 	// ID is an opaque identifier for the sandbox
 	ID string
 	// ContainerID is the ID of the container
@@ -37,7 +37,7 @@ type Sandbox struct {
 	EnvFile string
 }
 
-func (sb *Sandbox) GetContainer(ctx context.Context) (*types.Container, error) {
+func (sb *Box) GetContainer(ctx context.Context) (*types.Container, error) {
 	ctrs, err := ac.Containers.Inspect(ctx, sb.ID)
 	if err != nil {
 		return nil, err
@@ -49,7 +49,7 @@ func (sb *Sandbox) GetContainer(ctx context.Context) (*types.Container, error) {
 }
 
 // CreateContainer creates a new container instance. The container image must exist.
-func (sb *Sandbox) CreateContainer(ctx context.Context) error {
+func (sb *Box) CreateContainer(ctx context.Context) error {
 	containerID, err := ac.Containers.Create(ctx,
 		&options.CreateContainer{
 			ProcessOptions: options.ProcessOptions{
@@ -79,7 +79,7 @@ func (sb *Sandbox) CreateContainer(ctx context.Context) error {
 }
 
 // StartContainer starts a container instance. The container must exist, and it should not be in the "running" state.
-func (sb *Sandbox) StartContainer(ctx context.Context) error {
+func (sb *Box) StartContainer(ctx context.Context) error {
 	output, err := ac.Containers.Start(ctx, nil, sb.ContainerID)
 	if err != nil {
 		slog.ErrorContext(ctx, "startContainer", "error", err, "output", output)
@@ -102,7 +102,7 @@ func (sb *Sandbox) StartContainer(ctx context.Context) error {
 }
 
 // Shell executes a command in the container. The container must be in state "running".
-func (sb *Sandbox) Shell(ctx context.Context, env map[string]string, shellCmd string, stdin io.Reader, stdout, stderr io.Writer) error {
+func (sb *Box) Shell(ctx context.Context, env map[string]string, shellCmd string, stdin io.Reader, stdout, stderr io.Writer) error {
 	slog.InfoContext(ctx, "Sandbox.Shell", "shellCmd", shellCmd)
 
 	wait, err := ac.Containers.ExecStream(ctx,
@@ -124,7 +124,7 @@ func (sb *Sandbox) Shell(ctx context.Context, env map[string]string, shellCmd st
 }
 
 // Exec executes a command in the container. The container must be in state "running".
-func (sb *Sandbox) Exec(ctx context.Context, shellCmd string, args ...string) (string, error) {
+func (sb *Box) Exec(ctx context.Context, shellCmd string, args ...string) (string, error) {
 	output, err := ac.Containers.Exec(ctx,
 		&options.ExecContainer{
 			ProcessOptions: options.ProcessOptions{

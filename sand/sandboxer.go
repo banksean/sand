@@ -18,16 +18,17 @@ import (
 	"github.com/banksean/apple-container/options"
 )
 
+// SandBoxer manages the lifecycle of sandboxes.
 type SandBoxer struct {
 	cloneRoot      string
-	sandBoxes      map[string]*Sandbox
+	sandBoxes      map[string]*Box
 	terminalWriter io.Writer
 }
 
 func NewSandBoxer(cloneRoot string, terminalWriter io.Writer) *SandBoxer {
 	return &SandBoxer{
 		cloneRoot:      cloneRoot,
-		sandBoxes:      map[string]*Sandbox{},
+		sandBoxes:      map[string]*Box{},
 		terminalWriter: terminalWriter,
 	}
 }
@@ -42,7 +43,7 @@ func (sb *SandBoxer) EnsureDefaultImage(ctx context.Context, imageName, dockerfi
 // NewSandbox creates a new sandbox based on a clone of hostWorkDir.
 // TODO: clone envFile, if it exists, into sb.cloneRoot/id/env, so every command exec'd in that sandbox container
 // uses the same env file, even if the original .env file has changed on the host machine.
-func (sb *SandBoxer) NewSandbox(ctx context.Context, id, hostWorkDir, imageName, dockerFileDir, envFile string) (*Sandbox, error) {
+func (sb *SandBoxer) NewSandbox(ctx context.Context, id, hostWorkDir, imageName, dockerFileDir, envFile string) (*Box, error) {
 	slog.InfoContext(ctx, "SandBoxer.NewSandbox", "hostWorkDir", hostWorkDir, "id", id)
 
 	if err := sb.cloneWorkDir(ctx, id, hostWorkDir); err != nil {
@@ -57,7 +58,7 @@ func (sb *SandBoxer) NewSandbox(ctx context.Context, id, hostWorkDir, imageName,
 		return nil, err
 	}
 
-	ret := &Sandbox{
+	ret := &Box{
 		ID:             id,
 		HostOriginDir:  hostWorkDir,
 		SandboxWorkDir: filepath.Join(sb.cloneRoot, id),
@@ -74,7 +75,7 @@ func (sb *SandBoxer) NewSandbox(ctx context.Context, id, hostWorkDir, imageName,
 }
 
 // AttachSandbox re-connects to an existing container and sandboxWorkDir instead of creating a new one.
-func (sb *SandBoxer) AttachSandbox(ctx context.Context, id string) (*Sandbox, error) {
+func (sb *SandBoxer) AttachSandbox(ctx context.Context, id string) (*Box, error) {
 	slog.InfoContext(ctx, "SandBoxer.AttachSandbox", "id", id)
 	ret, err := sb.loadSandbox(ctx, id)
 	if err != nil {
@@ -83,9 +84,9 @@ func (sb *SandBoxer) AttachSandbox(ctx context.Context, id string) (*Sandbox, er
 	return ret, nil
 }
 
-func (sb *SandBoxer) List(ctx context.Context) ([]Sandbox, error) {
+func (sb *SandBoxer) List(ctx context.Context) ([]Box, error) {
 	dir := os.DirFS(sb.cloneRoot)
-	ret := []Sandbox{}
+	ret := []Box{}
 	err := fs.WalkDir(dir, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			slog.ErrorContext(ctx, "SandBoxer.List", "err", err)
@@ -106,7 +107,7 @@ func (sb *SandBoxer) List(ctx context.Context) ([]Sandbox, error) {
 	return ret, err
 }
 
-func (sb *SandBoxer) Get(ctx context.Context, id string) (*Sandbox, error) {
+func (sb *SandBoxer) Get(ctx context.Context, id string) (*Box, error) {
 	dir := filepath.Join(sb.cloneRoot, id)
 	slog.InfoContext(ctx, "SandBoxer.Get", "id", id)
 	f, err := os.Stat(dir)
@@ -129,7 +130,7 @@ func (sb *SandBoxer) Get(ctx context.Context, id string) (*Sandbox, error) {
 	return ret, nil
 }
 
-func (sb *SandBoxer) Cleanup(ctx context.Context, sbox *Sandbox) error {
+func (sb *SandBoxer) Cleanup(ctx context.Context, sbox *Box) error {
 	slog.InfoContext(ctx, "SandBoxer.Cleanup", "id", sbox.ID)
 
 	out, err := ac.Containers.Stop(ctx, nil, sbox.ContainerID)
@@ -382,7 +383,7 @@ func (sb *SandBoxer) userMsg(ctx context.Context, msg string) {
 }
 
 // SaveSandbox persists the Sandbox struct as JSON to disk atomically.
-func (sb *SandBoxer) SaveSandbox(ctx context.Context, sbox *Sandbox) error {
+func (sb *SandBoxer) SaveSandbox(ctx context.Context, sbox *Box) error {
 	sandboxPath := filepath.Join(sb.cloneRoot, sbox.ID, "sandbox.json")
 	slog.InfoContext(ctx, "SandBoxer.saveSandbox", "path", sandboxPath)
 
@@ -405,13 +406,13 @@ func (sb *SandBoxer) SaveSandbox(ctx context.Context, sbox *Sandbox) error {
 }
 
 // UpdateContainerID updates the ContainerID field of a sandbox and persists it.
-func (sb *SandBoxer) UpdateContainerID(ctx context.Context, sbox *Sandbox, containerID string) error {
+func (sb *SandBoxer) UpdateContainerID(ctx context.Context, sbox *Box, containerID string) error {
 	sbox.ContainerID = containerID
 	return sb.SaveSandbox(ctx, sbox)
 }
 
 // loadSandbox reads and deserializes a Sandbox struct from disk.
-func (sb *SandBoxer) loadSandbox(ctx context.Context, id string) (*Sandbox, error) {
+func (sb *SandBoxer) loadSandbox(ctx context.Context, id string) (*Box, error) {
 	sandboxPath := filepath.Join(sb.cloneRoot, id, "sandbox.json")
 	slog.InfoContext(ctx, "SandBoxer.loadSandbox", "path", sandboxPath)
 
@@ -423,7 +424,7 @@ func (sb *SandBoxer) loadSandbox(ctx context.Context, id string) (*Sandbox, erro
 		return nil, fmt.Errorf("failed to read sandbox.json: %w", err)
 	}
 
-	var sbox Sandbox
+	var sbox Box
 	if err := json.Unmarshal(data, &sbox); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal sandbox.json: %w", err)
 	}

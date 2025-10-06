@@ -20,7 +20,7 @@ func TestSaveSandbox(t *testing.T) {
 	sb := NewSandBoxer(tmpDir, nil)
 
 	// Create a test sandbox
-	testSandbox := &Sandbox{
+	testSandbox := &Box{
 		ID:             "test-id",
 		ContainerID:    "container-123",
 		HostOriginDir:  "/tmp/host-origin",
@@ -53,7 +53,7 @@ func TestSaveSandbox(t *testing.T) {
 		t.Fatalf("Failed to read sandbox.json: %v", err)
 	}
 
-	var loadedSandbox Sandbox
+	var loadedSandbox Box
 	if err := json.Unmarshal(data, &loadedSandbox); err != nil {
 		t.Fatalf("Failed to unmarshal sandbox.json: %v", err)
 	}
@@ -101,7 +101,7 @@ func TestLoadSandbox(t *testing.T) {
 	}
 
 	// Create a test sandbox struct
-	testSandbox := &Sandbox{
+	testSandbox := &Box{
 		ID:             testID,
 		ContainerID:    "container-456",
 		HostOriginDir:  "/tmp/host-load",

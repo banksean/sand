@@ -54,7 +54,7 @@ func (c *ExecCmd) Run(cctx *Context) error {
 		c.CloneFromDir = cwd
 	}
 
-	var sbox *sand.Sandbox
+	var sbox *sand.Box
 
 	if c.ID != "" {
 		sbox, err = cctx.sber.Get(ctx, c.ID) // Try to connect to an existing sandbo with this ID

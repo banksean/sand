@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/alecthomas/kong"
 	"github.com/banksean/apple-container/sand"
@@ -30,6 +31,7 @@ type CLI struct {
 	Rm      RmCmd      `cmd:"" help:"remove sandbox container and its clone directory"`
 	Stop    StopCmd    `cmd:"" help:"stop sandbox container"`
 	Doc     DocCmd     `cmd:"" help:"print complete command help formatted as markdown"`
+	Daemon  DaemonCmd  `cmd:"" help:"start or stop the sandmux daemon"`
 	Version VersionCmd `cmd:"" help:"print version infomation about this command"`
 }
 
@@ -89,6 +91,14 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Prerequisites check failed: %v\n", err.Error())
 		fmt.Fprintf(os.Stderr, "You may need to install Apple's `container` command from the releases published at https://github.com/apple/container/releases/tag/"+appleContainerVersion)
 		os.Exit(1)
+	}
+
+	// Don't try to ensure the daemon is running if we're trying to start or stop it.
+	if !strings.HasPrefix(ctx.Command(), "daemon") {
+		if err := sand.EnsureDaemon(); err != nil {
+			fmt.Fprintf(os.Stderr, "daemon not running, and failed to start it. error: %v\n", err)
+			os.Exit(1)
+		}
 	}
 
 	sber := sand.NewSandBoxer(cli.CloneRoot, os.Stderr)

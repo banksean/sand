@@ -19,7 +19,7 @@ func (c *ShellCmd) Run(cctx *Context) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	var sbox *sand.Sandbox
+	var sbox *sand.Box
 
 	sbox, err := cctx.sber.Get(ctx, c.ID)
 	if err != nil {
