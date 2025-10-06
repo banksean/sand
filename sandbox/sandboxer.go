@@ -203,21 +203,21 @@ func (sb *SandBoxer) cloneWorkDir(ctx context.Context, id, hostWorkDir string) e
 		return err
 	}
 
+	gitRemoteWorkDirToCloneCmd := exec.CommandContext(ctx, "git", "remote", "add", clonedWorkDirRemotePrefix+id, hostCloneDir)
+	gitRemoteWorkDirToCloneCmd.Dir = hostWorkDir
+	slog.InfoContext(ctx, "cloneWorkDir gitRemoteWorkDirToCloneCmd", "cmd", strings.Join(gitRemoteWorkDirToCloneCmd.Args, " "))
+	output, err = gitRemoteWorkDirToCloneCmd.CombinedOutput()
+	if err != nil {
+		slog.InfoContext(ctx, "cloneWorkDir gitRemoteWorkDirToCloneCmd", "error", err, "output", string(output))
+		return err
+	}
+
 	gitFetchCloneToWorkDirCmd := exec.CommandContext(ctx, "git", "fetch", originalWorkdDirRemoteName)
 	gitFetchCloneToWorkDirCmd.Dir = hostCloneDir
 	slog.InfoContext(ctx, "cloneWorkDir gitFetchCloneToWorkDirCmd", "cmd", strings.Join(gitFetchCloneToWorkDirCmd.Args, " "))
 	output, err = gitFetchCloneToWorkDirCmd.CombinedOutput()
 	if err != nil {
 		slog.InfoContext(ctx, "cloneWorkDir gitFetchCloneToWorkDirCmd", "error", err, "output", string(output))
-		return err
-	}
-
-	gitRemoteWorkDirToCloneCmd := exec.CommandContext(ctx, "git", "remote", "add", clonedWorkDirRemotePrefix+id, hostWorkDir)
-	gitRemoteWorkDirToCloneCmd.Dir = hostWorkDir
-	slog.InfoContext(ctx, "cloneWorkDir gitRemoteWorkDirToCloneCmd", "cmd", strings.Join(gitRemoteWorkDirToCloneCmd.Args, " "))
-	output, err = gitRemoteWorkDirToCloneCmd.CombinedOutput()
-	if err != nil {
-		slog.InfoContext(ctx, "cloneWorkDir gitRemoteWorkDirToCloneCmd", "error", err, "output", string(output))
 		return err
 	}
 
