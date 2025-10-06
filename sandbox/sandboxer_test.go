@@ -37,7 +37,7 @@ func TestSaveSandbox(t *testing.T) {
 
 	// Save the sandbox
 	ctx := context.Background()
-	if err := sb.saveSandbox(ctx, testSandbox); err != nil {
+	if err := sb.SaveSandbox(ctx, testSandbox); err != nil {
 		t.Fatalf("Failed to save sandbox: %v", err)
 	}
 

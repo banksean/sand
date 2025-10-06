@@ -24,6 +24,8 @@ type SandBoxer struct {
 	terminalWriter io.Writer
 }
 
+type SandboxSaver func(ctx context.Context, sbox *Sandbox) error
+
 func NewSandBoxer(cloneRoot string, terminalWriter io.Writer) *SandBoxer {
 	return &SandBoxer{
 		cloneRoot:      cloneRoot,
@@ -63,10 +65,11 @@ func (sb *SandBoxer) NewSandbox(ctx context.Context, id, hostWorkDir, imageName,
 		SandboxWorkDir: filepath.Join(sb.cloneRoot, id),
 		ImageName:      imageName,
 		EnvFile:        envFile,
+		Save:           sb.SaveSandbox,
 	}
 	sb.sandBoxes[id] = ret
 
-	if err := sb.saveSandbox(ctx, ret); err != nil {
+	if err := sb.SaveSandbox(ctx, ret); err != nil {
 		return nil, err
 	}
 
@@ -381,8 +384,8 @@ func (sb *SandBoxer) userMsg(ctx context.Context, msg string) {
 	fmt.Fprintln(sb.terminalWriter, msg)
 }
 
-// saveSandbox persists the Sandbox struct as JSON to disk.
-func (sb *SandBoxer) saveSandbox(ctx context.Context, sbox *Sandbox) error {
+// SaveSandbox persists the Sandbox struct as JSON to disk.
+func (sb *SandBoxer) SaveSandbox(ctx context.Context, sbox *Sandbox) error {
 	sandboxPath := filepath.Join(sb.cloneRoot, sbox.ID, "sandbox.json")
 	slog.InfoContext(ctx, "SandBoxer.saveSandbox", "path", sandboxPath)
 
