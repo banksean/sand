@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/banksean/apple-container/sandbox"
+	"github.com/banksean/apple-container/sand"
 	"github.com/google/uuid"
 )
 
@@ -54,7 +54,7 @@ func (c *ExecCmd) Run(cctx *Context) error {
 		c.CloneFromDir = cwd
 	}
 
-	var sbox *sandbox.Sandbox
+	var sbox *sand.Sandbox
 
 	if c.ID != "" {
 		sbox, err = cctx.sber.Get(ctx, c.ID) // Try to connect to an existing sandbo with this ID
@@ -77,7 +77,7 @@ func (c *ExecCmd) Run(cctx *Context) error {
 		}
 	}
 	if sbox.ImageName == "" {
-		sbox.ImageName = sandbox.DefaultImageName
+		sbox.ImageName = sand.DefaultImageName
 	}
 
 	ctr, err := sbox.GetContainer(ctx)

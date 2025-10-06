@@ -16,8 +16,6 @@ package main
 
 import (
 	"embed"
-
-	_ "embed"
 )
 
 var (

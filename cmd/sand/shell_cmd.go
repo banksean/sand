@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/banksean/apple-container/sandbox"
+	"github.com/banksean/apple-container/sand"
 )
 
 type ShellCmd struct {
@@ -19,7 +19,7 @@ func (c *ShellCmd) Run(cctx *Context) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	var sbox *sandbox.Sandbox
+	var sbox *sand.Sandbox
 
 	sbox, err := cctx.sber.Get(ctx, c.ID)
 	if err != nil {
