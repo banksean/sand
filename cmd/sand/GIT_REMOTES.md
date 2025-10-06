@@ -2,6 +2,8 @@
 
 ## Overview
 
+test edit
+
 When `sand` creates a new sandbox, it makes a copy-on-write (COW) clone of your original working directory using APFS's `clonefile(2)` functionality. To facilitate git operations between the original directory and the sandbox clone, `sand` automatically sets up **bidirectional git remotes** linking these two checkouts.
 
 ## Directory Structure
