@@ -24,8 +24,6 @@ type SandBoxer struct {
 	terminalWriter io.Writer
 }
 
-type SandboxSaver func(ctx context.Context, sbox *Sandbox) error
-
 func NewSandBoxer(cloneRoot string, terminalWriter io.Writer) *SandBoxer {
 	return &SandBoxer{
 		cloneRoot:      cloneRoot,
@@ -65,7 +63,6 @@ func (sb *SandBoxer) NewSandbox(ctx context.Context, id, hostWorkDir, imageName,
 		SandboxWorkDir: filepath.Join(sb.cloneRoot, id),
 		ImageName:      imageName,
 		EnvFile:        envFile,
-		Save:           sb.SaveSandbox,
 	}
 	sb.sandBoxes[id] = ret
 
@@ -384,7 +381,7 @@ func (sb *SandBoxer) userMsg(ctx context.Context, msg string) {
 	fmt.Fprintln(sb.terminalWriter, msg)
 }
 
-// SaveSandbox persists the Sandbox struct as JSON to disk.
+// SaveSandbox persists the Sandbox struct as JSON to disk atomically.
 func (sb *SandBoxer) SaveSandbox(ctx context.Context, sbox *Sandbox) error {
 	sandboxPath := filepath.Join(sb.cloneRoot, sbox.ID, "sandbox.json")
 	slog.InfoContext(ctx, "SandBoxer.saveSandbox", "path", sandboxPath)
@@ -394,11 +391,23 @@ func (sb *SandBoxer) SaveSandbox(ctx context.Context, sbox *Sandbox) error {
 		return fmt.Errorf("failed to marshal sandbox: %w", err)
 	}
 
-	if err := os.WriteFile(sandboxPath, data, 0644); err != nil {
-		return fmt.Errorf("failed to write sandbox.json: %w", err)
+	// Write to temp file first, then atomically rename
+	tempPath := sandboxPath + ".tmp"
+	if err := os.WriteFile(tempPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write temporary sandbox.json: %w", err)
+	}
+
+	if err := os.Rename(tempPath, sandboxPath); err != nil {
+		return fmt.Errorf("failed to rename sandbox.json: %w", err)
 	}
 
 	return nil
+}
+
+// UpdateContainerID updates the ContainerID field of a sandbox and persists it.
+func (sb *SandBoxer) UpdateContainerID(ctx context.Context, sbox *Sandbox, containerID string) error {
+	sbox.ContainerID = containerID
+	return sb.SaveSandbox(ctx, sbox)
 }
 
 // loadSandbox reads and deserializes a Sandbox struct from disk.

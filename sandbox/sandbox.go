@@ -35,8 +35,6 @@ type Sandbox struct {
 	DNSDomain string
 	// EnvFile is the host filesystem path to the env file to use when executing commands in the container
 	EnvFile string
-
-	Save SandboxSaver `json:"-"`
 }
 
 func (sb *Sandbox) GetContainer(ctx context.Context) (*types.Container, error) {
@@ -77,7 +75,6 @@ func (sb *Sandbox) CreateContainer(ctx context.Context) error {
 		return err
 	}
 	sb.ContainerID = containerID
-	sb.Save(ctx, sb)
 	return nil
 }
 

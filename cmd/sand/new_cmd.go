@@ -92,6 +92,10 @@ func (c *NewCmd) Run(cctx *Context) error {
 			slog.ErrorContext(ctx, "sbox.createContainer", "error", err)
 			return err
 		}
+		if err := cctx.sber.UpdateContainerID(ctx, sbox, sbox.ContainerID); err != nil {
+			slog.ErrorContext(ctx, "sber.UpdateContainerID", "error", err)
+			return err
+		}
 		// Get the container *again* and this time it should not be nil
 		ctr, err = sbox.GetContainer(ctx)
 		if err != nil || ctr == nil {
