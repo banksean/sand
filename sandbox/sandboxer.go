@@ -3,6 +3,7 @@ package sandbox
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -64,21 +65,21 @@ func (sb *SandBoxer) NewSandbox(ctx context.Context, id, hostWorkDir, imageName,
 		EnvFile:        envFile,
 	}
 	sb.sandBoxes[id] = ret
+
+	if err := sb.saveSandbox(ctx, ret); err != nil {
+		return nil, err
+	}
+
 	return ret, nil
 }
 
 // AttachSandbox re-connects to an existing container and sandboxWorkDir instead of creating a new one.
-// TODO: persist all the struct fields somewhere since we can't reconstruct them from the clone dir alone.
 func (sb *SandBoxer) AttachSandbox(ctx context.Context, id string) (*Sandbox, error) {
 	slog.InfoContext(ctx, "SandBoxer.AttachSandbox", "id", id)
-	ret := &Sandbox{
-		ID:             id,
-		SandboxWorkDir: filepath.Join(sb.cloneRoot, id),
-		ContainerID:    id,
-		HostOriginDir:  "", // we don't know this any more since we don't store it anywhere
-		ImageName:      "",
+	ret, err := sb.loadSandbox(ctx, id)
+	if err != nil {
+		return nil, err
 	}
-
 	return ret, nil
 }
 
@@ -120,13 +121,9 @@ func (sb *SandBoxer) Get(ctx context.Context, id string) (*Sandbox, error) {
 		return nil, fmt.Errorf("path exists but is not a directory: %s", dir)
 	}
 
-	// TODO: deserialize this struct from some persistent storage, even if it's just a json file.
-	ret := &Sandbox{
-		ID:             id,
-		SandboxWorkDir: filepath.Join(sb.cloneRoot, id),
-		ContainerID:    id,
-		HostOriginDir:  "", // we don't know this any more since we don't store it anywhere
-		ImageName:      "",
+	ret, err := sb.loadSandbox(ctx, id)
+	if err != nil {
+		return nil, err
 	}
 	slog.InfoContext(ctx, "SandBoxer.Get", "ret", ret)
 	return ret, nil
@@ -382,4 +379,42 @@ func (sb *SandBoxer) userMsg(ctx context.Context, msg string) {
 		return
 	}
 	fmt.Fprintln(sb.terminalWriter, msg)
+}
+
+// saveSandbox persists the Sandbox struct as JSON to disk.
+func (sb *SandBoxer) saveSandbox(ctx context.Context, sbox *Sandbox) error {
+	sandboxPath := filepath.Join(sb.cloneRoot, sbox.ID, "sandbox.json")
+	slog.InfoContext(ctx, "SandBoxer.saveSandbox", "path", sandboxPath)
+
+	data, err := json.MarshalIndent(sbox, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal sandbox: %w", err)
+	}
+
+	if err := os.WriteFile(sandboxPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write sandbox.json: %w", err)
+	}
+
+	return nil
+}
+
+// loadSandbox reads and deserializes a Sandbox struct from disk.
+func (sb *SandBoxer) loadSandbox(ctx context.Context, id string) (*Sandbox, error) {
+	sandboxPath := filepath.Join(sb.cloneRoot, id, "sandbox.json")
+	slog.InfoContext(ctx, "SandBoxer.loadSandbox", "path", sandboxPath)
+
+	data, err := os.ReadFile(sandboxPath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, fmt.Errorf("sandbox.json not found for id %s", id)
+		}
+		return nil, fmt.Errorf("failed to read sandbox.json: %w", err)
+	}
+
+	var sbox Sandbox
+	if err := json.Unmarshal(data, &sbox); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal sandbox.json: %w", err)
+	}
+
+	return &sbox, nil
 }
