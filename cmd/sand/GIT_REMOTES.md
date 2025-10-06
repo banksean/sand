@@ -1,20 +1,22 @@
 # Git Remotes Between Host and Sandbox
 
+`sand`'s design does not require the use of git, but if you do use git `sand` will do some extra work to make it easier to compare your working directory and sandboxed clones of your working directory.
+
 ## Overview
 
-When `sand` creates a new sandbox, it makes a copy-on-write (COW) clone of your original working directory using APFS's `clonefile(2)` functionality. To facilitate git operations between the original directory and the sandbox clone, `sand` automatically sets up **bidirectional git remotes** linking these two checkouts.
+When `sand` creates a new sandbox, it makes a copy-on-write (COW) clone of your original working directory using APFS's `clonefile(2)` functionality. To facilitate git operations between the original directory and the sandbox clone, `sand` automatically sets up **bidirectional git remotes** linking these two checkouts _on the host filesystem_.
 
 ## Directory Structure
 
 - **Original working directory (host)**: The directory where you ran `sand new` (e.g., `/Users/yourname/myproject`)
-- **Sandbox clone directory (host)**: `${SandBoxer.cloneRoot}/boxen/<sandbox-id>/app`
-  - Default `cloneRoot`: `/tmp/sand/boxen`
+- **Sandbox clone directory (host)**: `${--clone-root}/boxen/<sandbox-id>/app`
+  - Default `--clone-root`: `/tmp/sand/boxen`
   - Example full path: `/tmp/sand/boxen/my-sandbox/app`
 - **Container mount**: The sandbox clone is mounted to `/app` inside the container
 
 ## The Bidirectional Remote Relationship
 
-When creating a sandbox with ID `my-sandbox`, `sand` establishes these git remotes:
+When creating a sandbox with ID `my-sandbox` and current working directory `/Users/yourname/myproject`, `sand` establishes these git remotes:
 
 ### In the sandbox clone (`/tmp/sand/boxen/my-sandbox/app`):
 ```
@@ -30,7 +32,7 @@ Remote URL:  /tmp/sand/boxen/my-sandbox/app  (the sandbox clone directory)
 
 ## Important Caveat: Host-Only Paths
 
-⚠️ **These git remote paths only make sense on the host OS, not inside the container.**
+**These git remote paths only make sense on the host OS, not inside the container.**
 
 The remote URLs are absolute filesystem paths on the macOS host. Inside the container:
 - The path `/tmp/sand/boxen/my-sandbox/app` doesn't exist
@@ -38,10 +40,10 @@ The remote URLs are absolute filesystem paths on the macOS host. Inside the cont
 - Only `/app` (the mounted clone) is visible
 
 This means:
-- ✅ `git fetch origin-host-workdir` works on the **host** (from the sandbox clone directory)
-- ❌ `git fetch origin-host-workdir` **fails** inside the **container** (paths don't exist)
-- ✅ `git fetch sandbox-clone-my-sandbox` works on the **host** (from the original working directory)
-- ❌ `git fetch sandbox-clone-my-sandbox` **fails** inside the **container**
+- YES: `git fetch origin-host-workdir` works on the **host** (from the sandbox clone directory)
+- NO: `git fetch origin-host-workdir` **fails** inside the **container** (paths don't exist)
+- YES: `git fetch sandbox-clone-my-sandbox` works on the **host** (from the original working directory)
+- NO: `git fetch sandbox-clone-my-sandbox` **fails** inside the **container**
 
 ## Example: Comparing Original Working Directory to Sandbox
 
