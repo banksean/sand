@@ -9,7 +9,7 @@ Requires apple container CLI: https://github.com/apple/container/releases/tag/0.
 - `-h, --help` - Show context-sensitive help.
 - `--log-file` _`<log-file-path>`_ - location of log file (leave empty for a random tmp/ path) (default: `/tmp/sand/log`)
 - `--log-level` _`<debug|info|warn|error>`_ - the logging level (debug, info, warn, error) (default: `info`)
-- `--clone-root` _`<clone-root-dir>`_ - root dir to store sandbox clones of working directories (default: `/tmp/sand/boxen`)
+- `--clone-root` _`<clone-root-dir>`_ - root dir to store sandbox clones of working directories. Leave unset to use '~/Library/Application Support/Sand/boxen'
 
 ## Subcommands
 

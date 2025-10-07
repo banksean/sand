@@ -379,7 +379,7 @@ func (sb *SandBoxer) userMsg(ctx context.Context, msg string) {
 		slog.DebugContext(ctx, "userMsg (no terminalWriter)", "msg", msg)
 		return
 	}
-	fmt.Fprintln(sb.terminalWriter, msg)
+	fmt.Fprintln(sb.terminalWriter, "\033[90m"+msg+"\033[0m")
 }
 
 // SaveSandbox persists the Sandbox struct as JSON to disk atomically.

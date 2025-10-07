@@ -9,34 +9,35 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 )
 
 const (
-	defaultSocketPath = "/tmp/sandmux.sock"
-	defaultLockFile   = "/tmp/sandmux.lock"
+	defaultSocketFile = "sandmux.sock"
+	defaultLockFile   = "sandmux.lock"
 )
 
 type Mux struct {
-	SocketPath   string
-	LockFilePath string
-	listener     net.Listener
-	lockFile     *os.File
-	shutdown     chan any
+	AppBaseDir string
+
+	listener net.Listener
+	lockFile *os.File
+	shutdown chan any
 }
 
-func NewMux() *Mux {
+func NewMux(appBaseDir string) *Mux {
 	return &Mux{
-		SocketPath:   defaultSocketPath,
-		LockFilePath: defaultLockFile,
+		AppBaseDir: appBaseDir,
 	}
 }
 
 // ServeUnix serves the unix domain socket that sandmux clients (the CLI, e.g.) connect to.
 func (m *Mux) ServeUnix(ctx context.Context) error {
-	slog.InfoContext(ctx, "Mux.ServeUnix", "mux", m, "pid", os.Getpid())
-	lockFile, err := acquireLock(m.LockFilePath)
+	lockFilePath := filepath.Join(m.AppBaseDir, defaultLockFile)
+	slog.InfoContext(ctx, "Mux.ServeUnix", "mux", m, "pid", os.Getpid(), "lockFilePath", lockFilePath)
+	lockFile, err := acquireLock(lockFilePath)
 	if err != nil {
 		return err
 	}
@@ -51,19 +52,19 @@ func (m *Mux) ServeUnix(ctx context.Context) error {
 }
 
 func (m *Mux) startDaemonServer(ctx context.Context) error {
-	slog.InfoContext(ctx, "Mux.startDaemonServer", "socketPath", m.SocketPath)
-
+	socketPath := filepath.Join(m.AppBaseDir, defaultSocketFile)
+	slog.InfoContext(ctx, "Mux.startDaemonServer", "socketPath", socketPath)
 	// Remove old socket if it exists
-	os.Remove(m.SocketPath)
+	os.Remove(socketPath)
 
-	listener, err := net.Listen("unix", m.SocketPath)
+	listener, err := net.Listen("unix", socketPath)
 	if err != nil {
 		return err
 	}
 
 	if false { // TODO: do we need this?
 		// Set permissions so CLI can connect
-		if err := os.Chmod(m.SocketPath, 0600); err != nil {
+		if err := os.Chmod(socketPath, 0600); err != nil {
 			return err
 		}
 	}
@@ -97,6 +98,9 @@ func (m *Mux) handleShutdown(ctx context.Context) {
 }
 
 func (m *Mux) Shutdown(ctx context.Context) {
+	socketPath := filepath.Join(m.AppBaseDir, defaultSocketFile)
+	lockFilePath := filepath.Join(m.AppBaseDir, defaultLockFile)
+
 	slog.InfoContext(ctx, "Mux.Shutdown", "pid", os.Getpid())
 	// Close listener (stops accepting new connections)
 	if m.listener != nil {
@@ -105,14 +109,14 @@ func (m *Mux) Shutdown(ctx context.Context) {
 
 	// Remove socket file. This mail fail in many cases since closing the listener appears
 	// to remove the file automatically on MacOS. Therefore we ignore the err return value.
-	os.Remove(m.SocketPath)
+	os.Remove(socketPath)
 
 	// Release and remove lock file
 	if m.lockFile != nil {
 		syscall.Flock(int(m.lockFile.Fd()), syscall.LOCK_UN)
 		m.lockFile.Close()
-		if err := os.Remove(m.LockFilePath); err != nil {
-			slog.ErrorContext(ctx, "Mux.Shutdown removing lockfile", "error", err, "LockFilePath", m.LockFilePath)
+		if err := os.Remove(lockFilePath); err != nil {
+			slog.ErrorContext(ctx, "Mux.Shutdown removing lockfile", "error", err, "LockFilePath", lockFilePath)
 
 		}
 	}
@@ -200,7 +204,8 @@ func (m *Mux) NewClient(ctx context.Context) (*MuxClient, error) {
 }
 
 func (m *MuxClient) Shutdown(ctx context.Context) error {
-	conn, err := net.DialTimeout("unix", m.Mux.SocketPath, 2*time.Second)
+	socketPath := filepath.Join(m.Mux.AppBaseDir, defaultSocketFile)
+	conn, err := net.DialTimeout("unix", socketPath, 2*time.Second)
 	if err != nil {
 		return fmt.Errorf("daemon not running")
 	}
@@ -226,16 +231,18 @@ func (m *MuxClient) Shutdown(ctx context.Context) error {
 	time.Sleep(200 * time.Millisecond)
 
 	// Verify socket is gone
-	if _, err := os.Stat(m.Mux.SocketPath); err == nil {
+	if _, err := os.Stat(socketPath); err == nil {
 		return fmt.Errorf("daemon may not have shut down cleanly")
 	}
 
 	return nil
 }
 
-func EnsureDaemon() error {
+func EnsureDaemon(appBaseDir string) error {
+	socketPath := filepath.Join(appBaseDir, defaultSocketFile)
+
 	// Try to connect to existing daemon
-	conn, err := net.DialTimeout("unix", defaultSocketPath, 500*time.Millisecond)
+	conn, err := net.DialTimeout("unix", socketPath, 500*time.Millisecond)
 	if err == nil {
 		conn.Close()
 		return nil // Daemon already running
@@ -259,7 +266,7 @@ func EnsureDaemon() error {
 	// Wait for daemon to be ready
 	for i := 0; i < 20; i++ {
 		time.Sleep(100 * time.Millisecond)
-		conn, err := net.DialTimeout("unix", defaultSocketPath, 100*time.Millisecond)
+		conn, err := net.DialTimeout("unix", socketPath, 100*time.Millisecond)
 		if err == nil {
 			conn.Close()
 			return nil

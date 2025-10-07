@@ -13,16 +13,17 @@ import (
 )
 
 type Context struct {
-	LogFile   string
-	LogLevel  string
-	CloneRoot string
-	sber      *sand.SandBoxer
+	AppBaseDir string
+	LogFile    string
+	LogLevel   string
+	CloneRoot  string
+	sber       *sand.SandBoxer
 }
 
 type CLI struct {
 	LogFile   string `default:"/tmp/sand/log" placeholder:"<log-file-path>" help:"location of log file (leave empty for a random tmp/ path)"`
 	LogLevel  string `default:"info" placeholder:"<debug|info|warn|error>" help:"the logging level (debug, info, warn, error)"`
-	CloneRoot string `default:"/tmp/sand/boxen" placeholder:"<clone-root-dir>" help:"root dir to store sandbox clones of working directories"`
+	CloneRoot string `default:"" placeholder:"<clone-root-dir>" help:"root dir to store sandbox clones of working directories. Leave unset to use '~/Library/Application Support/Sand/boxen'"`
 
 	New     NewCmd     `cmd:"" help:"create a new sandbox and shell into its container"`
 	Shell   ShellCmd   `cmd:"" help:"shell into a sandbox container (and start the container, if necessary)"`
@@ -80,6 +81,24 @@ const description = `Manage lightweight linux container sandboxes on MacOS.
 
 Requires apple container CLI: https://github.com/apple/container/releases/tag/` + appleContainerVersion
 
+func appHomeDir() (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("error getting home directory: %w", err)
+	}
+
+	// Construct the path to the application support directory
+	appSupportDir := filepath.Join(homeDir, "Library", "Application Support", "Sand")
+
+	// Create the directory if it doesn't exist
+	err = os.MkdirAll(appSupportDir, 0755) // 0755 grants read/write/execute for owner, read/execute for group/others
+	if err != nil {
+		return "", fmt.Errorf("error creating application support directory: %w", err)
+	}
+
+	return appSupportDir, nil
+}
+
 func main() {
 	var cli CLI
 
@@ -94,20 +113,30 @@ func main() {
 		os.Exit(1)
 	}
 
+	appBaseDir, err := appHomeDir()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "unable to get application home directory: %v\n", err.Error())
+		os.Exit(1)
+	}
+
 	// Don't try to ensure the daemon is running if we're trying to start or stop it.
-	if !strings.HasPrefix(ctx.Command(), "daemon") {
-		if err := sand.EnsureDaemon(); err != nil {
+	if !strings.HasPrefix(ctx.Command(), "daemon") && ctx.Command() != "doc" {
+		if err := sand.EnsureDaemon(appBaseDir); err != nil {
 			fmt.Fprintf(os.Stderr, "daemon not running, and failed to start it. error: %v\n", err)
 			os.Exit(1)
 		}
 	}
 
+	if cli.CloneRoot == "" {
+		cli.CloneRoot = filepath.Join(appBaseDir, "boxen")
+	}
 	sber := sand.NewSandBoxer(cli.CloneRoot, os.Stderr)
-	err := ctx.Run(&Context{
-		LogFile:   cli.LogFile,
-		LogLevel:  cli.LogLevel,
-		CloneRoot: cli.CloneRoot,
-		sber:      sber,
+	err = ctx.Run(&Context{
+		AppBaseDir: appBaseDir,
+		LogFile:    cli.LogFile,
+		LogLevel:   cli.LogLevel,
+		CloneRoot:  cli.CloneRoot,
+		sber:       sber,
 	})
 	ctx.FatalIfErrorf(err)
 }

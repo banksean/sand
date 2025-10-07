@@ -12,7 +12,7 @@ type DaemonCmd struct {
 
 func (c *DaemonCmd) Run(cctx *Context) error {
 	ctx := context.Background()
-	mux := sand.NewMux()
+	mux := sand.NewMux(cctx.AppBaseDir)
 	if c.Stop {
 		mc, err := mux.NewClient(ctx)
 		if err != nil {
