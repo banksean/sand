@@ -36,7 +36,7 @@ type CLI struct {
 	Version VersionCmd `cmd:"" help:"print version infomation about this command"`
 }
 
-func (c *CLI) initSlog() {
+func (c *CLI) initSlog(cctx *kong.Context) {
 	var level slog.Level
 	switch c.LogLevel {
 	case "debug":
@@ -54,8 +54,11 @@ func (c *CLI) initSlog() {
 	// Create a new logger with a JSON handler writing to standard error
 	var f *os.File
 	var err error
+	if strings.HasPrefix(cctx.Command(), "daemon") {
+		c.LogFile = c.LogFile + "daemon"
+	}
 	if c.LogFile == "" {
-		f, err = os.CreateTemp("/tmp", c.LogFile)
+		f, err = os.CreateTemp("/tmp", "sand-log")
 		if err != nil {
 			panic(err)
 		}
@@ -105,7 +108,7 @@ func main() {
 	ctx := kong.Parse(&cli,
 		kong.Configuration(kong.JSON, ".sand.json", "~/.sand.json"),
 		kong.Description(description))
-	cli.initSlog()
+	cli.initSlog(ctx)
 
 	if err := verifyPrerequisites(context.Background()); err != nil {
 		fmt.Fprintf(os.Stderr, "Prerequisites check failed: %v\n", err.Error())
@@ -118,6 +121,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "unable to get application home directory: %v\n", err.Error())
 		os.Exit(1)
 	}
+	slog.Info("main", "appBaseDir", appBaseDir)
 
 	// Don't try to ensure the daemon is running if we're trying to start or stop it.
 	if !strings.HasPrefix(ctx.Command(), "daemon") && ctx.Command() != "doc" {

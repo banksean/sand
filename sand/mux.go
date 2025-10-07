@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -301,6 +302,10 @@ func (m *MuxClient) GetSandbox(ctx context.Context, id string) (*Box, error) {
 		return nil, fmt.Errorf("get failed: %s", resp.Error)
 	}
 
+	if resp.Data == nil {
+		return nil, nil
+	}
+
 	data, err := json.Marshal(resp.Data)
 	if err != nil {
 		return nil, err
@@ -512,7 +517,6 @@ func (m *Mux) handleStop(ctx context.Context, conn net.Conn, cmd MuxCommand) {
 
 func (m *Mux) handleCreate(ctx context.Context, conn net.Conn, cmd MuxCommand) {
 	var opts CreateSandboxOpts
-	
 	if id, ok := cmd.Args["id"].(string); ok {
 		opts.ID = id
 	}
@@ -539,6 +543,7 @@ func (m *Mux) handleCreate(ctx context.Context, conn net.Conn, cmd MuxCommand) {
 
 func EnsureDaemon(appBaseDir string) error {
 	socketPath := filepath.Join(appBaseDir, defaultSocketFile)
+	slog.Info("EnsureDaemon", "socketPath", socketPath)
 
 	// Try to connect to existing daemon
 	conn, err := net.DialTimeout("unix", socketPath, 500*time.Millisecond)
@@ -549,6 +554,10 @@ func EnsureDaemon(appBaseDir string) error {
 
 	// Start daemon in background
 	cmd := exec.Command(os.Args[0], "daemon")
+	if len(os.Args) > 2 {
+		cmd.Args = append(cmd.Args, os.Args[2:]...)
+	}
+	slog.Info("EnsureDaemon", "cmd", strings.Join(cmd.Args, " "))
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	cmd.Stdin = nil

@@ -25,7 +25,9 @@ type NewCmd struct {
 func (c *NewCmd) Run(cctx *Context) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	slog.InfoContext(ctx, "NewCmd.Run")
 
+	// Move this to the daemon startup sequence
 	if c.DockerFileDir == "" {
 		slog.InfoContext(ctx, "main: unpacking embedded container build files")
 		// TODO: name this dir using a content hash of defaultContainer.
@@ -70,7 +72,7 @@ func (c *NewCmd) Run(cctx *Context) error {
 
 	// Try to get existing sandbox
 	sbox, err := mc.GetSandbox(ctx, c.ID)
-	if err != nil {
+	if sbox == nil || err != nil {
 		// Sandbox doesn't exist, create it via daemon
 		slog.InfoContext(ctx, "Creating new sandbox via daemon", "id", c.ID)
 		sbox, err = mc.CreateSandbox(ctx, sand.CreateSandboxOpts{
@@ -98,6 +100,15 @@ func (c *NewCmd) Run(cctx *Context) error {
 		return err
 	}
 
+	if ctr == nil {
+		if err := sbox.CreateContainer(ctx); err != nil {
+			return err
+		}
+		ctr, err = sbox.GetContainer(ctx)
+		if err != nil {
+			return err
+		}
+	}
 	hostname := getContainerHostname(ctr)
 	env := map[string]string{
 		"HOSTNAME": hostname,
