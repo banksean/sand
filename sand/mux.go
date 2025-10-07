@@ -134,12 +134,12 @@ func (m *Mux) serveHTTP(ctx context.Context) {
 
 	// Register handlers
 	mux.HandleFunc("/shutdown", m.handleHTTPShutdown)
-	mux.HandleFunc("/ping", m.handleHTTPPing)
+	mux.HandleFunc("/ping", m.handlePing)
 	mux.HandleFunc("/list", m.handleHTTPList)
-	mux.HandleFunc("/get", m.handleHTTPGet)
-	mux.HandleFunc("/remove", m.handleHTTPRemove)
-	mux.HandleFunc("/stop", m.handleHTTPStop)
-	mux.HandleFunc("/create", m.handleHTTPCreate)
+	mux.HandleFunc("/get", m.handleGet)
+	mux.HandleFunc("/remove", m.handleRemove)
+	mux.HandleFunc("/stop", m.handleStop)
+	mux.HandleFunc("/create", m.handleCreate)
 
 	server := &http.Server{
 		Handler: mux,
@@ -176,7 +176,7 @@ func (m *Mux) handleHTTPShutdown(w http.ResponseWriter, r *http.Request) {
 	}()
 }
 
-func (m *Mux) handleHTTPPing(w http.ResponseWriter, r *http.Request) {
+func (m *Mux) handlePing(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -198,7 +198,7 @@ func (m *Mux) handleHTTPList(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, boxes)
 }
 
-func (m *Mux) handleHTTPGet(w http.ResponseWriter, r *http.Request) {
+func (m *Mux) handleGet(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -229,7 +229,7 @@ func (m *Mux) handleHTTPGet(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, sbox)
 }
 
-func (m *Mux) handleHTTPRemove(w http.ResponseWriter, r *http.Request) {
+func (m *Mux) handleRemove(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -255,7 +255,7 @@ func (m *Mux) handleHTTPRemove(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]string{"status": "ok"})
 }
 
-func (m *Mux) handleHTTPStop(w http.ResponseWriter, r *http.Request) {
+func (m *Mux) handleStop(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -281,7 +281,7 @@ func (m *Mux) handleHTTPStop(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]string{"status": "ok"})
 }
 
-func (m *Mux) handleHTTPCreate(w http.ResponseWriter, r *http.Request) {
+func (m *Mux) handleCreate(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -516,8 +516,6 @@ func (m *Mux) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*Box, 
 
 	return sbox, nil
 }
-
-
 
 func EnsureDaemon(appBaseDir string) error {
 	socketPath := filepath.Join(appBaseDir, defaultSocketFile)
