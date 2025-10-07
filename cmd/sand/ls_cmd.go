@@ -30,7 +30,7 @@ func (c *LsCmd) Run(cctx *Context) error {
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "SANDBOX ID\tSTATUS\tCONTAINER ID\tORIGIN DIR\tSANDBOX DIR\tIMAGE NAME\t")
+	fmt.Fprintln(w, "SANDBOX ID\tSTATUS\tCONTAINER ID\tORIGIN DIR\tIMAGE NAME\t")
 	for _, sbox := range list {
 		ctr, err := sbox.GetContainer(ctx)
 		if err != nil {
@@ -40,7 +40,7 @@ func (c *LsCmd) Run(cctx *Context) error {
 		if ctr != nil {
 			status = ctr.Status
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t\n", sbox.ID, status, sbox.ContainerID, sbox.HostOriginDir, sbox.SandboxWorkDir, sbox.ImageName)
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t\n", sbox.ID, status, sbox.ContainerID, sbox.HostOriginDir, sbox.ImageName)
 	}
 	w.Flush()
 	return nil
