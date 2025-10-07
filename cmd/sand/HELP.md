@@ -114,6 +114,20 @@ print complete command help formatted as markdown
 sand doc
 ```
 
+## `sand daemon`
+
+start or stop the sandmux daemon
+
+**Usage:**
+
+```
+sand daemon [flags]
+```
+
+**Flags:**
+
+- `--stop` - stop the daemon
+
 ## `sand version`
 
 print version infomation about this command
