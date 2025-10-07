@@ -77,7 +77,7 @@ func (m *Mux) startDaemonServer(ctx context.Context) error {
 	m.shutdown = make(chan any)
 
 	// Handle cleanup on shutdown
-	go m.handleShutdown(ctx)
+	go m.waitForShutdown(ctx)
 
 	// Start HTTP server
 	go m.serveHTTP(ctx)
@@ -88,7 +88,7 @@ func (m *Mux) startDaemonServer(ctx context.Context) error {
 	return nil
 }
 
-func (m *Mux) handleShutdown(ctx context.Context) {
+func (m *Mux) waitForShutdown(ctx context.Context) {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
@@ -133,7 +133,7 @@ func (m *Mux) serveHTTP(ctx context.Context) {
 	mux := http.NewServeMux()
 
 	// Register handlers
-	mux.HandleFunc("/shutdown", m.handleHTTPShutdown)
+	mux.HandleFunc("/shutdown", m.handleShutdown)
 	mux.HandleFunc("/ping", m.handlePing)
 	mux.HandleFunc("/list", m.handleHTTPList)
 	mux.HandleFunc("/get", m.handleGet)
@@ -161,7 +161,7 @@ func writeJSON(w http.ResponseWriter, data any) {
 }
 
 // HTTP handlers
-func (m *Mux) handleHTTPShutdown(w http.ResponseWriter, r *http.Request) {
+func (m *Mux) handleShutdown(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
