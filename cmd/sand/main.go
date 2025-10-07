@@ -84,6 +84,7 @@ func main() {
 	var cli CLI
 
 	ctx := kong.Parse(&cli,
+		kong.Configuration(kong.JSON, ".sand.json", "~/.sand.json"),
 		kong.Description(description))
 	cli.initSlog()
 

@@ -4,3 +4,4 @@ testbin
 .env.*
 .claude
 .claude.json
+.sand.json

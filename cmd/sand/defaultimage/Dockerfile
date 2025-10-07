@@ -73,6 +73,9 @@ RUN mkdir -p /root/.ssh && \
   echo "Host github.com\n\tPubkeyAuthentication yes" > /root/.ssh/config && \
   chmod 600 /root/.ssh/config
 
+ADD sand-sketch /usr/local/bin/sand-sketch
+RUN chmod +x /usr/local/bin/sand-sketch
+
 WORKDIR /workspace
 
 ARG GIT_DELTA_VERSION=0.18.2

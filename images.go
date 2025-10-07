@@ -54,7 +54,7 @@ func (i *ImagesSvc) Inspect(ctx context.Context, name string) ([]*types.ImageMan
 // Build builds an image. TODO: Since this can take a while, make it stream the command output
 // similar to how ContainerSvc.Logs works.
 func (i *ImagesSvc) Build(ctx context.Context, dockerFileDir string, opts *options.BuildOptions) (io.ReadCloser, io.ReadCloser, func() error, error) {
-	args := options.ToArgs(opts)
+	args := append(options.ToArgs(opts), dockerFileDir)
 	cmd := exec.CommandContext(ctx, "container", append([]string{"build"}, args...)...)
 	cmd.Dir = dockerFileDir
 	slog.InfoContext(ctx, "ImagesSvc.Build", "cmd.Dir", cmd.Dir, "cmd", strings.Join(cmd.Args, " "))
