@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -78,8 +79,8 @@ func (m *Mux) startDaemonServer(ctx context.Context) error {
 	// Handle cleanup on shutdown
 	go m.handleShutdown(ctx)
 
-	// Accept connections
-	go m.acceptConnections(ctx)
+	// Start HTTP server
+	go m.serveHTTP(ctx)
 
 	// Wait for shutdown signal
 	<-m.shutdown
@@ -128,70 +129,176 @@ func (m *Mux) Shutdown(ctx context.Context) {
 	close(m.shutdown)
 }
 
-func (m *Mux) acceptConnections(ctx context.Context) {
-	for {
-		conn, err := m.listener.Accept()
-		if err != nil {
-			return // Listener closed
-		}
-		go m.handleConnection(ctx, conn)
+func (m *Mux) serveHTTP(ctx context.Context) {
+	mux := http.NewServeMux()
+
+	// Register handlers
+	mux.HandleFunc("/shutdown", m.handleHTTPShutdown)
+	mux.HandleFunc("/ping", m.handleHTTPPing)
+	mux.HandleFunc("/list", m.handleHTTPList)
+	mux.HandleFunc("/get", m.handleHTTPGet)
+	mux.HandleFunc("/remove", m.handleHTTPRemove)
+	mux.HandleFunc("/stop", m.handleHTTPStop)
+	mux.HandleFunc("/create", m.handleHTTPCreate)
+
+	server := &http.Server{
+		Handler: mux,
 	}
+
+	server.Serve(m.listener)
 }
 
-type MuxCommand struct {
-	Type string         `json:"type"`
-	Args map[string]any `json:"args,omitempty"`
+// HTTP handler helpers
+func writeJSONError(w http.ResponseWriter, err error, code int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 }
 
-type MuxResponse struct {
-	Status string `json:"status"`
-	Data   any    `json:"data,omitempty"`
-	Error  string `json:"error,omitempty"`
+func writeJSON(w http.ResponseWriter, data any) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(data)
 }
 
-func (m *Mux) handleConnection(ctx context.Context, conn net.Conn) {
-	slog.InfoContext(ctx, "Mux.handleConnection", "conn", conn)
-	defer conn.Close()
-
-	decoder := json.NewDecoder(conn)
-	var cmd MuxCommand
-	if err := decoder.Decode(&cmd); err != nil {
+// HTTP handlers
+func (m *Mux) handleHTTPShutdown(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	switch cmd.Type {
-	case "shutdown":
-		// Send acknowledgment before shutting down
-		json.NewEncoder(conn).Encode(MuxResponse{Status: "ok"})
-		conn.Close()
+	writeJSON(w, map[string]string{"status": "ok"})
 
-		// Shutdown daemon
-		go func() {
-			time.Sleep(100 * time.Millisecond) // Give response time to send
-			m.Shutdown(ctx)
-		}()
+	// Shutdown daemon after response is sent
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		m.Shutdown(r.Context())
+	}()
+}
 
-	case "ping":
-		json.NewEncoder(conn).Encode(MuxResponse{Status: "pong"})
-
-	case "list":
-		m.handleList(ctx, conn, cmd)
-
-	case "get":
-		m.handleGet(ctx, conn, cmd)
-
-	case "remove":
-		m.handleRemove(ctx, conn, cmd)
-
-	case "stop":
-		m.handleStop(ctx, conn, cmd)
-
-	case "create":
-		m.handleCreate(ctx, conn, cmd)
-
-	default:
-		json.NewEncoder(conn).Encode(MuxResponse{Status: "error", Error: "unknown command type"})
+func (m *Mux) handleHTTPPing(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
 	}
+	writeJSON(w, map[string]string{"status": "pong"})
+}
+
+func (m *Mux) handleHTTPList(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	boxes, err := m.ListSandboxes(r.Context())
+	if err != nil {
+		writeJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, boxes)
+}
+
+func (m *Mux) handleHTTPGet(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var args struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&args); err != nil {
+		writeJSONError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	if args.ID == "" {
+		writeJSONError(w, fmt.Errorf("missing id"), http.StatusBadRequest)
+		return
+	}
+
+	sbox, err := m.GetSandbox(r.Context(), args.ID)
+	if err != nil {
+		writeJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+	if sbox == nil {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+	writeJSON(w, sbox)
+}
+
+func (m *Mux) handleHTTPRemove(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var args struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&args); err != nil {
+		writeJSONError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	if args.ID == "" {
+		writeJSONError(w, fmt.Errorf("missing id"), http.StatusBadRequest)
+		return
+	}
+
+	if err := m.RemoveSandbox(r.Context(), args.ID); err != nil {
+		writeJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string]string{"status": "ok"})
+}
+
+func (m *Mux) handleHTTPStop(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var args struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&args); err != nil {
+		writeJSONError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	if args.ID == "" {
+		writeJSONError(w, fmt.Errorf("missing id"), http.StatusBadRequest)
+		return
+	}
+
+	if err := m.StopSandbox(r.Context(), args.ID); err != nil {
+		writeJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string]string{"status": "ok"})
+}
+
+func (m *Mux) handleHTTPCreate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var opts CreateSandboxOpts
+	if err := json.NewDecoder(r.Body).Decode(&opts); err != nil {
+		writeJSONError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	sbox, err := m.CreateSandbox(r.Context(), opts)
+	if err != nil {
+		writeJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, sbox)
 }
 
 func acquireLock(lockFile string) (*os.File, error) {
@@ -215,41 +322,76 @@ func acquireLock(lockFile string) (*os.File, error) {
 }
 
 type MuxClient struct {
-	Mux *Mux
+	Mux        *Mux
+	httpClient *http.Client
 }
 
 func (m *Mux) NewClient(ctx context.Context) (*MuxClient, error) {
-	return &MuxClient{Mux: m}, nil
+	socketPath := filepath.Join(m.AppBaseDir, defaultSocketFile)
+	httpClient := &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				return net.Dial("unix", socketPath)
+			},
+		},
+	}
+	return &MuxClient{
+		Mux:        m,
+		httpClient: httpClient,
+	}, nil
 }
 
-func (m *MuxClient) sendCommand(ctx context.Context, cmd MuxCommand) (*MuxResponse, error) {
-	socketPath := filepath.Join(m.Mux.AppBaseDir, defaultSocketFile)
-	conn, err := net.DialTimeout("unix", socketPath, 2*time.Second)
+func (m *MuxClient) doRequest(ctx context.Context, method, path string, body any, result any) error {
+	var req *http.Request
+	var err error
+
+	if body != nil {
+		reqBody, err := json.Marshal(body)
+		if err != nil {
+			return err
+		}
+		req, err = http.NewRequestWithContext(ctx, method, "http://unix"+path, strings.NewReader(string(reqBody)))
+		if err != nil {
+			return err
+		}
+		req.Header.Set("Content-Type", "application/json")
+	} else {
+		req, err = http.NewRequestWithContext(ctx, method, "http://unix"+path, nil)
+		if err != nil {
+			return err
+		}
+	}
+
+	resp, err := m.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("daemon not running")
+		return fmt.Errorf("daemon not running: %w", err)
 	}
-	defer conn.Close()
+	defer resp.Body.Close()
 
-	if err := json.NewEncoder(conn).Encode(cmd); err != nil {
-		return nil, err
+	if resp.StatusCode >= 400 {
+		var errResp struct {
+			Error string `json:"error"`
+		}
+		if json.NewDecoder(resp.Body).Decode(&errResp) == nil && errResp.Error != "" {
+			return fmt.Errorf("%s", errResp.Error)
+		}
+		return fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
 
-	var resp MuxResponse
-	if err := json.NewDecoder(conn).Decode(&resp); err != nil {
-		return nil, err
+	if result != nil {
+		if err := json.NewDecoder(resp.Body).Decode(result); err != nil {
+			return err
+		}
 	}
 
-	return &resp, nil
+	return nil
 }
 
 func (m *MuxClient) Shutdown(ctx context.Context) error {
-	resp, err := m.sendCommand(ctx, MuxCommand{Type: "shutdown"})
-	if err != nil {
+	var resp map[string]string
+	if err := m.doRequest(ctx, http.MethodPost, "/shutdown", nil, &resp); err != nil {
 		return err
-	}
-
-	if resp.Status != "ok" {
-		return fmt.Errorf("shutdown failed: %s", resp.Error)
 	}
 
 	// Wait briefly to verify daemon stopped
@@ -265,121 +407,37 @@ func (m *MuxClient) Shutdown(ctx context.Context) error {
 }
 
 func (m *MuxClient) ListSandboxes(ctx context.Context) ([]Box, error) {
-	resp, err := m.sendCommand(ctx, MuxCommand{Type: "list"})
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.Status != "ok" {
-		return nil, fmt.Errorf("list failed: %s", resp.Error)
-	}
-
-	// The Data field contains []Box but as []interface{}
-	// We need to re-marshal and unmarshal to get the proper type
-	data, err := json.Marshal(resp.Data)
-	if err != nil {
-		return nil, err
-	}
-
 	var boxes []Box
-	if err := json.Unmarshal(data, &boxes); err != nil {
+	if err := m.doRequest(ctx, http.MethodGet, "/list", nil, &boxes); err != nil {
 		return nil, err
 	}
-
 	return boxes, nil
 }
 
 func (m *MuxClient) GetSandbox(ctx context.Context, id string) (*Box, error) {
-	resp, err := m.sendCommand(ctx, MuxCommand{
-		Type: "get",
-		Args: map[string]any{"id": id},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.Status != "ok" {
-		return nil, fmt.Errorf("get failed: %s", resp.Error)
-	}
-
-	if resp.Data == nil {
-		return nil, nil
-	}
-
-	data, err := json.Marshal(resp.Data)
-	if err != nil {
-		return nil, err
-	}
-
 	var box Box
-	if err := json.Unmarshal(data, &box); err != nil {
+	if err := m.doRequest(ctx, http.MethodPost, "/get", map[string]string{"id": id}, &box); err != nil {
+		if strings.Contains(err.Error(), "404") {
+			return nil, nil
+		}
 		return nil, err
 	}
-
 	return &box, nil
 }
 
 func (m *MuxClient) RemoveSandbox(ctx context.Context, id string) error {
-	resp, err := m.sendCommand(ctx, MuxCommand{
-		Type: "remove",
-		Args: map[string]any{"id": id},
-	})
-	if err != nil {
-		return err
-	}
-
-	if resp.Status != "ok" {
-		return fmt.Errorf("remove failed: %s", resp.Error)
-	}
-
-	return nil
+	return m.doRequest(ctx, http.MethodPost, "/remove", map[string]string{"id": id}, nil)
 }
 
 func (m *MuxClient) StopSandbox(ctx context.Context, id string) error {
-	resp, err := m.sendCommand(ctx, MuxCommand{
-		Type: "stop",
-		Args: map[string]any{"id": id},
-	})
-	if err != nil {
-		return err
-	}
-
-	if resp.Status != "ok" {
-		return fmt.Errorf("stop failed: %s", resp.Error)
-	}
-
-	return nil
+	return m.doRequest(ctx, http.MethodPost, "/stop", map[string]string{"id": id}, nil)
 }
 
 func (m *MuxClient) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*Box, error) {
-	resp, err := m.sendCommand(ctx, MuxCommand{
-		Type: "create",
-		Args: map[string]any{
-			"id":            opts.ID,
-			"cloneFromDir":  opts.CloneFromDir,
-			"imageName":     opts.ImageName,
-			"dockerFileDir": opts.DockerFileDir,
-			"envFile":       opts.EnvFile,
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.Status != "ok" {
-		return nil, fmt.Errorf("create failed: %s", resp.Error)
-	}
-
-	data, err := json.Marshal(resp.Data)
-	if err != nil {
-		return nil, err
-	}
-
 	var box Box
-	if err := json.Unmarshal(data, &box); err != nil {
+	if err := m.doRequest(ctx, http.MethodPost, "/create", opts, &box); err != nil {
 		return nil, err
 	}
-
 	return &box, nil
 }
 
@@ -418,11 +476,11 @@ func (m *Mux) StopSandbox(ctx context.Context, id string) error {
 }
 
 type CreateSandboxOpts struct {
-	ID            string
-	CloneFromDir  string
-	ImageName     string
-	DockerFileDir string
-	EnvFile       string
+	ID            string `json:"id,omitempty"`
+	CloneFromDir  string `json:"cloneFromDir,omitempty"`
+	ImageName     string `json:"imageName,omitempty"`
+	DockerFileDir string `json:"dockerFileDir,omitempty"`
+	EnvFile       string `json:"envFile,omitempty"`
 }
 
 // CreateSandbox creates a new sandbox and starts its container.
@@ -459,87 +517,7 @@ func (m *Mux) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*Box, 
 	return sbox, nil
 }
 
-// Handler functions for socket commands
 
-func (m *Mux) handleList(ctx context.Context, conn net.Conn, cmd MuxCommand) {
-	boxes, err := m.ListSandboxes(ctx)
-	if err != nil {
-		json.NewEncoder(conn).Encode(MuxResponse{Status: "error", Error: err.Error()})
-		return
-	}
-	json.NewEncoder(conn).Encode(MuxResponse{Status: "ok", Data: boxes})
-}
-
-func (m *Mux) handleGet(ctx context.Context, conn net.Conn, cmd MuxCommand) {
-	id, ok := cmd.Args["id"].(string)
-	if !ok {
-		json.NewEncoder(conn).Encode(MuxResponse{Status: "error", Error: "missing or invalid id"})
-		return
-	}
-
-	sbox, err := m.GetSandbox(ctx, id)
-	if err != nil {
-		json.NewEncoder(conn).Encode(MuxResponse{Status: "error", Error: err.Error()})
-		return
-	}
-	json.NewEncoder(conn).Encode(MuxResponse{Status: "ok", Data: sbox})
-}
-
-func (m *Mux) handleRemove(ctx context.Context, conn net.Conn, cmd MuxCommand) {
-	id, ok := cmd.Args["id"].(string)
-	if !ok {
-		json.NewEncoder(conn).Encode(MuxResponse{Status: "error", Error: "missing or invalid id"})
-		return
-	}
-
-	err := m.RemoveSandbox(ctx, id)
-	if err != nil {
-		json.NewEncoder(conn).Encode(MuxResponse{Status: "error", Error: err.Error()})
-		return
-	}
-	json.NewEncoder(conn).Encode(MuxResponse{Status: "ok"})
-}
-
-func (m *Mux) handleStop(ctx context.Context, conn net.Conn, cmd MuxCommand) {
-	id, ok := cmd.Args["id"].(string)
-	if !ok {
-		json.NewEncoder(conn).Encode(MuxResponse{Status: "error", Error: "missing or invalid id"})
-		return
-	}
-
-	err := m.StopSandbox(ctx, id)
-	if err != nil {
-		json.NewEncoder(conn).Encode(MuxResponse{Status: "error", Error: err.Error()})
-		return
-	}
-	json.NewEncoder(conn).Encode(MuxResponse{Status: "ok"})
-}
-
-func (m *Mux) handleCreate(ctx context.Context, conn net.Conn, cmd MuxCommand) {
-	var opts CreateSandboxOpts
-	if id, ok := cmd.Args["id"].(string); ok {
-		opts.ID = id
-	}
-	if cloneFromDir, ok := cmd.Args["cloneFromDir"].(string); ok {
-		opts.CloneFromDir = cloneFromDir
-	}
-	if imageName, ok := cmd.Args["imageName"].(string); ok {
-		opts.ImageName = imageName
-	}
-	if dockerFileDir, ok := cmd.Args["dockerFileDir"].(string); ok {
-		opts.DockerFileDir = dockerFileDir
-	}
-	if envFile, ok := cmd.Args["envFile"].(string); ok {
-		opts.EnvFile = envFile
-	}
-
-	sbox, err := m.CreateSandbox(ctx, opts)
-	if err != nil {
-		json.NewEncoder(conn).Encode(MuxResponse{Status: "error", Error: err.Error()})
-		return
-	}
-	json.NewEncoder(conn).Encode(MuxResponse{Status: "ok", Data: sbox})
-}
 
 func EnsureDaemon(appBaseDir string) error {
 	socketPath := filepath.Join(appBaseDir, defaultSocketFile)
