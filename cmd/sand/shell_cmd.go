@@ -19,15 +19,18 @@ func (c *ShellCmd) Run(cctx *Context) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	var sbox *sand.Box
-
-	sbox, err := cctx.sber.Get(ctx, c.ID)
+	// Use MuxClient to get sandbox info
+	mux := sand.NewMux(cctx.AppBaseDir, cctx.sber)
+	mc, err := mux.NewClient(ctx)
 	if err != nil {
+		slog.ErrorContext(ctx, "NewClient", "error", err)
 		return err
 	}
-	if sbox == nil {
-		slog.ErrorContext(ctx, "sber.NewSandbox not found", "id", c.ID)
-		return fmt.Errorf("could not find sandbox with ID %s", c.ID)
+
+	sbox, err := mc.GetSandbox(ctx, c.ID)
+	if err != nil {
+		slog.ErrorContext(ctx, "GetSandbox", "error", err, "id", c.ID)
+		return fmt.Errorf("could not find sandbox with ID %s: %w", c.ID, err)
 	}
 
 	ctr, err := sbox.GetContainer(ctx)

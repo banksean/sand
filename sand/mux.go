@@ -21,15 +21,17 @@ const (
 
 type Mux struct {
 	AppBaseDir string
+	sber       *SandBoxer
 
 	listener net.Listener
 	lockFile *os.File
 	shutdown chan any
 }
 
-func NewMux(appBaseDir string) *Mux {
+func NewMux(appBaseDir string, sber *SandBoxer) *Mux {
 	return &Mux{
 		AppBaseDir: appBaseDir,
+		sber:       sber,
 	}
 }
 
@@ -171,7 +173,23 @@ func (m *Mux) handleConnection(ctx context.Context, conn net.Conn) {
 	case "ping":
 		json.NewEncoder(conn).Encode(MuxResponse{Status: "pong"})
 
-		// ... other commands
+	case "list":
+		m.handleList(ctx, conn, cmd)
+
+	case "get":
+		m.handleGet(ctx, conn, cmd)
+
+	case "remove":
+		m.handleRemove(ctx, conn, cmd)
+
+	case "stop":
+		m.handleStop(ctx, conn, cmd)
+
+	case "create":
+		m.handleCreate(ctx, conn, cmd)
+
+	default:
+		json.NewEncoder(conn).Encode(MuxResponse{Status: "error", Error: "unknown command type"})
 	}
 }
 
@@ -203,23 +221,29 @@ func (m *Mux) NewClient(ctx context.Context) (*MuxClient, error) {
 	return &MuxClient{Mux: m}, nil
 }
 
-func (m *MuxClient) Shutdown(ctx context.Context) error {
+func (m *MuxClient) sendCommand(ctx context.Context, cmd MuxCommand) (*MuxResponse, error) {
 	socketPath := filepath.Join(m.Mux.AppBaseDir, defaultSocketFile)
 	conn, err := net.DialTimeout("unix", socketPath, 2*time.Second)
 	if err != nil {
-		return fmt.Errorf("daemon not running")
+		return nil, fmt.Errorf("daemon not running")
 	}
 	defer conn.Close()
 
-	// Send shutdown command
-	cmd := MuxCommand{Type: "shutdown"}
 	if err := json.NewEncoder(conn).Encode(cmd); err != nil {
-		return err
+		return nil, err
 	}
 
-	// Read acknowledgment
 	var resp MuxResponse
 	if err := json.NewDecoder(conn).Decode(&resp); err != nil {
+		return nil, err
+	}
+
+	return &resp, nil
+}
+
+func (m *MuxClient) Shutdown(ctx context.Context) error {
+	resp, err := m.sendCommand(ctx, MuxCommand{Type: "shutdown"})
+	if err != nil {
 		return err
 	}
 
@@ -231,11 +255,286 @@ func (m *MuxClient) Shutdown(ctx context.Context) error {
 	time.Sleep(200 * time.Millisecond)
 
 	// Verify socket is gone
+	socketPath := filepath.Join(m.Mux.AppBaseDir, defaultSocketFile)
 	if _, err := os.Stat(socketPath); err == nil {
 		return fmt.Errorf("daemon may not have shut down cleanly")
 	}
 
 	return nil
+}
+
+func (m *MuxClient) ListSandboxes(ctx context.Context) ([]Box, error) {
+	resp, err := m.sendCommand(ctx, MuxCommand{Type: "list"})
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.Status != "ok" {
+		return nil, fmt.Errorf("list failed: %s", resp.Error)
+	}
+
+	// The Data field contains []Box but as []interface{}
+	// We need to re-marshal and unmarshal to get the proper type
+	data, err := json.Marshal(resp.Data)
+	if err != nil {
+		return nil, err
+	}
+
+	var boxes []Box
+	if err := json.Unmarshal(data, &boxes); err != nil {
+		return nil, err
+	}
+
+	return boxes, nil
+}
+
+func (m *MuxClient) GetSandbox(ctx context.Context, id string) (*Box, error) {
+	resp, err := m.sendCommand(ctx, MuxCommand{
+		Type: "get",
+		Args: map[string]any{"id": id},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.Status != "ok" {
+		return nil, fmt.Errorf("get failed: %s", resp.Error)
+	}
+
+	data, err := json.Marshal(resp.Data)
+	if err != nil {
+		return nil, err
+	}
+
+	var box Box
+	if err := json.Unmarshal(data, &box); err != nil {
+		return nil, err
+	}
+
+	return &box, nil
+}
+
+func (m *MuxClient) RemoveSandbox(ctx context.Context, id string) error {
+	resp, err := m.sendCommand(ctx, MuxCommand{
+		Type: "remove",
+		Args: map[string]any{"id": id},
+	})
+	if err != nil {
+		return err
+	}
+
+	if resp.Status != "ok" {
+		return fmt.Errorf("remove failed: %s", resp.Error)
+	}
+
+	return nil
+}
+
+func (m *MuxClient) StopSandbox(ctx context.Context, id string) error {
+	resp, err := m.sendCommand(ctx, MuxCommand{
+		Type: "stop",
+		Args: map[string]any{"id": id},
+	})
+	if err != nil {
+		return err
+	}
+
+	if resp.Status != "ok" {
+		return fmt.Errorf("stop failed: %s", resp.Error)
+	}
+
+	return nil
+}
+
+func (m *MuxClient) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*Box, error) {
+	resp, err := m.sendCommand(ctx, MuxCommand{
+		Type: "create",
+		Args: map[string]any{
+			"id":            opts.ID,
+			"cloneFromDir":  opts.CloneFromDir,
+			"imageName":     opts.ImageName,
+			"dockerFileDir": opts.DockerFileDir,
+			"envFile":       opts.EnvFile,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.Status != "ok" {
+		return nil, fmt.Errorf("create failed: %s", resp.Error)
+	}
+
+	data, err := json.Marshal(resp.Data)
+	if err != nil {
+		return nil, err
+	}
+
+	var box Box
+	if err := json.Unmarshal(data, &box); err != nil {
+		return nil, err
+	}
+
+	return &box, nil
+}
+
+// ListSandboxes returns all sandboxes.
+func (m *Mux) ListSandboxes(ctx context.Context) ([]Box, error) {
+	return m.sber.List(ctx)
+}
+
+// GetSandbox retrieves a sandbox by ID.
+func (m *Mux) GetSandbox(ctx context.Context, id string) (*Box, error) {
+	return m.sber.Get(ctx, id)
+}
+
+// RemoveSandbox removes a single sandbox.
+func (m *Mux) RemoveSandbox(ctx context.Context, id string) error {
+	sbox, err := m.sber.Get(ctx, id)
+	if err != nil {
+		return err
+	}
+	if sbox == nil {
+		return fmt.Errorf("sandbox not found: %s", id)
+	}
+	return m.sber.Cleanup(ctx, sbox)
+}
+
+// StopSandbox stops a single sandbox container.
+func (m *Mux) StopSandbox(ctx context.Context, id string) error {
+	sbox, err := m.sber.Get(ctx, id)
+	if err != nil {
+		return err
+	}
+	if sbox == nil {
+		return fmt.Errorf("sandbox not found: %s", id)
+	}
+	return m.sber.StopContainer(ctx, sbox)
+}
+
+type CreateSandboxOpts struct {
+	ID            string
+	CloneFromDir  string
+	ImageName     string
+	DockerFileDir string
+	EnvFile       string
+}
+
+// CreateSandbox creates a new sandbox and starts its container.
+func (m *Mux) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*Box, error) {
+	sbox, err := m.sber.NewSandbox(ctx, opts.ID, opts.CloneFromDir, opts.ImageName, opts.DockerFileDir, opts.EnvFile)
+	if err != nil {
+		return nil, err
+	}
+
+	ctr, err := sbox.GetContainer(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if ctr == nil {
+		if err := sbox.CreateContainer(ctx); err != nil {
+			return nil, err
+		}
+		if err := m.sber.UpdateContainerID(ctx, sbox, sbox.ContainerID); err != nil {
+			return nil, err
+		}
+		ctr, err = sbox.GetContainer(ctx)
+		if err != nil || ctr == nil {
+			return nil, fmt.Errorf("failed to get container after creation")
+		}
+	}
+
+	if ctr.Status != "running" {
+		if err := sbox.StartContainer(ctx); err != nil {
+			return nil, err
+		}
+	}
+
+	return sbox, nil
+}
+
+// Handler functions for socket commands
+
+func (m *Mux) handleList(ctx context.Context, conn net.Conn, cmd MuxCommand) {
+	boxes, err := m.ListSandboxes(ctx)
+	if err != nil {
+		json.NewEncoder(conn).Encode(MuxResponse{Status: "error", Error: err.Error()})
+		return
+	}
+	json.NewEncoder(conn).Encode(MuxResponse{Status: "ok", Data: boxes})
+}
+
+func (m *Mux) handleGet(ctx context.Context, conn net.Conn, cmd MuxCommand) {
+	id, ok := cmd.Args["id"].(string)
+	if !ok {
+		json.NewEncoder(conn).Encode(MuxResponse{Status: "error", Error: "missing or invalid id"})
+		return
+	}
+
+	sbox, err := m.GetSandbox(ctx, id)
+	if err != nil {
+		json.NewEncoder(conn).Encode(MuxResponse{Status: "error", Error: err.Error()})
+		return
+	}
+	json.NewEncoder(conn).Encode(MuxResponse{Status: "ok", Data: sbox})
+}
+
+func (m *Mux) handleRemove(ctx context.Context, conn net.Conn, cmd MuxCommand) {
+	id, ok := cmd.Args["id"].(string)
+	if !ok {
+		json.NewEncoder(conn).Encode(MuxResponse{Status: "error", Error: "missing or invalid id"})
+		return
+	}
+
+	err := m.RemoveSandbox(ctx, id)
+	if err != nil {
+		json.NewEncoder(conn).Encode(MuxResponse{Status: "error", Error: err.Error()})
+		return
+	}
+	json.NewEncoder(conn).Encode(MuxResponse{Status: "ok"})
+}
+
+func (m *Mux) handleStop(ctx context.Context, conn net.Conn, cmd MuxCommand) {
+	id, ok := cmd.Args["id"].(string)
+	if !ok {
+		json.NewEncoder(conn).Encode(MuxResponse{Status: "error", Error: "missing or invalid id"})
+		return
+	}
+
+	err := m.StopSandbox(ctx, id)
+	if err != nil {
+		json.NewEncoder(conn).Encode(MuxResponse{Status: "error", Error: err.Error()})
+		return
+	}
+	json.NewEncoder(conn).Encode(MuxResponse{Status: "ok"})
+}
+
+func (m *Mux) handleCreate(ctx context.Context, conn net.Conn, cmd MuxCommand) {
+	var opts CreateSandboxOpts
+	
+	if id, ok := cmd.Args["id"].(string); ok {
+		opts.ID = id
+	}
+	if cloneFromDir, ok := cmd.Args["cloneFromDir"].(string); ok {
+		opts.CloneFromDir = cloneFromDir
+	}
+	if imageName, ok := cmd.Args["imageName"].(string); ok {
+		opts.ImageName = imageName
+	}
+	if dockerFileDir, ok := cmd.Args["dockerFileDir"].(string); ok {
+		opts.DockerFileDir = dockerFileDir
+	}
+	if envFile, ok := cmd.Args["envFile"].(string); ok {
+		opts.EnvFile = envFile
+	}
+
+	sbox, err := m.CreateSandbox(ctx, opts)
+	if err != nil {
+		json.NewEncoder(conn).Encode(MuxResponse{Status: "error", Error: err.Error()})
+		return
+	}
+	json.NewEncoder(conn).Encode(MuxResponse{Status: "ok", Data: sbox})
 }
 
 func EnsureDaemon(appBaseDir string) error {

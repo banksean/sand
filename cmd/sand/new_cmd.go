@@ -54,70 +54,48 @@ func (c *NewCmd) Run(cctx *Context) error {
 	if c.CloneFromDir == "" {
 		c.CloneFromDir = cwd
 	}
-	var sbox *sand.Box
 
-	if c.ID != "" {
-		sbox, err = cctx.sber.Get(ctx, c.ID) // Try to connect to an existing sandbox with this ID
-		if err != nil {
-			return err
-		}
-		if sbox == nil { // Create a new sandbox with this ID
-			sbox, err = cctx.sber.NewSandbox(ctx, c.ID, c.CloneFromDir, c.ImageName, c.DockerFileDir, c.EnvFile)
-			if err != nil {
-				slog.ErrorContext(ctx, "sber.NewSandbox", "error", err)
-				return err
-			}
-		}
-	} else { // Create a new sandbox with a random ID
+	// Generate ID if not provided
+	if c.ID == "" {
 		c.ID = uuid.NewString()
-		sbox, err = cctx.sber.NewSandbox(ctx, c.ID, c.CloneFromDir, c.ImageName, c.DockerFileDir, c.EnvFile)
+	}
+
+	// Use MuxClient to check if sandbox exists or create it
+	mux := sand.NewMux(cctx.AppBaseDir, cctx.sber)
+	mc, err := mux.NewClient(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx, "NewClient", "error", err)
+		return err
+	}
+
+	// Try to get existing sandbox
+	sbox, err := mc.GetSandbox(ctx, c.ID)
+	if err != nil {
+		// Sandbox doesn't exist, create it via daemon
+		slog.InfoContext(ctx, "Creating new sandbox via daemon", "id", c.ID)
+		sbox, err = mc.CreateSandbox(ctx, sand.CreateSandboxOpts{
+			ID:            c.ID,
+			CloneFromDir:  c.CloneFromDir,
+			ImageName:     c.ImageName,
+			DockerFileDir: c.DockerFileDir,
+			EnvFile:       c.EnvFile,
+		})
 		if err != nil {
-			slog.ErrorContext(ctx, "sber.NewSandbox", "error", err)
+			slog.ErrorContext(ctx, "CreateSandbox", "error", err)
 			return err
 		}
 	}
+
 	if sbox.ImageName == "" {
 		sbox.ImageName = sand.DefaultImageName
 	}
 
+	// At this point the sandbox and container exist and are running (created by daemon)
+	// Now attach to the shell directly (not through daemon)
 	ctr, err := sbox.GetContainer(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "sbox.GetContainer", "error", err)
 		return err
-	}
-
-	if ctr == nil { // The container doesn't exist.
-		slog.InfoContext(ctx, "main: sbox.createContainer")
-		if err := sbox.CreateContainer(ctx); err != nil {
-			slog.ErrorContext(ctx, "sbox.createContainer", "error", err)
-			return err
-		}
-		if err := cctx.sber.UpdateContainerID(ctx, sbox, sbox.ContainerID); err != nil {
-			slog.ErrorContext(ctx, "sber.UpdateContainerID", "error", err)
-			return err
-		}
-		// Get the container *again* and this time it should not be nil
-		ctr, err = sbox.GetContainer(ctx)
-		if err != nil || ctr == nil {
-			slog.ErrorContext(ctx, "sbox.GetContainer", "error", err, "ctr", ctr)
-			return err
-		}
-	}
-
-	slog.InfoContext(ctx, "NewCmd.Run", "ctr", ctr)
-
-	if ctr.Status != "running" {
-		slog.InfoContext(ctx, "main: sbox.startContainer")
-		if err := sbox.StartContainer(ctx); err != nil {
-			slog.ErrorContext(ctx, "sbox.startContainer", "error", err)
-			return err
-		}
-		// Get the container again to get the full struct details filled out now that it's running.
-		ctr, err = sbox.GetContainer(ctx)
-		if err != nil || ctr == nil {
-			slog.ErrorContext(ctx, "sbox.GetContainer", "error", err, "ctr", ctr)
-			return err
-		}
 	}
 
 	hostname := getContainerHostname(ctr)
@@ -135,16 +113,18 @@ func (c *NewCmd) Run(cctx *Context) error {
 			slog.ErrorContext(ctx, "sbox.new git checkout", "error", err, "out", out)
 		}
 	}
+
+	// Shell attachment is direct, not through daemon
 	if err := sbox.Shell(ctx, env, c.Shell, os.Stdin, os.Stdout, os.Stderr); err != nil {
 		slog.ErrorContext(ctx, "sbox.new", "error", err)
 	}
 
 	if c.Rm {
 		slog.InfoContext(ctx, "sbox.new finished, cleaning up...")
-		if err := cctx.sber.Cleanup(ctx, sbox); err != nil {
-			slog.ErrorContext(ctx, "sber.Cleanup", "error", err)
+		// Use daemon for cleanup
+		if err := mc.RemoveSandbox(ctx, sbox.ID); err != nil {
+			slog.ErrorContext(ctx, "RemoveSandbox", "error", err)
 		}
-
 		slog.InfoContext(ctx, "Cleanup complete. Exiting.")
 	}
 	return nil

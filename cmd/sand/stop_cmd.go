@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"sync"
 
-	applecontainer "github.com/banksean/apple-container"
+	"github.com/banksean/apple-container/sand"
 )
 
 type StopCmd struct {
@@ -18,39 +18,40 @@ func (c *StopCmd) Run(cctx *Context) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	mux := sand.NewMux(cctx.AppBaseDir, cctx.sber)
+	mc, err := mux.NewClient(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx, "NewClient", "error", err)
+		return err
+	}
+
 	ids := []string{}
 	if !c.All {
-		sbox, err := cctx.sber.Get(ctx, c.ID)
-		if err != nil {
-			return err
-		}
-
-		ids = append(ids, sbox.ContainerID)
+		ids = append(ids, c.ID)
 	} else {
-		bxs, err := cctx.sber.List(ctx)
+		bxs, err := mc.ListSandboxes(ctx)
 		if err != nil {
 			return err
 		}
 		for _, bx := range bxs {
-			ids = append(ids, bx.ContainerID)
+			ids = append(ids, bx.ID)
 		}
 	}
 
 	var wg sync.WaitGroup
 	errChan := make(chan error, len(ids))
 
-	for _, containerID := range ids {
+	for _, id := range ids {
 		wg.Add(1)
-		go func(containerID string) {
+		go func(id string) {
 			defer wg.Done()
-			out, err := applecontainer.Containers.Stop(ctx, nil, containerID)
-			if err != nil {
-				slog.ErrorContext(ctx, "StopCmd Containers.Stop", "error", err, "out", out)
+			if err := mc.StopSandbox(ctx, id); err != nil {
+				slog.ErrorContext(ctx, "StopSandbox", "error", err, "id", id)
 				errChan <- err
 				return
 			}
-			fmt.Printf("%s\t%s\n", containerID, out)
-		}(containerID)
+			fmt.Printf("%s\n", id)
+		}(id)
 	}
 
 	wg.Wait()

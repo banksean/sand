@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
 	"sync"
+
+	"github.com/banksean/apple-container/sand"
 )
 
 type RmCmd struct {
@@ -18,16 +19,18 @@ func (c *RmCmd) Run(cctx *Context) error {
 	defer cancel()
 	slog.InfoContext(ctx, "RmCmd", "run", *c)
 
-	cwd, err := os.Getwd()
+	mux := sand.NewMux(cctx.AppBaseDir, cctx.sber)
+	mc, err := mux.NewClient(ctx)
 	if err != nil {
-		slog.ErrorContext(ctx, "os.Getwd", "error", err)
+		slog.ErrorContext(ctx, "NewClient", "error", err)
 		return err
 	}
+
 	ids := []string{}
 	if !c.All {
 		ids = append(ids, c.ID)
 	} else {
-		bxs, err := cctx.sber.List(ctx)
+		bxs, err := mc.ListSandboxes(ctx)
 		if err != nil {
 			return err
 		}
@@ -36,8 +39,6 @@ func (c *RmCmd) Run(cctx *Context) error {
 		}
 	}
 
-	slog.InfoContext(ctx, "RmCmd.Run", "sber", cctx.sber, "cwd", cwd)
-
 	var wg sync.WaitGroup
 	errChan := make(chan error, len(ids))
 
@@ -45,15 +46,7 @@ func (c *RmCmd) Run(cctx *Context) error {
 		wg.Add(1)
 		go func(id string) {
 			defer wg.Done()
-			sbx, err := cctx.sber.Get(ctx, id)
-			if err != nil {
-				errChan <- err
-				return
-			}
-			if sbx == nil {
-				return
-			}
-			if err := cctx.sber.Cleanup(ctx, sbx); err != nil {
+			if err := mc.RemoveSandbox(ctx, id); err != nil {
 				errChan <- err
 				return
 			}

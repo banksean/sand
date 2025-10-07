@@ -411,6 +411,21 @@ func (sb *SandBoxer) UpdateContainerID(ctx context.Context, sbox *Box, container
 	return sb.SaveSandbox(ctx, sbox)
 }
 
+// StopContainer stops a sandbox's container without deleting it.
+func (sb *SandBoxer) StopContainer(ctx context.Context, sbox *Box) error {
+	if sbox.ContainerID == "" {
+		return fmt.Errorf("sandbox %s has no container ID", sbox.ID)
+	}
+
+	out, err := ac.Containers.Stop(ctx, nil, sbox.ContainerID)
+	if err != nil {
+		slog.ErrorContext(ctx, "SandBoxer.StopContainer", "error", err, "out", out)
+		return err
+	}
+	slog.InfoContext(ctx, "SandBoxer.StopContainer", "id", sbox.ID, "containerID", sbox.ContainerID, "out", out)
+	return nil
+}
+
 // loadSandbox reads and deserializes a Sandbox struct from disk.
 func (sb *SandBoxer) loadSandbox(ctx context.Context, id string) (*Box, error) {
 	sandboxPath := filepath.Join(sb.cloneRoot, id, "sandbox.json")
