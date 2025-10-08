@@ -54,8 +54,11 @@ jobs:
         run: |
           ls /usr/local/bin/container # Verify the app is present
 
-      - name: start conainer system
-        run: sudo container system start
+      - name: container status
+        run: sudo container --debug system status
+
+      - name: start container system
+        run: sudo container --debug system start
 
       - name: Install sand
         run: go install github.com/banksean/apple-container/cmd/sand
