@@ -24,9 +24,7 @@ on:
     branches-ignore:
       - "queue-main-*"
       - "queue-dev-*"
-    branches: [ "main" ]
   pull_request:
-    branches: [ "main" ]
 jobs:
   build:
     runs-on: macos-latest
