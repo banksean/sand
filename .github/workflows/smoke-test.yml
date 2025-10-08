@@ -57,8 +57,8 @@ jobs:
       - name: debug container status
         run: /bin/launchctl list
 
-      - name: launchd logs
-        run: cat /var/log/com.apple.xpc.launchd/launchd.log
+      - name: container system logs
+        run: container system logs -f
 
       - name: container status
         run: sudo container --debug system status
