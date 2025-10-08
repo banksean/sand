@@ -24,7 +24,7 @@ jobs:
   formatting:
     outputs:
       commit_sha: ${{ steps.get_commit.outputs.commit_sha }}
-    runs-on: macos-latest
+    runs-on: macos-26-arm64
     steps:
       - uses: actions/checkout@v4
         with:

@@ -41,7 +41,7 @@ jobs:
       include-slow-tests: false
 
   push-to-main:
-    runs-on: macos-latest
+    runs-on: macos-26-arm64
     needs:
       [
         go-test,
