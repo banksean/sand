@@ -64,3 +64,15 @@ jobs:
       - name: sand doc
         working-directory: ${{ inputs.working-directory || '.'}}
         run: sand doc
+
+      - name: sand daemon
+        working-directory: ${{ inputs.working-directory || '.'}}
+        run: sand daemon
+
+      - name: sand ls
+        working-directory: ${{ inputs.working-directory || '.'}}
+        run: sand ls
+
+      - name: sand daemon stop
+        working-directory: ${{ inputs.working-directory || '.'}}
+        run: sand daemon stop
