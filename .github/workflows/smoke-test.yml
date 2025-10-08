@@ -21,19 +21,7 @@ on:
       - "queue-dev-*"
   pull_request:
 jobs:
-  install:
-    runs-on: macos-26
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.24.1'
-
-    - name: Install
-      run: go install github.com/banksean/apple-container/cmd/sand
-  test:
+  smoke-test:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
@@ -53,6 +41,9 @@ jobs:
           key: ${{ runner.os }}-go1.24.1-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go1.24.1-
+
+      - name: Install sand
+        run: go install github.com/banksean/apple-container/cmd/sand
 
       - name: sand version
         working-directory: ${{ inputs.working-directory || '.'}}
