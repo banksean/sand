@@ -58,7 +58,7 @@ jobs:
         run: /bin/launchctl list
 
       - name: container system logs
-        run: container system logs -f
+        run: container system logs --last 1d
 
       - name: container status
         run: sudo container --debug system status
