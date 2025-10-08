@@ -39,16 +39,29 @@ jobs:
       - name: Install gofumpt v0.8.0
         run: |
           go install mvdan.cc/gofumpt@latest
-  
       - name: Check formatting
         if: inputs.auto_fix != true
-        run: scripts/run-formatters.sh check
+        run: |
+          scripts/run-formatters.sh check
+          ROOT_EXIT=$?
+          # If check failed, exit with error
+          if [ $ROOT_EXIT -ne 0 ]; then
+            exit 1
+          fi
 
       - name: Fix formatting
         if: inputs.auto_fix == true
-        run: scripts/run-formatters.sh fix
+        run: |
+          # Run both formatters in parallel
+          scripts/run-formatters.sh fix
+          ROOT_EXIT=$?
 
-      # Commit formatting fixes if auto_fix is true
+          # If fix failed, exit with error
+          if [ $ROOT_EXIT -ne 0 ]; then
+            exit 1
+          fi
+
+       # Commit formatting fixes if auto_fix is true
       - name: Commit and push formatting fixes if needed
         if: inputs.auto_fix == true
         run: |
@@ -65,15 +78,23 @@ jobs:
           MERGE_BASE=$(git merge-base HEAD origin/main)
           COMMIT_COUNT=$(git rev-list --count $MERGE_BASE..HEAD)
 
-          if [ "$COMMIT_COUNT" -eq 1 ]; then
-            echo "Found exactly one commit since merge-base with origin/main. Amending the commit."
-            git commit --amend --no-edit
-          else
+          # Check if there are multiple commits
+          if [ "$COMMIT_COUNT" -gt 1 ]; then
             echo "Found multiple commits ($COMMIT_COUNT) since merge-base with origin/main. Creating a new commit."
             git commit -m "all: fix formatting"
+          else
+            # There is exactly one commit, check file paths
+            echo "Found exactly one commit since merge-base with origin/main. Checking file paths."
+
+            # Assert there is only one commit
+            if [ "$COMMIT_COUNT" -ne 1 ]; then
+              echo "Error: Expected exactly one commit, found $COMMIT_COUNT"
+              exit 1
+            fi
           fi
 
           git push -f https://${GITHUB_ACTOR}:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git HEAD
+
 
       - name: Get commit SHA
         id: get_commit
