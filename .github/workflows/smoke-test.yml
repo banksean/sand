@@ -73,6 +73,14 @@ jobs:
         working-directory: ${{ inputs.working-directory || '.'}}
         run: sand ls
 
+      - name: sand new
+        working-directory: ${{ inputs.working-directory || '.'}}
+        run: sand new -b test-sandbox
+
+      - name: sand rm
+        working-directory: ${{ inputs.working-directory || '.'}}
+        run: sand rm -a
+
       - name: sand daemon stop
         working-directory: ${{ inputs.working-directory || '.'}}
         run: sand daemon stop
