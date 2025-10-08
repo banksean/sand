@@ -6,7 +6,7 @@ ENV TZ="$TZ"
 
 ARG CLAUDE_CODE_VERSION=latest
 # TODO: get this from a build arg, passed in from sandboxer, based on whatever is in the cloned dir's go.mod
-ARG GO_VERSION=1.24.1
+ARG GO_VERSION=1.25.1
 
 # Install basic development tools and iptables/ipset
 RUN apt-get update && apt-get install -y --no-install-recommends \

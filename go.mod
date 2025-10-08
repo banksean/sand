@@ -1,6 +1,6 @@
 module github.com/banksean/apple-container
 
-go 1.24.1
+go 1.25.1
 
 require (
 	github.com/alecthomas/kong v1.12.1
