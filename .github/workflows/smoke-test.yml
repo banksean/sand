@@ -42,6 +42,18 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go1.24.1-
 
+      - name: Download apple/container 0.5.0 installer
+        run: |
+          curl -L "https://github.com/apple/container/releases/download/0.5.0/container-0.5.0-installer-signed.pkg" -o container-0.5.0-installer-signed.pkg
+
+      - name: Install .pkg file
+        run: |
+          sudo installer -pkg container-0.5.0-installer-signed.pkg -target /
+
+      - name: Verify Installation (Optional)
+        run: |
+          ls /usr/local/bin/container # Verify the app is present
+
       - name: Install sand
         run: go install github.com/banksean/apple-container/cmd/sand
 
