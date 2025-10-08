@@ -50,7 +50,7 @@ jobs:
         run: |
           sudo installer -pkg container-0.5.0-installer-signed.pkg -target /
 
-      - name: Verify Installation (Optional)
+      - name: Verify "container" command installation
         run: |
           ls /usr/local/bin/container # Verify the app is present
 
