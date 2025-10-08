@@ -54,6 +54,9 @@ jobs:
         run: |
           ls /usr/local/bin/container # Verify the app is present
 
+      - name: sleep 10s to let container system settle
+        run: sleep 10
+
       - name: debug container status
         run: /bin/launchctl list
 
