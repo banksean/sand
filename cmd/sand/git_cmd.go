@@ -17,7 +17,7 @@ type GitCmd struct {
 }
 
 type DiffCmd struct {
-	Branch    string `short:"b" default:"main" placeholder:"<branch>" help:"branch to diff against (default: main)"`
+	Branch    string `short:"b" default:"" placeholder:"<branch>" help:"branch to diff against (default: sandbox ID)"`
 	SandboxID string `arg:"" help:"ID of the sandbox to diff against"`
 }
 
@@ -56,6 +56,10 @@ func (c *DiffCmd) Run(cctx *Context) error {
 	gitFetch.Stderr = os.Stderr
 	if err := gitFetch.Run(); err != nil {
 		return fmt.Errorf("git fetch failed: %w", err)
+	}
+
+	if c.Branch == "" {
+		c.Branch = c.SandboxID
 	}
 
 	// Now diff against the specified branch from the remote
