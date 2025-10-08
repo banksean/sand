@@ -56,6 +56,11 @@ func TestMuxHTTPPing(t *testing.T) {
 		t.Errorf("Expected pong response, got: %v", resp)
 	}
 
+	// Test Ping() client method
+	if err := client.Ping(ctx); err != nil {
+		t.Fatalf("Ping() method failed: %v", err)
+	}
+
 	// Test shutdown
 	if err := client.Shutdown(ctx); err != nil {
 		t.Fatalf("Shutdown failed: %v", err)
@@ -114,4 +119,35 @@ func TestMuxHTTPList(t *testing.T) {
 	if err := client.Shutdown(ctx); err != nil {
 		t.Fatalf("Shutdown failed: %v", err)
 	}
+}
+
+func TestMuxPingNotRunning(t *testing.T) {
+	// Create a temporary directory for the mux
+	tmpDir, err := os.MkdirTemp("", "mux-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create a sandboxer
+	sber := NewSandBoxer(tmpDir, nil)
+
+	// Create mux but don't start it
+	mux := NewMux(tmpDir, sber)
+	ctx := context.Background()
+
+	// Try to create a client when daemon is not running
+	client, err := mux.NewClient(ctx)
+	if err != nil {
+		// Creating client itself might succeed, but ping should fail
+		t.Logf("NewClient returned error (expected): %v", err)
+		return
+	}
+
+	// Ping should fail when daemon is not running
+	err = client.Ping(ctx)
+	if err == nil {
+		t.Fatalf("Expected Ping to fail when daemon is not running")
+	}
+	t.Logf("Ping failed as expected: %v", err)
 }

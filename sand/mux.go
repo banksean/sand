@@ -387,6 +387,14 @@ func (m *MuxClient) doRequest(ctx context.Context, method, path string, body any
 	return nil
 }
 
+func (m *MuxClient) Ping(ctx context.Context) error {
+	var resp map[string]string
+	if err := m.doRequest(ctx, http.MethodGet, "/ping", nil, &resp); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (m *MuxClient) Shutdown(ctx context.Context) error {
 	var resp map[string]string
 	if err := m.doRequest(ctx, http.MethodPost, "/shutdown", nil, &resp); err != nil {
@@ -516,7 +524,7 @@ func (m *Mux) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*Box, 
 	return sbox, nil
 }
 
-func EnsureDaemon(appBaseDir string) error {
+func EnsureDaemon(appBaseDir, logFile string) error {
 	socketPath := filepath.Join(appBaseDir, defaultSocketFile)
 	slog.Info("EnsureDaemon", "socketPath", socketPath)
 
@@ -528,7 +536,7 @@ func EnsureDaemon(appBaseDir string) error {
 	}
 
 	// Start daemon in background
-	cmd := exec.Command(os.Args[0], "daemon", "--clone-root", filepath.Join(appBaseDir, "boxen"))
+	cmd := exec.Command(os.Args[0], "daemon", "start", "--log-file", logFile, "--clone-root", filepath.Join(appBaseDir, "boxen"))
 	slog.Info("EnsureDaemon", "cmd", strings.Join(cmd.Args, " "))
 	cmd.Stdout = nil
 	cmd.Stderr = nil

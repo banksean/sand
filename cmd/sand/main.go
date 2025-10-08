@@ -55,7 +55,7 @@ func (c *CLI) initSlog(cctx *kong.Context) {
 	var f *os.File
 	var err error
 	if strings.HasPrefix(cctx.Command(), "daemon") {
-		c.LogFile = c.LogFile + "daemon"
+		c.LogFile = c.LogFile + ".daemon"
 	}
 	if c.LogFile == "" {
 		f, err = os.CreateTemp("/tmp", "sand-log")
@@ -124,7 +124,7 @@ func main() {
 
 	// Don't try to ensure the daemon is running if we're trying to start or stop it.
 	if !strings.HasPrefix(ctx.Command(), "daemon") && ctx.Command() != "doc" {
-		if err := sand.EnsureDaemon(appBaseDir); err != nil {
+		if err := sand.EnsureDaemon(appBaseDir, cli.LogFile); err != nil {
 			fmt.Fprintf(os.Stderr, "daemon not running, and failed to start it. error: %v\n", err)
 			os.Exit(1)
 		}
