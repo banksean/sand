@@ -528,10 +528,7 @@ func EnsureDaemon(appBaseDir string) error {
 	}
 
 	// Start daemon in background
-	cmd := exec.Command(os.Args[0], "daemon")
-	if len(os.Args) > 2 {
-		cmd.Args = append(cmd.Args, os.Args[2:]...)
-	}
+	cmd := exec.Command(os.Args[0], "daemon", "--clone-root", filepath.Join(appBaseDir, "boxen"))
 	slog.Info("EnsureDaemon", "cmd", strings.Join(cmd.Args, " "))
 	cmd.Stdout = nil
 	cmd.Stderr = nil

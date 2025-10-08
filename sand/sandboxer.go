@@ -263,6 +263,7 @@ func (sb *SandBoxer) cloneDotfiles(ctx context.Context, id string) error {
 		".gitconfig",
 		".p10k.zsh",
 		".zshrc",
+		".omp.json",
 	}
 	if err := os.MkdirAll(filepath.Join(sb.cloneRoot, id, "dotfiles"), 0o750); err != nil {
 		return err
@@ -272,6 +273,7 @@ func (sb *SandBoxer) cloneDotfiles(ctx context.Context, id string) error {
 		original := filepath.Join(os.Getenv("HOME"), dotfile)
 		fi, err := os.Lstat(original)
 		if errors.Is(err, os.ErrNotExist) {
+			sb.userMsg(ctx, "skipping "+original)
 			f, err := os.Create(clone)
 			if err != nil {
 				return err
@@ -311,6 +313,7 @@ func (sb *SandBoxer) cloneDotfiles(ctx context.Context, id string) error {
 			slog.InfoContext(ctx, "cloneDotfiles", "error", err, "output", output)
 			return err
 		}
+		sb.userMsg(ctx, "cloned "+original)
 	}
 
 	return nil

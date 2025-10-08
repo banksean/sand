@@ -108,10 +108,13 @@ RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/
   -a "export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhistory/.bash_history" \
   -a '[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh'
 
-# Install Claude
+# Install oh-my-posh
+RUN curl -s https://ohmyposh.dev/install.sh | bash -s -- -d /usr/local/bin
+
+# Install Claude Code
 RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}
 
-# Clone sketch repository and build
+# Clone sketch repository and build. TODO: use a pre-built binary instead of building here.
 RUN git clone https://github.com/boldsoftware/sketch.git /tmp/sketch && \
   cd /tmp/sketch && \
   make all && \
