@@ -1,4 +1,5 @@
-[![Go Reference](https://pkg.go.dev/badge/github.com/banksean/apple-container.svg)](https://pkg.go.dev/github.com/banksean/apple-container)
+[![Go Reference](https://pkg.go.dev/badge/github.com/banksean/apple-container.svg)](https://pkg.go.dev/github.com/banksean/apple-container) 
+[![Main Commit Queue](https://github.com/banksean/apple-container/actions/workflows/queue-main.yml/badge.svg)](https://github.com/banksean/apple-container/actions/workflows/queue-main.yml)
 
 # TL;DR
 

@@ -3,7 +3,7 @@
 # To submit a change to the queue, run:
 # git push -f origin HEAD:queue-main-$USER 
 
-name: Main Branch Commit Queue
+name: Main Commit Queue
 run-name: |
   ${{ github.event.inputs.original_run_name && format('{0} (rebase attempt {1})', github.event.inputs.original_run_name, github.event.inputs.rebase_attempt) || github.event.head_commit.message }}
 on:
