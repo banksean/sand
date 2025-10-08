@@ -61,10 +61,10 @@ jobs:
         run: container system logs --last 1d
 
       - name: container status
-        run: sudo container --debug system status
+        run: container --debug system status
 
       - name: start container system
-        run: sudo container --debug system start
+        run: container --debug system start
 
       - name: Install sand
         run: go install github.com/banksean/apple-container/cmd/sand
