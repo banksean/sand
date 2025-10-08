@@ -31,6 +31,7 @@ type CLI struct {
 	Ls      LsCmd      `cmd:"" help:"list sandboxes"`
 	Rm      RmCmd      `cmd:"" help:"remove sandbox container and its clone directory"`
 	Stop    StopCmd    `cmd:"" help:"stop sandbox container"`
+	Git     GitCmd     `cmd:"" help:"git operations with sandboxes"`
 	Doc     DocCmd     `cmd:"" help:"print complete command help formatted as markdown"`
 	Daemon  DaemonCmd  `cmd:"" help:"start or stop the sandmux daemon"`
 	Version VersionCmd `cmd:"" help:"print version infomation about this command"`
