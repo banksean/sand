@@ -12,8 +12,10 @@ import (
 	applecontainer "github.com/banksean/apple-container"
 )
 
-const appleContainerVersion = "0.5.0"
-const minimumMacOSVersion = 26
+const (
+	appleContainerVersion = "0.5.0"
+	minimumMacOSVersion   = 26
+)
 
 func verifyPrerequisites(ctx context.Context) error {
 	// Check macOS version

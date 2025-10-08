@@ -112,7 +112,6 @@ func run(ctx context.Context, bin string, args ...string) error {
 			Volume: cwd + ":/gorunac/dev",
 		},
 	}, *imageName, "/gorunac/dev/bin/linux/"+bin, os.Environ(), os.Stdin, os.Stdout, os.Stderr, args...)
-
 	if err != nil {
 		slog.ErrorContext(ctx, "getting running command in container", "error", err)
 		return err

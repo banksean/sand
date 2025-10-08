@@ -180,7 +180,7 @@ const (
 // contents of the host machine's working directory.
 func (sb *SandBoxer) cloneWorkDir(ctx context.Context, id, hostWorkDir string) error {
 	sb.userMsg(ctx, "Cloning "+hostWorkDir)
-	if err := os.MkdirAll(filepath.Join(sb.cloneRoot, id), 0750); err != nil {
+	if err := os.MkdirAll(filepath.Join(sb.cloneRoot, id), 0o750); err != nil {
 		return err
 	}
 	hostCloneDir := filepath.Join(sb.cloneRoot, "/", id, "app")
@@ -232,7 +232,7 @@ func (sb *SandBoxer) cloneWorkDir(ctx context.Context, id, hostWorkDir string) e
 }
 
 func (sb *SandBoxer) cloneClaudeDir(ctx context.Context, id string) error {
-	if err := os.MkdirAll(filepath.Join(sb.cloneRoot, id), 0750); err != nil {
+	if err := os.MkdirAll(filepath.Join(sb.cloneRoot, id), 0o750); err != nil {
 		return err
 	}
 	cloneClaude := filepath.Join(sb.cloneRoot, "/", id, "dotfiles")
@@ -264,7 +264,7 @@ func (sb *SandBoxer) cloneDotfiles(ctx context.Context, id string) error {
 		".p10k.zsh",
 		".zshrc",
 	}
-	if err := os.MkdirAll(filepath.Join(sb.cloneRoot, id, "dotfiles"), 0750); err != nil {
+	if err := os.MkdirAll(filepath.Join(sb.cloneRoot, id, "dotfiles"), 0o750); err != nil {
 		return err
 	}
 	for _, dotfile := range dotfiles {
@@ -394,7 +394,7 @@ func (sb *SandBoxer) SaveSandbox(ctx context.Context, sbox *Box) error {
 
 	// Write to temp file first, then atomically rename
 	tempPath := sandboxPath + ".tmp"
-	if err := os.WriteFile(tempPath, data, 0644); err != nil {
+	if err := os.WriteFile(tempPath, data, 0o644); err != nil {
 		return fmt.Errorf("failed to write temporary sandbox.json: %w", err)
 	}
 

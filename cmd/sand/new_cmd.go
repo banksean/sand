@@ -33,7 +33,7 @@ func (c *NewCmd) Run(cctx *Context) error {
 		// TODO: name this dir using a content hash of defaultContainer.
 		c.DockerFileDir = "/tmp/sandbox-container-build"
 		os.RemoveAll(c.DockerFileDir)
-		if err := os.MkdirAll(c.DockerFileDir, 0755); err != nil {
+		if err := os.MkdirAll(c.DockerFileDir, 0o755); err != nil {
 			return err
 		}
 		if err := os.CopyFS(c.DockerFileDir, defaultImageFS); err != nil {

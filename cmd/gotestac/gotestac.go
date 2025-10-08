@@ -235,7 +235,6 @@ func runTests(ctx context.Context, args ...string) error {
 				nil, id,
 				"/gorunac/dev/testbin/linux/"+path,
 				os.Environ(), os.Stdin, os.Stdout, os.Stderr, args...)
-
 			if err != nil {
 				slog.ErrorContext(ctx, "runTests container Exec", "id", id, "path", path, "error", err)
 			}
@@ -248,7 +247,6 @@ func runTests(ctx context.Context, args ...string) error {
 		})
 		return nil
 	})
-
 	if err != nil {
 		slog.ErrorContext(ctx, "runTests fs.WalkDir", "error", err)
 	}

@@ -18,7 +18,5 @@ import (
 	"embed"
 )
 
-var (
-	//go:embed defaultimage/*
-	defaultImageFS embed.FS
-)
+//go:embed defaultimage/*
+var defaultImageFS embed.FS

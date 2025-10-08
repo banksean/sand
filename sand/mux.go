@@ -68,7 +68,7 @@ func (m *Mux) startDaemonServer(ctx context.Context) error {
 
 	if false { // TODO: do we need this?
 		// Set permissions so CLI can connect
-		if err := os.Chmod(socketPath, 0600); err != nil {
+		if err := os.Chmod(socketPath, 0o600); err != nil {
 			return err
 		}
 	}
@@ -121,7 +121,6 @@ func (m *Mux) Shutdown(ctx context.Context) {
 		m.lockFile.Close()
 		if err := os.Remove(lockFilePath); err != nil {
 			slog.ErrorContext(ctx, "Mux.Shutdown removing lockfile", "error", err, "LockFilePath", lockFilePath)
-
 		}
 	}
 
@@ -302,7 +301,7 @@ func (m *Mux) handleCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 func acquireLock(lockFile string) (*os.File, error) {
-	file, err := os.OpenFile(lockFile, os.O_CREATE|os.O_RDWR, 0600)
+	file, err := os.OpenFile(lockFile, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		return nil, err
 	}

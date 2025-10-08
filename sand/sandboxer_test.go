@@ -31,7 +31,7 @@ func TestSaveSandbox(t *testing.T) {
 	}
 
 	// Create the sandbox directory
-	if err := os.MkdirAll(testSandbox.SandboxWorkDir, 0755); err != nil {
+	if err := os.MkdirAll(testSandbox.SandboxWorkDir, 0o755); err != nil {
 		t.Fatalf("Failed to create sandbox work dir: %v", err)
 	}
 
@@ -96,7 +96,7 @@ func TestLoadSandbox(t *testing.T) {
 	// Create a test sandbox directory
 	testID := "test-load-id"
 	sandboxDir := filepath.Join(tmpDir, testID)
-	if err := os.MkdirAll(sandboxDir, 0755); err != nil {
+	if err := os.MkdirAll(sandboxDir, 0o755); err != nil {
 		t.Fatalf("Failed to create sandbox dir: %v", err)
 	}
 
@@ -118,7 +118,7 @@ func TestLoadSandbox(t *testing.T) {
 	}
 
 	sandboxPath := filepath.Join(sandboxDir, "sandbox.json")
-	if err := os.WriteFile(sandboxPath, data, 0644); err != nil {
+	if err := os.WriteFile(sandboxPath, data, 0o644); err != nil {
 		t.Fatalf("Failed to write test sandbox.json: %v", err)
 	}
 

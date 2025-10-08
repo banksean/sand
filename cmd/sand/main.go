@@ -64,10 +64,10 @@ func (c *CLI) initSlog(cctx *kong.Context) {
 		}
 	} else {
 		logDir := filepath.Dir(c.LogFile)
-		if err := os.MkdirAll(logDir, 0755); err != nil {
+		if err := os.MkdirAll(logDir, 0o755); err != nil {
 			panic(err)
 		}
-		f, err = os.OpenFile(c.LogFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+		f, err = os.OpenFile(c.LogFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
 		if err != nil {
 			panic(err)
 		}
@@ -94,7 +94,7 @@ func appHomeDir() (string, error) {
 	appSupportDir := filepath.Join(homeDir, "Library", "Application Support", "Sand")
 
 	// Create the directory if it doesn't exist
-	err = os.MkdirAll(appSupportDir, 0755) // 0755 grants read/write/execute for owner, read/execute for group/others
+	err = os.MkdirAll(appSupportDir, 0o755) // 0755 grants read/write/execute for owner, read/execute for group/others
 	if err != nil {
 		return "", fmt.Errorf("error creating application support directory: %w", err)
 	}
