@@ -54,11 +54,11 @@ jobs:
         run: |
           ls /usr/local/bin/container # Verify the app is present
 
-      - name: sleep 10s to let container system settle
-        run: sleep 10
-
       - name: debug container status
         run: /bin/launchctl list
+
+      - name: launchd logs
+        run: cat /var/log/com.apple.xpc.launchd/launchd.log
 
       - name: container status
         run: sudo container --debug system status
