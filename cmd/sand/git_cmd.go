@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/banksean/apple-container/sand"
 )
@@ -16,8 +17,8 @@ type GitCmd struct {
 }
 
 type DiffCmd struct {
-	Branch     string `short:"b" default:"main" placeholder:"<branch>" help:"branch to diff against (default: main)"`
-	SandboxID  string `arg:"" help:"ID of the sandbox to diff against"`
+	Branch    string `short:"b" default:"main" placeholder:"<branch>" help:"branch to diff against (default: main)"`
+	SandboxID string `arg:"" help:"ID of the sandbox to diff against"`
 }
 
 func (c *DiffCmd) Run(cctx *Context) error {
@@ -48,8 +49,8 @@ func (c *DiffCmd) Run(cctx *Context) error {
 	remoteName := fmt.Sprintf("sandbox-clone-%s", c.SandboxID)
 
 	// First, fetch from the sandbox remote
-	fmt.Printf("Fetching from %s...\n", remoteName)
 	gitFetch := exec.CommandContext(ctx, "git", "fetch", remoteName)
+	slog.InfoContext(ctx, "GitCmd.DiffCmd", "gitFetch", strings.Join(gitFetch.Args, " "))
 	gitFetch.Dir = cwd
 	gitFetch.Stdout = os.Stdout
 	gitFetch.Stderr = os.Stderr
@@ -59,8 +60,8 @@ func (c *DiffCmd) Run(cctx *Context) error {
 
 	// Now diff against the specified branch from the remote
 	remoteBranch := fmt.Sprintf("%s/%s", remoteName, c.Branch)
-	fmt.Printf("Diffing against %s...\n", remoteBranch)
 	gitDiff := exec.CommandContext(ctx, "git", "diff", remoteBranch)
+	slog.InfoContext(ctx, "GitCmd.DiffCmd", "gitDiff", strings.Join(gitDiff.Args, " "))
 	gitDiff.Dir = cwd
 	gitDiff.Stdout = os.Stdout
 	gitDiff.Stderr = os.Stderr
