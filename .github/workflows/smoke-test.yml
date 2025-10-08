@@ -33,6 +33,15 @@ jobs:
           go-version-file: "${{ inputs.working-directory || '.'}}/go.mod"
           cache: true
 
+      - name: Cache Go 1.25.1
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go1.25.1-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go1.25.1-
+
       - name: Download apple/container 0.5.0 installer
         run: |
           curl -L "https://github.com/apple/container/releases/download/0.5.0/container-0.5.0-installer-signed.pkg" -o container-0.5.0-installer-signed.pkg
@@ -41,8 +50,8 @@ jobs:
         run: |
           sudo installer -pkg container-0.5.0-installer-signed.pkg -target /
 
-      - name: check for installer
-        run: pkgutil --pkgs
+      - name: check for installer files
+        run: pkgutil --only-files --files com.apple.container-installer
 
       - name: Verify "container" command installation
         run: |
