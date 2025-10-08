@@ -40,6 +40,14 @@ jobs:
       ref: ${{ needs.formatting.outputs.commit_sha }}
       include-slow-tests: false
 
+  smoke-test:
+    needs: [formatting]
+    uses: ./.github/workflows/smoke-test.yml
+    permissions:
+      contents: read
+    with:
+      ref: ${{ needs.formatting.outputs.commit_sha }}
+
   push-to-main:
     runs-on: macos-26
     needs:
