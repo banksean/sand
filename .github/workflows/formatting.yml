@@ -31,13 +31,15 @@ jobs:
           ref: ${{ (inputs.auto_fix == true && (github.head_ref || github.ref)) || (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.ref }}
           # Need full history for queue-main pushes
           fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: "go.mod"
+          cache: true
 
       - name: Install gofumpt v0.8.0
         run: |
-          curl -L https://github.com/mvdan/gofumpt/releases/download/v0.8.0/gofumpt_v0.8.0_linux_amd64 -o /tmp/gofumpt
-          chmod +x /tmp/gofumpt
-          sudo mv /tmp/gofumpt /usr/local/bin/gofumpt
-
+          go install mvdan.cc/gofumpt@latest
+  
       - name: Check formatting
         if: inputs.auto_fix != true
         run: scripts/run-formatters.sh check
