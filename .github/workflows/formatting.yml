@@ -1,0 +1,78 @@
+name: Code Formatting
+on:
+  workflow_call:
+    inputs:
+      auto_fix:
+        description: "Automatically fix formatting issues instead of just checking"
+        required: false
+        type: boolean
+        default: false
+    outputs:
+      commit_sha:
+        description: "The SHA of the commit with formatting fixes"
+        value: ${{ jobs.formatting.outputs.commit_sha }}
+  push:
+    branches-ignore:
+      - "queue-main-*"
+      - "queue-dev-*"
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  formatting:
+    outputs:
+      commit_sha: ${{ steps.get_commit.outputs.commit_sha }}
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ (inputs.auto_fix == true && (github.head_ref || github.ref)) || (github.event_name == 'pull_request' && github.event.pull_request.head.sha) || github.ref }}
+          # Need full history for queue-main pushes
+          fetch-depth: 0
+
+      - name: Install gofumpt v0.8.0
+        run: |
+          curl -L https://github.com/mvdan/gofumpt/releases/download/v0.8.0/gofumpt_v0.8.0_linux_amd64 -o /tmp/gofumpt
+          chmod +x /tmp/gofumpt
+          sudo mv /tmp/gofumpt /usr/local/bin/gofumpt
+
+      - name: Check formatting
+        if: inputs.auto_fix != true
+        run: scripts/run-formatters.sh check
+
+      - name: Fix formatting
+        if: inputs.auto_fix == true
+        run: scripts/run-formatters.sh fix
+
+      # Commit formatting fixes if auto_fix is true
+      - name: Commit and push formatting fixes if needed
+        if: inputs.auto_fix == true
+        run: |
+          # Only proceed if there are changes to commit
+          if [[ -z $(git status --porcelain) ]]; then
+            echo "No formatting changes detected, skipping commit"
+            exit 0
+          fi
+
+          git config --global user.name "Autoformatter"
+          git add .
+
+          git fetch origin main
+          MERGE_BASE=$(git merge-base HEAD origin/main)
+          COMMIT_COUNT=$(git rev-list --count $MERGE_BASE..HEAD)
+
+          if [ "$COMMIT_COUNT" -eq 1 ]; then
+            echo "Found exactly one commit since merge-base with origin/main. Amending the commit."
+            git commit --amend --no-edit
+          else
+            echo "Found multiple commits ($COMMIT_COUNT) since merge-base with origin/main. Creating a new commit."
+            git commit -m "all: fix formatting"
+          fi
+
+          git push -f https://${GITHUB_ACTOR}:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git HEAD
+
+      - name: Get commit SHA
+        id: get_commit
+        run: echo "commit_sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT

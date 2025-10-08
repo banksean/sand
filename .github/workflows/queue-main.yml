@@ -1,0 +1,67 @@
+# Commit Queue
+#
+# To submit a change to the queue, run:
+# git push -f origin HEAD:queue-main-$USER 
+
+name: Main Branch Commit Queue
+run-name: |
+  ${{ github.event.inputs.original_run_name && format('{0} (rebase attempt {1})', github.event.inputs.original_run_name, github.event.inputs.rebase_attempt) || github.event.head_commit.message }}
+on:
+  push:
+    branches:
+      - "queue-main-*"
+  workflow_dispatch:
+    inputs:
+      rebase_attempt:
+        description: "Rebase attempt number (starts at 0, increments with each retry)"
+        required: false
+        default: "0"
+        type: string
+      original_run_name:
+        description: "Original run name to preserve across rebase attempts"
+        required: false
+        type: string
+
+permissions: read-all
+
+jobs:
+  formatting:
+    uses: ./.github/workflows/formatting.yml
+    permissions:
+      contents: write
+    with:
+      auto_fix: true
+
+  go-test:
+    needs: [formatting]
+    uses: ./.github/workflows/go.yml
+    permissions: read-all
+    with:
+      ref: ${{ needs.formatting.outputs.commit_sha }}
+      include-slow-tests: false
+
+  push-to-main:
+    runs-on: macos-latest
+    needs:
+      [
+        go-test,
+        formatting,
+      ]
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push to main
+        run: scripts/push-to-main.sh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          REBASE_ATTEMPT: ${{ github.event.inputs.rebase_attempt || '0' }}
+          FORMAT_SHA: ${{ needs.formatting.outputs.commit_sha }}
+          ORIGINAL_RUN_NAME: ${{ github.event.inputs.original_run_name }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          REPOSITORY: ${{ github.repository }}
+          CURRENT_BRANCH: ${{ github.ref }}
