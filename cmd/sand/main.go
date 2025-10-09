@@ -134,7 +134,13 @@ func main() {
 	if cli.CloneRoot == "" {
 		cli.CloneRoot = filepath.Join(appBaseDir, "boxen")
 	}
-	sber := sand.NewSandBoxer(cli.CloneRoot, os.Stderr)
+	sber, err := sand.NewSandBoxer(cli.CloneRoot, os.Stderr)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to create sandboxer: %v\n", err)
+		os.Exit(1)
+	}
+	defer sber.Close()
+
 	err = ctx.Run(&Context{
 		AppBaseDir: appBaseDir,
 		LogFile:    cli.LogFile,

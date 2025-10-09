@@ -3,11 +3,11 @@ package sand
 import (
 	"bufio"
 	"context"
-	"encoding/json"
+	"database/sql"
+	_ "embed"
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -16,21 +16,61 @@ import (
 
 	ac "github.com/banksean/apple-container"
 	"github.com/banksean/apple-container/options"
+	"github.com/banksean/apple-container/sand/db"
+	_ "modernc.org/sqlite"
 )
+
+//go:generate sqlc generate
+
+//go:embed db/schema.sql
+var schemaSQL string
 
 // SandBoxer manages the lifecycle of sandboxes.
 type SandBoxer struct {
 	cloneRoot      string
 	sandBoxes      map[string]*Box
 	terminalWriter io.Writer
+	sqlDB          *sql.DB
+	queries        *db.Queries
 }
 
-func NewSandBoxer(cloneRoot string, terminalWriter io.Writer) *SandBoxer {
+func NewSandBoxer(cloneRoot string, terminalWriter io.Writer) (*SandBoxer, error) {
+	if err := os.MkdirAll(cloneRoot, 0o750); err != nil {
+		return nil, err
+	}
+
+	dbPath := filepath.Join(cloneRoot, "sandboxes.db")
+	sqlDB, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open database: %w", err)
+	}
+
+	// Enable WAL mode for better concurrency
+	if _, err := sqlDB.Exec("PRAGMA journal_mode=WAL"); err != nil {
+		sqlDB.Close()
+		return nil, fmt.Errorf("failed to enable WAL mode: %w", err)
+	}
+
+	// Initialize schema
+	if _, err := sqlDB.Exec(schemaSQL); err != nil {
+		sqlDB.Close()
+		return nil, fmt.Errorf("failed to initialize schema: %w", err)
+	}
+
 	return &SandBoxer{
 		cloneRoot:      cloneRoot,
 		sandBoxes:      map[string]*Box{},
 		terminalWriter: terminalWriter,
+		sqlDB:          sqlDB,
+		queries:        db.New(sqlDB),
+	}, nil
+}
+
+func (sb *SandBoxer) Close() error {
+	if sb.sqlDB != nil {
+		return sb.sqlDB.Close()
 	}
+	return nil
 }
 
 func (sb *SandBoxer) EnsureDefaultImage(ctx context.Context, imageName, dockerfileDir, sandboxUsername string) error {
@@ -85,49 +125,31 @@ func (sb *SandBoxer) AttachSandbox(ctx context.Context, id string) (*Box, error)
 }
 
 func (sb *SandBoxer) List(ctx context.Context) ([]Box, error) {
-	dir := os.DirFS(sb.cloneRoot)
-	ret := []Box{}
-	err := fs.WalkDir(dir, ".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			slog.ErrorContext(ctx, "SandBoxer.List", "err", err)
-		}
-		if path == "." {
-			return nil
-		}
-		if d.IsDir() {
-			sbox, err := sb.AttachSandbox(ctx, path)
-			if err != nil {
-				return err
-			}
-			ret = append(ret, *sbox)
-			return fs.SkipDir
-		}
-		return nil
-	})
-	return ret, err
+	sandboxes, err := sb.queries.ListSandboxes(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list sandboxes: %w", err)
+	}
+
+	boxes := make([]Box, len(sandboxes))
+	for i, s := range sandboxes {
+		boxes[i] = *sandboxFromDB(&s)
+	}
+	return boxes, nil
 }
 
 func (sb *SandBoxer) Get(ctx context.Context, id string) (*Box, error) {
-	dir := filepath.Join(sb.cloneRoot, id)
 	slog.InfoContext(ctx, "SandBoxer.Get", "id", id)
-	f, err := os.Stat(dir)
-	if err != nil {
-		slog.ErrorContext(ctx, "SandBoxer.Get", "error", err)
-		if errors.Is(err, os.ErrNotExist) {
-			return nil, nil
-		}
-		return nil, err
+	sandbox, err := sb.queries.GetSandbox(ctx, id)
+	if err == sql.ErrNoRows {
+		return nil, nil
 	}
-	if !f.IsDir() {
-		return nil, fmt.Errorf("path exists but is not a directory: %s", dir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sandbox: %w", err)
 	}
 
-	ret, err := sb.loadSandbox(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	slog.InfoContext(ctx, "SandBoxer.Get", "ret", ret)
-	return ret, nil
+	box := sandboxFromDB(&sandbox)
+	slog.InfoContext(ctx, "SandBoxer.Get", "ret", box)
+	return box, nil
 }
 
 func (sb *SandBoxer) Cleanup(ctx context.Context, sbox *Box) error {
@@ -156,7 +178,37 @@ func (sb *SandBoxer) Cleanup(ctx context.Context, sbox *Box) error {
 		return err
 	}
 
+	// Finally, remove from database
+	if err := sb.queries.DeleteSandbox(ctx, sbox.ID); err != nil {
+		return fmt.Errorf("failed to delete sandbox from database: %w", err)
+	}
+
 	return nil
+}
+
+// Helper functions for converting between Box and db.Sandbox
+
+func sandboxFromDB(s *db.Sandbox) *Box {
+	return &Box{
+		ID:             s.ID,
+		ContainerID:    fromNullString(s.ContainerID),
+		HostOriginDir:  s.HostOriginDir,
+		SandboxWorkDir: s.SandboxWorkDir,
+		ImageName:      s.ImageName,
+		DNSDomain:      fromNullString(s.DnsDomain),
+		EnvFile:        fromNullString(s.EnvFile),
+	}
+}
+
+func toNullString(s string) sql.NullString {
+	return sql.NullString{String: s, Valid: s != ""}
+}
+
+func fromNullString(ns sql.NullString) string {
+	if ns.Valid {
+		return ns.String
+	}
+	return ""
 }
 
 const (
@@ -385,33 +437,36 @@ func (sb *SandBoxer) userMsg(ctx context.Context, msg string) {
 	fmt.Fprintln(sb.terminalWriter, "\033[90m"+msg+"\033[0m")
 }
 
-// SaveSandbox persists the Sandbox struct as JSON to disk atomically.
+// SaveSandbox persists the Sandbox to the database.
 func (sb *SandBoxer) SaveSandbox(ctx context.Context, sbox *Box) error {
-	sandboxPath := filepath.Join(sb.cloneRoot, sbox.ID, "sandbox.json")
-	slog.InfoContext(ctx, "SandBoxer.saveSandbox", "path", sandboxPath)
+	slog.InfoContext(ctx, "SandBoxer.SaveSandbox", "id", sbox.ID)
 
-	data, err := json.MarshalIndent(sbox, "", "  ")
+	err := sb.queries.UpsertSandbox(ctx, db.UpsertSandboxParams{
+		ID:             sbox.ID,
+		ContainerID:    toNullString(sbox.ContainerID),
+		HostOriginDir:  sbox.HostOriginDir,
+		SandboxWorkDir: sbox.SandboxWorkDir,
+		ImageName:      sbox.ImageName,
+		DnsDomain:      toNullString(sbox.DNSDomain),
+		EnvFile:        toNullString(sbox.EnvFile),
+	})
 	if err != nil {
-		return fmt.Errorf("failed to marshal sandbox: %w", err)
+		return fmt.Errorf("failed to save sandbox: %w", err)
 	}
-
-	// Write to temp file first, then atomically rename
-	tempPath := sandboxPath + ".tmp"
-	if err := os.WriteFile(tempPath, data, 0o644); err != nil {
-		return fmt.Errorf("failed to write temporary sandbox.json: %w", err)
-	}
-
-	if err := os.Rename(tempPath, sandboxPath); err != nil {
-		return fmt.Errorf("failed to rename sandbox.json: %w", err)
-	}
-
 	return nil
 }
 
 // UpdateContainerID updates the ContainerID field of a sandbox and persists it.
 func (sb *SandBoxer) UpdateContainerID(ctx context.Context, sbox *Box, containerID string) error {
 	sbox.ContainerID = containerID
-	return sb.SaveSandbox(ctx, sbox)
+	err := sb.queries.UpdateContainerID(ctx, db.UpdateContainerIDParams{
+		ContainerID: toNullString(containerID),
+		ID:          sbox.ID,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to update container ID: %w", err)
+	}
+	return nil
 }
 
 // StopContainer stops a sandbox's container without deleting it.
@@ -429,23 +484,17 @@ func (sb *SandBoxer) StopContainer(ctx context.Context, sbox *Box) error {
 	return nil
 }
 
-// loadSandbox reads and deserializes a Sandbox struct from disk.
+// loadSandbox reads a Sandbox from the database.
 func (sb *SandBoxer) loadSandbox(ctx context.Context, id string) (*Box, error) {
-	sandboxPath := filepath.Join(sb.cloneRoot, id, "sandbox.json")
-	slog.InfoContext(ctx, "SandBoxer.loadSandbox", "path", sandboxPath)
+	slog.InfoContext(ctx, "SandBoxer.loadSandbox", "id", id)
 
-	data, err := os.ReadFile(sandboxPath)
+	sandbox, err := sb.queries.GetSandbox(ctx, id)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("sandbox not found for id %s", id)
+	}
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil, fmt.Errorf("sandbox.json not found for id %s", id)
-		}
-		return nil, fmt.Errorf("failed to read sandbox.json: %w", err)
+		return nil, fmt.Errorf("failed to load sandbox: %w", err)
 	}
 
-	var sbox Box
-	if err := json.Unmarshal(data, &sbox); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal sandbox.json: %w", err)
-	}
-
-	return &sbox, nil
+	return sandboxFromDB(&sandbox), nil
 }
