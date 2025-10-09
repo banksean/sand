@@ -6,7 +6,6 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"syscall"
 	"time"
 
@@ -93,9 +92,6 @@ func (c *DaemonCmd) restartDaemon(ctx context.Context, mux *sand.Mux, cctx *Cont
 		fmt.Println("Daemon stopped")
 	}
 
-	// Now start the daemon in a separate process
-	socketPath := filepath.Join(cctx.AppBaseDir, "mux.sock")
-	
 	// Build the command to start the daemon
 	cmd := exec.CommandContext(ctx, os.Args[0], "daemon", "start", "--log-file", cctx.LogFile, "--clone-root", cctx.CloneRoot)
 	cmd.Stdout = nil
@@ -114,7 +110,7 @@ func (c *DaemonCmd) restartDaemon(ctx context.Context, mux *sand.Mux, cctx *Cont
 	// Wait for daemon to be ready
 	for i := 0; i < 20; i++ {
 		time.Sleep(100 * time.Millisecond)
-		conn, err := net.DialTimeout("unix", socketPath, 100*time.Millisecond)
+		conn, err := net.DialTimeout("unix", mux.SocketPath, 100*time.Millisecond)
 		if err == nil {
 			conn.Close()
 			fmt.Println("Daemon restarted successfully")

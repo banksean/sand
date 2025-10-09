@@ -21,7 +21,9 @@ const (
 
 type Mux struct {
 	AppBaseDir string
-	sber       *SandBoxer
+	SocketPath string
+
+	sber *SandBoxer
 
 	listener net.Listener
 	lockFile *os.File
@@ -31,17 +33,17 @@ type Mux struct {
 func NewMuxServer(appBaseDir string, sber *SandBoxer) *Mux {
 	return &Mux{
 		AppBaseDir: appBaseDir,
+		SocketPath: filepath.Join(appBaseDir, defaultSocketFile),
 		sber:       sber,
 	}
 }
 
 func (m *Mux) NewClient(ctx context.Context) (*MuxClient, error) {
-	socketPath := filepath.Join(m.AppBaseDir, defaultSocketFile)
 	httpClient := &http.Client{
 		Timeout: 30 * time.Second,
 		Transport: &http.Transport{
 			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				return net.Dial("unix", socketPath)
+				return net.Dial("unix", m.SocketPath)
 			},
 		},
 	}
@@ -70,19 +72,18 @@ func (m *Mux) ServeUnix(ctx context.Context) error {
 }
 
 func (m *Mux) startDaemonServer(ctx context.Context) error {
-	socketPath := filepath.Join(m.AppBaseDir, defaultSocketFile)
-	slog.InfoContext(ctx, "Mux.startDaemonServer", "socketPath", socketPath)
+	slog.InfoContext(ctx, "Mux.startDaemonServer", "socketPath", m.SocketPath)
 	// Remove old socket if it exists
-	os.Remove(socketPath)
+	os.Remove(m.SocketPath)
 
-	listener, err := net.Listen("unix", socketPath)
+	listener, err := net.Listen("unix", m.SocketPath)
 	if err != nil {
 		return err
 	}
 
 	if false { // TODO: do we need this?
 		// Set permissions so CLI can connect
-		if err := os.Chmod(socketPath, 0o600); err != nil {
+		if err := os.Chmod(m.SocketPath, 0o600); err != nil {
 			return err
 		}
 	}
@@ -116,7 +117,6 @@ func (m *Mux) waitForShutdown(ctx context.Context) {
 }
 
 func (m *Mux) Shutdown(ctx context.Context) {
-	socketPath := filepath.Join(m.AppBaseDir, defaultSocketFile)
 	lockFilePath := filepath.Join(m.AppBaseDir, defaultLockFile)
 
 	slog.InfoContext(ctx, "Mux.Shutdown", "pid", os.Getpid())
@@ -127,7 +127,7 @@ func (m *Mux) Shutdown(ctx context.Context) {
 
 	// Remove socket file. This mail fail in many cases since closing the listener appears
 	// to remove the file automatically on MacOS. Therefore we ignore the err return value.
-	os.Remove(socketPath)
+	os.Remove(m.SocketPath)
 
 	// Release and remove lock file
 	if m.lockFile != nil {

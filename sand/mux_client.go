@@ -84,8 +84,7 @@ func (m *MuxClient) Shutdown(ctx context.Context) error {
 	time.Sleep(200 * time.Millisecond)
 
 	// Verify socket is gone
-	socketPath := filepath.Join(m.Mux.AppBaseDir, defaultSocketFile)
-	if _, err := os.Stat(socketPath); err == nil {
+	if _, err := os.Stat(m.Mux.SocketPath); err == nil {
 		return fmt.Errorf("daemon may not have shut down cleanly")
 	}
 

@@ -91,9 +91,8 @@ func TestMuxHTTPList(t *testing.T) {
 	}()
 
 	// Wait for the socket to be ready
-	socketPath := filepath.Join(tmpDir, defaultSocketFile)
 	for i := 0; i < 20; i++ {
-		if _, err := os.Stat(socketPath); err == nil {
+		if _, err := os.Stat(mux.SocketPath); err == nil {
 			break
 		}
 		time.Sleep(100 * time.Millisecond)
