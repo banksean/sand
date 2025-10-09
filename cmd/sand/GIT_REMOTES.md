@@ -52,9 +52,31 @@ Let's say you have:
 - Original working directory: `/Users/yourname/myproject`
 - Sandbox clone: `/tmp/sand/boxen/my-sandbox/app`
 
-### From the Host OS
+### Using the `sand git diff` Command
 
-You can diff from either directory:
+The easiest way to compare your working directory with a sandbox is to use the built-in command:
+
+```sh
+# From your original working directory
+cd /Users/yourname/myproject
+
+# Compare with committed changes in the sandbox
+sand git diff my-sandbox
+
+# Include uncommitted changes from the sandbox's working tree
+sand git diff --include-uncommitted my-sandbox
+# or use the short flag
+sand git diff -u my-sandbox
+
+# Diff against a specific branch (default is the sandbox ID)
+sand git diff -b main my-sandbox
+```
+
+The `--include-uncommitted` flag is useful when you want to see all changes in the sandbox, including files that haven't been committed yet. This creates a temporary commit in the sandbox, fetches it, shows the diff, and then cleans up the temporary commit automatically.
+
+### From the Host OS (Manual Git Operations)
+
+You can also diff manually from either directory:
 
 #### Option 1: From the original working directory
 ```sh

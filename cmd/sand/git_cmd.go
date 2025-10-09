@@ -17,8 +17,9 @@ type GitCmd struct {
 }
 
 type DiffCmd struct {
-	Branch    string `short:"b" default:"" placeholder:"<branch>" help:"branch to diff against (default: sandbox ID)"`
-	SandboxID string `arg:"" help:"ID of the sandbox to diff against"`
+	Branch             string `short:"b" default:"" placeholder:"<branch>" help:"branch to diff against (default: sandbox ID)"`
+	IncludeUncommitted bool   `short:"u" default:"false" help:"include uncommitted changes from sandbox working tree"`
+	SandboxID          string `arg:"" help:"ID of the sandbox to diff against"`
 }
 
 func (c *DiffCmd) Run(cctx *Context) error {
@@ -62,6 +63,30 @@ func (c *DiffCmd) Run(cctx *Context) error {
 		c.Branch = c.SandboxID
 	}
 
+	// If including uncommitted changes, create a temporary commit in the sandbox
+	var tempCommitCreated bool
+	if c.IncludeUncommitted {
+		if err := c.createTempCommit(ctx, sbox.SandboxWorkDir); err != nil {
+			return fmt.Errorf("failed to create temporary commit: %w", err)
+		}
+		tempCommitCreated = true
+		defer func() {
+			if err := c.cleanupTempCommit(ctx, sbox.SandboxWorkDir); err != nil {
+				slog.ErrorContext(ctx, "failed to cleanup temporary commit", "error", err)
+			}
+		}()
+
+		// Fetch again to get the temporary commit
+		gitFetch := exec.CommandContext(ctx, "git", "fetch", remoteName)
+		slog.InfoContext(ctx, "GitCmd.DiffCmd", "gitFetch (with temp commit)", strings.Join(gitFetch.Args, " "))
+		gitFetch.Dir = cwd
+		gitFetch.Stdout = os.Stdout
+		gitFetch.Stderr = os.Stderr
+		if err := gitFetch.Run(); err != nil {
+			return fmt.Errorf("git fetch failed: %w", err)
+		}
+	}
+
 	// Now diff against the specified branch from the remote
 	remoteBranch := fmt.Sprintf("%s/%s", remoteName, c.Branch)
 	gitDiff := exec.CommandContext(ctx, "git", "diff", remoteBranch)
@@ -71,6 +96,10 @@ func (c *DiffCmd) Run(cctx *Context) error {
 	gitDiff.Stderr = os.Stderr
 	if err := gitDiff.Run(); err != nil {
 		return fmt.Errorf("git diff failed: %w", err)
+	}
+
+	if tempCommitCreated {
+		fmt.Fprintf(os.Stderr, "\nNote: Diff includes uncommitted changes from sandbox working tree\n")
 	}
 
 	// Print information about the sandbox
@@ -89,6 +118,59 @@ func (c *DiffCmd) Run(cctx *Context) error {
 					absCwd, absOrigin)
 			}
 		}
+	}
+
+	return nil
+}
+
+// createTempCommit creates a temporary commit in the sandbox working directory
+// that includes all uncommitted changes (staged and unstaged).
+func (c *DiffCmd) createTempCommit(ctx context.Context, sandboxWorkDir string) error {
+	sandboxAppDir := filepath.Join(sandboxWorkDir, "app")
+	slog.InfoContext(ctx, "createTempCommit", "dir", sandboxAppDir)
+
+	// Add all changes to the index
+	gitAdd := exec.CommandContext(ctx, "git", "add", "-A")
+	gitAdd.Dir = sandboxAppDir
+	slog.InfoContext(ctx, "createTempCommit gitAdd", "cmd", strings.Join(gitAdd.Args, " "))
+	if output, err := gitAdd.CombinedOutput(); err != nil {
+		slog.ErrorContext(ctx, "git add failed", "error", err, "output", string(output))
+		return fmt.Errorf("git add failed: %w", err)
+	}
+
+	// Create a temporary commit
+	gitCommit := exec.CommandContext(ctx, "git", "commit", "--allow-empty", "-m", "[TEMPORARY] sand git diff --include-uncommitted")
+	gitCommit.Dir = sandboxAppDir
+	slog.InfoContext(ctx, "createTempCommit gitCommit", "cmd", strings.Join(gitCommit.Args, " "))
+	if output, err := gitCommit.CombinedOutput(); err != nil {
+		slog.ErrorContext(ctx, "git commit failed", "error", err, "output", string(output))
+		return fmt.Errorf("git commit failed: %w", err)
+	}
+
+	return nil
+}
+
+// cleanupTempCommit removes the temporary commit created by createTempCommit.
+func (c *DiffCmd) cleanupTempCommit(ctx context.Context, sandboxWorkDir string) error {
+	sandboxAppDir := filepath.Join(sandboxWorkDir, "app")
+	slog.InfoContext(ctx, "cleanupTempCommit", "dir", sandboxAppDir)
+
+	// Reset to the previous commit, keeping working tree changes
+	gitReset := exec.CommandContext(ctx, "git", "reset", "--soft", "HEAD~1")
+	gitReset.Dir = sandboxAppDir
+	slog.InfoContext(ctx, "cleanupTempCommit gitReset", "cmd", strings.Join(gitReset.Args, " "))
+	if output, err := gitReset.CombinedOutput(); err != nil {
+		slog.ErrorContext(ctx, "git reset failed", "error", err, "output", string(output))
+		return fmt.Errorf("git reset failed: %w", err)
+	}
+
+	// Unstage all changes to restore the original state
+	gitResetFiles := exec.CommandContext(ctx, "git", "reset", "HEAD")
+	gitResetFiles.Dir = sandboxAppDir
+	slog.InfoContext(ctx, "cleanupTempCommit gitResetFiles", "cmd", strings.Join(gitResetFiles.Args, " "))
+	if output, err := gitResetFiles.CombinedOutput(); err != nil {
+		slog.ErrorContext(ctx, "git reset HEAD failed", "error", err, "output", string(output))
+		return fmt.Errorf("git reset HEAD failed: %w", err)
 	}
 
 	return nil
