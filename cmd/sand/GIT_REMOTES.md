@@ -52,9 +52,22 @@ Let's say you have:
 - Original working directory: `/Users/yourname/myproject`
 - Sandbox clone: `/tmp/sand/boxen/my-sandbox/app`
 
-### Using the `sand git diff` Command
+### Using the `sand git` Commands
 
-The easiest way to compare your working directory with a sandbox is to use the built-in command:
+#### Viewing Sandbox Status
+
+To see the git status of a sandbox's working tree:
+
+```sh
+# From anywhere on the host
+sand git status my-sandbox
+```
+
+This runs `git status` in the sandbox's working directory and shows you what files have been modified, staged, or are untracked.
+
+#### Comparing with Diff
+
+The easiest way to compare your working directory with a sandbox is to use the built-in diff command:
 
 ```sh
 # From your original working directory
@@ -151,5 +164,4 @@ Alternatively, use `sand shell` to run git commands on the host OS that inspect 
 ## Future Enhancement Ideas
 
 - Implement a host-side service that the container can communicate with to perform `git fetch` operations against the original working directory
-- Provide `sand` subcommands like `sand diff <sandbox-id>` to facilitate these comparisons from the host
 - Create container-accessible git remotes using a git server protocol or ssh access back to the host
