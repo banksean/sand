@@ -104,6 +104,51 @@ sand stop [flags] [ID]
 
 - `-a, --all` - stop all sandboxes
 
+## `sand git`
+
+git operations with sandboxes
+
+**Usage:**
+
+```
+sand git
+```
+
+### `sand git diff`
+
+diff current working directory with sandbox clone
+
+**Usage:**
+
+```
+sand git diff [flags] <SANDBOX-ID>
+```
+
+**Flags:**
+
+- `-b, --branch` _`<branch>`_ - branch to diff against (default: sandbox ID)
+- `-u, --include-uncommitted` - include uncommitted changes from sandbox working tree (default: `false`)
+
+### `sand git status`
+
+show git status of sandbox working tree
+
+**Usage:**
+
+```
+sand git status <SANDBOX-ID>
+```
+
+### `sand git log`
+
+show git log of sandbox working tree
+
+**Usage:**
+
+```
+sand git log <SANDBOX-ID>
+```
+
 ## `sand doc`
 
 print complete command help formatted as markdown
@@ -121,12 +166,8 @@ start or stop the sandmux daemon
 **Usage:**
 
 ```
-sand daemon [flags]
+sand daemon [ACTION]
 ```
-
-**Flags:**
-
-- `--stop` - stop the daemon
 
 ## `sand version`
 
