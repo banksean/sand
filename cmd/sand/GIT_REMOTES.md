@@ -65,6 +65,17 @@ sand git status my-sandbox
 
 This runs `git status` in the sandbox's working directory and shows you what files have been modified, staged, or are untracked.
 
+#### Viewing Sandbox Log
+
+To see the git commit log of a sandbox's working tree:
+
+```sh
+# From anywhere on the host
+sand git log my-sandbox
+```
+
+This runs `git log` in the sandbox's working directory and shows you the commit history.
+
 #### Comparing with Diff
 
 The easiest way to compare your working directory with a sandbox is to use the built-in diff command:

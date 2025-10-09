@@ -15,10 +15,15 @@ import (
 type GitCmd struct {
 	Diff   DiffCmd   `cmd:"" help:"diff current working directory with sandbox clone"`
 	Status StatusCmd `cmd:"" help:"show git status of sandbox working tree"`
+	Log    LogCmd    `cmd:"" help:"show git log of sandbox working tree"`
 }
 
 type StatusCmd struct {
 	SandboxID string `arg:"" help:"ID of the sandbox to get status from"`
+}
+
+type LogCmd struct {
+	SandboxID string `arg:"" help:"ID of the sandbox to get log from"`
 }
 
 type DiffCmd struct {
@@ -231,6 +236,64 @@ func (c *StatusCmd) Run(cctx *Context) error {
 
 	// Print information about the sandbox
 	slog.InfoContext(ctx, "StatusCmd completed",
+		"sandbox_id", c.SandboxID,
+		"sandbox_workdir", sbox.SandboxWorkDir,
+		"host_origin_dir", sbox.HostOriginDir,
+	)
+
+	return nil
+}
+
+func (c *LogCmd) Run(cctx *Context) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Get the sandbox to verify it exists and get its metadata
+	mux := sand.NewMuxServer(cctx.AppBaseDir, cctx.sber)
+	mc, err := mux.NewClient(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx, "NewClient", "error", err)
+		return err
+	}
+
+	sbox, err := mc.GetSandbox(ctx, c.SandboxID)
+	if err != nil {
+		slog.ErrorContext(ctx, "GetSandbox", "error", err, "id", c.SandboxID)
+		return fmt.Errorf("could not find sandbox with ID %s: %w", c.SandboxID, err)
+	}
+
+	// Construct the remote name for the sandbox clone
+	remoteName := fmt.Sprintf("sandbox-clone-%s", c.SandboxID)
+
+	// Get current working directory
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("could not get current working directory: %w", err)
+	}
+
+	// First, fetch from the sandbox remote
+	gitFetch := exec.CommandContext(ctx, "git", "fetch", remoteName)
+	slog.InfoContext(ctx, "GitCmd.LogCmd", "gitFetch", strings.Join(gitFetch.Args, " "))
+	gitFetch.Dir = cwd
+	gitFetch.Stdout = os.Stdout
+	gitFetch.Stderr = os.Stderr
+	if err := gitFetch.Run(); err != nil {
+		return fmt.Errorf("git fetch failed: %w", err)
+	}
+
+	// Run git log in the sandbox working directory
+	sandboxAppDir := filepath.Join(sbox.SandboxWorkDir, "app")
+	gitLog := exec.CommandContext(ctx, "git", "log")
+	slog.InfoContext(ctx, "GitCmd.LogCmd", "gitLog", strings.Join(gitLog.Args, " "), "dir", sandboxAppDir)
+	gitLog.Dir = sandboxAppDir
+	gitLog.Stdout = os.Stdout
+	gitLog.Stderr = os.Stderr
+	if err := gitLog.Run(); err != nil {
+		return fmt.Errorf("git log failed: %w", err)
+	}
+
+	// Print information about the sandbox
+	slog.InfoContext(ctx, "LogCmd completed",
 		"sandbox_id", c.SandboxID,
 		"sandbox_workdir", sbox.SandboxWorkDir,
 		"host_origin_dir", sbox.HostOriginDir,
