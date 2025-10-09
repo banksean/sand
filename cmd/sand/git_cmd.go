@@ -26,7 +26,7 @@ func (c *DiffCmd) Run(cctx *Context) error {
 	defer cancel()
 
 	// Get the sandbox to verify it exists and get its metadata
-	mux := sand.NewMux(cctx.AppBaseDir, cctx.sber)
+	mux := sand.NewMuxServer(cctx.AppBaseDir, cctx.sber)
 	mc, err := mux.NewClient(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "NewClient", "error", err)

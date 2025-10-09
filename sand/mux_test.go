@@ -20,7 +20,7 @@ func TestMuxHTTPPing(t *testing.T) {
 	sber := NewSandBoxer(tmpDir, nil)
 
 	// Create and start mux
-	mux := NewMux(tmpDir, sber)
+	mux := NewMuxServer(tmpDir, sber)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -79,7 +79,7 @@ func TestMuxHTTPList(t *testing.T) {
 	sber := NewSandBoxer(tmpDir, nil)
 
 	// Create and start mux
-	mux := NewMux(tmpDir, sber)
+	mux := NewMuxServer(tmpDir, sber)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -133,7 +133,7 @@ func TestMuxPingNotRunning(t *testing.T) {
 	sber := NewSandBoxer(tmpDir, nil)
 
 	// Create mux but don't start it
-	mux := NewMux(tmpDir, sber)
+	mux := NewMuxServer(tmpDir, sber)
 	ctx := context.Background()
 
 	// Try to create a client when daemon is not running

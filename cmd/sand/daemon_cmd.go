@@ -14,7 +14,7 @@ type DaemonCmd struct {
 // Run handles all daemon command variants
 func (c *DaemonCmd) Run(cctx *Context) error {
 	ctx := context.Background()
-	mux := sand.NewMux(cctx.AppBaseDir, cctx.sber)
+	mux := sand.NewMuxServer(cctx.AppBaseDir, cctx.sber)
 
 	switch c.Action {
 	case "start":

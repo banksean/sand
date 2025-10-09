@@ -63,7 +63,7 @@ func (c *NewCmd) Run(cctx *Context) error {
 	}
 
 	// Use MuxClient to check if sandbox exists or create it
-	mux := sand.NewMux(cctx.AppBaseDir, cctx.sber)
+	mux := sand.NewMuxServer(cctx.AppBaseDir, cctx.sber)
 	mc, err := mux.NewClient(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "NewClient", "error", err)

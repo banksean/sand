@@ -16,7 +16,7 @@ func (c *LsCmd) Run(cctx *Context) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	mux := sand.NewMux(cctx.AppBaseDir, cctx.sber)
+	mux := sand.NewMuxServer(cctx.AppBaseDir, cctx.sber)
 	mc, err := mux.NewClient(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "NewClient", "error", err)

@@ -19,7 +19,7 @@ func (c *RmCmd) Run(cctx *Context) error {
 	defer cancel()
 	slog.InfoContext(ctx, "RmCmd", "run", *c)
 
-	mux := sand.NewMux(cctx.AppBaseDir, cctx.sber)
+	mux := sand.NewMuxServer(cctx.AppBaseDir, cctx.sber)
 	mc, err := mux.NewClient(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "NewClient", "error", err)
