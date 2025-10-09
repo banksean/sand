@@ -126,6 +126,62 @@ func TestMuxHTTPList(t *testing.T) {
 	}
 }
 
+func TestMuxHTTPVersion(t *testing.T) {
+	// Create a temporary directory for the mux
+	tmpDir, err := os.MkdirTemp("", "mux-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	sber, err := NewBoxer(tmpDir, nil)
+	if err != nil {
+		t.Fatalf("Failed to create Boxer: %v", err)
+	}
+	defer sber.Close()
+
+	// Create and start mux
+	mux := NewMuxServer(tmpDir, sber)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Start the mux server in a goroutine
+	go func() {
+		if err := mux.ServeUnix(ctx); err != nil {
+			t.Logf("Mux serve error: %v", err)
+		}
+	}()
+
+	// Wait for the socket to be ready
+	socketPath := filepath.Join(tmpDir, defaultSocketFile)
+	for i := 0; i < 20; i++ {
+		if _, err := os.Stat(socketPath); err == nil {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	// Create a client
+	client, err := mux.NewClient(ctx)
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	// Test version endpoint
+	versionInfo, err := client.Version(ctx)
+	if err != nil {
+		t.Fatalf("Version request failed: %v", err)
+	}
+
+	// Version info should at least be present (may be empty in tests)
+	t.Logf("Version info: %+v", versionInfo)
+
+	// Test shutdown
+	if err := client.Shutdown(ctx); err != nil {
+		t.Fatalf("Shutdown failed: %v", err)
+	}
+}
+
 func TestMuxPingNotRunning(t *testing.T) {
 	// Create a temporary directory for the mux
 	tmpDir, err := os.MkdirTemp("", "mux-test-*")

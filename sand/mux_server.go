@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"syscall"
 	"time"
+
+	"github.com/banksean/apple-container/version"
 )
 
 const (
@@ -148,6 +150,7 @@ func (m *Mux) serveHTTP(ctx context.Context) {
 	// Register handlers
 	mux.HandleFunc("/shutdown", m.handleShutdown)
 	mux.HandleFunc("/ping", m.handlePing)
+	mux.HandleFunc("/version", m.handleVersion)
 	mux.HandleFunc("/list", m.handleHTTPList)
 	mux.HandleFunc("/get", m.handleGet)
 	mux.HandleFunc("/remove", m.handleRemove)
@@ -195,6 +198,14 @@ func (m *Mux) handlePing(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]string{"status": "pong"})
+}
+
+func (m *Mux) handleVersion(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	writeJSON(w, version.Get())
 }
 
 func (m *Mux) handleHTTPList(w http.ResponseWriter, r *http.Request) {

@@ -13,6 +13,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/banksean/apple-container/version"
 )
 
 type MuxClient struct {
@@ -72,6 +74,14 @@ func (m *MuxClient) Ping(ctx context.Context) error {
 		return err
 	}
 	return nil
+}
+
+func (m *MuxClient) Version(ctx context.Context) (version.Info, error) {
+	var info version.Info
+	if err := m.doRequest(ctx, http.MethodGet, "/version", nil, &info); err != nil {
+		return version.Info{}, err
+	}
+	return info, nil
 }
 
 func (m *MuxClient) Shutdown(ctx context.Context) error {
@@ -210,7 +220,18 @@ func EnsureDaemon(appBaseDir, logFile string) error {
 	conn, err := net.DialTimeout("unix", socketPath, 500*time.Millisecond)
 	if err == nil {
 		conn.Close()
-		return nil // Daemon already running
+		// Daemon is running, check if version matches
+		if err := checkDaemonVersion(appBaseDir); err != nil {
+			slog.Info("EnsureDaemon", "versionMismatch", err.Error())
+			// Version mismatch, shut down old daemon
+			if err := shutdownDaemon(appBaseDir); err != nil {
+				slog.Warn("EnsureDaemon", "shutdownError", err.Error())
+				// Continue to try starting new daemon anyway
+			}
+			// Fall through to start new daemon
+		} else {
+			return nil // Daemon running with correct version
+		}
 	}
 
 	// Start daemon in background
@@ -240,4 +261,40 @@ func EnsureDaemon(appBaseDir, logFile string) error {
 	}
 
 	return fmt.Errorf("daemon failed to start")
+}
+
+func checkDaemonVersion(appBaseDir string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	mux := NewMuxServer(appBaseDir, nil)
+	client, err := mux.NewClient(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
+
+	daemonVersion, err := client.Version(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get daemon version: %w", err)
+	}
+
+	cliVersion := version.Get()
+	if !cliVersion.Equal(daemonVersion) {
+		return fmt.Errorf("version mismatch: CLI=%s, Daemon=%s", cliVersion.GitCommit, daemonVersion.GitCommit)
+	}
+
+	return nil
+}
+
+func shutdownDaemon(appBaseDir string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	mux := NewMuxServer(appBaseDir, nil)
+	client, err := mux.NewClient(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
+
+	return client.Shutdown(ctx)
 }
