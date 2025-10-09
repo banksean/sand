@@ -59,6 +59,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go1.25.1-
 
+      - name: Ensure sqlc is installed
+        uses: sqlc-dev/setup-sqlc@v4
+        with:
+          sqlc-version: '1.25.0'
+
       - name: Install tools
         run: |
           go install golang.org/x/tools/gopls@latest
