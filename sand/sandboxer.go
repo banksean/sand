@@ -20,7 +20,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-//go:generate sqlc generate
+//go:generate sh -c "cd .. && sqlc generate"
 
 //go:embed db/schema.sql
 var schemaSQL string
