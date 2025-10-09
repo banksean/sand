@@ -126,7 +126,7 @@ sand git diff [flags] <SANDBOX-ID>
 
 **Flags:**
 
-- `-b, --branch` _`<branch>`_ - branch to diff against (default: sandbox ID)
+- `-b, --branch` _`<branch name>`_ - remote branch to diff against (default: active git branch name in cwd)
 - `-u, --include-uncommitted` - include uncommitted changes from sandbox working tree (default: `false`)
 
 ### `sand git status`

@@ -27,7 +27,7 @@ type LogCmd struct {
 }
 
 type DiffCmd struct {
-	Branch             string `short:"b" default:"" placeholder:"<branch>" help:"branch to diff against (default: sandbox ID)"`
+	Branch             string `short:"b" default:"" placeholder:"<branch name>" help:"remote branch to diff against (default: active git branch name in cwd)"`
 	IncludeUncommitted bool   `short:"u" default:"false" help:"include uncommitted changes from sandbox working tree"`
 	SandboxID          string `arg:"" help:"ID of the sandbox to diff against"`
 }
@@ -70,7 +70,14 @@ func (c *DiffCmd) Run(cctx *Context) error {
 	}
 
 	if c.Branch == "" {
-		c.Branch = c.SandboxID
+		// get the active branch name in cwd.
+		cwdBranchCmd := exec.CommandContext(ctx, "git", "branch", "--show-current")
+		cwdBranchCmd.Dir = cwd
+		out, err := cwdBranchCmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("git branch --show-current failed: %w", err)
+		}
+		c.Branch = strings.TrimSpace(string(out))
 	}
 
 	// If including uncommitted changes, create a temporary commit in the sandbox
