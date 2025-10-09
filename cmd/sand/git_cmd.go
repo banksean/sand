@@ -57,7 +57,7 @@ func (c *DiffCmd) Run(cctx *Context) error {
 	}
 
 	// Construct the remote name for the sandbox clone
-	remoteName := fmt.Sprintf("sandbox-clone-%s", c.SandboxID)
+	remoteName := sand.ClonedWorkDirRemotePrefix + c.SandboxID
 
 	// First, fetch from the sandbox remote
 	gitFetch := exec.CommandContext(ctx, "git", "fetch", remoteName)
@@ -205,7 +205,7 @@ func (c *StatusCmd) Run(cctx *Context) error {
 	}
 
 	// Construct the remote name for the sandbox clone
-	remoteName := fmt.Sprintf("sandbox-clone-%s", c.SandboxID)
+	remoteName := sand.ClonedWorkDirRemotePrefix + c.SandboxID
 
 	// Get current working directory
 	cwd, err := os.Getwd()
@@ -263,7 +263,7 @@ func (c *LogCmd) Run(cctx *Context) error {
 	}
 
 	// Construct the remote name for the sandbox clone
-	remoteName := fmt.Sprintf("sandbox-clone-%s", c.SandboxID)
+	remoteName := sand.ClonedWorkDirRemotePrefix + c.SandboxID
 
 	// Get current working directory
 	cwd, err := os.Getwd()

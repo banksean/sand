@@ -26,7 +26,7 @@ Remote URL:  /Users/yourname/myproject  (the original host working directory)
 
 ### In the original working directory (`/Users/yourname/myproject`):
 ```
-Remote name: sandbox-clone-my-sandbox
+Remote name: sand/my-sandbox
 Remote URL:  /tmp/sand/boxen/my-sandbox/app  (the sandbox clone directory)
 ```
 
@@ -42,8 +42,8 @@ The remote URLs are absolute filesystem paths on the macOS host. Inside the cont
 This means:
 - YES: `git fetch origin-host-workdir` works on the **host** (from the sandbox clone directory)
 - NO: `git fetch origin-host-workdir` **fails** inside the **container** (paths don't exist)
-- YES: `git fetch sandbox-clone-my-sandbox` works on the **host** (from the original working directory)
-- NO: `git fetch sandbox-clone-my-sandbox` **fails** inside the **container**
+- YES: `git fetch sand/my-sandbox` works on the **host** (from the original working directory)
+- NO: `git fetch sand/my-sandbox` **fails** inside the **container**
 
 ## Example: Comparing Original Working Directory to Sandbox
 
@@ -106,13 +106,13 @@ You can also diff manually from either directory:
 ```sh
 # First, fetch the latest from the sandbox clone
 cd /Users/yourname/myproject
-git fetch sandbox-clone-my-sandbox
+git fetch sand/my-sandbox
 
 # Compare your current working tree to the sandbox's main branch
-git diff sandbox-clone-my-sandbox/main
+git diff sand/my-sandbox/main
 
 # Or compare specific commits/branches
-git diff HEAD..sandbox-clone-my-sandbox/main
+git diff HEAD..sand/my-sandbox/main
 ```
 
 #### Option 2: From the sandbox clone directory
@@ -166,8 +166,8 @@ To compare the container's current state with the original working directory:
 2. **From the original working directory on host**, fetch and diff:
    ```sh
    cd /Users/yourname/myproject
-   git fetch sandbox-clone-my-sandbox
-   git diff sandbox-clone-my-sandbox/main
+   git fetch sand/my-sandbox
+   git diff sand/my-sandbox/main
    ```
 
 Alternatively, use `sand shell` to run git commands on the host OS that inspect the sandbox clone's state without entering the container.

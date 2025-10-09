@@ -143,7 +143,7 @@ func (sb *SandBoxer) Cleanup(ctx context.Context, sbox *Box) error {
 		slog.ErrorContext(ctx, "SandBoxer Containers.Delete", "error", err, "out", out)
 	}
 
-	gitRmCloneRemote := exec.CommandContext(ctx, "git", "remote", "remove", clonedWorkDirRemotePrefix+sbox.ID)
+	gitRmCloneRemote := exec.CommandContext(ctx, "git", "remote", "remove", ClonedWorkDirRemotePrefix+sbox.ID)
 	gitRmCloneRemote.Dir = sbox.HostOriginDir
 	slog.InfoContext(ctx, "Cleanup gitRmCloneRemote", "cmd", strings.Join(gitRmCloneRemote.Args, " "))
 	output, err := gitRmCloneRemote.CombinedOutput()
@@ -161,7 +161,7 @@ func (sb *SandBoxer) Cleanup(ctx context.Context, sbox *Box) error {
 
 const (
 	originalWorkdDirRemoteName = "origin-host-workdir"
-	clonedWorkDirRemotePrefix  = "sandbox-clone-"
+	ClonedWorkDirRemotePrefix  = "sand/"
 )
 
 // cloneWorkDir creates a recursive, copy-on-write copy of hostWorkDir, under the sandboxer's root directory.
@@ -169,7 +169,7 @@ const (
 // Git stuff:
 // Set up bi-drectional "remotes" to link the two checkouts:
 // - in cloneRoot/id/app, remote "origin-host-workdir" -> hostWorkDir
-// - in hostWorkDir, remote "sandbox-clone-<id>" -> cloneRoot/id/app
+// - in hostWorkDir, remote "sand/<sandbox-id>" -> cloneRoot/id/app
 // TODO: figure out how to deal with the inconsistency that the container's /app dir checkout now
 // has remotes that point to host filesystem paths, not container filesystem paths.  This means
 // "git fetch clonedfrom" works on the *host* OS, but not from inside the container, since those paths
@@ -201,7 +201,7 @@ func (sb *SandBoxer) cloneWorkDir(ctx context.Context, id, hostWorkDir string) e
 		return err
 	}
 
-	gitRemoteWorkDirToCloneCmd := exec.CommandContext(ctx, "git", "remote", "add", clonedWorkDirRemotePrefix+id, hostCloneDir)
+	gitRemoteWorkDirToCloneCmd := exec.CommandContext(ctx, "git", "remote", "add", ClonedWorkDirRemotePrefix+id, hostCloneDir)
 	gitRemoteWorkDirToCloneCmd.Dir = hostWorkDir
 	slog.InfoContext(ctx, "cloneWorkDir gitRemoteWorkDirToCloneCmd", "cmd", strings.Join(gitRemoteWorkDirToCloneCmd.Args, " "))
 	output, err = gitRemoteWorkDirToCloneCmd.CombinedOutput()
@@ -219,7 +219,7 @@ func (sb *SandBoxer) cloneWorkDir(ctx context.Context, id, hostWorkDir string) e
 		return err
 	}
 
-	gitFetchWorkDirToCloneCmd := exec.CommandContext(ctx, "git", "fetch", clonedWorkDirRemotePrefix+id)
+	gitFetchWorkDirToCloneCmd := exec.CommandContext(ctx, "git", "fetch", ClonedWorkDirRemotePrefix+id)
 	gitFetchWorkDirToCloneCmd.Dir = hostWorkDir
 	slog.InfoContext(ctx, "cloneWorkDir gitFetchWorkDirToCloneCmd", "cmd", strings.Join(gitFetchWorkDirToCloneCmd.Args, " "))
 	output, err = gitFetchWorkDirToCloneCmd.CombinedOutput()
