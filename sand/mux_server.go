@@ -23,14 +23,14 @@ type Mux struct {
 	AppBaseDir string
 	SocketPath string
 
-	sber *SandBoxer
+	sber *Boxer
 
 	listener net.Listener
 	lockFile *os.File
 	shutdown chan any
 }
 
-func NewMuxServer(appBaseDir string, sber *SandBoxer) *Mux {
+func NewMuxServer(appBaseDir string, sber *Boxer) *Mux {
 	return &Mux{
 		AppBaseDir: appBaseDir,
 		SocketPath: filepath.Join(appBaseDir, defaultSocketFile),

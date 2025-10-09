@@ -25,8 +25,8 @@ import (
 //go:embed db/schema.sql
 var schemaSQL string
 
-// SandBoxer manages the lifecycle of sandboxes.
-type SandBoxer struct {
+// Boxer manages the lifecycle of sandboxes.
+type Boxer struct {
 	appRoot        string
 	cloneRoot      string
 	sandBoxes      map[string]*Box
@@ -35,7 +35,7 @@ type SandBoxer struct {
 	queries        *db.Queries
 }
 
-func NewSandBoxer(appRoot string, terminalWriter io.Writer) (*SandBoxer, error) {
+func NewBoxer(appRoot string, terminalWriter io.Writer) (*Boxer, error) {
 	if err := os.MkdirAll(appRoot, 0o750); err != nil {
 		return nil, err
 	}
@@ -58,7 +58,7 @@ func NewSandBoxer(appRoot string, terminalWriter io.Writer) (*SandBoxer, error) 
 		return nil, fmt.Errorf("failed to initialize schema: %w", err)
 	}
 
-	return &SandBoxer{
+	return &Boxer{
 		appRoot:        appRoot,
 		cloneRoot:      filepath.Join(appRoot, "clones"),
 		sandBoxes:      map[string]*Box{},
@@ -68,14 +68,14 @@ func NewSandBoxer(appRoot string, terminalWriter io.Writer) (*SandBoxer, error) 
 	}, nil
 }
 
-func (sb *SandBoxer) Close() error {
+func (sb *Boxer) Close() error {
 	if sb.sqlDB != nil {
 		return sb.sqlDB.Close()
 	}
 	return nil
 }
 
-func (sb *SandBoxer) EnsureDefaultImage(ctx context.Context, imageName, dockerfileDir, sandboxUsername string) error {
+func (sb *Boxer) EnsureDefaultImage(ctx context.Context, imageName, dockerfileDir, sandboxUsername string) error {
 	if err := sb.checkForImage(ctx, imageName, dockerfileDir, sandboxUsername); err != nil {
 		return err
 	}
@@ -85,8 +85,8 @@ func (sb *SandBoxer) EnsureDefaultImage(ctx context.Context, imageName, dockerfi
 // NewSandbox creates a new sandbox based on a clone of hostWorkDir.
 // TODO: clone envFile, if it exists, into sb.cloneRoot/id/env, so every command exec'd in that sandbox container
 // uses the same env file, even if the original .env file has changed on the host machine.
-func (sb *SandBoxer) NewSandbox(ctx context.Context, id, hostWorkDir, imageName, dockerFileDir, envFile string) (*Box, error) {
-	slog.InfoContext(ctx, "SandBoxer.NewSandbox", "hostWorkDir", hostWorkDir, "id", id)
+func (sb *Boxer) NewSandbox(ctx context.Context, id, hostWorkDir, imageName, dockerFileDir, envFile string) (*Box, error) {
+	slog.InfoContext(ctx, "Boxer.NewSandbox", "hostWorkDir", hostWorkDir, "id", id)
 
 	if err := sb.cloneWorkDir(ctx, id, hostWorkDir); err != nil {
 		return nil, err
@@ -117,8 +117,8 @@ func (sb *SandBoxer) NewSandbox(ctx context.Context, id, hostWorkDir, imageName,
 }
 
 // AttachSandbox re-connects to an existing container and sandboxWorkDir instead of creating a new one.
-func (sb *SandBoxer) AttachSandbox(ctx context.Context, id string) (*Box, error) {
-	slog.InfoContext(ctx, "SandBoxer.AttachSandbox", "id", id)
+func (sb *Boxer) AttachSandbox(ctx context.Context, id string) (*Box, error) {
+	slog.InfoContext(ctx, "Boxer.AttachSandbox", "id", id)
 	ret, err := sb.loadSandbox(ctx, id)
 	if err != nil {
 		return nil, err
@@ -126,7 +126,7 @@ func (sb *SandBoxer) AttachSandbox(ctx context.Context, id string) (*Box, error)
 	return ret, nil
 }
 
-func (sb *SandBoxer) List(ctx context.Context) ([]Box, error) {
+func (sb *Boxer) List(ctx context.Context) ([]Box, error) {
 	sandboxes, err := sb.queries.ListSandboxes(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list sandboxes: %w", err)
@@ -139,8 +139,8 @@ func (sb *SandBoxer) List(ctx context.Context) ([]Box, error) {
 	return boxes, nil
 }
 
-func (sb *SandBoxer) Get(ctx context.Context, id string) (*Box, error) {
-	slog.InfoContext(ctx, "SandBoxer.Get", "id", id)
+func (sb *Boxer) Get(ctx context.Context, id string) (*Box, error) {
+	slog.InfoContext(ctx, "Boxer.Get", "id", id)
 	sandbox, err := sb.queries.GetSandbox(ctx, id)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -150,21 +150,21 @@ func (sb *SandBoxer) Get(ctx context.Context, id string) (*Box, error) {
 	}
 
 	box := sandboxFromDB(&sandbox)
-	slog.InfoContext(ctx, "SandBoxer.Get", "ret", box)
+	slog.InfoContext(ctx, "Boxer.Get", "ret", box)
 	return box, nil
 }
 
-func (sb *SandBoxer) Cleanup(ctx context.Context, sbox *Box) error {
-	slog.InfoContext(ctx, "SandBoxer.Cleanup", "id", sbox.ID)
+func (sb *Boxer) Cleanup(ctx context.Context, sbox *Box) error {
+	slog.InfoContext(ctx, "Boxer.Cleanup", "id", sbox.ID)
 
 	out, err := ac.Containers.Stop(ctx, nil, sbox.ContainerID)
 	if err != nil {
-		slog.ErrorContext(ctx, "SandBoxer Containers.Stop", "error", err, "out", out)
+		slog.ErrorContext(ctx, "Boxer Containers.Stop", "error", err, "out", out)
 	}
 
 	out, err = ac.Containers.Delete(ctx, nil, sbox.ContainerID)
 	if err != nil {
-		slog.ErrorContext(ctx, "SandBoxer Containers.Delete", "error", err, "out", out)
+		slog.ErrorContext(ctx, "Boxer Containers.Delete", "error", err, "out", out)
 	}
 
 	gitRmCloneRemote := exec.CommandContext(ctx, "git", "remote", "remove", ClonedWorkDirRemotePrefix+sbox.ID)
@@ -218,7 +218,7 @@ const (
 	ClonedWorkDirRemotePrefix  = "sand/"
 )
 
-// cloneWorkDir creates a recursive, copy-on-write copy of hostWorkDir, under the sandboxer's root directory.
+// cloneWorkDir creates a recursive, copy-on-write copy of hostWorkDir, under the Boxer's root directory.
 // "cp -c" uses APFS's clonefile(2) function to make the destination dir contents be COW.
 // Git stuff:
 // Set up bi-drectional "remotes" to link the two checkouts:
@@ -232,7 +232,7 @@ const (
 // in the host OS to run the "git fetch clonedfrom" command in the cloneWorkDir
 // on the container's behalf. This will update the sandbox clone's git checkout to reflect the latest
 // contents of the host machine's working directory.
-func (sb *SandBoxer) cloneWorkDir(ctx context.Context, id, hostWorkDir string) error {
+func (sb *Boxer) cloneWorkDir(ctx context.Context, id, hostWorkDir string) error {
 	sb.userMsg(ctx, "Cloning "+hostWorkDir)
 	if err := os.MkdirAll(filepath.Join(sb.cloneRoot, id), 0o750); err != nil {
 		return err
@@ -285,7 +285,7 @@ func (sb *SandBoxer) cloneWorkDir(ctx context.Context, id, hostWorkDir string) e
 	return nil
 }
 
-func (sb *SandBoxer) cloneClaudeDir(ctx context.Context, id string) error {
+func (sb *Boxer) cloneClaudeDir(ctx context.Context, id string) error {
 	if err := os.MkdirAll(filepath.Join(sb.cloneRoot, id), 0o750); err != nil {
 		return err
 	}
@@ -310,7 +310,7 @@ func (sb *SandBoxer) cloneClaudeDir(ctx context.Context, id string) error {
 	return nil
 }
 
-func (sb *SandBoxer) cloneDotfiles(ctx context.Context, id string) error {
+func (sb *Boxer) cloneDotfiles(ctx context.Context, id string) error {
 	sb.userMsg(ctx, "Cloning dotfiles...")
 	dotfiles := []string{
 		".claude.json",
@@ -338,7 +338,7 @@ func (sb *SandBoxer) cloneDotfiles(ctx context.Context, id string) error {
 		if fi.Mode()&os.ModeSymlink != 0 {
 			destination, err := os.Readlink(original)
 			if err != nil {
-				slog.ErrorContext(ctx, "SandBoxer.cloneDotfiles error reading symbolic link", "original", original, "error", err)
+				slog.ErrorContext(ctx, "Boxer.cloneDotfiles error reading symbolic link", "original", original, "error", err)
 				continue
 			}
 			if !filepath.IsAbs(destination) {
@@ -347,7 +347,7 @@ func (sb *SandBoxer) cloneDotfiles(ctx context.Context, id string) error {
 			// Now verify that the file that the symlink points to actually exists.
 			_, err = os.Lstat(destination)
 			if errors.Is(err, os.ErrNotExist) {
-				slog.ErrorContext(ctx, "SandBoxer.cloneDotfiles symbolic link points to nonexistent file",
+				slog.ErrorContext(ctx, "Boxer.cloneDotfiles symbolic link points to nonexistent file",
 					"original", original, "destination", destination, "error", err)
 				f, err := os.Create(clone)
 				if err != nil {
@@ -356,7 +356,7 @@ func (sb *SandBoxer) cloneDotfiles(ctx context.Context, id string) error {
 				f.Close()
 				continue
 			}
-			slog.ErrorContext(ctx, "SandBoxer.cloneDotfiles resolved symbolic link",
+			slog.ErrorContext(ctx, "Boxer.cloneDotfiles resolved symbolic link",
 				"original", original, "destination", destination)
 			original = destination
 		}
@@ -373,8 +373,8 @@ func (sb *SandBoxer) cloneDotfiles(ctx context.Context, id string) error {
 	return nil
 }
 
-func (sb *SandBoxer) buildDefaultImage(ctx context.Context, dockerFileDir, sandboxUsername string) error {
-	slog.InfoContext(ctx, "SandBoxer.buildDefaultImage", "dockerFileDir", dockerFileDir, "sandboxUsername", sandboxUsername)
+func (sb *Boxer) buildDefaultImage(ctx context.Context, dockerFileDir, sandboxUsername string) error {
+	slog.InfoContext(ctx, "Boxer.buildDefaultImage", "dockerFileDir", dockerFileDir, "sandboxUsername", sandboxUsername)
 	sb.userMsg(ctx, "This may take a while, but we only do it once: building default container image...")
 
 	outLogs, errLogs, wait, err := ac.Images.Build(ctx, dockerFileDir,
@@ -416,7 +416,7 @@ func (sb *SandBoxer) buildDefaultImage(ctx context.Context, dockerFileDir, sandb
 	return err
 }
 
-func (sb *SandBoxer) checkForImage(ctx context.Context, imageName, dockerfileDir, sandboxUsername string) error {
+func (sb *Boxer) checkForImage(ctx context.Context, imageName, dockerfileDir, sandboxUsername string) error {
 	manifests, err := ac.Images.Inspect(ctx, imageName)
 	if err != nil {
 		slog.ErrorContext(ctx, "buildSandboxImage: Images.Build", "error", err, "manifests", len(manifests))
@@ -431,7 +431,7 @@ func (sb *SandBoxer) checkForImage(ctx context.Context, imageName, dockerfileDir
 	return nil
 }
 
-func (sb *SandBoxer) userMsg(ctx context.Context, msg string) {
+func (sb *Boxer) userMsg(ctx context.Context, msg string) {
 	if sb.terminalWriter == nil {
 		slog.DebugContext(ctx, "userMsg (no terminalWriter)", "msg", msg)
 		return
@@ -440,8 +440,8 @@ func (sb *SandBoxer) userMsg(ctx context.Context, msg string) {
 }
 
 // SaveSandbox persists the Sandbox to the database.
-func (sb *SandBoxer) SaveSandbox(ctx context.Context, sbox *Box) error {
-	slog.InfoContext(ctx, "SandBoxer.SaveSandbox", "id", sbox.ID)
+func (sb *Boxer) SaveSandbox(ctx context.Context, sbox *Box) error {
+	slog.InfoContext(ctx, "Boxer.SaveSandbox", "id", sbox.ID)
 
 	err := sb.queries.UpsertSandbox(ctx, db.UpsertSandboxParams{
 		ID:             sbox.ID,
@@ -459,7 +459,7 @@ func (sb *SandBoxer) SaveSandbox(ctx context.Context, sbox *Box) error {
 }
 
 // UpdateContainerID updates the ContainerID field of a sandbox and persists it.
-func (sb *SandBoxer) UpdateContainerID(ctx context.Context, sbox *Box, containerID string) error {
+func (sb *Boxer) UpdateContainerID(ctx context.Context, sbox *Box, containerID string) error {
 	sbox.ContainerID = containerID
 	err := sb.queries.UpdateContainerID(ctx, db.UpdateContainerIDParams{
 		ContainerID: toNullString(containerID),
@@ -472,23 +472,23 @@ func (sb *SandBoxer) UpdateContainerID(ctx context.Context, sbox *Box, container
 }
 
 // StopContainer stops a sandbox's container without deleting it.
-func (sb *SandBoxer) StopContainer(ctx context.Context, sbox *Box) error {
+func (sb *Boxer) StopContainer(ctx context.Context, sbox *Box) error {
 	if sbox.ContainerID == "" {
 		return fmt.Errorf("sandbox %s has no container ID", sbox.ID)
 	}
 
 	out, err := ac.Containers.Stop(ctx, nil, sbox.ContainerID)
 	if err != nil {
-		slog.ErrorContext(ctx, "SandBoxer.StopContainer", "error", err, "out", out)
+		slog.ErrorContext(ctx, "Boxer.StopContainer", "error", err, "out", out)
 		return err
 	}
-	slog.InfoContext(ctx, "SandBoxer.StopContainer", "id", sbox.ID, "containerID", sbox.ContainerID, "out", out)
+	slog.InfoContext(ctx, "Boxer.StopContainer", "id", sbox.ID, "containerID", sbox.ContainerID, "out", out)
 	return nil
 }
 
 // loadSandbox reads a Sandbox from the database.
-func (sb *SandBoxer) loadSandbox(ctx context.Context, id string) (*Box, error) {
-	slog.InfoContext(ctx, "SandBoxer.loadSandbox", "id", id)
+func (sb *Boxer) loadSandbox(ctx context.Context, id string) (*Box, error) {
+	slog.InfoContext(ctx, "Boxer.loadSandbox", "id", id)
 
 	sandbox, err := sb.queries.GetSandbox(ctx, id)
 	if err == sql.ErrNoRows {

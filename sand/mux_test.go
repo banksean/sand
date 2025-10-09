@@ -16,10 +16,9 @@ func TestMuxHTTPPing(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// Create a sandboxer (can be minimal for ping test)
-	sber, err := NewSandBoxer(tmpDir, nil)
+	sber, err := NewBoxer(tmpDir, nil)
 	if err != nil {
-		t.Fatalf("Failed to create SandBoxer: %v", err)
+		t.Fatalf("Failed to create Boxer: %v", err)
 	}
 	defer sber.Close()
 
@@ -79,10 +78,9 @@ func TestMuxHTTPList(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// Create a sandboxer
-	sber, err := NewSandBoxer(tmpDir, nil)
+	sber, err := NewBoxer(tmpDir, nil)
 	if err != nil {
-		t.Fatalf("Failed to create SandBoxer: %v", err)
+		t.Fatalf("Failed to create Boxer: %v", err)
 	}
 	defer sber.Close()
 
@@ -136,10 +134,9 @@ func TestMuxPingNotRunning(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// Create a sandboxer
-	sber, err := NewSandBoxer(tmpDir, nil)
+	sber, err := NewBoxer(tmpDir, nil)
 	if err != nil {
-		t.Fatalf("Failed to create SandBoxer: %v", err)
+		t.Fatalf("Failed to create Boxer: %v", err)
 	}
 	defer sber.Close()
 

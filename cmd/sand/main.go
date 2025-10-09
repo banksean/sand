@@ -17,7 +17,7 @@ type Context struct {
 	LogFile    string
 	LogLevel   string
 	CloneRoot  string
-	sber       *sand.SandBoxer
+	sber       *sand.Boxer
 }
 
 type CLI struct {
@@ -134,9 +134,9 @@ func main() {
 	if cli.AppBaseDir == "" {
 		cli.AppBaseDir = appBaseDir
 	}
-	sber, err := sand.NewSandBoxer(cli.AppBaseDir, os.Stderr)
+	sber, err := sand.NewBoxer(cli.AppBaseDir, os.Stderr)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to create sandboxer: %v\n", err)
+		fmt.Fprintf(os.Stderr, "failed to create Boxer: %v\n", err)
 		os.Exit(1)
 	}
 	defer sber.Close()
