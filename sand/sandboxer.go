@@ -27,6 +27,7 @@ var schemaSQL string
 
 // SandBoxer manages the lifecycle of sandboxes.
 type SandBoxer struct {
+	appRoot        string
 	cloneRoot      string
 	sandBoxes      map[string]*Box
 	terminalWriter io.Writer
@@ -34,12 +35,12 @@ type SandBoxer struct {
 	queries        *db.Queries
 }
 
-func NewSandBoxer(cloneRoot string, terminalWriter io.Writer) (*SandBoxer, error) {
-	if err := os.MkdirAll(cloneRoot, 0o750); err != nil {
+func NewSandBoxer(appRoot string, terminalWriter io.Writer) (*SandBoxer, error) {
+	if err := os.MkdirAll(appRoot, 0o750); err != nil {
 		return nil, err
 	}
 
-	dbPath := filepath.Join(cloneRoot, "sandboxes.db")
+	dbPath := filepath.Join(appRoot, "sand.db")
 	sqlDB, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
@@ -58,7 +59,8 @@ func NewSandBoxer(cloneRoot string, terminalWriter io.Writer) (*SandBoxer, error
 	}
 
 	return &SandBoxer{
-		cloneRoot:      cloneRoot,
+		appRoot:        appRoot,
+		cloneRoot:      filepath.Join(appRoot, "clones"),
 		sandBoxes:      map[string]*Box{},
 		terminalWriter: terminalWriter,
 		sqlDB:          sqlDB,

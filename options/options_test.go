@@ -75,13 +75,13 @@ func TestToFlags(t *testing.T) {
 			s: &CreateContainer{
 				ManagementOptions: ManagementOptions{
 					Mount: []string{
-						"type=bind,source=/Users/seanmccullough/sandboxen/59edaa35-1cbb-4914-a478-606ae706f324,target=/app",
+						"type=bind,source=/Users/Library/Application Support/Sand/clones/59edaa35-1cbb-4914-a478-606ae706f324,target=/app",
 						"type=bind,source=/Users/seanmccullough/.claude,target=/home/node/.claude,readonly",
 					},
 				},
 			},
 			expected: []string{
-				"--mount", "type=bind,source=/Users/seanmccullough/sandboxen/59edaa35-1cbb-4914-a478-606ae706f324,target=/app",
+				"--mount", "type=bind,source=/Users/Library/Application Support/Sand/clones/59edaa35-1cbb-4914-a478-606ae706f324,target=/app",
 				"--mount", "type=bind,source=/Users/seanmccullough/.claude,target=/home/node/.claude,readonly",
 			},
 		},

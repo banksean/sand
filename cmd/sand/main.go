@@ -21,9 +21,9 @@ type Context struct {
 }
 
 type CLI struct {
-	LogFile   string `default:"/tmp/sand/log" placeholder:"<log-file-path>" help:"location of log file (leave empty for a random tmp/ path)"`
-	LogLevel  string `default:"info" placeholder:"<debug|info|warn|error>" help:"the logging level (debug, info, warn, error)"`
-	CloneRoot string `default:"" placeholder:"<clone-root-dir>" help:"root dir to store sandbox clones of working directories. Leave unset to use '~/Library/Application Support/Sand/boxen'"`
+	LogFile    string `default:"/tmp/sand/log" placeholder:"<log-file-path>" help:"location of log file (leave empty for a random tmp/ path)"`
+	LogLevel   string `default:"info" placeholder:"<debug|info|warn|error>" help:"the logging level (debug, info, warn, error)"`
+	AppBaseDir string `default:"" placeholder:"<app-base-dir>" help:"root dir to store sandbox clones of working directories. Leave unset to use '~/Library/Application Support/Sand'"`
 
 	New     NewCmd     `cmd:"" help:"create a new sandbox and shell into its container"`
 	Shell   ShellCmd   `cmd:"" help:"shell into a sandbox container (and start the container, if necessary)"`
@@ -131,10 +131,10 @@ func main() {
 		}
 	}
 
-	if cli.CloneRoot == "" {
-		cli.CloneRoot = filepath.Join(appBaseDir, "boxen")
+	if cli.AppBaseDir == "" {
+		cli.AppBaseDir = appBaseDir
 	}
-	sber, err := sand.NewSandBoxer(cli.CloneRoot, os.Stderr)
+	sber, err := sand.NewSandBoxer(cli.AppBaseDir, os.Stderr)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to create sandboxer: %v\n", err)
 		os.Exit(1)
@@ -145,7 +145,7 @@ func main() {
 		AppBaseDir: appBaseDir,
 		LogFile:    cli.LogFile,
 		LogLevel:   cli.LogLevel,
-		CloneRoot:  cli.CloneRoot,
+		CloneRoot:  cli.AppBaseDir,
 		sber:       sber,
 	})
 	ctx.FatalIfErrorf(err)

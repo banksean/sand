@@ -9,16 +9,16 @@ When `sand` creates a new sandbox, it makes a copy-on-write (COW) clone of your 
 ## Directory Structure
 
 - **Original working directory (host)**: The directory where you ran `sand new` (e.g., `/Users/yourname/myproject`)
-- **Sandbox clone directory (host)**: `${--clone-root}/boxen/<sandbox-id>/app`
-  - Default `--clone-root`: `/tmp/sand/boxen`
-  - Example full path: `/tmp/sand/boxen/my-sandbox/app`
+- **Sandbox clone directory (host)**: `${--app-base-dir}/clones/<sandbox-id>/app`
+  - Default `--app-base-dir`: `/tmp/sand/clones`
+  - Example full path: `/tmp/sand/clones/my-sandbox/app`
 - **Container mount**: The sandbox clone is mounted to `/app` inside the container
 
 ## The Bidirectional Remote Relationship
 
 When creating a sandbox with ID `my-sandbox` and current working directory `/Users/yourname/myproject`, `sand` establishes these git remotes:
 
-### In the sandbox clone (`/tmp/sand/boxen/my-sandbox/app`):
+### In the sandbox clone (`/tmp/sand/clones/my-sandbox/app`):
 ```
 Remote name: origin-host-workdir
 Remote URL:  /Users/yourname/myproject  (the original host working directory)
@@ -27,7 +27,7 @@ Remote URL:  /Users/yourname/myproject  (the original host working directory)
 ### In the original working directory (`/Users/yourname/myproject`):
 ```
 Remote name: sand/my-sandbox
-Remote URL:  /tmp/sand/boxen/my-sandbox/app  (the sandbox clone directory)
+Remote URL:  /tmp/sand/clones/my-sandbox/app  (the sandbox clone directory)
 ```
 
 ## Important Caveat: Host-Only Paths
@@ -35,7 +35,7 @@ Remote URL:  /tmp/sand/boxen/my-sandbox/app  (the sandbox clone directory)
 **These git remote paths only make sense on the host OS, not inside the container.**
 
 The remote URLs are absolute filesystem paths on the macOS host. Inside the container:
-- The path `/tmp/sand/boxen/my-sandbox/app` doesn't exist
+- The path `/tmp/sand/clones/my-sandbox/app` doesn't exist
 - The path `/Users/yourname/myproject` doesn't exist
 - Only `/app` (the mounted clone) is visible
 
@@ -50,7 +50,7 @@ This means:
 Let's say you have:
 - Sandbox ID: `my-sandbox`
 - Original working directory: `/Users/yourname/myproject`
-- Sandbox clone: `/tmp/sand/boxen/my-sandbox/app`
+- Sandbox clone: `/tmp/sand/clones/my-sandbox/app`
 
 ### Using the `sand git` Commands
 
@@ -118,7 +118,7 @@ git diff HEAD..sand/my-sandbox/main
 #### Option 2: From the sandbox clone directory
 ```sh
 # First, fetch the latest from the original working directory
-cd /tmp/sand/boxen/my-sandbox/app
+cd /tmp/sand/clones/my-sandbox/app
 git fetch origin-host-workdir
 
 # Compare the sandbox's working tree to the original's main branch
@@ -157,7 +157,7 @@ To compare the container's current state with the original working directory:
 1. **From a host shell**, commit or fetch the sandbox's changes:
    ```sh
    # On host: check what's in the sandbox clone
-   cd /tmp/sand/boxen/my-sandbox/app
+   cd /tmp/sand/clones/my-sandbox/app
    git status
    git add -A
    git commit -m "sandbox changes"
