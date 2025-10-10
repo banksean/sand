@@ -217,6 +217,8 @@ type StatusBar struct {
 	mu          sync.Mutex
 	resizeChan  chan os.Signal
 	lastUpdate  time.Time
+	lineBuffer  []string
+	maxBuffer   int
 }
 
 func NewStatusBar(writer io.Writer, fileName string) *StatusBar {
@@ -224,6 +226,8 @@ func NewStatusBar(writer io.Writer, fileName string) *StatusBar {
 		writer:     writer,
 		fileName:   fileName,
 		resizeChan: make(chan os.Signal, 1),
+		lineBuffer: make([]string, 0, 1000),
+		maxBuffer:  1000,
 	}
 }
 
@@ -248,6 +252,9 @@ func (s *StatusBar) Enable() error {
 	s.enabled = true
 	s.mu.Unlock()
 
+	fmt.Fprintf(s.writer, "\x1b[?1049h")
+	fmt.Fprintf(s.writer, "\x1b[2J")
+	fmt.Fprintf(s.writer, "\x1b[1;1H")
 	s.setupScrollRegion()
 
 	signal.Notify(s.resizeChan, syscall.SIGWINCH)
@@ -267,11 +274,40 @@ func (s *StatusBar) handleResize() {
 		s.mu.Lock()
 		s.width = width
 		s.height = height
+		
+		s.resetScrollRegion()
+		fmt.Fprintf(s.writer, "\x1b[2J")
+		fmt.Fprintf(s.writer, "\x1b[1;1H")
+		
+		linesToShow := len(s.lineBuffer)
+		if linesToShow > height-2 {
+			linesToShow = height - 2
+		}
+		startIdx := len(s.lineBuffer) - linesToShow
+		if startIdx < 0 {
+			startIdx = 0
+		}
+		
+		for i := startIdx; i < len(s.lineBuffer); i++ {
+			fmt.Fprint(s.writer, s.lineBuffer[i])
+		}
+		
 		s.mu.Unlock()
-
+		
 		s.setupScrollRegion()
 		s.redraw()
 	}
+}
+
+func (s *StatusBar) resetScrollRegion() {
+	fmt.Fprintf(s.writer, "\x1b[r")
+}
+
+func (s *StatusBar) clearStatusLine(lineNumber int) {
+	fmt.Fprintf(s.writer, "\x1b[s")
+	fmt.Fprintf(s.writer, "\x1b[%d;1H", lineNumber)
+	fmt.Fprintf(s.writer, "\x1b[K")
+	fmt.Fprintf(s.writer, "\x1b[u")
 }
 
 func (s *StatusBar) setupScrollRegion() {
@@ -329,6 +365,15 @@ func (s *StatusBar) redrawLocked() {
 }
 
 func (s *StatusBar) Write(p []byte) (n int, err error) {
+	s.mu.Lock()
+	if s.enabled {
+		s.lineBuffer = append(s.lineBuffer, string(p))
+		if len(s.lineBuffer) > s.maxBuffer {
+			s.lineBuffer = s.lineBuffer[len(s.lineBuffer)-s.maxBuffer:]
+		}
+	}
+	s.mu.Unlock()
+	
 	n, err = s.writer.Write(p)
 	if err != nil {
 		return n, err
@@ -355,9 +400,8 @@ func (s *StatusBar) Cleanup() {
 	signal.Stop(s.resizeChan)
 	close(s.resizeChan)
 
-	fmt.Fprintf(s.writer, "\x1b[r")
-	fmt.Fprintf(s.writer, "\x1b[%d;1H", s.height)
-	fmt.Fprintf(s.writer, "\x1b[K")
+	s.resetScrollRegion()
+	fmt.Fprintf(s.writer, "\x1b[?1049l")
 
 	s.enabled = false
 }
