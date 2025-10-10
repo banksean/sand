@@ -9,7 +9,7 @@ import (
 func TestStatusBarWrite(t *testing.T) {
 	buf := &bytes.Buffer{}
 	sb := NewStatusBar(buf, "test.log")
-	
+
 	n, err := sb.Write([]byte("test\n"))
 	if err != nil {
 		t.Fatalf("Write failed: %v", err)
@@ -25,13 +25,13 @@ func TestStatusBarWrite(t *testing.T) {
 func TestStatusBarCleanupSafe(t *testing.T) {
 	buf := &bytes.Buffer{}
 	sb := NewStatusBar(buf, "test.log")
-	
+
 	sb.Cleanup()
 }
 
 func TestStatusBarUpdate(t *testing.T) {
 	buf := &bytes.Buffer{}
 	sb := NewStatusBar(buf, "test.log")
-	
+
 	sb.Update(100)
 }

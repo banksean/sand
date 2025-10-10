@@ -208,17 +208,17 @@ func (h *Handler) Handle(ctx context.Context, r map[string]any) error {
 }
 
 type StatusBar struct {
-	writer      io.Writer
-	enabled     bool
-	width       int
-	height      int
-	fileName    string
-	lineCount   int
-	mu          sync.Mutex
-	resizeChan  chan os.Signal
-	lastUpdate  time.Time
-	lineBuffer  []string
-	maxBuffer   int
+	writer     io.Writer
+	enabled    bool
+	width      int
+	height     int
+	fileName   string
+	lineCount  int
+	mu         sync.Mutex
+	resizeChan chan os.Signal
+	lastUpdate time.Time
+	lineBuffer []string
+	maxBuffer  int
 }
 
 func NewStatusBar(writer io.Writer, fileName string) *StatusBar {
@@ -274,11 +274,11 @@ func (s *StatusBar) handleResize() {
 		s.mu.Lock()
 		s.width = width
 		s.height = height
-		
+
 		s.resetScrollRegion()
 		fmt.Fprintf(s.writer, "\x1b[2J")
 		fmt.Fprintf(s.writer, "\x1b[1;1H")
-		
+
 		linesToShow := len(s.lineBuffer)
 		if linesToShow > height-2 {
 			linesToShow = height - 2
@@ -287,13 +287,13 @@ func (s *StatusBar) handleResize() {
 		if startIdx < 0 {
 			startIdx = 0
 		}
-		
+
 		for i := startIdx; i < len(s.lineBuffer); i++ {
 			fmt.Fprint(s.writer, s.lineBuffer[i])
 		}
-		
+
 		s.mu.Unlock()
-		
+
 		s.setupScrollRegion()
 		s.redraw()
 	}
@@ -373,7 +373,7 @@ func (s *StatusBar) Write(p []byte) (n int, err error) {
 		}
 	}
 	s.mu.Unlock()
-	
+
 	n, err = s.writer.Write(p)
 	if err != nil {
 		return n, err
