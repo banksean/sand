@@ -86,17 +86,6 @@ type Handler struct {
 	outputEmptyAttrs bool
 }
 
-func (h *Handler) computeAttrs(
-	r map[string]any,
-) map[string]any {
-	ret := r
-	delete(ret, slog.LevelKey)
-	delete(ret, slog.TimeKey)
-	delete(ret, slog.MessageKey)
-
-	return ret
-}
-
 func (h *Handler) Handle(ctx context.Context, r map[string]any) error {
 	colorize := func(code int, value string) string {
 		return value

@@ -392,7 +392,6 @@ func (sb *Boxer) buildDefaultImage(ctx context.Context, dockerFileDir, sandboxUs
 		logScanner := bufio.NewScanner(outLogs)
 		for logScanner.Scan() {
 			sb.userMsg(ctx, logScanner.Text())
-			slog.InfoContext(ctx, "buildDefaultImage", "stdout", logScanner.Text())
 		}
 		if logScanner.Err() != nil {
 			slog.ErrorContext(ctx, "buildDefaultImage", "error", err)
@@ -403,7 +402,6 @@ func (sb *Boxer) buildDefaultImage(ctx context.Context, dockerFileDir, sandboxUs
 		logScanner := bufio.NewScanner(errLogs)
 		for logScanner.Scan() {
 			sb.userMsg(ctx, logScanner.Text())
-			slog.ErrorContext(ctx, "buildDefaultImage", "stderr", logScanner.Text())
 		}
 		if logScanner.Err() != nil {
 			slog.ErrorContext(ctx, "buildDefaultImage", "error", err)
