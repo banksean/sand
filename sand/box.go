@@ -95,9 +95,14 @@ func (sb *Box) StartContainer(ctx context.Context) error {
 	if err != nil {
 		slog.ErrorContext(ctx, "Sandbox.StartContainer: copying dotfiles", "error", err, "cpOut", cpOut)
 	}
+
+	sshdOut, err := sb.Exec(ctx, "/etc/init.d/ssh", "start")
+	if err != nil {
+		slog.ErrorContext(ctx, "Sandbox.StartContainer: starting sshd", "error", err, "cpOut", sshdOut)
+	}
 	// TODO: run "git gc" or "git repack"? Or do that *before* cloning?
 
-	slog.InfoContext(ctx, "startContainer succeeded", "output", output)
+	slog.InfoContext(ctx, "startContainer succeeded", "output", output, "sshdOut", sshdOut)
 	return nil
 }
 
