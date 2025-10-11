@@ -19,9 +19,7 @@ import (
 	"github.com/walles/moor/v2/pkg/moor"
 )
 
-var (
-	flagPager = flag.Bool("pager", false, "paginate output")
-)
+var flagPager = flag.Bool("pager", false, "paginate output")
 
 type writeFlusher interface {
 	io.Writer
