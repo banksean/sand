@@ -318,6 +318,7 @@ func (sb *Boxer) cloneDotfiles(ctx context.Context, id string) error {
 		".p10k.zsh",
 		".zshrc",
 		".omp.json",
+		".ssh/id_ed25519.pub",
 	}
 	if err := os.MkdirAll(filepath.Join(sb.cloneRoot, id, "dotfiles"), 0o750); err != nil {
 		return err
@@ -356,9 +357,14 @@ func (sb *Boxer) cloneDotfiles(ctx context.Context, id string) error {
 				f.Close()
 				continue
 			}
-			slog.ErrorContext(ctx, "Boxer.cloneDotfiles resolved symbolic link",
+			slog.InfoContext(ctx, "Boxer.cloneDotfiles resolved symbolic link",
 				"original", original, "destination", destination)
 			original = destination
+		}
+		cloneDir := filepath.Dir(clone)
+		if err := os.MkdirAll(cloneDir, 0o750); err != nil {
+			slog.ErrorContext(ctx, "cloneDotfiles couldn't make clone dir", "cloneDir", cloneDir, "error", err)
+			return err
 		}
 		cmd := exec.CommandContext(ctx, "cp", "-Rc", original, clone)
 		slog.InfoContext(ctx, "cloneDotfiles", "cmd", strings.Join(cmd.Args, " "))

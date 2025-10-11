@@ -29,6 +29,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   nano \
   vim \
   openssh-client \
+  openssh-server \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install Go toolchain
@@ -75,6 +76,8 @@ RUN mkdir -p /root/.ssh && \
 
 ADD sand-sketch /usr/local/bin/sand-sketch
 RUN chmod +x /usr/local/bin/sand-sketch
+
+ADD sshd_config /etc/ssh/sshd_config
 
 WORKDIR /workspace
 
