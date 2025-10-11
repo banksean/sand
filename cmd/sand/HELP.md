@@ -179,3 +179,13 @@ print version infomation about this command
 sand version
 ```
 
+## `sand vsc`
+
+launch a vscode remote window connected to the sandbox's container
+
+**Usage:**
+
+```
+sand vsc <ID>
+```
+

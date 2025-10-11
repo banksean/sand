@@ -35,6 +35,7 @@ type CLI struct {
 	Doc     DocCmd     `cmd:"" help:"print complete command help formatted as markdown"`
 	Daemon  DaemonCmd  `cmd:"" help:"start or stop the sandmux daemon"`
 	Version VersionCmd `cmd:"" help:"print version infomation about this command"`
+	Vsc     VscCmd     `cmd:"" help:"launch a vscode remote window connected to the sandbox's container"`
 }
 
 func (c *CLI) initSlog(cctx *kong.Context) {
