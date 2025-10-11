@@ -1,38 +1,51 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"log/slog"
 	"os"
-	"os/signal"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/nxadm/tail"
-	"golang.org/x/term"
+	"github.com/walles/moor/v2/pkg/moor"
 )
 
+var (
+	flagPager = flag.Bool("pager", false, "paginate output")
+)
+
+type writeFlusher interface {
+	io.Writer
+	Flush() error
+}
+
 func main() {
-	if len(os.Args) != 2 {
+	flag.Parse()
+
+	if len(flag.Args()) != 1 {
 		fmt.Fprintf(os.Stderr, "usage: %s <log file path>\n", os.Args[0])
 		os.Exit(1)
 	}
-	inputPath := os.Args[1]
+	inputPath := flag.Args()[0]
 
-	statusBar := NewStatusBar(os.Stdout, filepath.Base(inputPath))
-	if err := statusBar.Enable(); err == nil {
-		defer statusBar.Cleanup()
-	}
+	ctx := context.Background()
+	var writer writeFlusher
+	var reader io.Reader
 
-	h := NewHandler(nil, statusBar)
+	pipeReader, pipeWriter := io.Pipe()
+	buf := bufio.NewReadWriter(bufio.NewReader(pipeReader), bufio.NewWriter(pipeWriter))
+	reader, writer = buf.Reader, buf.Writer
+
+	h := NewHandler(nil, writer)
 
 	t, err := tail.TailFile(inputPath, tail.Config{
 		ReOpen:        true,
@@ -43,22 +56,33 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	ctx := context.Background()
+	defer t.Cleanup()
 
-	lineCount := 0
-	for line := range t.Lines {
-		decoder := json.NewDecoder(strings.NewReader(line.Text))
-		var slogLine map[string]any
-		if err := decoder.Decode(&slogLine); err != nil {
-			fmt.Fprintln(os.Stderr, err.Error())
+	go func() {
+		for line := range t.Lines {
+			decoder := json.NewDecoder(strings.NewReader(line.Text))
+			var slogLine map[string]any
+			if err := decoder.Decode(&slogLine); err != nil {
+				fmt.Fprintln(os.Stderr, err.Error())
+			}
+			h.Handle(ctx, slogLine)
+			writer.Flush()
 		}
-		h.Handle(ctx, slogLine)
-		lineCount++
-		statusBar.Update(lineCount)
-	}
-	err = t.Wait()
-	if err != nil {
-		fmt.Println(err)
+	}()
+	if *flagPager {
+		if err := moor.PageFromStream(reader, moor.Options{
+			NoAutoFormat:  false,
+			WrapLongLines: false,
+			Title:         inputPath,
+		}); err != nil {
+			fmt.Fprintln(os.Stderr, err.Error())
+			os.Exit(1)
+		}
+	} else {
+		_, err := io.Copy(os.Stdout, reader)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err.Error())
+		}
 	}
 }
 
@@ -86,7 +110,11 @@ const (
 )
 
 func colorizer(colorCode int, v string) string {
-	return fmt.Sprintf("\033[%sm%s%s", strconv.Itoa(colorCode), v, reset)
+	lines := strings.Split(v, "\n")
+	for i, line := range lines {
+		lines[i] = fmt.Sprintf("\033[%sm%s%s", strconv.Itoa(colorCode), line, reset)
+	}
+	return strings.Join(lines, "\n")
 }
 
 type Handler struct {
@@ -157,10 +185,10 @@ func (h *Handler) Handle(ctx context.Context, r map[string]any) error {
 		ts, err := time.Parse(time.RFC3339Nano, timestamp)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error parsing timestamp %q: %v\n", timestamp, err)
-			timestamp = colorize(lightGray, timestamp)
 		} else {
-			timestamp = ts.Local().Format(time.DateTime)
+			timestamp = ts.Local().Format(timeFormat)
 		}
+		timestamp = colorize(lightGray, timestamp)
 	}
 
 	var msg string
@@ -205,205 +233,6 @@ func (h *Handler) Handle(ctx context.Context, r map[string]any) error {
 	}
 
 	return nil
-}
-
-type StatusBar struct {
-	writer     io.Writer
-	enabled    bool
-	width      int
-	height     int
-	fileName   string
-	lineCount  int
-	mu         sync.Mutex
-	resizeChan chan os.Signal
-	lastUpdate time.Time
-	lineBuffer []string
-	maxBuffer  int
-}
-
-func NewStatusBar(writer io.Writer, fileName string) *StatusBar {
-	return &StatusBar{
-		writer:     writer,
-		fileName:   fileName,
-		resizeChan: make(chan os.Signal, 1),
-		lineBuffer: make([]string, 0, 1000),
-		maxBuffer:  1000,
-	}
-}
-
-func (s *StatusBar) Enable() error {
-	fd := int(os.Stdout.Fd())
-	if !term.IsTerminal(fd) {
-		return fmt.Errorf("not a terminal")
-	}
-
-	width, height, err := term.GetSize(fd)
-	if err != nil {
-		return err
-	}
-
-	if height < 3 {
-		return fmt.Errorf("terminal too small")
-	}
-
-	s.mu.Lock()
-	s.width = width
-	s.height = height
-	s.enabled = true
-	s.mu.Unlock()
-
-	fmt.Fprintf(s.writer, "\x1b[?1049h")
-	fmt.Fprintf(s.writer, "\x1b[2J")
-	fmt.Fprintf(s.writer, "\x1b[1;1H")
-	s.setupScrollRegion()
-
-	signal.Notify(s.resizeChan, syscall.SIGWINCH)
-	go s.handleResize()
-
-	return nil
-}
-
-func (s *StatusBar) handleResize() {
-	for range s.resizeChan {
-		fd := int(os.Stdout.Fd())
-		width, height, err := term.GetSize(fd)
-		if err != nil {
-			continue
-		}
-
-		s.mu.Lock()
-		s.width = width
-		s.height = height
-
-		s.resetScrollRegion()
-		fmt.Fprintf(s.writer, "\x1b[2J")
-		fmt.Fprintf(s.writer, "\x1b[1;1H")
-
-		linesToShow := len(s.lineBuffer)
-		if linesToShow > height-2 {
-			linesToShow = height - 2
-		}
-		startIdx := len(s.lineBuffer) - linesToShow
-		if startIdx < 0 {
-			startIdx = 0
-		}
-
-		for i := startIdx; i < len(s.lineBuffer); i++ {
-			fmt.Fprint(s.writer, s.lineBuffer[i])
-		}
-
-		s.mu.Unlock()
-
-		s.setupScrollRegion()
-		s.redraw()
-	}
-}
-
-func (s *StatusBar) resetScrollRegion() {
-	fmt.Fprintf(s.writer, "\x1b[r")
-}
-
-func (s *StatusBar) clearStatusLine(lineNumber int) {
-	fmt.Fprintf(s.writer, "\x1b[s")
-	fmt.Fprintf(s.writer, "\x1b[%d;1H", lineNumber)
-	fmt.Fprintf(s.writer, "\x1b[K")
-	fmt.Fprintf(s.writer, "\x1b[u")
-}
-
-func (s *StatusBar) setupScrollRegion() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if !s.enabled {
-		return
-	}
-
-	fmt.Fprintf(s.writer, "\x1b[1;%dr", s.height-1)
-}
-
-func (s *StatusBar) Update(lineCount int) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if !s.enabled {
-		return
-	}
-
-	s.lineCount = lineCount
-
-	now := time.Now()
-	if now.Sub(s.lastUpdate) < 100*time.Millisecond {
-		return
-	}
-	s.lastUpdate = now
-
-	s.redrawLocked()
-}
-
-func (s *StatusBar) redraw() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.redrawLocked()
-}
-
-func (s *StatusBar) redrawLocked() {
-	if !s.enabled {
-		return
-	}
-
-	status := fmt.Sprintf(" ⎗ %s │ %d lines ", s.fileName, s.lineCount)
-	if len(status) > s.width {
-		status = status[:s.width]
-	}
-
-	fmt.Fprintf(s.writer, "\x1b[s")
-	fmt.Fprintf(s.writer, "\x1b[%d;1H", s.height)
-	fmt.Fprintf(s.writer, "\x1b[7m")
-	fmt.Fprintf(s.writer, "%-*s", s.width, status)
-	fmt.Fprintf(s.writer, "\x1b[0m")
-	fmt.Fprintf(s.writer, "\x1b[u")
-}
-
-func (s *StatusBar) Write(p []byte) (n int, err error) {
-	s.mu.Lock()
-	if s.enabled {
-		s.lineBuffer = append(s.lineBuffer, string(p))
-		if len(s.lineBuffer) > s.maxBuffer {
-			s.lineBuffer = s.lineBuffer[len(s.lineBuffer)-s.maxBuffer:]
-		}
-	}
-	s.mu.Unlock()
-
-	n, err = s.writer.Write(p)
-	if err != nil {
-		return n, err
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if s.enabled {
-		s.redrawLocked()
-	}
-
-	return n, nil
-}
-
-func (s *StatusBar) Cleanup() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if !s.enabled {
-		return
-	}
-
-	signal.Stop(s.resizeChan)
-	close(s.resizeChan)
-
-	s.resetScrollRegion()
-	fmt.Fprintf(s.writer, "\x1b[?1049l")
-
-	s.enabled = false
 }
 
 func NewHandler(handlerOptions *slog.HandlerOptions, writer io.Writer) *Handler {
