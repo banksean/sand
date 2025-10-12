@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	applecontainer "github.com/banksean/apple-container"
+	"github.com/banksean/apple-container/types"
 )
 
 const (
@@ -38,6 +39,31 @@ func verifyPrerequisites(ctx context.Context) error {
 	slog.InfoContext(ctx, "verifyPrerequisites", "version", version)
 	if !strings.Contains("container CLI version "+version, appleContainerVersion) {
 		return fmt.Errorf("expected container command version %q, but got %q", appleContainerVersion, version)
+	}
+
+	domains, err := applecontainer.System.DNSList(ctx)
+	if err != nil {
+		return fmt.Errorf("could not get container system dns domain list: %w", err)
+	}
+	if len(domains) == 0 {
+		return fmt.Errorf("no container system dns domains exist. vsc and ssh will not work without at least one dns domain")
+	}
+
+	systemProps, err := applecontainer.System.PropertyList(ctx)
+	if err != nil {
+		return fmt.Errorf("could not get container system properties: %w", err)
+	}
+	if len(systemProps) == 0 {
+		return fmt.Errorf("no container system properties")
+	}
+
+	propMap := map[string]types.SystemProperty{}
+	for _, p := range systemProps {
+		propMap[p.ID] = p
+	}
+
+	if p, ok := propMap["dns.domain"]; !ok || p.Value == nil {
+		return fmt.Errorf("missing system property 'dns.domain'")
 	}
 	return nil
 }

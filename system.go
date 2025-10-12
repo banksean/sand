@@ -2,6 +2,7 @@ package applecontainer
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -10,6 +11,7 @@ import (
 	"syscall"
 
 	"github.com/banksean/apple-container/options"
+	"github.com/banksean/apple-container/types"
 )
 
 type SystemSvc struct{}
@@ -59,6 +61,42 @@ func (s *SystemSvc) Stop(ctx context.Context, opts *options.SystemStop) (string,
 		return "", err
 	}
 	return strings.TrimSpace(string(output)), nil
+}
+
+// DNSList lists the container system's dns domains, or an error.
+func (s *SystemSvc) DNSList(ctx context.Context) ([]string, error) {
+	cmd := exec.CommandContext(ctx, "container", "system", "dns", "list")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, err
+	}
+	return strings.Split(string(output), "\n"), nil
+}
+
+// DNSCreate adds a new local dns domain to the container system.
+func (s *SystemSvc) DNSCreate(ctx context.Context, domain string) error {
+	cmd := exec.CommandContext(ctx, "container", "system", "dns", "create", domain)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		slog.ErrorContext(ctx, "SystemSvc.DNSCreate", "output", output, "error", err)
+		return err
+	}
+	return nil
+}
+
+// PropertyList returns a slice of system property values, or an error.
+func (s *SystemSvc) PropertyList(ctx context.Context) ([]types.SystemProperty, error) {
+	cmd := exec.CommandContext(ctx, "container", "system", "property", "list", "--format", "json")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, err
+	}
+	var ret []types.SystemProperty
+	if err := json.Unmarshal(output, &ret); err != nil {
+		slog.ErrorContext(ctx, "SystemSvc.PropertyList", "output", string(output), "error", err)
+		return nil, err
+	}
+	return ret, nil
 }
 
 // Logs returns an io.ReadCloser for streaming log output and a wait func that blocks on the command's completion, or an error.

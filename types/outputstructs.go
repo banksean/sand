@@ -173,3 +173,20 @@ type NetworkStatus struct {
 	Address string `json:"address"`
 	Gateway string `json:"gateway"`
 }
+
+type SystemProperty struct {
+	ID          string `json:"id"`
+	Type        string `json:"type"`
+	Description string `json:"description"`
+	Value       any    `json:"value"`
+}
+
+func (s *SystemProperty) StringValue() (string, bool) {
+	ret, ok := s.Value.(string)
+	return ret, ok
+}
+
+func (s *SystemProperty) BoolValue() (bool, bool) {
+	ret, ok := s.Value.(bool)
+	return ret, ok
+}
