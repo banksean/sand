@@ -115,7 +115,7 @@ func main() {
 	if failures := verifyPrerequisites(context.Background()); len(failures) != 0 {
 		fmt.Fprintf(os.Stderr, "%d rerequisite check(s) failed:\n", len(failures))
 		for name, err := range failures {
-			fmt.Fprintf(os.Stderr, "\tCheck: %q\n\tError: %q\n\n", name, err)
+			fmt.Fprintf(os.Stderr, "\tCheck: %s\n\tError: %s\n\n", name, err)
 		}
 		os.Exit(1)
 	}

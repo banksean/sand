@@ -21,6 +21,7 @@ const (
 type diagnosticCheck struct {
 	Name string
 	Run  func(context.Context) error
+	// TODO: Severity, AffectedFeatures, Remedy
 }
 
 var diagnosticChecks = []diagnosticCheck{
@@ -92,6 +93,23 @@ var diagnosticChecks = []diagnosticCheck{
 
 			if p, ok := propMap["dns.domain"]; !ok || p.Value == nil {
 				return fmt.Errorf("missing system property 'dns.domain'")
+			}
+			return nil
+		},
+	},
+	{
+		Name: "git checkout should be authenticated to origin with ssh",
+		Run: func(ctx context.Context) error {
+			gitCmd := exec.Command("git", "remote", "get-url", "origin")
+			out, err := gitCmd.Output()
+			if err != nil {
+				return err
+			}
+			origin := strings.TrimSpace(string(out))
+			isSSH := strings.HasPrefix(origin, "git@") || strings.HasPrefix(origin, "ssh://")
+
+			if !isSSH {
+				return fmt.Errorf("git origin %q does not appear to be authenticated with ssh", origin)
 			}
 			return nil
 		},
