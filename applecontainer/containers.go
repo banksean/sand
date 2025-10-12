@@ -10,8 +10,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/banksean/apple-container/options"
-	"github.com/banksean/apple-container/types"
+	"github.com/banksean/sand/applecontainer/options"
+	"github.com/banksean/sand/applecontainer/types"
 	"github.com/creack/pty"
 	"golang.org/x/term"
 )

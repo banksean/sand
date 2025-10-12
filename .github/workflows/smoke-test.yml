@@ -73,7 +73,7 @@ jobs:
         run: container --debug system start
 
       - name: Install sand
-        run: go install github.com/banksean/apple-container/cmd/sand
+        run: go install github.com/banksean/sand/cmd/sand
 
       - name: sand version
         working-directory: ${{ inputs.working-directory || '.'}}

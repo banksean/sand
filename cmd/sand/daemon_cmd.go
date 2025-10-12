@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/banksean/apple-container/sand"
+	"github.com/banksean/sand/sand"
 )
 
 type DaemonCmd struct {

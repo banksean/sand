@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/banksean/apple-container/types"
+	"github.com/banksean/sand/applecontainer/types"
 )
 
 type NetworkSvc struct{}

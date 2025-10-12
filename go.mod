@@ -1,4 +1,4 @@
-module github.com/banksean/apple-container
+module github.com/banksean/sand
 
 go 1.25.1
 

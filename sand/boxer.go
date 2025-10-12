@@ -14,9 +14,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	ac "github.com/banksean/apple-container"
-	"github.com/banksean/apple-container/options"
-	"github.com/banksean/apple-container/sand/db"
+	ac "github.com/banksean/sand/applecontainer"
+	"github.com/banksean/sand/applecontainer/options"
+	"github.com/banksean/sand/sand/db"
 	_ "modernc.org/sqlite"
 )
 

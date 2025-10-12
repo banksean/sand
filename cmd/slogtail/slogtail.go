@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/banksean/apple-container/ansi"
+	"github.com/banksean/sand/ansi"
 	"github.com/nxadm/tail"
 	"github.com/walles/moor/v2/pkg/moor"
 )

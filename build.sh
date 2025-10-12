@@ -6,8 +6,8 @@ GIT_COMMIT=$(git rev-parse HEAD)
 BUILD_TIME=$(date -u '+%Y-%m-%d_%H:%M:%S')
 
 go build -ldflags "\
-    -X 'github.com/banksean/apple-container/version.GitRepo=${GIT_REPO}' \
-    -X 'github.com/banksean/apple-container/version.GitBranch=${GIT_BRANCH}' \
-    -X 'github.com/banksean/apple-container/version.GitCommit=${GIT_COMMIT}' \
-    -X 'github.com/banksean/apple-container/version.BuildTime=${BUILD_TIME}'" \
+    -X 'github.com/banksean/sand/version.GitRepo=${GIT_REPO}' \
+    -X 'github.com/banksean/sand/version.GitBranch=${GIT_BRANCH}' \
+    -X 'github.com/banksean/sand/version.GitCommit=${GIT_COMMIT}' \
+    -X 'github.com/banksean/sand/version.BuildTime=${BUILD_TIME}'" \
     -o ./bin/sand ./cmd/sand

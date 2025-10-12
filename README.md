@@ -1,12 +1,11 @@
-[![Go Reference](https://pkg.go.dev/badge/github.com/banksean/apple-container.svg)](https://pkg.go.dev/github.com/banksean/apple-container) 
-[![Main Commit Queue](https://github.com/banksean/apple-container/actions/workflows/queue-main.yml/badge.svg)](https://github.com/banksean/apple-container/actions/workflows/queue-main.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/banksean/sand.svg)](https://pkg.go.dev/github.com/banksean/sand) 
+[![Main Commit Queue](https://github.com/banksean/sand/actions/workflows/queue-main.yml/badge.svg)](https://github.com/banksean/sand/actions/workflows/queue-main.yml)
 
 # TL;DR
 
 ```sh
-% go install github.com/banksean/apple-container/
-cmd/sand
-% sand shell
+% go install github.com/banksean/sand/cmd/sand
+% sand new your-new-sandbox-name
 ```
 
 You are now root, in a Linux container, with a COW clone of your current working directory mounted in the container at `/app`.
@@ -15,15 +14,15 @@ For more information about `sand`'s subcommands and other options, see [cmd/sand
 
 ## Requirements
 - Only works on Apple hardware (of course).
-- Install [`apple-container`](https://github.com/apple/container) first, since these helper functions just shell out to it. 
+- Install [`sand`](https://github.com/apple/container) first, since these helper functions just shell out to it. 
 
 # Other stuff
 ## `gorunac` and `gotestac` commands
 ```
-go install github.com/banksean/apple-container/
+go install github.com/banksean/sand/
 cmd/gorunac
 
-go install github.com/banksean/apple-container/
+go install github.com/banksean/sand/
 cmd/gotestac
 ```
 

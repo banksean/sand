@@ -3,7 +3,7 @@ package main
 import (
 	"strings"
 
-	"github.com/banksean/apple-container/types"
+	"github.com/banksean/sand/applecontainer/types"
 )
 
 func getContainerHostname(ctr *types.Container) string {

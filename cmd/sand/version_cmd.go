@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"runtime/debug"
 
-	"github.com/banksean/apple-container/version"
+	"github.com/banksean/sand/version"
 )
 
 type VersionCmd struct{}

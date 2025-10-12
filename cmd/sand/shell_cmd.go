@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/banksean/apple-container/sand"
+	"github.com/banksean/sand/sand"
 )
 
 type ShellCmd struct {

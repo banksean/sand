@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"strings"
 
-	applecontainer "github.com/banksean/apple-container"
-	"github.com/banksean/apple-container/types"
+	"github.com/banksean/sand/applecontainer"
+	"github.com/banksean/sand/applecontainer/types"
 )
 
 const (

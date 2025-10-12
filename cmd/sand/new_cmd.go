@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/banksean/apple-container/sand"
+	"github.com/banksean/sand/sand"
 	"github.com/google/uuid"
 )
 

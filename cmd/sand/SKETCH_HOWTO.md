@@ -3,7 +3,7 @@
 You will need to install `sand` first, if you haven't done so yet.
 
 ```sh
-% go install github.com/banksean/apple-container/cmd/sand@latest
+% go install github.com/banksean/sand/cmd/sand@latest
 ```
 
 ## One-time setup

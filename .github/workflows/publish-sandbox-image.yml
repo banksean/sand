@@ -15,7 +15,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: banksean/apple-container/sandbox
+  IMAGE_NAME: banksean/sand/sandbox
 
 jobs:
   build-and-push:

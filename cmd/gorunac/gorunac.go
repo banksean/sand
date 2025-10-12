@@ -13,8 +13,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	applecontainer "github.com/banksean/apple-container"
-	"github.com/banksean/apple-container/options"
+	"github.com/banksean/sand/applecontainer"
+	"github.com/banksean/sand/applecontainer/options"
 )
 
 var (

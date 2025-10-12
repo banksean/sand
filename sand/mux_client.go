@@ -14,7 +14,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/banksean/apple-container/version"
+	"github.com/banksean/sand/version"
 )
 
 type MuxClient struct {
