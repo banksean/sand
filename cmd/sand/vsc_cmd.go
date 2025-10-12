@@ -38,18 +38,8 @@ func (c *VscCmd) Run(cctx *Context) error {
 		return err
 	}
 
-	if ctr.Status != "running" {
-		slog.InfoContext(ctx, "main: sbox.startContainer")
-		if err := sbox.StartContainer(ctx); err != nil {
-			slog.ErrorContext(ctx, "sbox.startContainer", "error", err)
-			return err
-		}
-		// Get the container again to get the full struct details filled out now that it's running.
-		ctr, err = sbox.GetContainer(ctx)
-		if err != nil || ctr == nil {
-			slog.ErrorContext(ctx, "sbox.GetContainer", "error", err, "ctr", ctr)
-			return err
-		}
+	if ctr == nil || ctr.Status != "running" {
+		return fmt.Errorf("cannot connect to sandbox %q becacuse it is not currently running", c.ID)
 	}
 
 	hostname := getContainerHostname(ctr)
