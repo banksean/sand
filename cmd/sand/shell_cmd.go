@@ -30,7 +30,11 @@ func (c *ShellCmd) Run(cctx *Context) error {
 	sbox, err := mc.GetSandbox(ctx, c.ID)
 	if err != nil {
 		slog.ErrorContext(ctx, "GetSandbox", "error", err, "id", c.ID)
-		return fmt.Errorf("could not find sandbox with ID %s: %w", c.ID, err)
+		return fmt.Errorf("error while trying to find sandbox with ID %s: %w", c.ID, err)
+	}
+
+	if sbox == nil {
+		return fmt.Errorf("could not find sandbox with ID %s", c.ID)
 	}
 
 	ctr, err := sbox.GetContainer(ctx)
