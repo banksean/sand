@@ -10,11 +10,11 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/banksean/apple-container/ansi"
 	"github.com/nxadm/tail"
 	"github.com/walles/moor/v2/pkg/moor"
 )
@@ -86,34 +86,7 @@ func main() {
 
 const (
 	timeFormat = "[15:04:05.000]"
-
-	reset = "\033[0m"
-
-	black        = 30
-	red          = 31
-	green        = 32
-	yellow       = 33
-	blue         = 34
-	magenta      = 35
-	cyan         = 36
-	lightGray    = 37
-	darkGray     = 90
-	lightRed     = 91
-	lightGreen   = 92
-	lightYellow  = 93
-	lightBlue    = 94
-	lightMagenta = 95
-	lightCyan    = 96
-	white        = 97
 )
-
-func colorizer(colorCode int, v string) string {
-	lines := strings.Split(v, "\n")
-	for i, line := range lines {
-		lines[i] = fmt.Sprintf("\033[%sm%s%s", strconv.Itoa(colorCode), line, reset)
-	}
-	return strings.Join(lines, "\n")
-}
 
 type Handler struct {
 	r                func([]string, slog.Attr) slog.Attr
@@ -129,7 +102,7 @@ func (h *Handler) Handle(ctx context.Context, r map[string]any) error {
 		return value
 	}
 	if h.colorize {
-		colorize = colorizer
+		colorize = ansi.Colorize
 	}
 
 	levelName, ok := r[slog.LevelKey].(string)
@@ -163,17 +136,17 @@ func (h *Handler) Handle(ctx context.Context, r map[string]any) error {
 		levelName = levelAttr.Value.String() + ":"
 
 		if level <= slog.LevelDebug {
-			levelName = colorize(lightGray, levelName)
+			levelName = colorize(ansi.LightGray, levelName)
 		} else if level <= slog.LevelInfo {
-			levelName = colorize(cyan, levelName)
+			levelName = colorize(ansi.Cyan, levelName)
 		} else if level < slog.LevelWarn {
-			levelName = colorize(lightBlue, levelName)
+			levelName = colorize(ansi.LightBlue, levelName)
 		} else if level < slog.LevelError {
-			levelName = colorize(lightYellow, levelName)
+			levelName = colorize(ansi.LightYellow, levelName)
 		} else if level <= slog.LevelError+1 {
-			levelName = colorize(lightRed, levelName)
+			levelName = colorize(ansi.LightRed, levelName)
 		} else if level > slog.LevelError+1 {
-			levelName = colorize(lightMagenta, levelName)
+			levelName = colorize(ansi.LightMagenta, levelName)
 		}
 	}
 
@@ -186,13 +159,13 @@ func (h *Handler) Handle(ctx context.Context, r map[string]any) error {
 		} else {
 			timestamp = ts.Local().Format(timeFormat)
 		}
-		timestamp = colorize(lightGray, timestamp)
+		timestamp = colorize(ansi.LightGray, timestamp)
 	}
 
 	var msg string
 	msg, ok = r[slog.MessageKey].(string)
 	if !ok {
-		msg = colorize(white, msg)
+		msg = colorize(ansi.White, msg)
 	}
 
 	delete(r, slog.LevelKey)
@@ -222,7 +195,7 @@ func (h *Handler) Handle(ctx context.Context, r map[string]any) error {
 		out.WriteString(" ")
 	}
 	if len(attrsAsBytes) > 0 {
-		out.WriteString(colorize(darkGray, string(attrsAsBytes)))
+		out.WriteString(colorize(ansi.DarkGray, string(attrsAsBytes)))
 	}
 
 	_, err = io.WriteString(h.writer, out.String()+"\n")
