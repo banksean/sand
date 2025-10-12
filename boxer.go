@@ -16,7 +16,7 @@ import (
 
 	ac "github.com/banksean/sand/applecontainer"
 	"github.com/banksean/sand/applecontainer/options"
-	"github.com/banksean/sand/sand/db"
+	"github.com/banksean/sand/db"
 	_ "modernc.org/sqlite"
 )
 

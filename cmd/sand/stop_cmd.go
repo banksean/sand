@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"sync"
 
-	"github.com/banksean/sand/sand"
+	"github.com/banksean/sand"
 )
 
 type StopCmd struct {

@@ -15,7 +15,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: banksean/sand/sandbox
+  IMAGE_NAME: banksean/sand/default
 
 jobs:
   build-and-push:

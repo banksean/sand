@@ -7,7 +7,7 @@ import (
 	"os"
 	"text/tabwriter"
 
-	"github.com/banksean/sand/sand"
+	"github.com/banksean/sand"
 )
 
 type LsCmd struct{}

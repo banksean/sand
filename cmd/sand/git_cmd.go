@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/banksean/sand/sand"
+	"github.com/banksean/sand"
 )
 
 type GitCmd struct {

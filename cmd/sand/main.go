@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/alecthomas/kong"
-	"github.com/banksean/sand/sand"
+	"github.com/banksean/sand"
 )
 
 type Context struct {

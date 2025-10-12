@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/banksean/sand/sand"
+	"github.com/banksean/sand"
 )
 
 type VscCmd struct {
