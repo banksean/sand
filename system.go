@@ -70,7 +70,14 @@ func (s *SystemSvc) DNSList(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return strings.Split(string(output), "\n"), nil
+	var ret []string
+	for _, s := range strings.Split(string(output), "\n") {
+		s = strings.TrimSpace(s)
+		if s != "" {
+			ret = append(ret, s)
+		}
+	}
+	return ret, nil
 }
 
 // DNSCreate adds a new local dns domain to the container system.
