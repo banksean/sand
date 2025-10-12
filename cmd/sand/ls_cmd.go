@@ -29,18 +29,24 @@ func (c *LsCmd) Run(cctx *Context) error {
 		return err
 	}
 
+	if len(list) == 0 {
+		return nil
+	}
+
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "SANDBOX ID\tSTATUS\tCONTAINER ID\tORIGIN DIR\tIMAGE NAME\t")
+	fmt.Fprintln(w, "SANDBOX ID\tSTATUS\tCONTAINER ID\tHOSTNAME\tORIGIN DIR\tIMAGE NAME\t")
 	for _, sbox := range list {
 		ctr, err := sbox.GetContainer(ctx)
 		if err != nil {
 			return err
 		}
 		status := "dormant"
+		hostname := ""
 		if ctr != nil {
 			status = ctr.Status
+			hostname = getContainerHostname(ctr)
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t\n", sbox.ID, status, sbox.ContainerID, sbox.HostOriginDir, sbox.ImageName)
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t\n", sbox.ID, status, sbox.ContainerID, hostname, sbox.HostOriginDir, sbox.ImageName)
 	}
 	w.Flush()
 	return nil
