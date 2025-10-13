@@ -1,15 +1,15 @@
-name: Build and Publish Sandbox Image
+name: Build and Publish Default Sandbox Image
 
 on:
   push:
     branches:
       - main
     paths:
-      - 'cmd/sand/defaultimage/**'
+      - 'images/default/**'
       - '.github/workflows/publish-sandbox-image.yml'
   pull_request:
     paths:
-      - 'cmd/sand/defaultimage/**'
+      - 'images/default/**'
       - '.github/workflows/publish-sandbox-image.yml'
   workflow_dispatch:
 
@@ -53,8 +53,8 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ./cmd/sand/defaultimage
-          file: ./cmd/sand/defaultimage/Dockerfile
+          context: ./images/default
+          file: ./images/default/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
