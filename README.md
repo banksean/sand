@@ -15,7 +15,7 @@ You are now root, in a Linux container, with your CWD set to a copy-on-write clo
 ## You work with a sandboxed clone of `./`
 The sandbox starts out with a clone of your MacOS current directory, mounted as `/app` inside the container. 
 
-This operation actually uses much less disk space than a full copy of the original directory, because `sand` clones it using copy-on-write (via APFS's `clonefile(2)` call). New bytes only get written to disk when you make changes to the cloned files.
+This operation actually uses much less disk space than a full copy of the original directory, because `sand` clones it using copy-on-write (via APFS's `clonefile(2)` call). Additional disk space is only required when you make changes to the cloned files.
 
 The original files on your MacOS host filesystem are not affected by changes made to the clones of those files inside the sandbox.
 
