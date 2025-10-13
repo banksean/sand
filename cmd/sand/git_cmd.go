@@ -33,8 +33,7 @@ type DiffCmd struct {
 }
 
 func (c *DiffCmd) Run(cctx *Context) error {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := cctx.Context
 
 	// Get the sandbox to verify it exists and get its metadata
 	mux := sand.NewMuxServer(cctx.AppBaseDir, cctx.sber)
@@ -194,8 +193,7 @@ func (c *DiffCmd) cleanupTempCommit(ctx context.Context, sandboxWorkDir string) 
 }
 
 func (c *StatusCmd) Run(cctx *Context) error {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := cctx.Context
 
 	// Get the sandbox to verify it exists and get its metadata
 	mux := sand.NewMuxServer(cctx.AppBaseDir, cctx.sber)
@@ -252,8 +250,7 @@ func (c *StatusCmd) Run(cctx *Context) error {
 }
 
 func (c *LogCmd) Run(cctx *Context) error {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := cctx.Context
 
 	// Get the sandbox to verify it exists and get its metadata
 	mux := sand.NewMuxServer(cctx.AppBaseDir, cctx.sber)

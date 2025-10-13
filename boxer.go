@@ -1,7 +1,6 @@
 package sand
 
 import (
-	"bufio"
 	"context"
 	"database/sql"
 	_ "embed"
@@ -13,9 +12,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	ac "github.com/banksean/sand/applecontainer"
-	"github.com/banksean/sand/applecontainer/options"
 	"github.com/banksean/sand/db"
 	_ "modernc.org/sqlite"
 )
@@ -75,17 +74,10 @@ func (sb *Boxer) Close() error {
 	return nil
 }
 
-func (sb *Boxer) EnsureDefaultImage(ctx context.Context, imageName, dockerfileDir, sandboxUsername string) error {
-	if err := sb.checkForImage(ctx, imageName, dockerfileDir, sandboxUsername); err != nil {
-		return err
-	}
-	return nil
-}
-
 // NewSandbox creates a new sandbox based on a clone of hostWorkDir.
 // TODO: clone envFile, if it exists, into sb.cloneRoot/id/env, so every command exec'd in that sandbox container
 // uses the same env file, even if the original .env file has changed on the host machine.
-func (sb *Boxer) NewSandbox(ctx context.Context, id, hostWorkDir, imageName, dockerFileDir, envFile string) (*Box, error) {
+func (sb *Boxer) NewSandbox(ctx context.Context, id, hostWorkDir, imageName, envFile string) (*Box, error) {
 	slog.InfoContext(ctx, "Boxer.NewSandbox", "hostWorkDir", hostWorkDir, "id", id)
 
 	if err := sb.cloneWorkDir(ctx, id, hostWorkDir); err != nil {
@@ -379,55 +371,32 @@ func (sb *Boxer) cloneDotfiles(ctx context.Context, id string) error {
 	return nil
 }
 
-func (sb *Boxer) buildDefaultImage(ctx context.Context, dockerFileDir, sandboxUsername string) error {
-	slog.InfoContext(ctx, "Boxer.buildDefaultImage", "dockerFileDir", dockerFileDir, "sandboxUsername", sandboxUsername)
-	sb.userMsg(ctx, "This may take a while, but we only do it once: building default container image...")
-
-	outLogs, errLogs, wait, err := ac.Images.Build(ctx, dockerFileDir,
-		&options.BuildOptions{
-			Tag:      DefaultImageName,
-			BuildArg: map[string]string{"USERNAME": sandboxUsername},
-		})
+func (sb *Boxer) pullImage(ctx context.Context, imageName string) error {
+	slog.InfoContext(ctx, "Boxer.pullImage", "imageName", imageName)
+	sb.userMsg(ctx, fmt.Sprintf("This may take a while: pulling container image %s...", imageName))
+	start := time.Now()
+	wait, err := ac.Images.Pull(ctx, imageName)
 	if err != nil {
-		slog.ErrorContext(ctx, "buildSandboxImage: Images.Build", "error", err)
+		slog.ErrorContext(ctx, "pullImage: Images.Pull", "error", err)
 		return err
 	}
-	defer outLogs.Close()
 
-	go func() {
-		logScanner := bufio.NewScanner(outLogs)
-		for logScanner.Scan() {
-			sb.userMsg(ctx, logScanner.Text())
-		}
-		if logScanner.Err() != nil {
-			slog.ErrorContext(ctx, "buildDefaultImage", "error", err)
-		}
-	}()
-
-	go func() {
-		logScanner := bufio.NewScanner(errLogs)
-		for logScanner.Scan() {
-			sb.userMsg(ctx, logScanner.Text())
-		}
-		if logScanner.Err() != nil {
-			slog.ErrorContext(ctx, "buildDefaultImage", "error", err)
-		}
-	}()
 	err = wait()
 	if err == nil {
-		sb.userMsg(ctx, "\n\nDone building default container image.\n\n")
+		sb.userMsg(ctx, fmt.Sprintf("Done pulling container image. Took %v.", time.Since(start)))
 	}
+
 	return err
 }
 
-func (sb *Boxer) checkForImage(ctx context.Context, imageName, dockerfileDir, sandboxUsername string) error {
+func (sb *Boxer) EnsureImage(ctx context.Context, imageName string) error {
 	manifests, err := ac.Images.Inspect(ctx, imageName)
 	if err != nil {
-		slog.ErrorContext(ctx, "buildSandboxImage: Images.Build", "error", err, "manifests", len(manifests))
+		slog.ErrorContext(ctx, "checkForImage: Images.Inspect", "error", err, "manifests", len(manifests))
 		if imageName != DefaultImageName {
 			return err
 		}
-		return sb.buildDefaultImage(ctx, dockerfileDir, sandboxUsername)
+		return sb.pullImage(ctx, imageName)
 	}
 	if len(manifests) == 0 {
 		return fmt.Errorf("no images named %s ", imageName)

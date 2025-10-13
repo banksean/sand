@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"os/exec"
@@ -15,8 +14,8 @@ type VscCmd struct {
 }
 
 func (c *VscCmd) Run(cctx *Context) error {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := cctx.Context
+
 	slog.InfoContext(ctx, "VscCmd", "run", *c)
 
 	mux := sand.NewMuxServer(cctx.AppBaseDir, cctx.sber)

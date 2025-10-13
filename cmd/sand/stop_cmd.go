@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -15,8 +14,7 @@ type StopCmd struct {
 }
 
 func (c *StopCmd) Run(cctx *Context) error {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := cctx.Context
 
 	mux := sand.NewMuxServer(cctx.AppBaseDir, cctx.sber)
 	mc, err := mux.NewClient(ctx)

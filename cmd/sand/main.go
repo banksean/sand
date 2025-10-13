@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/alecthomas/kong"
 	"github.com/banksean/sand"
@@ -17,6 +19,7 @@ type Context struct {
 	LogFile    string
 	LogLevel   string
 	CloneRoot  string
+	Context    context.Context
 	sber       *sand.Boxer
 }
 
@@ -107,12 +110,20 @@ func appHomeDir() (string, error) {
 func main() {
 	var cli CLI
 
-	ctx := kong.Parse(&cli,
+	kongCtx := kong.Parse(&cli,
 		kong.Configuration(kong.JSON, ".sand.json", "~/.sand.json"),
 		kong.Description(description))
-	cli.initSlog(ctx)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	// Catch control-C so if you break out of "sand new" because it's taking too long
+	// to download a container image (which runs in exec.CommandContext subprocess),
+	// we also kill any subprocesses that were started with ctx.
+	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
-	if failures := verifyPrerequisites(context.Background()); len(failures) != 0 {
+	cli.initSlog(kongCtx)
+
+	if failures := verifyPrerequisites(ctx); len(failures) != 0 {
 		fmt.Fprintf(os.Stderr, "%d rerequisite check(s) failed:\n", len(failures))
 		for name, err := range failures {
 			fmt.Fprintf(os.Stderr, "\tCheck: %s\n\tError: %s\n\n", name, err)
@@ -128,8 +139,8 @@ func main() {
 	slog.Info("main", "appBaseDir", appBaseDir)
 
 	// Don't try to ensure the daemon is running if we're trying to start or stop it.
-	if !strings.HasPrefix(ctx.Command(), "daemon") && ctx.Command() != "doc" {
-		if err := sand.EnsureDaemon(appBaseDir, cli.LogFile); err != nil {
+	if !strings.HasPrefix(kongCtx.Command(), "daemon") && kongCtx.Command() != "doc" {
+		if err := sand.EnsureDaemon(ctx, appBaseDir, cli.LogFile); err != nil {
 			fmt.Fprintf(os.Stderr, "daemon not running, and failed to start it. error: %v\n", err)
 			os.Exit(1)
 		}
@@ -145,12 +156,13 @@ func main() {
 	}
 	defer sber.Close()
 
-	err = ctx.Run(&Context{
+	err = kongCtx.Run(&Context{
+		Context:    ctx,
 		AppBaseDir: appBaseDir,
 		LogFile:    cli.LogFile,
 		LogLevel:   cli.LogLevel,
 		CloneRoot:  cli.AppBaseDir,
 		sber:       sber,
 	})
-	ctx.FatalIfErrorf(err)
+	kongCtx.FatalIfErrorf(err)
 }

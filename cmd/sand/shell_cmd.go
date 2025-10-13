@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"os"
@@ -16,8 +15,7 @@ type ShellCmd struct {
 }
 
 func (c *ShellCmd) Run(cctx *Context) error {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := cctx.Context
 
 	// Use MuxClient to get sandbox info
 	mux := sand.NewMuxServer(cctx.AppBaseDir, cctx.sber)

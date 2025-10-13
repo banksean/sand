@@ -1,49 +1,30 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"os"
-	"path/filepath"
 
 	"github.com/banksean/sand"
 	"github.com/google/uuid"
 )
 
 type NewCmd struct {
-	ImageName     string `short:"i" default:"sandbox" placeholder:"<container-image-name>" help:"name of container image to use"`
-	DockerFileDir string `short:"d" placeholder:"<docker-file-dir>" help:"location of directory with docker file from which to build the image locally. Uses an embedded dockerfile if unset."`
-	Shell         string `short:"s" default:"/bin/zsh" placeholder:"<shell-command>" help:"shell command to exec in the container"`
-	CloneFromDir  string `short:"c" placeholder:"<project-dir>" help:"directory to clone into the sandbox. Defaults to current working directory, if unset."`
-	EnvFile       string `short:"e" placholder:"<file-path>" help:"path to env file to use when creating a new shell"`
-	Branch        bool   `short:"b" help:"create a new git branch inside the sandbox _container_ (not on your host workdir)"`
-	Rm            bool   `help:"remove the sandbox after the shell terminates"`
-	ID            string `arg:"" optional:"" help:"ID of the sandbox to create, or re-attach to"`
+	ImageName    string `short:"i" default:"ghcr.io/banksean/sand/default:latest" placeholder:"<container-image-name>" help:"name of container image to use"`
+	Shell        string `short:"s" default:"/bin/zsh" placeholder:"<shell-command>" help:"shell command to exec in the container"`
+	CloneFromDir string `short:"c" placeholder:"<project-dir>" help:"directory to clone into the sandbox. Defaults to current working directory, if unset."`
+	EnvFile      string `short:"e" placholder:"<file-path>" help:"path to env file to use when creating a new shell"`
+	Branch       bool   `short:"b" help:"create a new git branch inside the sandbox _container_ (not on your host workdir)"`
+	Rm           bool   `help:"remove the sandbox after the shell terminates"`
+	ID           string `arg:"" optional:"" help:"ID of the sandbox to create, or re-attach to"`
 }
 
 func (c *NewCmd) Run(cctx *Context) error {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := cctx.Context
+
 	slog.InfoContext(ctx, "NewCmd.Run")
 
-	// Move this to the daemon startup sequence
-	if c.DockerFileDir == "" {
-		slog.InfoContext(ctx, "main: unpacking embedded container build files")
-		// TODO: name this dir using a content hash of defaultContainer.
-		c.DockerFileDir = "/tmp/sandbox-container-build"
-		os.RemoveAll(c.DockerFileDir)
-		if err := os.MkdirAll(c.DockerFileDir, 0o755); err != nil {
-			return err
-		}
-		if err := os.CopyFS(c.DockerFileDir, defaultImageFS); err != nil {
-			return err
-		}
-		slog.InfoContext(ctx, "main: done unpacking embedded dockerfile")
-		c.DockerFileDir = filepath.Join(c.DockerFileDir, "defaultimage")
-	}
-
-	if err := cctx.sber.EnsureDefaultImage(ctx, c.ImageName, c.DockerFileDir, "root"); err != nil {
+	if err := cctx.sber.EnsureImage(ctx, c.ImageName); err != nil {
 		slog.ErrorContext(ctx, "sber.Init", "error", err)
 		return err
 	}
@@ -76,11 +57,10 @@ func (c *NewCmd) Run(cctx *Context) error {
 		// Sandbox doesn't exist, create it via daemon
 		slog.InfoContext(ctx, "Creating new sandbox via daemon", "id", c.ID)
 		sbox, err = mc.CreateSandbox(ctx, sand.CreateSandboxOpts{
-			ID:            c.ID,
-			CloneFromDir:  c.CloneFromDir,
-			ImageName:     c.ImageName,
-			DockerFileDir: c.DockerFileDir,
-			EnvFile:       c.EnvFile,
+			ID:           c.ID,
+			CloneFromDir: c.CloneFromDir,
+			ImageName:    c.ImageName,
+			EnvFile:      c.EnvFile,
 		})
 		if err != nil {
 			slog.ErrorContext(ctx, "CreateSandbox", "error", err)

@@ -171,16 +171,15 @@ func (m *Mux) StopSandbox(ctx context.Context, id string) error {
 }
 
 type CreateSandboxOpts struct {
-	ID            string `json:"id,omitempty"`
-	CloneFromDir  string `json:"cloneFromDir,omitempty"`
-	ImageName     string `json:"imageName,omitempty"`
-	DockerFileDir string `json:"dockerFileDir,omitempty"`
-	EnvFile       string `json:"envFile,omitempty"`
+	ID           string `json:"id,omitempty"`
+	CloneFromDir string `json:"cloneFromDir,omitempty"`
+	ImageName    string `json:"imageName,omitempty"`
+	EnvFile      string `json:"envFile,omitempty"`
 }
 
 // CreateSandbox creates a new sandbox and starts its container.
 func (m *Mux) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*Box, error) {
-	sbox, err := m.sber.NewSandbox(ctx, opts.ID, opts.CloneFromDir, opts.ImageName, opts.DockerFileDir, opts.EnvFile)
+	sbox, err := m.sber.NewSandbox(ctx, opts.ID, opts.CloneFromDir, opts.ImageName, opts.EnvFile)
 	if err != nil {
 		return nil, err
 	}
@@ -212,7 +211,7 @@ func (m *Mux) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*Box, 
 	return sbox, nil
 }
 
-func EnsureDaemon(appBaseDir, logFile string) error {
+func EnsureDaemon(ctx context.Context, appBaseDir, logFile string) error {
 	socketPath := filepath.Join(appBaseDir, defaultSocketFile)
 	slog.Info("EnsureDaemon", "socketPath", socketPath)
 
@@ -221,7 +220,7 @@ func EnsureDaemon(appBaseDir, logFile string) error {
 	if err == nil {
 		conn.Close()
 		// Daemon is running, check if version matches
-		if err := checkDaemonVersion(appBaseDir); err != nil {
+		if err := checkDaemonVersion(ctx, appBaseDir); err != nil {
 			slog.Info("EnsureDaemon", "versionMismatch", err.Error())
 			// Version mismatch, shut down old daemon
 			if err := shutdownDaemon(appBaseDir); err != nil {
@@ -263,10 +262,7 @@ func EnsureDaemon(appBaseDir, logFile string) error {
 	return fmt.Errorf("daemon failed to start")
 }
 
-func checkDaemonVersion(appBaseDir string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
+func checkDaemonVersion(ctx context.Context, appBaseDir string) error {
 	mux := NewMuxServer(appBaseDir, nil)
 	client, err := mux.NewClient(ctx)
 	if err != nil {

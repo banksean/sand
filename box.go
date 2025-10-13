@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	DefaultImageName = "sandbox"
+	DefaultImageName = "ghcr.io/banksean/sand/default:latest"
 )
 
 // Box connects a local container instance to a dedicated, persistent local storage volume.
