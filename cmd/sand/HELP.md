@@ -25,8 +25,7 @@ sand new [flags] [ID]
 
 **Flags:**
 
-- `-i, --image-name` _`<container-image-name>`_ - name of container image to use (default: `sandbox`)
-- `-d, --docker-file-dir` _`<docker-file-dir>`_ - location of directory with docker file from which to build the image locally. Uses an embedded dockerfile if unset.
+- `-i, --image-name` _`<container-image-name>`_ - name of container image to use (default: `ghcr.io/banksean/sand/default:latest`)
 - `-s, --shell` _`<shell-command>`_ - shell command to exec in the container (default: `/bin/zsh`)
 - `-c, --clone-from-dir` _`<project-dir>`_ - directory to clone into the sandbox. Defaults to current working directory, if unset.
 - `-e, --env-file` _`STRING`_ - path to env file to use when creating a new shell
@@ -61,7 +60,6 @@ sand exec [flags] <ID> <ARG>...
 **Flags:**
 
 - `-i, --image-name` _`<container-image-name>`_ - name of container image to use (default: `sandbox`)
-- `-d, --docker-file-dir` _`<docker-file-dir>`_ - location of directory with docker file from which to build the image locally. Uses an embedded dockerfile if unset.
 - `-c, --clone-from-dir` _`<project-dir>`_ - directory to clone into the sandbox. Defaults to current working directory, if unset.
 - `-e, --env-file` _`STRING`_ - path to env file to use when creating a new shell
 - `--rm` - remove the sandbox after the shell terminates
