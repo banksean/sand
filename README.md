@@ -14,7 +14,7 @@ For more information about `sand`'s subcommands and other options, see [cmd/sand
 
 ## Requirements
 - Only works on Apple hardware (of course).
-- Install [`sand`](https://github.com/apple/container) first, since these helper functions just shell out to it. 
+- Install [`apple/container`](https://github.com/apple/container) first, since these helper functions just shell out to it. 
 
 # Other stuff
 ## `gorunac` and `gotestac` commands
