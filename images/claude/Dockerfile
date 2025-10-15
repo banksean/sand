@@ -28,10 +28,10 @@ RUN apk add --no-cache \
   openssh-client \
   openssh-server
 
-ARG USERNAME=node
+ARG USERNAME=root
 USER ${USERNAME}
 
-# Ensure default node user has access to /usr/local/share
+# Ensure default root user has access to /usr/local/share
 RUN mkdir -p /usr/local/share/npm-global && \
   chown -R $USERNAME:$USERNAME /usr/local/share
 
