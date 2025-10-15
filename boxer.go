@@ -331,7 +331,7 @@ func (sb *Boxer) cloneClaudeJSON(ctx context.Context, cwd, id string) error {
 		return err
 	}
 	clone := filepath.Join(sb.cloneRoot, "/", id, "dotfiles", ".claude.json")
-	err = os.WriteFile(clone, claudeJSON, 0700)
+	err = os.WriteFile(clone, claudeJSON, 0o700)
 	return err
 }
 
