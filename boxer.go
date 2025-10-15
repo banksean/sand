@@ -84,13 +84,23 @@ func (sb *Boxer) NewSandbox(ctx context.Context, id, hostWorkDir, imageName, env
 		return nil, err
 	}
 
-	if err := sb.cloneClaudeDir(ctx, id); err != nil {
+	if err := os.MkdirAll(filepath.Join(sb.cloneRoot, id, "dotfiles"), 0o750); err != nil {
+		return nil, err
+	}
+
+	if err := sb.cloneClaudeDir(ctx, hostWorkDir, id); err != nil {
 		return nil, err
 	}
 
 	if err := sb.cloneDotfiles(ctx, id); err != nil {
 		return nil, err
 	}
+
+	slog.InfoContext(ctx, "about to cloneClaudeJSON")
+	if err := sb.cloneClaudeJSON(ctx, hostWorkDir, id); err != nil {
+		return nil, err
+	}
+	slog.InfoContext(ctx, "cloneClaudeJSON worked?")
 
 	ret := &Box{
 		ID:             id,
@@ -277,11 +287,11 @@ func (sb *Boxer) cloneWorkDir(ctx context.Context, id, hostWorkDir string) error
 	return nil
 }
 
-func (sb *Boxer) cloneClaudeDir(ctx context.Context, id string) error {
+func (sb *Boxer) cloneClaudeDir(ctx context.Context, hostWorkDir, id string) error {
 	if err := os.MkdirAll(filepath.Join(sb.cloneRoot, id), 0o750); err != nil {
 		return err
 	}
-	cloneClaude := filepath.Join(sb.cloneRoot, "/", id, "dotfiles")
+	cloneClaude := filepath.Join(sb.cloneRoot, "/", id, "dotfiles", ".claude")
 	dotClaude := filepath.Join(os.Getenv("HOME"), ".claude")
 	if _, err := os.Stat(dotClaude); errors.Is(err, os.ErrNotExist) {
 		f, err := os.Create(cloneClaude)
@@ -299,21 +309,40 @@ func (sb *Boxer) cloneClaudeDir(ctx context.Context, id string) error {
 		return err
 	}
 
+	projDirName := filepath.Join(cloneClaude, "projects", strings.Replace(hostWorkDir, string(filepath.Separator), "-", -1))
+	slog.InfoContext(ctx, "cloneClaudDir: checking for project dir to rename", "projDirName", projDirName)
+	if _, err := os.Stat(projDirName); err == nil {
+		mvProjDirCmd := exec.CommandContext(ctx, "mv", projDirName, filepath.Join(cloneClaude, "projects", "-app"))
+		slog.InfoContext(ctx, "cloneClaudeDir", "mvProjDirCmd", strings.Join(mvProjDirCmd.Args, " "))
+		output, err = mvProjDirCmd.CombinedOutput()
+		if err != nil {
+			slog.InfoContext(ctx, "cloneClaudeDir", "error", err, "output", string(output))
+			return err
+		}
+	}
 	return nil
+}
+
+// Clones .claude.json but filters the "projects" map to just the one we're interested in,
+// and updates its key to be "/app" which is the container-side path for it.
+func (sb *Boxer) cloneClaudeJSON(ctx context.Context, cwd, id string) error {
+	claudeJSON, err := filterClaudeJSON(ctx, cwd)
+	if err != nil {
+		return err
+	}
+	clone := filepath.Join(sb.cloneRoot, "/", id, "dotfiles", ".claude.json")
+	err = os.WriteFile(clone, claudeJSON, 0700)
+	return err
 }
 
 func (sb *Boxer) cloneDotfiles(ctx context.Context, id string) error {
 	sb.userMsg(ctx, "Cloning dotfiles...")
 	dotfiles := []string{
-		".claude.json",
 		".gitconfig",
 		".p10k.zsh",
 		".zshrc",
 		".omp.json",
 		".ssh/id_ed25519.pub",
-	}
-	if err := os.MkdirAll(filepath.Join(sb.cloneRoot, id, "dotfiles"), 0o750); err != nil {
-		return err
 	}
 	for _, dotfile := range dotfiles {
 		clone := filepath.Join(sb.cloneRoot, "/", id, "dotfiles", dotfile)
