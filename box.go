@@ -64,6 +64,7 @@ func (sb *Box) CreateContainer(ctx context.Context) error {
 				Remove:    false,
 				Mount: []string{
 					// TODO: mount other image-independent config files etc into the default user's home directory after the container starts up.
+					fmt.Sprintf(`type=bind,source=%s,target=/hostkeys,readonly`, filepath.Join(sb.SandboxWorkDir, "hostkeys")),
 					fmt.Sprintf(`type=bind,source=%s,target=/dotfiles,readonly`, filepath.Join(sb.SandboxWorkDir, "dotfiles")),
 					fmt.Sprintf(`type=bind,source=%s,target=/app`, filepath.Join(sb.SandboxWorkDir, "app")),
 				},
@@ -99,6 +100,11 @@ func (sb *Box) StartContainer(ctx context.Context) error {
 	authorizedKeysOut, err := sb.Exec(ctx, "cp", "-r", "/root/.ssh/id_ed25519.pub", "/root/.ssh/authorized_keys")
 	if err != nil {
 		slog.ErrorContext(ctx, "Sandbox.StartContainer: copying dotfiles", "error", err, "authorizedKeysOut", authorizedKeysOut)
+	}
+
+	hostKeysOut, err := sb.Exec(ctx, "cp", "-r", "/hostkeys/.", "/etc/ssh/.")
+	if err != nil {
+		slog.ErrorContext(ctx, "Sandbox.StartContainer: copying host keys", "error", err, "hostKeysOut", hostKeysOut)
 	}
 
 	// Since apple containerization uses its own "vminitd" init system, the standard systemd commands

@@ -2,8 +2,11 @@ package sand
 
 import (
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
 	"database/sql"
 	_ "embed"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
@@ -16,6 +19,7 @@ import (
 
 	ac "github.com/banksean/sand/applecontainer"
 	"github.com/banksean/sand/db"
+	"golang.org/x/crypto/ssh"
 	_ "modernc.org/sqlite"
 )
 
@@ -33,6 +37,8 @@ type Boxer struct {
 	sqlDB          *sql.DB
 	queries        *db.Queries
 }
+
+const hostKeyFilename = "ssh_host_ed25519_key"
 
 func NewBoxer(appRoot string, terminalWriter io.Writer) (*Boxer, error) {
 	if err := os.MkdirAll(appRoot, 0o750); err != nil {
@@ -55,6 +61,11 @@ func NewBoxer(appRoot string, terminalWriter io.Writer) (*Boxer, error) {
 	if _, err := sqlDB.Exec(schemaSQL); err != nil {
 		sqlDB.Close()
 		return nil, fmt.Errorf("failed to initialize schema: %w", err)
+	}
+
+	// Generate ssh host key pair if it doesn't exist already.
+	if _, err := createKeyPairIfMissing(filepath.Join(appRoot, hostKeyFilename)); err != nil {
+		return nil, fmt.Errorf("could not create host key pair: %w", err)
 	}
 
 	return &Boxer{
@@ -101,6 +112,10 @@ func (sb *Boxer) NewSandbox(ctx context.Context, id, hostWorkDir, imageName, env
 		return nil, err
 	}
 	slog.InfoContext(ctx, "cloneClaudeJSON worked?")
+
+	if err := sb.cloneHostKeyPair(ctx, id); err != nil {
+		return nil, err
+	}
 
 	ret := &Box{
 		ID:             id,
@@ -239,7 +254,7 @@ func (sb *Boxer) cloneWorkDir(ctx context.Context, id, hostWorkDir string) error
 	if err := os.MkdirAll(filepath.Join(sb.cloneRoot, id), 0o750); err != nil {
 		return err
 	}
-	hostCloneDir := filepath.Join(sb.cloneRoot, "/", id, "app")
+	hostCloneDir := filepath.Join(sb.cloneRoot, id, "app")
 	cpCmd := exec.CommandContext(ctx, "cp", "-Rc", hostWorkDir, hostCloneDir)
 	slog.InfoContext(ctx, "cloneWorkDir cpCmd", "cmd", strings.Join(cpCmd.Args, " "))
 	output, err := cpCmd.CombinedOutput()
@@ -287,11 +302,39 @@ func (sb *Boxer) cloneWorkDir(ctx context.Context, id, hostWorkDir string) error
 	return nil
 }
 
+func (sb *Boxer) cloneHostKeyPair(ctx context.Context, id string) error {
+	hostKey := filepath.Join(sb.appRoot, hostKeyFilename)
+	hostKeyPub := filepath.Join(sb.appRoot, hostKeyFilename+".pub")
+
+	cloneHostKeyDir := filepath.Join(sb.cloneRoot, id, "hostkeys")
+	if err := os.MkdirAll(cloneHostKeyDir, 0o750); err != nil {
+		return err
+	}
+
+	cmd := exec.CommandContext(ctx, "cp", "-Rc", hostKey, cloneHostKeyDir)
+	slog.InfoContext(ctx, "cloneHostKeyPair", "cmd", strings.Join(cmd.Args, " "))
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		slog.InfoContext(ctx, "cloneHostKeyPair", "error", err, "output", string(output))
+		return err
+	}
+
+	cmd = exec.CommandContext(ctx, "cp", "-Rc", hostKeyPub, cloneHostKeyDir)
+	slog.InfoContext(ctx, "cloneHostKeyPair", "cmd", strings.Join(cmd.Args, " "))
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		slog.InfoContext(ctx, "cloneHostKeyPair", "error", err, "output", string(output))
+		return err
+	}
+
+	return nil
+}
+
 func (sb *Boxer) cloneClaudeDir(ctx context.Context, hostWorkDir, id string) error {
 	if err := os.MkdirAll(filepath.Join(sb.cloneRoot, id), 0o750); err != nil {
 		return err
 	}
-	cloneClaude := filepath.Join(sb.cloneRoot, "/", id, "dotfiles", ".claude")
+	cloneClaude := filepath.Join(sb.cloneRoot, id, "dotfiles", ".claude")
 	dotClaude := filepath.Join(os.Getenv("HOME"), ".claude")
 	if _, err := os.Stat(dotClaude); errors.Is(err, os.ErrNotExist) {
 		f, err := os.Create(cloneClaude)
@@ -330,7 +373,7 @@ func (sb *Boxer) cloneClaudeJSON(ctx context.Context, cwd, id string) error {
 	if err != nil {
 		return err
 	}
-	clone := filepath.Join(sb.cloneRoot, "/", id, "dotfiles", ".claude.json")
+	clone := filepath.Join(sb.cloneRoot, id, "dotfiles", ".claude.json")
 	err = os.WriteFile(clone, claudeJSON, 0o700)
 	return err
 }
@@ -345,7 +388,7 @@ func (sb *Boxer) cloneDotfiles(ctx context.Context, id string) error {
 		".ssh/id_ed25519.pub",
 	}
 	for _, dotfile := range dotfiles {
-		clone := filepath.Join(sb.cloneRoot, "/", id, "dotfiles", dotfile)
+		clone := filepath.Join(sb.cloneRoot, id, "dotfiles", dotfile)
 		original := filepath.Join(os.Getenv("HOME"), dotfile)
 		fi, err := os.Lstat(original)
 		if errors.Is(err, os.ErrNotExist) {
@@ -501,4 +544,58 @@ func (sb *Boxer) loadSandbox(ctx context.Context, id string) (*Box, error) {
 	}
 
 	return sandboxFromDB(&sandbox), nil
+}
+
+func writeKeyToFile(keyBytes []byte, filename string) error {
+	err := os.WriteFile(filename, keyBytes, 0o600)
+	return err
+}
+
+func genHostKeyPair() (ed25519.PublicKey, ed25519.PrivateKey, error) {
+	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
+	return publicKey, privateKey, err
+}
+
+// encodePrivateKeyToPEM encodes an Ed25519 private key for storage
+func encodePrivateKeyToPEM(privateKey ed25519.PrivateKey) []byte {
+	// No need to create a signer first, we can directly marshal the key
+
+	// Format and encode as a binary private key format
+	pkBytes, err := ssh.MarshalPrivateKey(privateKey, "sketch key")
+	if err != nil {
+		panic(fmt.Sprintf("failed to marshal private key: %v", err))
+	}
+
+	// Return PEM encoded bytes
+	return pem.EncodeToMemory(pkBytes)
+}
+
+func createKeyPairIfMissing(idPath string) (ssh.PublicKey, error) {
+	if _, err := os.Stat(idPath); err == nil {
+		return nil, nil
+	}
+
+	publicKey, privateKey, err := genHostKeyPair()
+	if err != nil {
+		return nil, fmt.Errorf("error generating key pair: %w", err)
+	}
+
+	sshPublicKey, err := ssh.NewPublicKey(publicKey)
+	if err != nil {
+		return nil, fmt.Errorf("error converting to SSH public key: %w", err)
+	}
+
+	privateKeyPEM := encodePrivateKeyToPEM(privateKey)
+
+	err = writeKeyToFile(privateKeyPEM, idPath)
+	if err != nil {
+		return nil, fmt.Errorf("error writing private key to file %w", err)
+	}
+	pubKeyBytes := ssh.MarshalAuthorizedKey(sshPublicKey)
+
+	err = writeKeyToFile([]byte(pubKeyBytes), idPath+".pub")
+	if err != nil {
+		return nil, fmt.Errorf("error writing public key to file %w", err)
+	}
+	return sshPublicKey, nil
 }
