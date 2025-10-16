@@ -30,14 +30,18 @@ ENV DEVCONTAINER=true
 RUN mkdir -p /workspace && \
   chown -R root:root /workspace
 
+# Generate some SSH host keys so that the SSH server can start.
+# TODO: Generate this keypair outside the container and mount it in as a secret.
+# As-is, the ssh-keygen below will run once at image creation time, and the keys will
+# be baked into the image, which is ...not ideal.
+RUN ssh-keygen -t ed25519 -C "root@sand" -f /etc/ssh/ssh_host_ed25519_key
+
 # Configure SSH for GitHub authentication
 RUN mkdir -p /root/.ssh && \
   chmod 700 /root/.ssh && \
   ssh-keyscan github.com >> /root/.ssh/known_hosts && \
   echo "Host github.com\n\tPubkeyAuthentication yes" > /root/.ssh/config && \
   chmod 600 /root/.ssh/config
-
-ADD sshd_config /etc/ssh/sshd_config
 
 WORKDIR /workspace
 

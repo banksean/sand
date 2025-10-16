@@ -96,13 +96,22 @@ func (sb *Box) StartContainer(ctx context.Context) error {
 		slog.ErrorContext(ctx, "Sandbox.StartContainer: copying dotfiles", "error", err, "cpOut", cpOut)
 	}
 
-	sshdOut, err := sb.Exec(ctx, "/etc/init.d/ssh", "start")
+	authorizedKeysOut, err := sb.Exec(ctx, "cp", "-r", "/root/.ssh/id_ed25519.pub", "/root/.ssh/authorized_keys")
+	if err != nil {
+		slog.ErrorContext(ctx, "Sandbox.StartContainer: copying dotfiles", "error", err, "authorizedKeysOut", authorizedKeysOut)
+	}
+
+	// Since apple containerization uses its own "vminitd" init system, the standard systemd commands
+	// won't work (and alpine doesn't use systemd either). So this is ugly and brittle but for now
+	// it'll have to do: just exec sshd directly.
+	sshdOut, err := sb.Exec(ctx, "/usr/sbin/sshd", "-f", "/etc/ssh/sshd_config")
 	if err != nil {
 		slog.ErrorContext(ctx, "Sandbox.StartContainer: starting sshd", "error", err, "cpOut", sshdOut)
 	}
-	// TODO: run "git gc" or "git repack"? Or do that *before* cloning?
 
 	slog.InfoContext(ctx, "startContainer succeeded", "output", output, "sshdOut", sshdOut)
+
+	// TODO: run "git gc" or "git repack"? Or do that *before* cloning?
 	return nil
 }
 

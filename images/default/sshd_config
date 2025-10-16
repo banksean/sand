@@ -38,8 +38,8 @@ Include /etc/ssh/sshd_config.d/*.conf
 #PubkeyAuthentication yes
 
 # Expect .ssh/authorized_keys2 to be disregarded by default in future.
-#AuthorizedKeysFile     .ssh/authorized_keys .ssh/authorized_keys2
-AuthorizedKeysFile      /root/.ssh/id_ed25519.pub
+AuthorizedKeysFile     .ssh/authorized_keys .ssh/authorized_keys2
+# AuthorizedKeysFile      /root/.ssh/id_ed25519.pub
 
 #AuthorizedPrincipalsFile none
 
