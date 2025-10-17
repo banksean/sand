@@ -34,7 +34,7 @@ type Boxer struct {
 	terminalWriter io.Writer
 	sqlDB          *sql.DB
 	queries        *db.Queries
-	provisioner    WorkspaceProvisioner
+	provisioner    WorkspaceCloner
 }
 
 const hostKeyFilename = "ssh_host_ed25519_key"
@@ -74,7 +74,7 @@ func NewBoxer(appRoot string, terminalWriter io.Writer) (*Boxer, error) {
 		sqlDB:          sqlDB,
 		queries:        db.New(sqlDB),
 	}
-	sb.provisioner = NewDefaultWorkspaceProvisioner(appRoot, terminalWriter)
+	sb.provisioner = NewDefaultWorkspaceCloner(appRoot, terminalWriter)
 	return sb, nil
 }
 
@@ -86,13 +86,13 @@ func (sb *Boxer) Close() error {
 }
 
 // SetProvisioner allows callers (primarily tests) to swap the default workspace provisioner.
-func (sb *Boxer) SetProvisioner(p WorkspaceProvisioner) {
+func (sb *Boxer) SetProvisioner(p WorkspaceCloner) {
 	sb.provisioner = p
 }
 
 func (sb *Boxer) ensureProvisioner() {
 	if sb.provisioner == nil {
-		sb.provisioner = NewDefaultWorkspaceProvisioner(sb.appRoot, sb.terminalWriter)
+		sb.provisioner = NewDefaultWorkspaceCloner(sb.appRoot, sb.terminalWriter)
 	}
 }
 
@@ -111,7 +111,7 @@ func (sb *Boxer) NewSandbox(ctx context.Context, id, hostWorkDir, imageName, env
 	slog.InfoContext(ctx, "Boxer.NewSandbox", "hostWorkDir", hostWorkDir, "id", id)
 
 	sb.ensureProvisioner()
-	provisionResult, err := sb.provisioner.Prepare(ctx, ProvisionRequest{
+	provisionResult, err := sb.provisioner.Prepare(ctx, CloneRequest{
 		ID:          id,
 		HostWorkDir: hostWorkDir,
 		EnvFile:     envFile,

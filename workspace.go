@@ -32,8 +32,8 @@ func (m MountSpec) String() string {
 	return strings.Join(parts, ",")
 }
 
-// ContainerHook allows callers to inject container startup customisation.
-type ContainerHook interface {
+// ContainerStartupHook allows callers to inject container startup customisation.
+type ContainerStartupHook interface {
 	Name() string
 	OnStart(ctx context.Context, b *Box) error
 }
@@ -51,28 +51,28 @@ func (h containerHook) OnStart(ctx context.Context, b *Box) error {
 	return h.fn(ctx, b)
 }
 
-// NewContainerHook helpers callers construct hook instances without exporting internals.
-func NewContainerHook(name string, fn func(ctx context.Context, b *Box) error) ContainerHook {
+// NewContainerStartupHook helpers callers construct hook instances without exporting internals.
+func NewContainerStartupHook(name string, fn func(ctx context.Context, b *Box) error) ContainerStartupHook {
 	return containerHook{name: name, fn: fn}
 }
 
-// ProvisionRequest captures the inputs necessary to prepare a sandbox workspace.
-type ProvisionRequest struct {
+// CloneRequest captures the inputs necessary to prepare a sandbox workspace.
+type CloneRequest struct {
 	ID          string
 	HostWorkDir string
 	EnvFile     string
 }
 
-// ProvisionResult describes the assets created for a sandbox and how to mount/configure them.
-type ProvisionResult struct {
+// CloneResult describes the assets created for a sandbox and how to mount/configure them.
+type CloneResult struct {
 	SandboxWorkDir string
 	Mounts         []MountSpec
-	ContainerHooks []ContainerHook
+	ContainerHooks []ContainerStartupHook
 }
 
-// WorkspaceProvisioner abstracts the steps for preparing sandbox host resources.
-type WorkspaceProvisioner interface {
-	Prepare(ctx context.Context, req ProvisionRequest) (*ProvisionResult, error)
+// WorkspaceCloner abstracts the steps for preparing sandbox host resources.
+type WorkspaceCloner interface {
+	Prepare(ctx context.Context, req CloneRequest) (*CloneResult, error)
 	Hydrate(ctx context.Context, box *Box) error
 }
 
@@ -81,16 +81,16 @@ const (
 	ClonedWorkDirRemotePrefix  = "sand/"
 )
 
-// DefaultWorkspaceProvisioner reproduces the current cloning behaviour.
-type DefaultWorkspaceProvisioner struct {
+// DefaultWorkspaceCloner reproduces the current cloning behaviour.
+type DefaultWorkspaceCloner struct {
 	appRoot        string
 	cloneRoot      string
 	terminalWriter io.Writer
 }
 
-// NewDefaultWorkspaceProvisioner constructs the default provisioner used by Boxer.
-func NewDefaultWorkspaceProvisioner(appRoot string, terminalWriter io.Writer) *DefaultWorkspaceProvisioner {
-	return &DefaultWorkspaceProvisioner{
+// NewDefaultWorkspaceCloner constructs the default provisioner used by Boxer.
+func NewDefaultWorkspaceCloner(appRoot string, terminalWriter io.Writer) *DefaultWorkspaceCloner {
+	return &DefaultWorkspaceCloner{
 		appRoot:        appRoot,
 		cloneRoot:      filepath.Join(appRoot, "clones"),
 		terminalWriter: terminalWriter,
@@ -98,7 +98,7 @@ func NewDefaultWorkspaceProvisioner(appRoot string, terminalWriter io.Writer) *D
 }
 
 // Prepare performs the same cloning steps previously implemented inline in Boxer.
-func (p *DefaultWorkspaceProvisioner) Prepare(ctx context.Context, req ProvisionRequest) (*ProvisionResult, error) {
+func (p *DefaultWorkspaceCloner) Prepare(ctx context.Context, req CloneRequest) (*CloneResult, error) {
 	if err := os.MkdirAll(filepath.Join(p.cloneRoot, req.ID), 0o750); err != nil {
 		return nil, err
 	}
@@ -130,11 +130,11 @@ func (p *DefaultWorkspaceProvisioner) Prepare(ctx context.Context, req Provision
 	sandboxWorkDir := filepath.Join(p.cloneRoot, req.ID)
 
 	mounts := p.mountPlanFor(sandboxWorkDir)
-	hooks := []ContainerHook{
+	hooks := []ContainerStartupHook{
 		p.defaultContainerHook(),
 	}
 
-	return &ProvisionResult{
+	return &CloneResult{
 		SandboxWorkDir: sandboxWorkDir,
 		Mounts:         mounts,
 		ContainerHooks: hooks,
@@ -142,7 +142,7 @@ func (p *DefaultWorkspaceProvisioner) Prepare(ctx context.Context, req Provision
 }
 
 // Hydrate populates runtime-only fields on a Box that was loaded from persistent storage.
-func (p *DefaultWorkspaceProvisioner) Hydrate(ctx context.Context, box *Box) error {
+func (p *DefaultWorkspaceCloner) Hydrate(ctx context.Context, box *Box) error {
 	if box == nil {
 		return fmt.Errorf("nil box provided to hydrate")
 	}
@@ -151,11 +151,11 @@ func (p *DefaultWorkspaceProvisioner) Hydrate(ctx context.Context, box *Box) err
 		return fmt.Errorf("sandbox %s missing workdir", box.ID)
 	}
 	box.Mounts = p.mountPlanFor(sandboxWorkDir)
-	box.ContainerHooks = []ContainerHook{p.defaultContainerHook()}
+	box.ContainerHooks = []ContainerStartupHook{p.defaultContainerHook()}
 	return nil
 }
 
-func (p *DefaultWorkspaceProvisioner) mountPlanFor(sandboxWorkDir string) []MountSpec {
+func (p *DefaultWorkspaceCloner) mountPlanFor(sandboxWorkDir string) []MountSpec {
 	return []MountSpec{
 		{
 			Source:   filepath.Join(sandboxWorkDir, "hostkeys"),
@@ -174,7 +174,7 @@ func (p *DefaultWorkspaceProvisioner) mountPlanFor(sandboxWorkDir string) []Moun
 	}
 }
 
-func (p *DefaultWorkspaceProvisioner) userMsg(ctx context.Context, msg string) {
+func (p *DefaultWorkspaceCloner) userMsg(ctx context.Context, msg string) {
 	if p.terminalWriter == nil {
 		slog.DebugContext(ctx, "provisioner userMsg (no terminalWriter)", "msg", msg)
 		return
@@ -182,7 +182,7 @@ func (p *DefaultWorkspaceProvisioner) userMsg(ctx context.Context, msg string) {
 	fmt.Fprintln(p.terminalWriter, "\033[90m"+msg+"\033[0m")
 }
 
-func (p *DefaultWorkspaceProvisioner) cloneWorkDir(ctx context.Context, id, hostWorkDir string) error {
+func (p *DefaultWorkspaceCloner) cloneWorkDir(ctx context.Context, id, hostWorkDir string) error {
 	p.userMsg(ctx, "Cloning "+hostWorkDir)
 	if err := os.MkdirAll(filepath.Join(p.cloneRoot, id), 0o750); err != nil {
 		return err
@@ -235,7 +235,7 @@ func (p *DefaultWorkspaceProvisioner) cloneWorkDir(ctx context.Context, id, host
 	return nil
 }
 
-func (p *DefaultWorkspaceProvisioner) cloneHostKeyPair(ctx context.Context, id string) error {
+func (p *DefaultWorkspaceCloner) cloneHostKeyPair(ctx context.Context, id string) error {
 	hostKey := filepath.Join(p.appRoot, hostKeyFilename)
 	hostKeyPub := filepath.Join(p.appRoot, hostKeyFilename+".pub")
 
@@ -263,7 +263,7 @@ func (p *DefaultWorkspaceProvisioner) cloneHostKeyPair(ctx context.Context, id s
 	return nil
 }
 
-func (p *DefaultWorkspaceProvisioner) cloneClaudeDir(ctx context.Context, hostWorkDir, id string) error {
+func (p *DefaultWorkspaceCloner) cloneClaudeDir(ctx context.Context, hostWorkDir, id string) error {
 	if err := os.MkdirAll(filepath.Join(p.cloneRoot, id), 0o750); err != nil {
 		return err
 	}
@@ -301,7 +301,7 @@ func (p *DefaultWorkspaceProvisioner) cloneClaudeDir(ctx context.Context, hostWo
 
 // Clones .claude.json but filters the "projects" map to just the one we're interested in,
 // and updates its key to be "/app" which is the container-side path for it.
-func (p *DefaultWorkspaceProvisioner) cloneClaudeJSON(ctx context.Context, cwd, id string) error {
+func (p *DefaultWorkspaceCloner) cloneClaudeJSON(ctx context.Context, cwd, id string) error {
 	claudeJSON, err := filterClaudeJSON(ctx, cwd)
 	if err != nil {
 		return err
@@ -311,7 +311,7 @@ func (p *DefaultWorkspaceProvisioner) cloneClaudeJSON(ctx context.Context, cwd, 
 	return err
 }
 
-func (p *DefaultWorkspaceProvisioner) cloneDotfiles(ctx context.Context, id string) error {
+func (p *DefaultWorkspaceCloner) cloneDotfiles(ctx context.Context, id string) error {
 	p.userMsg(ctx, "Cloning dotfiles...")
 	dotfiles := []string{
 		".gitconfig",
@@ -376,8 +376,8 @@ func (p *DefaultWorkspaceProvisioner) cloneDotfiles(ctx context.Context, id stri
 	return nil
 }
 
-func (p *DefaultWorkspaceProvisioner) defaultContainerHook() ContainerHook {
-	return NewContainerHook("default container bootstrap", func(ctx context.Context, b *Box) error {
+func (p *DefaultWorkspaceCloner) defaultContainerHook() ContainerStartupHook {
+	return NewContainerStartupHook("default container bootstrap", func(ctx context.Context, b *Box) error {
 		var errs []error
 
 		cpOut, err := b.Exec(ctx, "cp", "-r", "/dotfiles/.", "/root/.")
