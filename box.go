@@ -2,6 +2,7 @@ package sand
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -35,6 +36,10 @@ type Box struct {
 	DNSDomain string
 	// EnvFile is the host filesystem path to the env file to use when executing commands in the container
 	EnvFile string
+	// Mounts defines bind mounts that should be attached when creating the container.
+	Mounts []MountSpec
+	// ContainerHooks run after the container has started to perform any bootstrap logic.
+	ContainerHooks []ContainerHook
 }
 
 func (sb *Box) GetContainer(ctx context.Context) (*types.Container, error) {
@@ -50,6 +55,12 @@ func (sb *Box) GetContainer(ctx context.Context) (*types.Container, error) {
 
 // CreateContainer creates a new container instance. The container image must exist.
 func (sb *Box) CreateContainer(ctx context.Context) error {
+	mounts := sb.effectiveMounts()
+	mountOpts := make([]string, 0, len(mounts))
+	for _, m := range mounts {
+		mountOpts = append(mountOpts, m.String())
+	}
+
 	containerID, err := ac.Containers.Create(ctx,
 		&options.CreateContainer{
 			ProcessOptions: options.ProcessOptions{
@@ -62,12 +73,7 @@ func (sb *Box) CreateContainer(ctx context.Context) error {
 				SSH:       true,
 				DNSDomain: sb.DNSDomain,
 				Remove:    false,
-				Mount: []string{
-					// TODO: mount other image-independent config files etc into the default user's home directory after the container starts up.
-					fmt.Sprintf(`type=bind,source=%s,target=/hostkeys,readonly`, filepath.Join(sb.SandboxWorkDir, "hostkeys")),
-					fmt.Sprintf(`type=bind,source=%s,target=/dotfiles,readonly`, filepath.Join(sb.SandboxWorkDir, "dotfiles")),
-					fmt.Sprintf(`type=bind,source=%s,target=/app`, filepath.Join(sb.SandboxWorkDir, "app")),
-				},
+				Mount:     mountOpts,
 			},
 		},
 		sb.ImageName, nil)
@@ -87,37 +93,23 @@ func (sb *Box) StartContainer(ctx context.Context) error {
 		return err
 	}
 
-	// TODO: move these to a separate "on first container start for this sandbox" lifecycle state.
-	// We probably do not want to clobber doftile changes that the user may have made previously
-	// in this sandbox's filesystem.
-
-	// At startup, copy whatever is in /dotfiles into the root user's home directory.
-	cpOut, err := sb.Exec(ctx, "cp", "-r", "/dotfiles/.", "/root/.")
-	if err != nil {
-		slog.ErrorContext(ctx, "Sandbox.StartContainer: copying dotfiles", "error", err, "cpOut", cpOut)
+	var hookErrs []error
+	for _, hook := range sb.ContainerHooks {
+		if hook == nil {
+			continue
+		}
+		slog.InfoContext(ctx, "startContainer running hook", "hook", hook.Name())
+		if err := hook.OnStart(ctx, sb); err != nil {
+			slog.ErrorContext(ctx, "startContainer hook error", "hook", hook.Name(), "error", err)
+			hookErrs = append(hookErrs, fmt.Errorf("%s: %w", hook.Name(), err))
+		}
 	}
 
-	authorizedKeysOut, err := sb.Exec(ctx, "cp", "-r", "/root/.ssh/id_ed25519.pub", "/root/.ssh/authorized_keys")
-	if err != nil {
-		slog.ErrorContext(ctx, "Sandbox.StartContainer: copying dotfiles", "error", err, "authorizedKeysOut", authorizedKeysOut)
+	slog.InfoContext(ctx, "startContainer succeeded", "output", output)
+
+	if len(hookErrs) > 0 {
+		return errors.Join(hookErrs...)
 	}
-
-	hostKeysOut, err := sb.Exec(ctx, "cp", "-r", "/hostkeys/.", "/etc/ssh/.")
-	if err != nil {
-		slog.ErrorContext(ctx, "Sandbox.StartContainer: copying host keys", "error", err, "hostKeysOut", hostKeysOut)
-	}
-
-	// Since apple containerization uses its own "vminitd" init system, the standard systemd commands
-	// won't work (and alpine doesn't use systemd either). So this is ugly and brittle but for now
-	// it'll have to do: just exec sshd directly.
-	sshdOut, err := sb.Exec(ctx, "/usr/sbin/sshd", "-f", "/etc/ssh/sshd_config")
-	if err != nil {
-		slog.ErrorContext(ctx, "Sandbox.StartContainer: starting sshd", "error", err, "cpOut", sshdOut)
-	}
-
-	slog.InfoContext(ctx, "startContainer succeeded", "output", output, "sshdOut", sshdOut)
-
-	// TODO: run "git gc" or "git repack"? Or do that *before* cloning?
 	return nil
 }
 
@@ -160,4 +152,29 @@ func (sb *Box) Exec(ctx context.Context, shellCmd string, args ...string) (strin
 	}
 
 	return output, nil
+}
+
+func (sb *Box) effectiveMounts() []MountSpec {
+	if len(sb.Mounts) > 0 {
+		return sb.Mounts
+	}
+	if sb.SandboxWorkDir == "" {
+		return nil
+	}
+	return []MountSpec{
+		{
+			Source:   filepath.Join(sb.SandboxWorkDir, "hostkeys"),
+			Target:   "/hostkeys",
+			ReadOnly: true,
+		},
+		{
+			Source:   filepath.Join(sb.SandboxWorkDir, "dotfiles"),
+			Target:   "/dotfiles",
+			ReadOnly: true,
+		},
+		{
+			Source: filepath.Join(sb.SandboxWorkDir, "app"),
+			Target: "/app",
+		},
+	}
 }

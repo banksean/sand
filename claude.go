@@ -3,6 +3,7 @@ package sand
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -25,6 +26,10 @@ func filterClaudeJSON(ctx context.Context, cwd string) ([]byte, error) {
 	claudeJSONPath := filepath.Join(homeDir, ".claude.json")
 	data, err := os.ReadFile(claudeJSONPath)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			slog.InfoContext(ctx, "filterClaudeJSON missing file, using default", "path", claudeJSONPath)
+			return json.Marshal(map[string]any{"projects": map[string]any{}})
+		}
 		return nil, fmt.Errorf("failed to read %s: %w", claudeJSONPath, err)
 	}
 
@@ -34,30 +39,26 @@ func filterClaudeJSON(ctx context.Context, cwd string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to parse JSON: %w", err)
 	}
 
-	// Get the projects field
-	projects, ok := config["projects"]
-	if !ok {
-		return nil, fmt.Errorf("no 'projects' field found in %s", claudeJSONPath)
+	// Extract the projects map if present
+	projectsMap := map[string]interface{}{}
+	if projects, ok := config["projects"]; ok {
+		if cast, ok := projects.(map[string]interface{}); ok {
+			projectsMap = cast
+		} else {
+			slog.InfoContext(ctx, "filterClaudeJSON non-map projects field, resetting", "type", fmt.Sprintf("%T", projects))
+		}
 	}
 
-	// Ensure projects is a map
-	projectsMap, ok := projects.(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("'projects' field is not a map")
-	}
-
-	// Create new filtered projects map with /app as the key
+	// Create new filtered projects map with /app as the key when we have a match
 	filteredProjects := map[string]interface{}{}
-	// Find the entry with key equal to cwd
-	value, ok := projectsMap[cwd]
-	if ok {
+	if value, ok := projectsMap[cwd]; ok {
 		filteredProjects["/app"] = value
 	}
 
 	// Replace the projects field
 	config["projects"] = filteredProjects
 
-	slog.InfoContext(ctx, "filterClaudeJSON sucess")
+	slog.InfoContext(ctx, "filterClaudeJSON success")
 	// Re-marshal the JSON
 	result, err := json.Marshal(config)
 	if err != nil {
