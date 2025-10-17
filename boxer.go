@@ -34,7 +34,6 @@ type Boxer struct {
 	terminalWriter io.Writer
 	sqlDB          *sql.DB
 	queries        *db.Queries
-	provisioner    WorkspaceCloner
 }
 
 const hostKeyFilename = "ssh_host_ed25519_key"
@@ -74,7 +73,6 @@ func NewBoxer(appRoot string, terminalWriter io.Writer) (*Boxer, error) {
 		sqlDB:          sqlDB,
 		queries:        db.New(sqlDB),
 	}
-	sb.provisioner = NewDefaultWorkspaceCloner(appRoot, terminalWriter)
 	return sb, nil
 }
 
@@ -85,33 +83,13 @@ func (sb *Boxer) Close() error {
 	return nil
 }
 
-// SetProvisioner allows callers (primarily tests) to swap the default workspace provisioner.
-func (sb *Boxer) SetProvisioner(p WorkspaceCloner) {
-	sb.provisioner = p
-}
-
-func (sb *Boxer) ensureProvisioner() {
-	if sb.provisioner == nil {
-		sb.provisioner = NewDefaultWorkspaceCloner(sb.appRoot, sb.terminalWriter)
-	}
-}
-
-func (sb *Boxer) hydrateBox(ctx context.Context, box *Box) error {
-	if box == nil {
-		return fmt.Errorf("nil box to hydrate")
-	}
-	sb.ensureProvisioner()
-	return sb.provisioner.Hydrate(ctx, box)
-}
-
 // NewSandbox creates a new sandbox based on a clone of hostWorkDir.
 // TODO: clone envFile, if it exists, into the sandbox clone so every command exec'd in that sandbox container
 // uses the same env file, even if the original .env file has changed on the host machine.
-func (sb *Boxer) NewSandbox(ctx context.Context, id, hostWorkDir, imageName, envFile string) (*Box, error) {
+func (sb *Boxer) NewSandbox(ctx context.Context, cloner WorkspaceCloner, id, hostWorkDir, imageName, envFile string) (*Box, error) {
 	slog.InfoContext(ctx, "Boxer.NewSandbox", "hostWorkDir", hostWorkDir, "id", id)
 
-	sb.ensureProvisioner()
-	provisionResult, err := sb.provisioner.Prepare(ctx, CloneRequest{
+	provisionResult, err := cloner.Prepare(ctx, CloneRequest{
 		ID:          id,
 		HostWorkDir: hostWorkDir,
 		EnvFile:     envFile,
@@ -157,9 +135,6 @@ func (sb *Boxer) List(ctx context.Context) ([]Box, error) {
 	boxes := make([]Box, len(sandboxes))
 	for i, s := range sandboxes {
 		box := sandboxFromDB(&s)
-		if err := sb.hydrateBox(ctx, box); err != nil {
-			return nil, err
-		}
 		boxes[i] = *box
 	}
 	return boxes, nil
@@ -176,9 +151,6 @@ func (sb *Boxer) Get(ctx context.Context, id string) (*Box, error) {
 	}
 
 	box := sandboxFromDB(&sandbox)
-	if err := sb.hydrateBox(ctx, box); err != nil {
-		return nil, err
-	}
 	slog.InfoContext(ctx, "Boxer.Get", "ret", box)
 	return box, nil
 }
@@ -354,9 +326,6 @@ func (sb *Boxer) loadSandbox(ctx context.Context, id string) (*Box, error) {
 	}
 
 	box := sandboxFromDB(&sandbox)
-	if err := sb.hydrateBox(ctx, box); err != nil {
-		return nil, err
-	}
 
 	return box, nil
 }

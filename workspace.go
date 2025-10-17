@@ -89,7 +89,7 @@ type DefaultWorkspaceCloner struct {
 }
 
 // NewDefaultWorkspaceCloner constructs the default provisioner used by Boxer.
-func NewDefaultWorkspaceCloner(appRoot string, terminalWriter io.Writer) *DefaultWorkspaceCloner {
+func NewDefaultWorkspaceCloner(appRoot string, terminalWriter io.Writer) WorkspaceCloner {
 	return &DefaultWorkspaceCloner{
 		appRoot:        appRoot,
 		cloneRoot:      filepath.Join(appRoot, "clones"),
@@ -97,8 +97,8 @@ func NewDefaultWorkspaceCloner(appRoot string, terminalWriter io.Writer) *Defaul
 	}
 }
 
-// Prepare performs the same cloning steps previously implemented inline in Boxer.
 func (p *DefaultWorkspaceCloner) Prepare(ctx context.Context, req CloneRequest) (*CloneResult, error) {
+	slog.InfoContext(ctx, "DefaultWorkspaceCloner.Prepare", "req", req)
 	if err := os.MkdirAll(filepath.Join(p.cloneRoot, req.ID), 0o750); err != nil {
 		return nil, err
 	}
@@ -111,15 +111,7 @@ func (p *DefaultWorkspaceCloner) Prepare(ctx context.Context, req CloneRequest) 
 		return nil, err
 	}
 
-	if err := p.cloneClaudeDir(ctx, req.HostWorkDir, req.ID); err != nil {
-		return nil, err
-	}
-
 	if err := p.cloneDotfiles(ctx, req.ID); err != nil {
-		return nil, err
-	}
-
-	if err := p.cloneClaudeJSON(ctx, req.HostWorkDir, req.ID); err != nil {
 		return nil, err
 	}
 
@@ -143,6 +135,8 @@ func (p *DefaultWorkspaceCloner) Prepare(ctx context.Context, req CloneRequest) 
 
 // Hydrate populates runtime-only fields on a Box that was loaded from persistent storage.
 func (p *DefaultWorkspaceCloner) Hydrate(ctx context.Context, box *Box) error {
+	slog.InfoContext(ctx, "DefaultWorkspaceCloner.Hydrate", "req", box)
+
 	if box == nil {
 		return fmt.Errorf("nil box provided to hydrate")
 	}
@@ -261,54 +255,6 @@ func (p *DefaultWorkspaceCloner) cloneHostKeyPair(ctx context.Context, id string
 	}
 
 	return nil
-}
-
-func (p *DefaultWorkspaceCloner) cloneClaudeDir(ctx context.Context, hostWorkDir, id string) error {
-	if err := os.MkdirAll(filepath.Join(p.cloneRoot, id), 0o750); err != nil {
-		return err
-	}
-	cloneClaude := filepath.Join(p.cloneRoot, id, "dotfiles", ".claude")
-	dotClaude := filepath.Join(os.Getenv("HOME"), ".claude")
-	if _, err := os.Stat(dotClaude); errors.Is(err, os.ErrNotExist) {
-		f, err := os.Create(cloneClaude)
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-		return nil
-	}
-	cmd := exec.CommandContext(ctx, "cp", "-Rc", dotClaude, cloneClaude)
-	slog.InfoContext(ctx, "cloneClaudeDir", "cmd", strings.Join(cmd.Args, " "))
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		slog.InfoContext(ctx, "cloneClaudeDir", "error", err, "output", string(output))
-		return err
-	}
-
-	projDirName := filepath.Join(cloneClaude, "projects", strings.Replace(hostWorkDir, string(filepath.Separator), "-", -1))
-	slog.InfoContext(ctx, "cloneClaudDir: checking for project dir to rename", "projDirName", projDirName)
-	if _, err := os.Stat(projDirName); err == nil {
-		mvProjDirCmd := exec.CommandContext(ctx, "mv", projDirName, filepath.Join(cloneClaude, "projects", "-app"))
-		slog.InfoContext(ctx, "cloneClaudeDir", "mvProjDirCmd", strings.Join(mvProjDirCmd.Args, " "))
-		output, err = mvProjDirCmd.CombinedOutput()
-		if err != nil {
-			slog.InfoContext(ctx, "cloneClaudeDir", "error", err, "output", string(output))
-			return err
-		}
-	}
-	return nil
-}
-
-// Clones .claude.json but filters the "projects" map to just the one we're interested in,
-// and updates its key to be "/app" which is the container-side path for it.
-func (p *DefaultWorkspaceCloner) cloneClaudeJSON(ctx context.Context, cwd, id string) error {
-	claudeJSON, err := filterClaudeJSON(ctx, cwd)
-	if err != nil {
-		return err
-	}
-	clone := filepath.Join(p.cloneRoot, id, "dotfiles", ".claude.json")
-	err = os.WriteFile(clone, claudeJSON, 0o700)
-	return err
 }
 
 func (p *DefaultWorkspaceCloner) cloneDotfiles(ctx context.Context, id string) error {

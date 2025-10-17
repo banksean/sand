@@ -175,11 +175,18 @@ type CreateSandboxOpts struct {
 	CloneFromDir string `json:"cloneFromDir,omitempty"`
 	ImageName    string `json:"imageName,omitempty"`
 	EnvFile      string `json:"envFile,omitempty"`
+	Cloner       string `json:"cloner,omitempty"`
 }
 
 // CreateSandbox creates a new sandbox and starts its container.
 func (m *Mux) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*Box, error) {
-	sbox, err := m.sber.NewSandbox(ctx, opts.ID, opts.CloneFromDir, opts.ImageName, opts.EnvFile)
+	cloner := NewDefaultWorkspaceCloner(m.AppBaseDir, os.Stderr)
+	slog.Info("main", "cloner name", opts.Cloner)
+	switch opts.Cloner {
+	case "claude":
+		cloner = NewClaudeWorkspaceCloner(cloner, m.AppBaseDir, os.Stderr)
+	}
+	sbox, err := m.sber.NewSandbox(ctx, cloner, opts.ID, opts.CloneFromDir, opts.ImageName, opts.EnvFile)
 	if err != nil {
 		return nil, err
 	}

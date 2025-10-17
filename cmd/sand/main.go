@@ -149,6 +149,7 @@ func main() {
 	if cli.AppBaseDir == "" {
 		cli.AppBaseDir = appBaseDir
 	}
+
 	sber, err := sand.NewBoxer(cli.AppBaseDir, os.Stderr)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to create Boxer: %v\n", err)
