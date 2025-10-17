@@ -39,7 +39,7 @@ type Box struct {
 	// Mounts defines bind mounts that should be attached when creating the container.
 	Mounts []MountSpec
 	// ContainerHooks run after the container has started to perform any bootstrap logic.
-	ContainerHooks []ContainerHook
+	ContainerHooks []ContainerHook `json:"-"`
 }
 
 func (sb *Box) GetContainer(ctx context.Context) (*types.Container, error) {
