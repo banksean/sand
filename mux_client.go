@@ -185,6 +185,8 @@ func (m *Mux) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*Box, 
 	switch opts.Cloner {
 	case "claude":
 		cloner = NewClaudeWorkspaceCloner(cloner, m.AppBaseDir, os.Stderr)
+	case "opencode":
+		cloner = NewOpenCodeWorkspaceCloner(cloner, m.AppBaseDir, os.Stderr)
 	}
 	sbox, err := m.sber.NewSandbox(ctx, cloner, opts.ID, opts.CloneFromDir, opts.ImageName, opts.EnvFile)
 	if err != nil {
