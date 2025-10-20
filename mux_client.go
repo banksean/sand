@@ -158,68 +158,6 @@ func (m *Mux) RemoveSandbox(ctx context.Context, id string) error {
 	return m.sber.Cleanup(ctx, sbox)
 }
 
-// StopSandbox stops a single sandbox container.
-func (m *Mux) StopSandbox(ctx context.Context, id string) error {
-	sbox, err := m.sber.Get(ctx, id)
-	if err != nil {
-		return err
-	}
-	if sbox == nil {
-		return fmt.Errorf("sandbox not found: %s", id)
-	}
-	return m.sber.StopContainer(ctx, sbox)
-}
-
-type CreateSandboxOpts struct {
-	ID           string `json:"id,omitempty"`
-	CloneFromDir string `json:"cloneFromDir,omitempty"`
-	ImageName    string `json:"imageName,omitempty"`
-	EnvFile      string `json:"envFile,omitempty"`
-	Cloner       string `json:"cloner,omitempty"`
-}
-
-// CreateSandbox creates a new sandbox and starts its container.
-func (m *Mux) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*Box, error) {
-	cloner := NewDefaultWorkspaceCloner(m.AppBaseDir, os.Stderr)
-	slog.Info("main", "cloner name", opts.Cloner)
-	switch opts.Cloner {
-	case "claude":
-		cloner = NewClaudeWorkspaceCloner(cloner, m.AppBaseDir, os.Stderr)
-	case "opencode":
-		cloner = NewOpenCodeWorkspaceCloner(cloner, m.AppBaseDir, os.Stderr)
-	}
-	sbox, err := m.sber.NewSandbox(ctx, cloner, opts.ID, opts.CloneFromDir, opts.ImageName, opts.EnvFile)
-	if err != nil {
-		return nil, err
-	}
-
-	ctr, err := sbox.GetContainer(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	if ctr == nil {
-		if err := sbox.CreateContainer(ctx); err != nil {
-			return nil, err
-		}
-		if err := m.sber.UpdateContainerID(ctx, sbox, sbox.ContainerID); err != nil {
-			return nil, err
-		}
-		ctr, err = sbox.GetContainer(ctx)
-		if err != nil || ctr == nil {
-			return nil, fmt.Errorf("failed to get container after creation")
-		}
-	}
-
-	if ctr.Status != "running" {
-		if err := sbox.StartContainer(ctx); err != nil {
-			return nil, err
-		}
-	}
-
-	return sbox, nil
-}
-
 func EnsureDaemon(ctx context.Context, appBaseDir, logFile string) error {
 	socketPath := filepath.Join(appBaseDir, defaultSocketFile)
 	slog.Info("EnsureDaemon", "socketPath", socketPath)

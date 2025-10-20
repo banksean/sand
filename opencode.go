@@ -3,7 +3,6 @@ package sand
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -45,29 +44,19 @@ func (c *OpenCodeWorkspaceCloner) Prepare(ctx context.Context, req CloneRequest)
 }
 
 func (c *OpenCodeWorkspaceCloner) Hydrate(ctx context.Context, box *Box) error {
+	box.ContainerHooks = append(box.ContainerHooks,
+		NewContainerStartupHook("Copy opencode binary to /usr/local/bin", func(ctx context.Context, b *Box) error {
+
+			cpOut, err := b.Exec(ctx, "cp", "-r", "/root/.opencode/bin/opencode", "/usr/local/bin/opencode")
+			if err != nil {
+				slog.ErrorContext(ctx, "DefaultContainerHook copying dotfiles", "error", err, "cpOut", cpOut)
+				return err
+			}
+
+			return nil
+		}))
 	slog.InfoContext(ctx, "OpenCodeWorkspaceCloner.Hydrate", "box", box)
-
 	return c.baseCloner.Hydrate(ctx, box)
-}
-
-func (c *OpenCodeWorkspaceCloner) userMsg(ctx context.Context, msg string) {
-	if c.terminalWriter == nil {
-		slog.DebugContext(ctx, "opencode cloner userMsg (no terminalWriter)", "msg", msg)
-		return
-	}
-	fmt.Fprintln(c.terminalWriter, "\033[90m"+msg+"\033[0m")
-}
-
-func (c *OpenCodeWorkspaceCloner) cloneOpenCodeConfigDir(ctx context.Context, hostWorkDir, id string) error {
-	/*
-		TODO: process the opencode config settings from the user environment.
-		In order of increasing prescedence:
-		- ~/.config/opencode/opencode.json
-		- ./opencode.json
-		- OPENCODE_CONFIG env var
-	*/
-
-	return nil
 }
 
 func (c *OpenCodeWorkspaceCloner) cloneOpenCodeAuth(ctx context.Context, cwd, id string) error {

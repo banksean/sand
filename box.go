@@ -43,13 +43,14 @@ type Box struct {
 }
 
 func (sb *Box) GetContainer(ctx context.Context) (*types.Container, error) {
-	ctrs, err := ac.Containers.Inspect(ctx, sb.ID)
+	ctrs, err := ac.Containers.Inspect(ctx, sb.ContainerID)
 	if err != nil {
 		return nil, err
 	}
 	if len(ctrs) == 0 {
 		return nil, nil
 	}
+
 	return &ctrs[0], nil
 }
 
@@ -69,6 +70,8 @@ func (sb *Box) CreateContainer(ctx context.Context) error {
 				EnvFile:     sb.EnvFile,
 			},
 			ManagementOptions: options.ManagementOptions{
+				// TODO: Try to name the container after the sandbox, and handle collisions
+				// if the name is already in use (e.g. append random chars to sb.ID).
 				Name:      sb.ID,
 				SSH:       true,
 				DNSDomain: sb.DNSDomain,
@@ -87,6 +90,7 @@ func (sb *Box) CreateContainer(ctx context.Context) error {
 
 // StartContainer starts a container instance. The container must exist, and it should not be in the "running" state.
 func (sb *Box) StartContainer(ctx context.Context) error {
+	slog.InfoContext(ctx, "Box.StartContainer", "box", *sb, "ContainerHooks", len(sb.ContainerHooks))
 	output, err := ac.Containers.Start(ctx, nil, sb.ContainerID)
 	if err != nil {
 		slog.ErrorContext(ctx, "startContainer", "error", err, "output", output)
@@ -95,17 +99,14 @@ func (sb *Box) StartContainer(ctx context.Context) error {
 
 	var hookErrs []error
 	for _, hook := range sb.ContainerHooks {
-		if hook == nil {
-			continue
-		}
-		slog.InfoContext(ctx, "startContainer running hook", "hook", hook.Name())
+		slog.InfoContext(ctx, "Box.StartContainer running hook", "hook", hook.Name())
 		if err := hook.OnStart(ctx, sb); err != nil {
-			slog.ErrorContext(ctx, "startContainer hook error", "hook", hook.Name(), "error", err)
+			slog.ErrorContext(ctx, "Box.StartContainer hook error", "hook", hook.Name(), "error", err)
 			hookErrs = append(hookErrs, fmt.Errorf("%s: %w", hook.Name(), err))
 		}
 	}
 
-	slog.InfoContext(ctx, "startContainer succeeded", "output", output)
+	slog.InfoContext(ctx, "Box.StartContainer succeeded", "output", output)
 
 	if len(hookErrs) > 0 {
 		return errors.Join(hookErrs...)

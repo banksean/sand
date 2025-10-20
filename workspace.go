@@ -73,6 +73,7 @@ type CloneResult struct {
 // WorkspaceCloner abstracts the steps for preparing sandbox host resources.
 type WorkspaceCloner interface {
 	Prepare(ctx context.Context, req CloneRequest) (*CloneResult, error)
+	// BUG: Hydrate isn't getting called anywhere, so extra container startup hooks aren't getting registered or invoked.
 	Hydrate(ctx context.Context, box *Box) error
 }
 
@@ -145,7 +146,7 @@ func (p *DefaultWorkspaceCloner) Hydrate(ctx context.Context, box *Box) error {
 		return fmt.Errorf("sandbox %s missing workdir", box.ID)
 	}
 	box.Mounts = p.mountPlanFor(sandboxWorkDir)
-	box.ContainerHooks = []ContainerStartupHook{p.defaultContainerHook()}
+	box.ContainerHooks = append(box.ContainerHooks, p.defaultContainerHook())
 	return nil
 }
 
