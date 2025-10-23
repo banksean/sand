@@ -30,7 +30,6 @@ var schemaSQL string
 // Boxer manages the lifecycle of sandboxes.
 type Boxer struct {
 	appRoot        string
-	sandBoxes      map[string]*Box
 	terminalWriter io.Writer
 	sqlDB          *sql.DB
 	queries        *db.Queries
@@ -68,7 +67,6 @@ func NewBoxer(appRoot string, terminalWriter io.Writer) (*Boxer, error) {
 
 	sb := &Boxer{
 		appRoot:        appRoot,
-		sandBoxes:      map[string]*Box{},
 		terminalWriter: terminalWriter,
 		sqlDB:          sqlDB,
 		queries:        db.New(sqlDB),
@@ -79,6 +77,34 @@ func NewBoxer(appRoot string, terminalWriter io.Writer) (*Boxer, error) {
 func (sb *Boxer) Close() error {
 	if sb.sqlDB != nil {
 		return sb.sqlDB.Close()
+	}
+	return nil
+}
+
+// Sync tells Boxer to synchronize its internal database with the external states of
+// the clone rool directory and local container service.
+func (sb *Boxer) Sync(ctx context.Context) error {
+	slog.InfoContext(ctx, "Boxer.Sync")
+	// First, iterate through the sandbox records in the DB and update the its fiels to
+	// reflect the current state of the filesystem clone root directory and container instance
+	// states according to the local container service.
+	sboxes, err := sb.queries.ListSandboxes(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx, "Boxer.Sync ListSandboxes", "error", err)
+
+		return err
+	}
+
+	// For each sandbox, update the status of its filesystem clone and its container instance.
+	for _, dbBox := range sboxes {
+		slog.InfoContext(ctx, "Boxer.Sync", "box", dbBox)
+		box, err := sb.Get(ctx, dbBox.ID)
+		if err != nil {
+			return err
+		}
+		if err := box.Sync(ctx); err != nil {
+			slog.ErrorContext(ctx, "Boxer.Sync box.Sync", "error", err)
+		}
 	}
 	return nil
 }
@@ -107,7 +133,6 @@ func (sb *Boxer) NewSandbox(ctx context.Context, cloner WorkspaceCloner, id, hos
 		Mounts:         provisionResult.Mounts,
 		ContainerHooks: provisionResult.ContainerHooks,
 	}
-	sb.sandBoxes[id] = ret
 
 	if err := sb.SaveSandbox(ctx, ret); err != nil {
 		return nil, err

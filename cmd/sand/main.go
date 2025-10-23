@@ -155,6 +155,10 @@ func main() {
 		fmt.Fprintf(os.Stderr, "failed to create Boxer: %v\n", err)
 		os.Exit(1)
 	}
+	if err := sber.Sync(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "failed to sync Boxer db with current environment state: %v\n", err)
+		os.Exit(1)
+	}
 	defer sber.Close()
 
 	err = kongCtx.Run(&Context{

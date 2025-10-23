@@ -18,9 +18,12 @@ const (
 	DefaultImageName = "ghcr.io/banksean/sand/default:latest"
 )
 
-// Box connects a local container instance to a dedicated, persistent local storage volume.
-// Dedicated local storage volumes are visible to the host OS, regardless of the current state of the container.
-// We can "revive" a Box by starting a new container that mounts a previously-used local storage volume
+// Box is a "sandbox" - it represents the connection between
+// - a local filesystem clone of a local dev workspace directory
+// - a local container instance (whose state is managed by a separate container service)
+//
+// At startup, the sand.Mux server will synchronize its internal database with the current
+// observed state of the local filesystem clone root and the local container service.
 type Box struct {
 	// ID is an opaque identifier for the sandbox
 	ID string
@@ -38,6 +41,14 @@ type Box struct {
 	EnvFile string
 	// Mounts defines bind mounts that should be attached when creating the container.
 	Mounts []MountSpec
+	// SandboxWorkDirError and SandboxContainerError are the most recently updated error states of the sandbox
+	// work dir and container instance. In-memory only. Updated once either at
+	// server startup or sandbox creation time, and then updated periodically thereafter.
+	// Empty string implies things are ok.
+	// TODO: Make sandbox operations conditional on these values, so that e.g. you don't try to start
+	// a sandbox container instance if the sandbox's work dir is not available.
+	SandboxWorkDirError   string
+	SandboxContainerError string
 	// ContainerHooks run after the container has started to perform any bootstrap logic.
 	ContainerHooks []ContainerStartupHook `json:"-"`
 }
@@ -52,6 +63,21 @@ func (sb *Box) GetContainer(ctx context.Context) (*types.Container, error) {
 	}
 
 	return &ctrs[0], nil
+}
+
+func (sb *Box) Sync(ctx context.Context) error {
+	fi, err := os.Stat(sb.SandboxWorkDir)
+	if err != nil || !fi.IsDir() {
+		slog.ErrorContext(ctx, "Boxer.Sync SandboxWorkDir stat", "fi", fi, "error", err)
+		sb.SandboxWorkDirError = "NO CLONE DIR"
+	}
+	// What *should* this code do, if we get an error while trying to inspect the sandbox's container state?
+	_, err = sb.GetContainer(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx, "Boxer.Sync GetContainer", "error", err)
+		sb.SandboxContainerError = fmt.Sprintf("NO CONTAINER: %q", err.Error())
+	}
+	return nil
 }
 
 // CreateContainer creates a new container instance. The container image must exist.

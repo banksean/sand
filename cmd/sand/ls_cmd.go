@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/banksean/sand"
@@ -34,17 +35,24 @@ func (c *LsCmd) Run(cctx *Context) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "SANDBOX ID\tSTATUS\tCONTAINER ID\tHOSTNAME\tORIGIN DIR\tIMAGE NAME\t")
 	for _, sbox := range list {
+		sbox.Sync(ctx)
 		ctr, err := sbox.GetContainer(ctx)
 		if err != nil {
 			return err
 		}
-		status := "dormant"
+		status := []string{"dormant"}
 		hostname := ""
 		if ctr != nil {
-			status = ctr.Status
+			status[0] = ctr.Status
 			hostname = getContainerHostname(ctr)
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t\n", sbox.ID, status, sbox.ContainerID, hostname, sbox.HostOriginDir, sbox.ImageName)
+		if sbox.SandboxContainerError != "" {
+			status = append(status, sbox.SandboxContainerError)
+		}
+		if sbox.SandboxWorkDirError != "" {
+			status = append(status, sbox.SandboxWorkDirError)
+		}
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t\n", sbox.ID, strings.Join(status, ", "), sbox.ContainerID, hostname, sbox.HostOriginDir, sbox.ImageName)
 	}
 	w.Flush()
 	return nil
