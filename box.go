@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 
-	ac "github.com/banksean/sand/applecontainer"
 	"github.com/banksean/sand/applecontainer/options"
 	"github.com/banksean/sand/applecontainer/types"
 )
@@ -51,10 +50,12 @@ type Box struct {
 	SandboxContainerError string
 	// ContainerHooks run after the container has started to perform any bootstrap logic.
 	ContainerHooks []ContainerStartupHook `json:"-"`
+	// containerService is the service for interacting with containers
+	containerService ContainerService
 }
 
 func (sb *Box) GetContainer(ctx context.Context) (*types.Container, error) {
-	ctrs, err := ac.Containers.Inspect(ctx, sb.ContainerID)
+	ctrs, err := sb.containerService.Inspect(ctx, sb.ContainerID)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +89,7 @@ func (sb *Box) CreateContainer(ctx context.Context) error {
 		mountOpts = append(mountOpts, m.String())
 	}
 
-	containerID, err := ac.Containers.Create(ctx,
+	containerID, err := sb.containerService.Create(ctx,
 		&options.CreateContainer{
 			ProcessOptions: options.ProcessOptions{
 				Interactive: true,
@@ -117,7 +118,7 @@ func (sb *Box) CreateContainer(ctx context.Context) error {
 // StartContainer starts a container instance. The container must exist, and it should not be in the "running" state.
 func (sb *Box) StartContainer(ctx context.Context) error {
 	slog.InfoContext(ctx, "Box.StartContainer", "box", *sb, "ContainerHooks", len(sb.ContainerHooks))
-	output, err := ac.Containers.Start(ctx, nil, sb.ContainerID)
+	output, err := sb.containerService.Start(ctx, nil, sb.ContainerID)
 	if err != nil {
 		slog.ErrorContext(ctx, "startContainer", "error", err, "output", output)
 		return err
@@ -144,7 +145,7 @@ func (sb *Box) StartContainer(ctx context.Context) error {
 func (sb *Box) Shell(ctx context.Context, env map[string]string, shellCmd string, stdin io.Reader, stdout, stderr io.Writer) error {
 	slog.InfoContext(ctx, "Sandbox.Shell", "shellCmd", shellCmd)
 
-	wait, err := ac.Containers.ExecStream(ctx,
+	wait, err := sb.containerService.ExecStream(ctx,
 		&options.ExecContainer{
 			ProcessOptions: options.ProcessOptions{
 				Interactive: true,
@@ -155,7 +156,7 @@ func (sb *Box) Shell(ctx context.Context, env map[string]string, shellCmd string
 			},
 		}, sb.ContainerID, shellCmd, os.Environ(), stdin, stdout, stderr)
 	if err != nil {
-		slog.ErrorContext(ctx, "shell: ac.Containers.Exec", "error", err)
+		slog.ErrorContext(ctx, "shell: containerService.ExecStream", "error", err)
 		return err
 	}
 
@@ -164,7 +165,7 @@ func (sb *Box) Shell(ctx context.Context, env map[string]string, shellCmd string
 
 // Exec executes a command in the container. The container must be in state "running".
 func (sb *Box) Exec(ctx context.Context, shellCmd string, args ...string) (string, error) {
-	output, err := ac.Containers.Exec(ctx,
+	output, err := sb.containerService.Exec(ctx,
 		&options.ExecContainer{
 			ProcessOptions: options.ProcessOptions{
 				Interactive: false,
@@ -174,7 +175,7 @@ func (sb *Box) Exec(ctx context.Context, shellCmd string, args ...string) (strin
 			},
 		}, sb.ContainerID, shellCmd, os.Environ(), args...)
 	if err != nil {
-		slog.ErrorContext(ctx, "shell: ac.Containers.Exec", "error", err)
+		slog.ErrorContext(ctx, "shell: containerService.Exec", "error", err)
 		return "", err
 	}
 

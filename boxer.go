@@ -16,7 +16,6 @@ import (
 	"strings"
 	"time"
 
-	ac "github.com/banksean/sand/applecontainer"
 	"github.com/banksean/sand/db"
 	"golang.org/x/crypto/ssh"
 	_ "modernc.org/sqlite"
@@ -29,10 +28,12 @@ var schemaSQL string
 
 // Boxer manages the lifecycle of sandboxes.
 type Boxer struct {
-	appRoot        string
-	terminalWriter io.Writer
-	sqlDB          *sql.DB
-	queries        *db.Queries
+	appRoot          string
+	terminalWriter   io.Writer
+	sqlDB            *sql.DB
+	queries          *db.Queries
+	containerService ContainerService
+	imageService     ImageService
 }
 
 const hostKeyFilename = "ssh_host_ed25519_key"
@@ -66,10 +67,12 @@ func NewBoxer(appRoot string, terminalWriter io.Writer) (*Boxer, error) {
 	}
 
 	sb := &Boxer{
-		appRoot:        appRoot,
-		terminalWriter: terminalWriter,
-		sqlDB:          sqlDB,
-		queries:        db.New(sqlDB),
+		appRoot:          appRoot,
+		terminalWriter:   terminalWriter,
+		sqlDB:            sqlDB,
+		queries:          db.New(sqlDB),
+		containerService: NewAppleContainerService(),
+		imageService:     NewAppleImageService(),
 	}
 	return sb, nil
 }
@@ -125,13 +128,14 @@ func (sb *Boxer) NewSandbox(ctx context.Context, cloner WorkspaceCloner, id, hos
 	}
 
 	ret := &Box{
-		ID:             id,
-		HostOriginDir:  hostWorkDir,
-		SandboxWorkDir: provisionResult.SandboxWorkDir,
-		ImageName:      imageName,
-		EnvFile:        envFile,
-		Mounts:         provisionResult.Mounts,
-		ContainerHooks: provisionResult.ContainerHooks,
+		ID:               id,
+		HostOriginDir:    hostWorkDir,
+		SandboxWorkDir:   provisionResult.SandboxWorkDir,
+		ImageName:        imageName,
+		EnvFile:          envFile,
+		Mounts:           provisionResult.Mounts,
+		ContainerHooks:   provisionResult.ContainerHooks,
+		containerService: sb.containerService,
 	}
 
 	if err := sb.SaveSandbox(ctx, ret); err != nil {
@@ -159,7 +163,7 @@ func (sb *Boxer) List(ctx context.Context) ([]Box, error) {
 
 	boxes := make([]Box, len(sandboxes))
 	for i, s := range sandboxes {
-		box := sandboxFromDB(&s)
+		box := sb.sandboxFromDB(&s)
 		boxes[i] = *box
 	}
 	return boxes, nil
@@ -175,7 +179,7 @@ func (sb *Boxer) Get(ctx context.Context, id string) (*Box, error) {
 		return nil, fmt.Errorf("failed to get sandbox: %w", err)
 	}
 
-	box := sandboxFromDB(&sandbox)
+	box := sb.sandboxFromDB(&sandbox)
 	slog.InfoContext(ctx, "Boxer.Get", "ret", box)
 	return box, nil
 }
@@ -183,12 +187,12 @@ func (sb *Boxer) Get(ctx context.Context, id string) (*Box, error) {
 func (sb *Boxer) Cleanup(ctx context.Context, sbox *Box) error {
 	slog.InfoContext(ctx, "Boxer.Cleanup", "id", sbox.ID)
 
-	out, err := ac.Containers.Stop(ctx, nil, sbox.ContainerID)
+	out, err := sb.containerService.Stop(ctx, nil, sbox.ContainerID)
 	if err != nil {
 		slog.ErrorContext(ctx, "Boxer Containers.Stop", "error", err, "out", out)
 	}
 
-	out, err = ac.Containers.Delete(ctx, nil, sbox.ContainerID)
+	out, err = sb.containerService.Delete(ctx, nil, sbox.ContainerID)
 	if err != nil {
 		slog.ErrorContext(ctx, "Boxer Containers.Delete", "error", err, "out", out)
 	}
@@ -216,15 +220,16 @@ func (sb *Boxer) Cleanup(ctx context.Context, sbox *Box) error {
 
 // Helper functions for converting between Box and db.Sandbox
 
-func sandboxFromDB(s *db.Sandbox) *Box {
+func (sb *Boxer) sandboxFromDB(s *db.Sandbox) *Box {
 	return &Box{
-		ID:             s.ID,
-		ContainerID:    fromNullString(s.ContainerID),
-		HostOriginDir:  s.HostOriginDir,
-		SandboxWorkDir: s.SandboxWorkDir,
-		ImageName:      s.ImageName,
-		DNSDomain:      fromNullString(s.DnsDomain),
-		EnvFile:        fromNullString(s.EnvFile),
+		ID:               s.ID,
+		ContainerID:      fromNullString(s.ContainerID),
+		HostOriginDir:    s.HostOriginDir,
+		SandboxWorkDir:   s.SandboxWorkDir,
+		ImageName:        s.ImageName,
+		DNSDomain:        fromNullString(s.DnsDomain),
+		EnvFile:          fromNullString(s.EnvFile),
+		containerService: sb.containerService,
 	}
 }
 
@@ -243,7 +248,7 @@ func fromNullString(ns sql.NullString) string {
 func (sb *Boxer) EnsureImage(ctx context.Context, imageName string) error {
 	slog.InfoContext(ctx, "Boxer.EnsureImage", "imageName", imageName)
 
-	images, err := ac.Images.List(ctx)
+	images, err := sb.imageService.List(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to list images: %w", err)
 	}
@@ -266,7 +271,7 @@ func (sb *Boxer) pullImage(ctx context.Context, imageName string) error {
 	sb.userMsg(ctx, fmt.Sprintf("This may take a while: pulling container image %s...", imageName))
 	start := time.Now()
 
-	waitFn, err := ac.Images.Pull(ctx, imageName)
+	waitFn, err := sb.imageService.Pull(ctx, imageName)
 	if err != nil {
 		slog.ErrorContext(ctx, "Boxer.pullImage", "error", err)
 		return err
@@ -329,7 +334,7 @@ func (sb *Boxer) StopContainer(ctx context.Context, sbox *Box) error {
 		return fmt.Errorf("sandbox %s has no container ID", sbox.ID)
 	}
 
-	out, err := ac.Containers.Stop(ctx, nil, sbox.ContainerID)
+	out, err := sb.containerService.Stop(ctx, nil, sbox.ContainerID)
 	if err != nil {
 		slog.ErrorContext(ctx, "Boxer.StopContainer", "error", err, "out", out)
 		return err
@@ -350,7 +355,7 @@ func (sb *Boxer) loadSandbox(ctx context.Context, id string) (*Box, error) {
 		return nil, fmt.Errorf("failed to load sandbox: %w", err)
 	}
 
-	box := sandboxFromDB(&sandbox)
+	box := sb.sandboxFromDB(&sandbox)
 
 	return box, nil
 }
