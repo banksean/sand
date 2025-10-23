@@ -46,7 +46,6 @@ func (c *OpenCodeWorkspaceCloner) Prepare(ctx context.Context, req CloneRequest)
 func (c *OpenCodeWorkspaceCloner) Hydrate(ctx context.Context, box *Box) error {
 	box.ContainerHooks = append(box.ContainerHooks,
 		NewContainerStartupHook("Copy opencode binary to /usr/local/bin", func(ctx context.Context, b *Box) error {
-
 			cpOut, err := b.Exec(ctx, "cp", "-r", "/root/.opencode/bin/opencode", "/usr/local/bin/opencode")
 			if err != nil {
 				slog.ErrorContext(ctx, "DefaultContainerHook copying dotfiles", "error", err, "cpOut", cpOut)
