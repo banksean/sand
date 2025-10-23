@@ -2,8 +2,6 @@ package version
 
 import (
 	"runtime/debug"
-
-	"github.com/google/go-cmp/cmp"
 )
 
 var (
@@ -40,14 +38,10 @@ func Get() Info {
 
 // Equal checks if two version infos represent the same version
 // Two versions are considered equal if they have the same git commit
+// and build info settings.
 func (v Info) Equal(other Info) bool {
 	if v.BuildInfo != nil {
 		if other.BuildInfo == nil {
-			return false
-		}
-		if v.BuildInfo.Main.Path != other.BuildInfo.Main.Path ||
-			!cmp.Equal(v.BuildInfo.Deps, other.BuildInfo.Deps) ||
-			v.BuildInfo.GoVersion != other.BuildInfo.GoVersion {
 			return false
 		}
 	}
@@ -56,6 +50,21 @@ func (v Info) Equal(other Info) bool {
 		v.GitCommit != other.GitCommit ||
 		v.GitRepo != other.GitRepo {
 		return false
+	}
+	if other.BuildInfo != nil && v.BuildInfo == nil ||
+		other.BuildInfo == nil && v.BuildInfo != nil {
+		return false
+	}
+	if v.BuildInfo == nil {
+		return true
+	}
+	if len(other.BuildInfo.Settings) != len(v.BuildInfo.Settings) {
+		return false
+	}
+	for i, setting := range v.BuildInfo.Settings {
+		if other.BuildInfo.Settings[i] != setting {
+			return false
+		}
 	}
 	return true
 }
