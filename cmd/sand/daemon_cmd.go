@@ -13,7 +13,7 @@ import (
 )
 
 type DaemonCmd struct {
-	Action string `arg:"" optional:"" default:"status" enum:"start,stop,restart,status" help:"Action to perform: start, stop, restart, or status (default). Shows daemon status if omitted."`
+	Action string `arg:"" optional:"" default:"status" enum:"start,stop,restart,status,version" help:"Action to perform: start, stop, restart, or status (default). Shows daemon status if omitted."`
 }
 
 // Run handles all daemon command variants
@@ -28,12 +28,50 @@ func (c *DaemonCmd) Run(cctx *Context) error {
 		return c.stopDaemon(ctx, mux)
 	case "restart":
 		return c.restartDaemon(ctx, mux, cctx)
+	case "version":
+		return c.version(ctx, mux)
 	case "status":
 		fallthrough
 	default:
 		// Check status
 		return c.checkStatus(ctx, mux)
 	}
+}
+
+func (c *DaemonCmd) version(ctx context.Context, mux *sand.Mux) error {
+	mc, err := mux.NewClient(ctx)
+	if err != nil {
+		fmt.Println("Daemon is not running")
+		return nil
+	}
+
+	versionInfo, err := mc.Version(ctx)
+	if err != nil {
+		fmt.Printf("Could not get version info from daemon: %v\n", err)
+		return nil
+	}
+
+	fmt.Printf("Git Repository: %s\n", versionInfo.GitRepo)
+	fmt.Printf("Git Branch: %s\n", versionInfo.GitBranch)
+	fmt.Printf("Git Commit: %s\n", versionInfo.GitCommit)
+	fmt.Printf("Build Time: %s\n", versionInfo.BuildTime)
+	buildInfo := versionInfo.BuildInfo
+	if buildInfo == nil {
+		return nil
+	}
+	for _, setting := range buildInfo.Settings {
+		if setting.Key == "vcs.revision" && versionInfo.GitCommit == "" {
+			fmt.Printf("Git Commit: %s\n", setting.Value)
+		}
+		if setting.Key == "vcs.time" && versionInfo.BuildTime == "" {
+			fmt.Printf("Commit Time: %s\n", setting.Value)
+		}
+		if setting.Key == "vcs.modified" {
+			fmt.Printf("Modified: %s\n", setting.Value)
+		}
+	}
+	return nil
+	return nil
 }
 
 func (c *DaemonCmd) checkStatus(ctx context.Context, mux *sand.Mux) error {
@@ -63,7 +101,7 @@ func (c *DaemonCmd) startDaemon(ctx context.Context, mux *sand.Mux) error {
 	}
 
 	// Start the daemon
-	return mux.ServeUnix(ctx)
+	return mux.ServeUnixSocket(ctx)
 }
 
 func (c *DaemonCmd) stopDaemon(ctx context.Context, mux *sand.Mux) error {

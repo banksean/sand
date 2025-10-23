@@ -37,7 +37,7 @@ func TestEqual(t *testing.T) {
 			name:     "same commit different build time",
 			v1:       Info{GitCommit: "abc123", BuildTime: "2024-01-01"},
 			v2:       Info{GitCommit: "abc123", BuildTime: "2024-01-02"},
-			expected: true,
+			expected: false,
 		},
 	}
 

@@ -29,7 +29,7 @@ func TestMuxHTTPPing(t *testing.T) {
 
 	// Start the mux server in a goroutine
 	go func() {
-		if err := mux.ServeUnix(ctx); err != nil {
+		if err := mux.ServeUnixSocket(ctx); err != nil {
 			t.Logf("Mux serve error: %v", err)
 		}
 	}()
@@ -91,7 +91,7 @@ func TestMuxHTTPList(t *testing.T) {
 
 	// Start the mux server
 	go func() {
-		if err := mux.ServeUnix(ctx); err != nil {
+		if err := mux.ServeUnixSocket(ctx); err != nil {
 			t.Logf("Mux serve error: %v", err)
 		}
 	}()
@@ -147,7 +147,7 @@ func TestMuxHTTPVersion(t *testing.T) {
 
 	// Start the mux server in a goroutine
 	go func() {
-		if err := mux.ServeUnix(ctx); err != nil {
+		if err := mux.ServeUnixSocket(ctx); err != nil {
 			t.Logf("Mux serve error: %v", err)
 		}
 	}()

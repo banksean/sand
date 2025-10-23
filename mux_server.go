@@ -55,8 +55,8 @@ func (m *Mux) NewClient(ctx context.Context) (*MuxClient, error) {
 	}, nil
 }
 
-// ServeUnix serves the unix domain socket that sandmux clients (the CLI, e.g.) connect to.
-func (m *Mux) ServeUnix(ctx context.Context) error {
+// ServeUnixSocket serves the unix domain socket that sandmux clients (the CLI, e.g.) connect to.
+func (m *Mux) ServeUnixSocket(ctx context.Context) error {
 	lockFilePath := filepath.Join(m.AppBaseDir, defaultLockFile)
 	slog.InfoContext(ctx, "Mux.ServeUnix", "mux", m, "pid", os.Getpid(), "lockFilePath", lockFilePath)
 	lockFile, err := acquireLock(lockFilePath)

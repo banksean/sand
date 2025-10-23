@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"runtime/debug"
 
 	"github.com/banksean/sand/version"
 )
@@ -15,12 +14,10 @@ func (c *VersionCmd) Run(cctx *Context) error {
 	fmt.Printf("Git Branch: %s\n", versionInfo.GitBranch)
 	fmt.Printf("Git Commit: %s\n", versionInfo.GitCommit)
 	fmt.Printf("Build Time: %s\n", versionInfo.BuildTime)
-	buildInfo, ok := debug.ReadBuildInfo()
-	if !ok {
-		fmt.Println("Build info not available")
+	buildInfo := versionInfo.BuildInfo
+	if buildInfo == nil {
 		return nil
 	}
-
 	for _, setting := range buildInfo.Settings {
 		if setting.Key == "vcs.revision" && versionInfo.GitCommit == "" {
 			fmt.Printf("Git Commit: %s\n", setting.Value)
