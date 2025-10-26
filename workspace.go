@@ -7,7 +7,6 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -87,6 +86,8 @@ type DefaultWorkspaceCloner struct {
 	appRoot        string
 	cloneRoot      string
 	terminalWriter io.Writer
+	gitOps         GitOperations
+	fileOps        FileOps
 }
 
 // NewDefaultWorkspaceCloner constructs the default provisioner used by Boxer.
@@ -95,12 +96,14 @@ func NewDefaultWorkspaceCloner(appRoot string, terminalWriter io.Writer) Workspa
 		appRoot:        appRoot,
 		cloneRoot:      filepath.Join(appRoot, "clones"),
 		terminalWriter: terminalWriter,
+		gitOps:         NewDefaultGitOps(),
+		fileOps:        NewDefaultFileOps(),
 	}
 }
 
 func (p *DefaultWorkspaceCloner) Prepare(ctx context.Context, req CloneRequest) (*CloneResult, error) {
 	slog.InfoContext(ctx, "DefaultWorkspaceCloner.Prepare", "req", req)
-	if err := os.MkdirAll(filepath.Join(p.cloneRoot, req.ID), 0o750); err != nil {
+	if err := p.fileOps.MkdirAll(filepath.Join(p.cloneRoot, req.ID), 0o750); err != nil {
 		return nil, err
 	}
 
@@ -108,7 +111,7 @@ func (p *DefaultWorkspaceCloner) Prepare(ctx context.Context, req CloneRequest) 
 		return nil, err
 	}
 
-	if err := os.MkdirAll(filepath.Join(p.cloneRoot, req.ID, "dotfiles"), 0o750); err != nil {
+	if err := p.fileOps.MkdirAll(filepath.Join(p.cloneRoot, req.ID, "dotfiles"), 0o750); err != nil {
 		return nil, err
 	}
 
@@ -179,51 +182,27 @@ func (p *DefaultWorkspaceCloner) userMsg(ctx context.Context, msg string) {
 
 func (p *DefaultWorkspaceCloner) cloneWorkDir(ctx context.Context, id, hostWorkDir string) error {
 	p.userMsg(ctx, "Cloning "+hostWorkDir)
-	if err := os.MkdirAll(filepath.Join(p.cloneRoot, id), 0o750); err != nil {
+	if err := p.fileOps.MkdirAll(filepath.Join(p.cloneRoot, id), 0o750); err != nil {
 		return err
 	}
 	hostCloneDir := filepath.Join(p.cloneRoot, id, "app")
-	cpCmd := exec.CommandContext(ctx, "cp", "-Rc", hostWorkDir, hostCloneDir)
-	slog.InfoContext(ctx, "cloneWorkDir cpCmd", "cmd", strings.Join(cpCmd.Args, " "))
-	output, err := cpCmd.CombinedOutput()
-	if err != nil {
-		slog.InfoContext(ctx, "cloneWorkDir cpCmd", "error", err, "output", string(output))
+	if err := p.fileOps.Copy(ctx, hostWorkDir, hostCloneDir); err != nil {
 		return err
 	}
 
-	gitRemoteCloneToWorkDirCmd := exec.CommandContext(ctx, "git", "remote", "add", originalWorkdDirRemoteName, hostWorkDir)
-	gitRemoteCloneToWorkDirCmd.Dir = hostCloneDir
-	slog.InfoContext(ctx, "cloneWorkDir gitRemoteCloneToWorkDirCmd", "cmd", strings.Join(gitRemoteCloneToWorkDirCmd.Args, " "))
-	output, err = gitRemoteCloneToWorkDirCmd.CombinedOutput()
-	if err != nil {
-		slog.InfoContext(ctx, "cloneWorkDir gitRemoteCloneToWorkDirCmd", "error", err, "output", string(output))
+	if err := p.gitOps.AddRemote(ctx, hostCloneDir, originalWorkdDirRemoteName, hostWorkDir); err != nil {
 		return err
 	}
 
-	gitRemoteWorkDirToCloneCmd := exec.CommandContext(ctx, "git", "remote", "add", ClonedWorkDirRemotePrefix+id, hostCloneDir)
-	gitRemoteWorkDirToCloneCmd.Dir = hostWorkDir
-	slog.InfoContext(ctx, "cloneWorkDir gitRemoteWorkDirToCloneCmd", "cmd", strings.Join(gitRemoteWorkDirToCloneCmd.Args, " "))
-	output, err = gitRemoteWorkDirToCloneCmd.CombinedOutput()
-	if err != nil {
-		slog.InfoContext(ctx, "cloneWorkDir gitRemoteWorkDirToCloneCmd", "error", err, "output", string(output))
+	if err := p.gitOps.AddRemote(ctx, hostWorkDir, ClonedWorkDirRemotePrefix+id, hostCloneDir); err != nil {
 		return err
 	}
 
-	gitFetchCloneToWorkDirCmd := exec.CommandContext(ctx, "git", "fetch", originalWorkdDirRemoteName)
-	gitFetchCloneToWorkDirCmd.Dir = hostCloneDir
-	slog.InfoContext(ctx, "cloneWorkDir gitFetchCloneToWorkDirCmd", "cmd", strings.Join(gitFetchCloneToWorkDirCmd.Args, " "))
-	output, err = gitFetchCloneToWorkDirCmd.CombinedOutput()
-	if err != nil {
-		slog.InfoContext(ctx, "cloneWorkDir gitFetchCloneToWorkDirCmd", "error", err, "output", string(output))
+	if err := p.gitOps.Fetch(ctx, hostCloneDir, originalWorkdDirRemoteName); err != nil {
 		return err
 	}
 
-	gitFetchWorkDirToCloneCmd := exec.CommandContext(ctx, "git", "fetch", ClonedWorkDirRemotePrefix+id)
-	gitFetchWorkDirToCloneCmd.Dir = hostWorkDir
-	slog.InfoContext(ctx, "cloneWorkDir gitFetchWorkDirToCloneCmd", "cmd", strings.Join(gitFetchWorkDirToCloneCmd.Args, " "))
-	output, err = gitFetchWorkDirToCloneCmd.CombinedOutput()
-	if err != nil {
-		slog.InfoContext(ctx, "cloneWorkDir gitFetchWorkDirToCloneCmd", "error", err, "output", string(output))
+	if err := p.gitOps.Fetch(ctx, hostWorkDir, ClonedWorkDirRemotePrefix+id); err != nil {
 		return err
 	}
 
@@ -235,23 +214,15 @@ func (p *DefaultWorkspaceCloner) cloneHostKeyPair(ctx context.Context, id string
 	hostKeyPub := filepath.Join(p.appRoot, hostKeyFilename+".pub")
 
 	cloneHostKeyDir := filepath.Join(p.cloneRoot, id, "hostkeys")
-	if err := os.MkdirAll(cloneHostKeyDir, 0o750); err != nil {
+	if err := p.fileOps.MkdirAll(cloneHostKeyDir, 0o750); err != nil {
 		return err
 	}
 
-	cmd := exec.CommandContext(ctx, "cp", "-Rc", hostKey, cloneHostKeyDir)
-	slog.InfoContext(ctx, "cloneHostKeyPair", "cmd", strings.Join(cmd.Args, " "))
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		slog.InfoContext(ctx, "cloneHostKeyPair", "error", err, "output", string(output))
+	if err := p.fileOps.Copy(ctx, hostKey, cloneHostKeyDir); err != nil {
 		return err
 	}
 
-	cmd = exec.CommandContext(ctx, "cp", "-Rc", hostKeyPub, cloneHostKeyDir)
-	slog.InfoContext(ctx, "cloneHostKeyPair", "cmd", strings.Join(cmd.Args, " "))
-	output, err = cmd.CombinedOutput()
-	if err != nil {
-		slog.InfoContext(ctx, "cloneHostKeyPair", "error", err, "output", string(output))
+	if err := p.fileOps.Copy(ctx, hostKeyPub, cloneHostKeyDir); err != nil {
 		return err
 	}
 
@@ -270,10 +241,10 @@ func (p *DefaultWorkspaceCloner) cloneDotfiles(ctx context.Context, id string) e
 	for _, dotfile := range dotfiles {
 		clone := filepath.Join(p.cloneRoot, id, "dotfiles", dotfile)
 		original := filepath.Join(os.Getenv("HOME"), dotfile)
-		fi, err := os.Lstat(original)
+		fi, err := p.fileOps.Lstat(original)
 		if errors.Is(err, os.ErrNotExist) {
 			p.userMsg(ctx, "skipping "+original)
-			f, err := os.Create(clone)
+			f, err := p.fileOps.Create(clone)
 			if err != nil {
 				return err
 			}
@@ -281,7 +252,7 @@ func (p *DefaultWorkspaceCloner) cloneDotfiles(ctx context.Context, id string) e
 			continue
 		}
 		if fi.Mode()&os.ModeSymlink != 0 {
-			destination, err := os.Readlink(original)
+			destination, err := p.fileOps.Readlink(original)
 			if err != nil {
 				slog.ErrorContext(ctx, "Boxer.cloneDotfiles error reading symbolic link", "original", original, "error", err)
 				continue
@@ -289,12 +260,11 @@ func (p *DefaultWorkspaceCloner) cloneDotfiles(ctx context.Context, id string) e
 			if !filepath.IsAbs(destination) {
 				destination = filepath.Join(os.Getenv("HOME"), destination)
 			}
-			// Now verify that the file that the symlink points to actually exists.
-			_, err = os.Lstat(destination)
+			_, err = p.fileOps.Lstat(destination)
 			if errors.Is(err, os.ErrNotExist) {
 				slog.ErrorContext(ctx, "Boxer.cloneDotfiles symbolic link points to nonexistent file",
 					"original", original, "destination", destination, "error", err)
-				f, err := os.Create(clone)
+				f, err := p.fileOps.Create(clone)
 				if err != nil {
 					return err
 				}
@@ -306,15 +276,11 @@ func (p *DefaultWorkspaceCloner) cloneDotfiles(ctx context.Context, id string) e
 			original = destination
 		}
 		cloneDir := filepath.Dir(clone)
-		if err := os.MkdirAll(cloneDir, 0o750); err != nil {
+		if err := p.fileOps.MkdirAll(cloneDir, 0o750); err != nil {
 			slog.ErrorContext(ctx, "cloneDotfiles couldn't make clone dir", "cloneDir", cloneDir, "error", err)
 			return err
 		}
-		cmd := exec.CommandContext(ctx, "cp", "-Rc", original, clone)
-		slog.InfoContext(ctx, "cloneDotfiles", "cmd", strings.Join(cmd.Args, " "))
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			slog.InfoContext(ctx, "cloneDotfiles", "error", err, "output", string(output))
+		if err := p.fileOps.Copy(ctx, original, clone); err != nil {
 			return err
 		}
 		p.userMsg(ctx, "cloned "+original)

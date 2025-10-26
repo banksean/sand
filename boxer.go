@@ -10,10 +10,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/banksean/sand/db"
@@ -34,12 +31,15 @@ type Boxer struct {
 	queries          *db.Queries
 	containerService ContainerService
 	imageService     ImageService
+	gitOps           GitOperations
+	fileOps          FileOps
 }
 
 const hostKeyFilename = "ssh_host_ed25519_key"
 
 func NewBoxer(appRoot string, terminalWriter io.Writer) (*Boxer, error) {
-	if err := os.MkdirAll(appRoot, 0o750); err != nil {
+	fileOps := NewDefaultFileOps()
+	if err := fileOps.MkdirAll(appRoot, 0o750); err != nil {
 		return nil, err
 	}
 
@@ -62,7 +62,7 @@ func NewBoxer(appRoot string, terminalWriter io.Writer) (*Boxer, error) {
 	}
 
 	// Generate ssh host key pair if it doesn't exist already.
-	if _, err := createKeyPairIfMissing(filepath.Join(appRoot, hostKeyFilename)); err != nil {
+	if _, err := createKeyPairIfMissing(fileOps, filepath.Join(appRoot, hostKeyFilename)); err != nil {
 		return nil, fmt.Errorf("could not create host key pair: %w", err)
 	}
 
@@ -73,6 +73,8 @@ func NewBoxer(appRoot string, terminalWriter io.Writer) (*Boxer, error) {
 		queries:          db.New(sqlDB),
 		containerService: NewAppleContainerService(),
 		imageService:     NewAppleImageService(),
+		gitOps:           NewDefaultGitOps(),
+		fileOps:          fileOps,
 	}
 	return sb, nil
 }
@@ -197,16 +199,11 @@ func (sb *Boxer) Cleanup(ctx context.Context, sbox *Box) error {
 		slog.ErrorContext(ctx, "Boxer Containers.Delete", "error", err, "out", out)
 	}
 
-	gitRmCloneRemote := exec.CommandContext(ctx, "git", "remote", "remove", ClonedWorkDirRemotePrefix+sbox.ID)
-	gitRmCloneRemote.Dir = sbox.HostOriginDir
-	slog.InfoContext(ctx, "Cleanup gitRmCloneRemote", "cmd", strings.Join(gitRmCloneRemote.Args, " "))
-	output, err := gitRmCloneRemote.CombinedOutput()
-	if err != nil {
-		slog.InfoContext(ctx, "Cleanup gitRmCloneRemote", "error", err, "output", string(output))
+	if err := sb.gitOps.RemoveRemote(ctx, sbox.HostOriginDir, ClonedWorkDirRemotePrefix+sbox.ID); err != nil {
 		return err
 	}
 
-	if err := os.RemoveAll(sbox.SandboxWorkDir); err != nil {
+	if err := sb.fileOps.RemoveAll(sbox.SandboxWorkDir); err != nil {
 		return err
 	}
 
@@ -360,8 +357,8 @@ func (sb *Boxer) loadSandbox(ctx context.Context, id string) (*Box, error) {
 	return box, nil
 }
 
-func writeKeyToFile(keyBytes []byte, filename string) error {
-	err := os.WriteFile(filename, keyBytes, 0o600)
+func writeKeyToFile(fileOps FileOps, keyBytes []byte, filename string) error {
+	err := fileOps.WriteFile(filename, keyBytes, 0o600)
 	return err
 }
 
@@ -384,8 +381,8 @@ func encodePrivateKeyToPEM(privateKey ed25519.PrivateKey) []byte {
 	return pem.EncodeToMemory(pkBytes)
 }
 
-func createKeyPairIfMissing(idPath string) (ssh.PublicKey, error) {
-	if _, err := os.Stat(idPath); err == nil {
+func createKeyPairIfMissing(fileOps FileOps, idPath string) (ssh.PublicKey, error) {
+	if _, err := fileOps.Stat(idPath); err == nil {
 		return nil, nil
 	}
 
@@ -401,13 +398,13 @@ func createKeyPairIfMissing(idPath string) (ssh.PublicKey, error) {
 
 	privateKeyPEM := encodePrivateKeyToPEM(privateKey)
 
-	err = writeKeyToFile(privateKeyPEM, idPath)
+	err = writeKeyToFile(fileOps, privateKeyPEM, idPath)
 	if err != nil {
 		return nil, fmt.Errorf("error writing private key to file %w", err)
 	}
 	pubKeyBytes := ssh.MarshalAuthorizedKey(sshPublicKey)
 
-	err = writeKeyToFile([]byte(pubKeyBytes), idPath+".pub")
+	err = writeKeyToFile(fileOps, []byte(pubKeyBytes), idPath+".pub")
 	if err != nil {
 		return nil, fmt.Errorf("error writing public key to file %w", err)
 	}
