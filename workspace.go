@@ -83,44 +83,44 @@ const (
 
 // DefaultWorkspaceCloner reproduces the current cloning behaviour.
 type DefaultWorkspaceCloner struct {
-	appRoot        string
-	cloneRoot      string
-	terminalWriter io.Writer
-	gitOps         GitOps
-	fileOps        FileOps
+	appRoot   string
+	cloneRoot string
+	messenger UserMessenger
+	gitOps    GitOps
+	fileOps   FileOps
 }
 
 // NewDefaultWorkspaceCloner constructs the default provisioner used by Boxer.
 func NewDefaultWorkspaceCloner(appRoot string, terminalWriter io.Writer) WorkspaceCloner {
 	return &DefaultWorkspaceCloner{
-		appRoot:        appRoot,
-		cloneRoot:      filepath.Join(appRoot, "clones"),
-		terminalWriter: terminalWriter,
-		gitOps:         NewDefaultGitOps(),
-		fileOps:        NewDefaultFileOps(),
+		appRoot:   appRoot,
+		cloneRoot: filepath.Join(appRoot, "clones"),
+		messenger: NewTerminalMessenger(terminalWriter),
+		gitOps:    NewDefaultGitOps(),
+		fileOps:   NewDefaultFileOps(),
 	}
 }
 
 func (p *DefaultWorkspaceCloner) Prepare(ctx context.Context, req CloneRequest) (*CloneResult, error) {
 	slog.InfoContext(ctx, "DefaultWorkspaceCloner.Prepare", "req", req)
 	if err := p.fileOps.MkdirAll(filepath.Join(p.cloneRoot, req.ID), 0o750); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create clone directory for sandbox %s: %w", req.ID, err)
 	}
 
 	if err := p.cloneWorkDir(ctx, req.ID, req.HostWorkDir); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to clone workdir for sandbox %s: %w", req.ID, err)
 	}
 
 	if err := p.fileOps.MkdirAll(filepath.Join(p.cloneRoot, req.ID, "dotfiles"), 0o750); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create dotfiles directory for sandbox %s: %w", req.ID, err)
 	}
 
 	if err := p.cloneDotfiles(ctx, req.ID); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to clone dotfiles for sandbox %s: %w", req.ID, err)
 	}
 
 	if err := p.cloneHostKeyPair(ctx, req.ID); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to clone host key pair for sandbox %s: %w", req.ID, err)
 	}
 
 	sandboxWorkDir := filepath.Join(p.cloneRoot, req.ID)
@@ -172,38 +172,30 @@ func (p *DefaultWorkspaceCloner) mountPlanFor(sandboxWorkDir string) []MountSpec
 	}
 }
 
-func (p *DefaultWorkspaceCloner) userMsg(ctx context.Context, msg string) {
-	if p.terminalWriter == nil {
-		slog.DebugContext(ctx, "provisioner userMsg (no terminalWriter)", "msg", msg)
-		return
-	}
-	fmt.Fprintln(p.terminalWriter, "\033[90m"+msg+"\033[0m")
-}
-
 func (p *DefaultWorkspaceCloner) cloneWorkDir(ctx context.Context, id, hostWorkDir string) error {
-	p.userMsg(ctx, "Cloning "+hostWorkDir)
+	p.messenger.Message(ctx, "Cloning "+hostWorkDir)
 	if err := p.fileOps.MkdirAll(filepath.Join(p.cloneRoot, id), 0o750); err != nil {
-		return err
+		return fmt.Errorf("failed to create clone root for sandbox %s: %w", id, err)
 	}
 	hostCloneDir := filepath.Join(p.cloneRoot, id, "app")
 	if err := p.fileOps.Copy(ctx, hostWorkDir, hostCloneDir); err != nil {
-		return err
+		return fmt.Errorf("failed to copy workdir %s to %s for sandbox %s: %w", hostWorkDir, hostCloneDir, id, err)
 	}
 
 	if err := p.gitOps.AddRemote(ctx, hostCloneDir, originalWorkdDirRemoteName, hostWorkDir); err != nil {
-		return err
+		return fmt.Errorf("failed to add git remote %s for sandbox %s: %w", originalWorkdDirRemoteName, id, err)
 	}
 
 	if err := p.gitOps.AddRemote(ctx, hostWorkDir, ClonedWorkDirRemotePrefix+id, hostCloneDir); err != nil {
-		return err
+		return fmt.Errorf("failed to add git remote %s for sandbox %s: %w", ClonedWorkDirRemotePrefix+id, id, err)
 	}
 
 	if err := p.gitOps.Fetch(ctx, hostCloneDir, originalWorkdDirRemoteName); err != nil {
-		return err
+		return fmt.Errorf("failed to fetch git remote %s for sandbox %s: %w", originalWorkdDirRemoteName, id, err)
 	}
 
 	if err := p.gitOps.Fetch(ctx, hostWorkDir, ClonedWorkDirRemotePrefix+id); err != nil {
-		return err
+		return fmt.Errorf("failed to fetch git remote %s for sandbox %s: %w", ClonedWorkDirRemotePrefix+id, id, err)
 	}
 
 	return nil
@@ -215,22 +207,22 @@ func (p *DefaultWorkspaceCloner) cloneHostKeyPair(ctx context.Context, id string
 
 	cloneHostKeyDir := filepath.Join(p.cloneRoot, id, "hostkeys")
 	if err := p.fileOps.MkdirAll(cloneHostKeyDir, 0o750); err != nil {
-		return err
+		return fmt.Errorf("failed to create hostkeys directory for sandbox %s: %w", id, err)
 	}
 
 	if err := p.fileOps.Copy(ctx, hostKey, cloneHostKeyDir); err != nil {
-		return err
+		return fmt.Errorf("failed to copy host key for sandbox %s: %w", id, err)
 	}
 
 	if err := p.fileOps.Copy(ctx, hostKeyPub, cloneHostKeyDir); err != nil {
-		return err
+		return fmt.Errorf("failed to copy host key pub for sandbox %s: %w", id, err)
 	}
 
 	return nil
 }
 
 func (p *DefaultWorkspaceCloner) cloneDotfiles(ctx context.Context, id string) error {
-	p.userMsg(ctx, "Cloning dotfiles...")
+	p.messenger.Message(ctx, "Cloning dotfiles...")
 	dotfiles := []string{
 		".gitconfig",
 		".p10k.zsh",
@@ -243,10 +235,10 @@ func (p *DefaultWorkspaceCloner) cloneDotfiles(ctx context.Context, id string) e
 		original := filepath.Join(os.Getenv("HOME"), dotfile)
 		fi, err := p.fileOps.Lstat(original)
 		if errors.Is(err, os.ErrNotExist) {
-			p.userMsg(ctx, "skipping "+original)
+			p.messenger.Message(ctx, "skipping "+original)
 			f, err := p.fileOps.Create(clone)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to create empty dotfile %s for sandbox %s: %w", dotfile, id, err)
 			}
 			f.Close()
 			continue
@@ -263,10 +255,10 @@ func (p *DefaultWorkspaceCloner) cloneDotfiles(ctx context.Context, id string) e
 			_, err = p.fileOps.Lstat(destination)
 			if errors.Is(err, os.ErrNotExist) {
 				slog.ErrorContext(ctx, "Boxer.cloneDotfiles symbolic link points to nonexistent file",
-					"original", original, "destination", destination, "error", err)
+					"sandbox", id, "dotfile", dotfile, "original", original, "destination", destination, "error", err)
 				f, err := p.fileOps.Create(clone)
 				if err != nil {
-					return err
+					return fmt.Errorf("failed to create empty dotfile %s for sandbox %s: %w", dotfile, id, err)
 				}
 				f.Close()
 				continue
@@ -277,13 +269,13 @@ func (p *DefaultWorkspaceCloner) cloneDotfiles(ctx context.Context, id string) e
 		}
 		cloneDir := filepath.Dir(clone)
 		if err := p.fileOps.MkdirAll(cloneDir, 0o750); err != nil {
-			slog.ErrorContext(ctx, "cloneDotfiles couldn't make clone dir", "cloneDir", cloneDir, "error", err)
-			return err
+			slog.ErrorContext(ctx, "cloneDotfiles couldn't make clone dir", "sandbox", id, "dotfile", dotfile, "cloneDir", cloneDir, "error", err)
+			return fmt.Errorf("failed to create dotfile directory %s for sandbox %s: %w", cloneDir, id, err)
 		}
 		if err := p.fileOps.Copy(ctx, original, clone); err != nil {
-			return err
+			return fmt.Errorf("failed to copy dotfile %s for sandbox %s: %w", dotfile, id, err)
 		}
-		p.userMsg(ctx, "cloned "+original)
+		p.messenger.Message(ctx, "cloned "+original)
 	}
 
 	return nil

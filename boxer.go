@@ -26,7 +26,7 @@ var schemaSQL string
 // Boxer manages the lifecycle of sandboxes.
 type Boxer struct {
 	appRoot          string
-	terminalWriter   io.Writer
+	messenger        UserMessenger
 	sqlDB            *sql.DB
 	queries          *db.Queries
 	containerService ContainerOps
@@ -46,7 +46,7 @@ func NewBoxer(appRoot string, terminalWriter io.Writer) (*Boxer, error) {
 	dbPath := filepath.Join(appRoot, "sand.db")
 	sqlDB, err := sql.Open("sqlite", dbPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open database: %w", err)
+		return nil, fmt.Errorf("failed to open database at %s: %w", dbPath, err)
 	}
 
 	// Enable WAL mode for better concurrency
@@ -68,7 +68,7 @@ func NewBoxer(appRoot string, terminalWriter io.Writer) (*Boxer, error) {
 
 	sb := &Boxer{
 		appRoot:          appRoot,
-		terminalWriter:   terminalWriter,
+		messenger:        NewTerminalMessenger(terminalWriter),
 		sqlDB:            sqlDB,
 		queries:          db.New(sqlDB),
 		containerService: NewAppleContainerOps(),
@@ -191,25 +191,25 @@ func (sb *Boxer) Cleanup(ctx context.Context, sbox *Box) error {
 
 	out, err := sb.containerService.Stop(ctx, nil, sbox.ContainerID)
 	if err != nil {
-		slog.ErrorContext(ctx, "Boxer Containers.Stop", "error", err, "out", out)
+		slog.ErrorContext(ctx, "Boxer Containers.Stop", "sandbox", sbox.ID, "error", err, "out", out)
 	}
 
 	out, err = sb.containerService.Delete(ctx, nil, sbox.ContainerID)
 	if err != nil {
-		slog.ErrorContext(ctx, "Boxer Containers.Delete", "error", err, "out", out)
+		slog.ErrorContext(ctx, "Boxer Containers.Delete", "sandbox", sbox.ID, "error", err, "out", out)
 	}
 
 	if err := sb.gitOps.RemoveRemote(ctx, sbox.HostOriginDir, ClonedWorkDirRemotePrefix+sbox.ID); err != nil {
-		return err
+		return fmt.Errorf("failed to remove git remote for sandbox %s: %w", sbox.ID, err)
 	}
 
 	if err := sb.fileOps.RemoveAll(sbox.SandboxWorkDir); err != nil {
-		return err
+		return fmt.Errorf("failed to remove workdir %s for sandbox %s: %w", sbox.SandboxWorkDir, sbox.ID, err)
 	}
 
 	// Finally, remove from database
 	if err := sb.queries.DeleteSandbox(ctx, sbox.ID); err != nil {
-		return fmt.Errorf("failed to delete sandbox from database: %w", err)
+		return fmt.Errorf("failed to delete sandbox %s from database: %w", sbox.ID, err)
 	}
 
 	return nil
@@ -265,7 +265,7 @@ func (sb *Boxer) EnsureImage(ctx context.Context, imageName string) error {
 func (sb *Boxer) pullImage(ctx context.Context, imageName string) error {
 	slog.InfoContext(ctx, "Boxer.pullImage", "imageName", imageName)
 
-	sb.userMsg(ctx, fmt.Sprintf("This may take a while: pulling container image %s...", imageName))
+	sb.messenger.Message(ctx, fmt.Sprintf("This may take a while: pulling container image %s...", imageName))
 	start := time.Now()
 
 	waitFn, err := sb.imageService.Pull(ctx, imageName)
@@ -281,16 +281,8 @@ func (sb *Boxer) pullImage(ctx context.Context, imageName string) error {
 		}
 	}
 
-	sb.userMsg(ctx, fmt.Sprintf("Done pulling container image. Took %v.", time.Since(start)))
+	sb.messenger.Message(ctx, fmt.Sprintf("Done pulling container image. Took %v.", time.Since(start)))
 	return nil
-}
-
-func (sb *Boxer) userMsg(ctx context.Context, msg string) {
-	if sb.terminalWriter == nil {
-		slog.DebugContext(ctx, "userMsg (no terminalWriter)", "msg", msg)
-		return
-	}
-	fmt.Fprintln(sb.terminalWriter, "\033[90m"+msg+"\033[0m")
 }
 
 // SaveSandbox persists the Sandbox to the database.
@@ -333,10 +325,10 @@ func (sb *Boxer) StopContainer(ctx context.Context, sbox *Box) error {
 
 	out, err := sb.containerService.Stop(ctx, nil, sbox.ContainerID)
 	if err != nil {
-		slog.ErrorContext(ctx, "Boxer.StopContainer", "error", err, "out", out)
-		return err
+		slog.ErrorContext(ctx, "Boxer.StopContainer", "sandbox", sbox.ID, "containerID", sbox.ContainerID, "error", err, "out", out)
+		return fmt.Errorf("failed to stop container for sandbox %s: %w", sbox.ID, err)
 	}
-	slog.InfoContext(ctx, "Boxer.StopContainer", "id", sbox.ID, "containerID", sbox.ContainerID, "out", out)
+	slog.InfoContext(ctx, "Boxer.StopContainer", "sandbox", sbox.ID, "containerID", sbox.ContainerID, "out", out)
 	return nil
 }
 

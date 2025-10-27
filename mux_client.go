@@ -106,6 +106,9 @@ func (m *MuxClient) ListSandboxes(ctx context.Context) ([]Box, error) {
 	if err := m.doRequest(ctx, http.MethodGet, "/list", nil, &boxes); err != nil {
 		return nil, err
 	}
+	for i := range boxes {
+		boxes[i].containerService = m.Mux.sber.containerService
+	}
 	return boxes, nil
 }
 
@@ -117,6 +120,7 @@ func (m *MuxClient) GetSandbox(ctx context.Context, id string) (*Box, error) {
 		}
 		return nil, err
 	}
+	box.containerService = m.Mux.sber.containerService
 	return &box, nil
 }
 
