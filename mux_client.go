@@ -137,6 +137,7 @@ func (m *MuxClient) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (
 	if err := m.doRequest(ctx, http.MethodPost, "/create", opts, &box); err != nil {
 		return nil, err
 	}
+	box.containerService = m.Mux.sber.containerService
 	return &box, nil
 }
 
