@@ -1,5 +1,5 @@
 # TODO: tune this to work more seamlessly with macOS, user settings etc
-FROM node:20
+FROM alpine
 
 ARG TZ
 ENV TZ="$TZ"
@@ -9,36 +9,36 @@ ARG CLAUDE_CODE_VERSION=latest
 ARG GO_VERSION=1.25.1
 
 # Install basic development tools and iptables/ipset
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apk add --no-cache \
+  bash \
   less \
   git \
+  curl \
   procps \
   sudo \
   fzf \
   zsh \
   man-db \
+  make \
   unzip \
-  gnupg2 \
-  gh \
+  gnupg \
+  github-cli \
   iptables \
   ipset \
   iproute2 \
-  dnsutils \
-  aggregate \
   jq \
   nano \
   vim \
+  nodejs \
+  npm \
   openssh-client \
-  openssh-server \
-  && apt-get clean && rm -rf /var/lib/apt/lists/*
+  openssh-server
+
+ARG USERNAME=root
+USER ${USERNAME}
 
 # Install Go toolchain
-RUN ARCH=$(dpkg --print-architecture) && \
-  case "$ARCH" in \
-    amd64) GO_ARCH="amd64" ;; \
-    arm64) GO_ARCH="arm64" ;; \
-    *) echo "Unsupported architecture: $ARCH" && exit 1 ;; \
-  esac && \
+RUN GO_ARCH=arm64 && \
   wget "https://go.dev/dl/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz" && \
   tar -C /usr/local -xzf "go${GO_VERSION}.linux-${GO_ARCH}.tar.gz" && \
   rm "go${GO_VERSION}.linux-${GO_ARCH}.tar.gz"
@@ -48,11 +48,9 @@ ENV PATH=$PATH:/usr/local/go/bin
 ENV GOPATH=/home/node/go
 ENV PATH=$PATH:$GOPATH/bin
 
-# Ensure default node user has access to /usr/local/share
+# Ensure default root user has access to /usr/local/share
 RUN mkdir -p /usr/local/share/npm-global && \
-  chown -R node:node /usr/local/share
-
-ARG USERNAME=node
+  chown -R $USERNAME:$USERNAME /usr/local/share
 
 # Persist bash history.
 RUN SNIPPET="export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhistory/.bash_history" \
@@ -64,8 +62,8 @@ RUN SNIPPET="export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhisto
 ENV DEVCONTAINER=true
 
 # Create workspace and config directories and set permissions
-RUN mkdir -p /workspace /home/node/.claude && \
-  chown -R node:node /workspace /home/node/.claude
+RUN mkdir -p /workspace /home/$USERNAME/.claude && \
+  chown -R  $USERNAME:$USERNAME /workspace /home/$USERNAME/.claude
 
 # Configure SSH for GitHub authentication
 RUN mkdir -p /root/.ssh && \
@@ -80,12 +78,6 @@ RUN chmod +x /usr/local/bin/sand-sketch
 ADD sshd_config /etc/ssh/sshd_config
 
 WORKDIR /workspace
-
-ARG GIT_DELTA_VERSION=0.18.2
-RUN ARCH=$(dpkg --print-architecture) && \
-  wget "https://github.com/dandavison/delta/releases/download/${GIT_DELTA_VERSION}/git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb" && \
-  sudo dpkg -i "git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb" && \
-  rm "git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb"
 
 # Set default user to root
 USER root
