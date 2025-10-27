@@ -9,7 +9,7 @@ import (
 	"github.com/banksean/sand/applecontainer/types"
 )
 
-type ContainerService interface {
+type ContainerOps interface {
 	Create(ctx context.Context, opts *options.CreateContainer, image string, args []string) (string, error)
 	Start(ctx context.Context, opts *options.StartContainer, containerID string) (string, error)
 	Stop(ctx context.Context, opts *options.StopContainer, containerID string) (string, error)
@@ -19,55 +19,55 @@ type ContainerService interface {
 	Inspect(ctx context.Context, containerID string) ([]types.Container, error)
 }
 
-type ImageService interface {
+type ImageOps interface {
 	List(ctx context.Context) ([]types.ImageEntry, error)
 	Pull(ctx context.Context, image string) (func() error, error)
 }
 
-type appleContainerService struct{}
+type appleContainerOps struct{}
 
-func NewAppleContainerService() ContainerService {
-	return &appleContainerService{}
+func NewAppleContainerOps() ContainerOps {
+	return &appleContainerOps{}
 }
 
-func (a *appleContainerService) Create(ctx context.Context, opts *options.CreateContainer, image string, args []string) (string, error) {
+func (a *appleContainerOps) Create(ctx context.Context, opts *options.CreateContainer, image string, args []string) (string, error) {
 	return ac.Containers.Create(ctx, opts, image, args)
 }
 
-func (a *appleContainerService) Start(ctx context.Context, opts *options.StartContainer, containerID string) (string, error) {
+func (a *appleContainerOps) Start(ctx context.Context, opts *options.StartContainer, containerID string) (string, error) {
 	return ac.Containers.Start(ctx, opts, containerID)
 }
 
-func (a *appleContainerService) Stop(ctx context.Context, opts *options.StopContainer, containerID string) (string, error) {
+func (a *appleContainerOps) Stop(ctx context.Context, opts *options.StopContainer, containerID string) (string, error) {
 	return ac.Containers.Stop(ctx, opts, containerID)
 }
 
-func (a *appleContainerService) Delete(ctx context.Context, opts *options.DeleteContainer, containerID string) (string, error) {
+func (a *appleContainerOps) Delete(ctx context.Context, opts *options.DeleteContainer, containerID string) (string, error) {
 	return ac.Containers.Delete(ctx, opts, containerID)
 }
 
-func (a *appleContainerService) Exec(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, args ...string) (string, error) {
+func (a *appleContainerOps) Exec(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, args ...string) (string, error) {
 	return ac.Containers.Exec(ctx, opts, containerID, cmd, env, args...)
 }
 
-func (a *appleContainerService) ExecStream(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, stdin io.Reader, stdout, stderr io.Writer) (func() error, error) {
+func (a *appleContainerOps) ExecStream(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, stdin io.Reader, stdout, stderr io.Writer) (func() error, error) {
 	return ac.Containers.ExecStream(ctx, opts, containerID, cmd, env, stdin, stdout, stderr)
 }
 
-func (a *appleContainerService) Inspect(ctx context.Context, containerID string) ([]types.Container, error) {
+func (a *appleContainerOps) Inspect(ctx context.Context, containerID string) ([]types.Container, error) {
 	return ac.Containers.Inspect(ctx, containerID)
 }
 
-type appleImageService struct{}
+type appleImageOps struct{}
 
-func NewAppleImageService() ImageService {
-	return &appleImageService{}
+func NewAppleImageOps() ImageOps {
+	return &appleImageOps{}
 }
 
-func (a *appleImageService) List(ctx context.Context) ([]types.ImageEntry, error) {
+func (a *appleImageOps) List(ctx context.Context) ([]types.ImageEntry, error) {
 	return ac.Images.List(ctx)
 }
 
-func (a *appleImageService) Pull(ctx context.Context, image string) (func() error, error) {
+func (a *appleImageOps) Pull(ctx context.Context, image string) (func() error, error) {
 	return ac.Images.Pull(ctx, image)
 }

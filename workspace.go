@@ -86,7 +86,7 @@ type DefaultWorkspaceCloner struct {
 	appRoot        string
 	cloneRoot      string
 	terminalWriter io.Writer
-	gitOps         GitOperations
+	gitOps         GitOps
 	fileOps        FileOps
 }
 

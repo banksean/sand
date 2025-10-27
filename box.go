@@ -51,7 +51,7 @@ type Box struct {
 	// ContainerHooks run after the container has started to perform any bootstrap logic.
 	ContainerHooks []ContainerStartupHook `json:"-"`
 	// containerService is the service for interacting with containers
-	containerService ContainerService
+	containerService ContainerOps
 }
 
 func (sb *Box) GetContainer(ctx context.Context) (*types.Container, error) {

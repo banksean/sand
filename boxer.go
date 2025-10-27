@@ -29,9 +29,9 @@ type Boxer struct {
 	terminalWriter   io.Writer
 	sqlDB            *sql.DB
 	queries          *db.Queries
-	containerService ContainerService
-	imageService     ImageService
-	gitOps           GitOperations
+	containerService ContainerOps
+	imageService     ImageOps
+	gitOps           GitOps
 	fileOps          FileOps
 }
 
@@ -71,8 +71,8 @@ func NewBoxer(appRoot string, terminalWriter io.Writer) (*Boxer, error) {
 		terminalWriter:   terminalWriter,
 		sqlDB:            sqlDB,
 		queries:          db.New(sqlDB),
-		containerService: NewAppleContainerService(),
-		imageService:     NewAppleImageService(),
+		containerService: NewAppleContainerOps(),
+		imageService:     NewAppleImageOps(),
 		gitOps:           NewDefaultGitOps(),
 		fileOps:          fileOps,
 	}

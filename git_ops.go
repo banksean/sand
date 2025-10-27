@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-type GitOperations interface {
+type GitOps interface {
 	AddRemote(ctx context.Context, dir, name, url string) error
 	RemoveRemote(ctx context.Context, dir, name string) error
 	Fetch(ctx context.Context, dir, remote string) error
@@ -16,7 +16,7 @@ type GitOperations interface {
 
 type defaultGitOps struct{}
 
-func NewDefaultGitOps() GitOperations {
+func NewDefaultGitOps() GitOps {
 	return &defaultGitOps{}
 }
 
