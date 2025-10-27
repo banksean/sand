@@ -1,5 +1,17 @@
 # Test Coverage Improvement Plan
 
+## ✅ Completed Refactorings
+
+Three major refactorings have been completed to enable comprehensive testing:
+
+1. **Container Operations** - `container_ops.go` provides ContainerOps and ImageOps interfaces
+2. **Git Operations** - `git_ops.go` provides GitOps interface  
+3. **File Operations** - `fileops.go` provides FileOps interface
+
+All external dependencies (containers, git, filesystem) are now abstracted behind mockable interfaces. The codebase is ready for comprehensive unit testing!
+
+---
+
 ## Current Coverage Status
 
 **box.go**: 0% - No tests at all  
@@ -32,8 +44,8 @@
 7. **effectiveMounts** - Test mount generation logic with custom mounts vs. defaults
 
 #### Test Strategy:
-- Use mock container service or test containers
-- Create temporary directories for filesystem tests
+- Mock ContainerOps interface (implemented in container_ops.go)
+- Mock FileOps interface (implemented in fileops.go) for filesystem operations
 - Test error paths (missing directories, failed container operations)
 - Test hook execution and error aggregation with `errors.Join`
 - Verify all error states are properly set (SandboxWorkDirError, SandboxContainerError)
@@ -76,8 +88,9 @@
 8. **userMsg** - Test terminal output with/without terminalWriter
 
 #### Test Strategy:
-- Mock `applecontainer.Containers` and `applecontainer.Images` for container/image operations
-- Use test git repositories for cleanup tests
+- Mock ContainerOps and ImageOps interfaces (implemented in container_ops.go)
+- Mock GitOps interface (implemented in git_ops.go) for git operations
+- Use test git repositories for integration tests if needed
 - Test error handling in all paths
 - Test terminalWriter output capture with bytes.Buffer
 - Integration tests with real WorkspaceCloner
@@ -119,24 +132,24 @@
 10. **defaultContainerHook** - Test default bootstrap logic, error aggregation
 
 #### Test Strategy:
-- Create minimal git repos for cloning tests
+- Mock GitOps interface (implemented in git_ops.go) for git operations
+- Mock FileOps interface (implemented in fileops.go) for filesystem operations
 - Test symlink handling comprehensively (relative, absolute, broken)
 - Test missing file scenarios
 - Mock Box.Exec for hook testing
-- Test git remote setup/removal with real git commands
-- Use temp directories for all filesystem operations
+- Integration tests can use real git and filesystem if needed
 
 ---
 
 ## Suggested Refactorings
 
-### 1. Extract Container Operations Interface (boxer.go, box.go)
+### 1. Extract Container Operations Interface (boxer.go, box.go) ✅ COMPLETED
 
-**Current Issue**: Direct dependency on `applecontainer` package makes testing difficult.
+**Status**: Implemented in `container_ops.go`
 
-**Proposed Solution**:
+**Solution**:
 ```go
-type ContainerService interface {
+type ContainerOps interface {
     Create(ctx context.Context, opts *options.CreateContainer, image string, args []string) (string, error)
     Start(ctx context.Context, opts *options.StartContainer, containerID string) (string, error)
     Stop(ctx context.Context, opts *options.StopContainer, containerID string) (string, error)
@@ -146,7 +159,7 @@ type ContainerService interface {
     Inspect(ctx context.Context, containerID string) ([]types.Container, error)
 }
 
-type ImageService interface {
+type ImageOps interface {
     List(ctx context.Context) ([]types.Image, error)
     Pull(ctx context.Context, image string) (func() error, error)
 }
@@ -154,47 +167,43 @@ type ImageService interface {
 
 **Benefit**: Enables mocking for comprehensive unit tests without real containers. Can inject mock services into Boxer and Box.
 
-**Impact**: Medium refactor - affects Box and Boxer constructors, all container operations.
+**Changes Made**:
+- Created `container_ops.go` with ContainerOps and ImageOps interfaces
+- Box now has `containerOps ContainerOps` field
+- Boxer now has `containerOps` and `imageOps` fields
+- All direct `ac.Containers.*` and `ac.Images.*` calls replaced with interface methods
 
 ---
 
-### 2. Extract Git Operations (workspace.go)
+### 2. Extract Git Operations (workspace.go, boxer.go) ✅ COMPLETED
 
-**Current Issue**: Direct `exec.Command` calls make testing difficult and slow.
+**Status**: Implemented in `git_ops.go`
 
-**Proposed Solution**:
+**Solution**:
 ```go
-type GitOperations interface {
+type GitOps interface {
     AddRemote(ctx context.Context, dir, name, url string) error
     RemoveRemote(ctx context.Context, dir, name string) error
     Fetch(ctx context.Context, dir, remote string) error
 }
-
-type defaultGitOps struct{}
-
-func (g *defaultGitOps) AddRemote(ctx context.Context, dir, name, url string) error {
-    cmd := exec.CommandContext(ctx, "git", "remote", "add", name, url)
-    cmd.Dir = dir
-    output, err := cmd.CombinedOutput()
-    if err != nil {
-        return fmt.Errorf("git remote add failed: %w (output: %s)", err, output)
-    }
-    return nil
-}
-// ... similar for other operations
 ```
 
 **Benefit**: Simplifies testing cloneWorkDir without actual git operations. Enables fast unit tests with mocked git.
 
-**Impact**: Small refactor - only affects DefaultWorkspaceCloner, already has good boundaries.
+**Changes Made**:
+- Created `git_ops.go` with GitOps interface and defaultGitOps implementation
+- DefaultWorkspaceCloner now has `gitOps GitOps` field
+- Boxer now has `gitOps GitOps` field
+- cloneWorkDir simplified from ~40 lines to ~10 lines
+- Boxer.Cleanup now uses gitOps.RemoveRemote instead of exec.Command
 
 ---
 
-### 3. Extract Filesystem Operations (workspace.go, boxer.go)
+### 3. Extract Filesystem Operations (workspace.go, boxer.go) ✅ COMPLETED
 
-**Current Issue**: Direct `os` package calls make testing require real filesystem, slow tests.
+**Status**: Implemented in `fileops.go`
 
-**Proposed Solution**:
+**Solution**:
 ```go
 type FileOps interface {
     MkdirAll(path string, perm os.FileMode) error
@@ -204,14 +213,19 @@ type FileOps interface {
     Readlink(path string) (string, error)
     Create(path string) (*os.File, error)
     RemoveAll(path string) error
+    WriteFile(path string, data []byte, perm os.FileMode) error
 }
 ```
 
 **Benefit**: Enables testing without filesystem side effects. Can use in-memory implementations for fast tests.
 
-**Impact**: Medium refactor - pervasive change but mechanical. Consider using existing libraries like `afero`.
-
-**Note**: May not be worth it initially - temp directories work fine for tests. Consider only if tests become too slow.
+**Changes Made**:
+- Created `fileops.go` with FileOps interface and defaultFileOps implementation
+- DefaultWorkspaceCloner now has `fileOps FileOps` field
+- Boxer now has `fileOps FileOps` field
+- All os.MkdirAll, os.Stat, os.Lstat, os.Readlink, os.Create, os.RemoveAll, os.WriteFile calls replaced
+- All exec.Command("cp", ...) calls replaced with fileOps.Copy
+- Helper functions like writeKeyToFile and createKeyPairIfMissing now accept FileOps parameter
 
 ---
 
@@ -442,12 +456,13 @@ func (nm *nullMessenger) Message(ctx context.Context, msg string) {
 ### 4. **mocks_test.go** or use mockgen (SUPPORT FILE)
 - **Estimated effort**: 1-2 hours
 - **Contents**:
-  - Mock ContainerService
-  - Mock ImageService
-  - Mock GitOperations
-  - Mock FileOps (if refactored)
+  - Mock ContainerOps (from container_ops.go)
+  - Mock ImageOps (from container_ops.go)
+  - Mock GitOps (from git_ops.go)
+  - Mock FileOps (from fileops.go)
   - Mock WorkspaceCloner
 - **Alternative**: Use `github.com/golang/mock` or `github.com/stretchr/testify/mock`
+- **Note**: All major external dependencies now have interfaces ready for mocking!
 
 ---
 
@@ -715,3 +730,45 @@ func assertNoError(t *testing.T, err error) {
 - Consider using `t.TempDir()` instead of `os.MkdirTemp` in new tests (auto-cleanup)
 - All tests should work with `GOEXPERIMENT=synctest` flag
 - Consider adding `-short` flag support to skip slow integration tests
+
+---
+
+## Refactoring Implementation Summary
+
+The following interfaces have been implemented to enable comprehensive mocking and testing:
+
+### container_ops.go
+```go
+type ContainerOps interface {
+    Create, Start, Stop, Delete, Exec, ExecStream, Inspect
+}
+type ImageOps interface {
+    List, Pull
+}
+// Default implementation: appleContainerOps, appleImageOps
+```
+
+### git_ops.go
+```go
+type GitOps interface {
+    AddRemote(ctx, dir, name, url)
+    RemoveRemote(ctx, dir, name)
+    Fetch(ctx, dir, remote)
+}
+// Default implementation: defaultGitOps
+```
+
+### fileops.go
+```go
+type FileOps interface {
+    MkdirAll, Copy, Stat, Lstat, Readlink, Create, RemoveAll, WriteFile
+}
+// Default implementation: defaultFileOps
+```
+
+**Impact**:
+- Box struct now has `containerOps ContainerOps` field
+- Boxer struct now has `containerOps`, `imageOps`, `gitOps`, and `fileOps` fields
+- DefaultWorkspaceCloner now has `gitOps` and `fileOps` fields
+- All direct calls to `applecontainer`, `exec.Command("git",...)`, `exec.Command("cp",...)`, and `os.*` file operations replaced with interface methods
+- Ready for comprehensive unit testing with mock implementations
