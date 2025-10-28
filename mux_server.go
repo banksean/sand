@@ -24,6 +24,7 @@ const (
 type Mux struct {
 	AppBaseDir string
 	SocketPath string
+	MCP        *MCP
 
 	sber *Boxer
 
@@ -36,6 +37,7 @@ func NewMuxServer(appBaseDir string, sber *Boxer) *Mux {
 	return &Mux{
 		AppBaseDir: appBaseDir,
 		SocketPath: filepath.Join(appBaseDir, defaultSocketFile),
+		MCP:        &MCP{ChromeDevToolsPort: 9222},
 		sber:       sber,
 	}
 }
@@ -99,6 +101,11 @@ func (m *Mux) startDaemonServer(ctx context.Context) error {
 	// Start HTTP server
 	go m.serveHTTP(ctx)
 
+	go func() {
+		if err := m.MCP.StartMCPDeps(ctx); err != nil {
+			slog.ErrorContext(ctx, "startDaemonServer MCP.StartMCPDeps", "error", err)
+		}
+	}()
 	// Wait for shutdown signal
 	<-m.shutdown
 
@@ -125,6 +132,12 @@ func (m *Mux) Shutdown(ctx context.Context) {
 	// Close listener (stops accepting new connections)
 	if m.listener != nil {
 		m.listener.Close()
+	}
+
+	if m.MCP != nil {
+		if err := m.MCP.Cleanup(ctx); err != nil {
+			slog.ErrorContext(ctx, "Mux.Shutdown: MCP.Cleanup", "error", err)
+		}
 	}
 
 	// Remove socket file. This mail fail in many cases since closing the listener appears

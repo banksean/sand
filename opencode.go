@@ -9,6 +9,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
+
+	"github.com/banksean/sand/applecontainer/types"
 )
 
 type OpenCodeWorkspaceCloner struct {
@@ -43,7 +46,18 @@ func (c *OpenCodeWorkspaceCloner) Prepare(ctx context.Context, req CloneRequest)
 	if err := c.cloneOpenCodeDirs(ctx, req.HostWorkDir, req.ID); err != nil {
 		return nil, err
 	}
+
+	if err := c.configureOpenCode(ctx, req.HostWorkDir, req.ID); err != nil {
+		return nil, err
+	}
 	return result, nil
+}
+
+func getContainerHostname(ctr *types.Container) string {
+	for _, n := range ctr.Networks {
+		return strings.TrimSuffix(n.Hostname, ".")
+	}
+	return ctr.Configuration.ID
 }
 
 func (c *OpenCodeWorkspaceCloner) Hydrate(ctx context.Context, box *Box) error {
@@ -55,6 +69,33 @@ func (c *OpenCodeWorkspaceCloner) Hydrate(ctx context.Context, box *Box) error {
 				return err
 			}
 
+			return nil
+		}))
+
+	box.ContainerHooks = append(box.ContainerHooks,
+		NewContainerStartupHook("open remote ssh tunnel for chrome-devtools mcp", func(ctx context.Context, b *Box) error {
+			ctr, err := b.GetContainer(ctx)
+			if err != nil {
+				return err
+			}
+			// No context - this should run in a separate process that outlives the cloner startup hook invocations.
+			cmd := exec.Command("ssh", "-R", "9222:127.0.0.1:9222", "-N", "-o", "ExitOnForwardFailure=yes", "-o", "BatchMode=yes", "root@"+getContainerHostname(ctr))
+			cmd.SysProcAttr = &syscall.SysProcAttr{
+				Setpgid: true,
+			}
+			slog.InfoContext(ctx, "OpenCodeWorkspaceCloner opening ssh remote port forward", "cmd", strings.Join(cmd.Args, " "))
+			if err := cmd.Start(); err != nil {
+				slog.ErrorContext(ctx, "OpenCodeWorkspaceCloner opening ssh remote port forward", "error", err)
+				return err
+			}
+			slog.InfoContext(ctx, "OpenCodeWorkspaceCloner ssh remote port forward", "pid", cmd.Process.Pid)
+			go func() {
+				if err := cmd.Wait(); err != nil {
+					slog.ErrorContext(ctx, "OpenCodeWorkspaceCloner ssh remote port forward cmd", "error", err)
+				}
+			}()
+			// TODO: save the pid of the ssh tunnel process somewhere in the db so we can kill it later during cleanup,
+			// which may occur in a different process (sand cli invocation) than this one.
 			return nil
 		}))
 	slog.InfoContext(ctx, "OpenCodeWorkspaceCloner.Hydrate", "box", box)
@@ -100,7 +141,7 @@ func (c *OpenCodeWorkspaceCloner) cloneOpenCodeDirs(ctx context.Context, cwd, id
 	slog.InfoContext(ctx, "cloneOpenCodeStorage", "cmd", strings.Join(cmd.Args, " "))
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		slog.InfoContext(ctx, "cloneOpenCodeStorage", "error", err, "output", string(output))
+		slog.ErrorContext(ctx, "cloneOpenCodeStorage", "error", err, "output", string(output))
 		return err
 	}
 
@@ -119,7 +160,7 @@ func (c *OpenCodeWorkspaceCloner) cloneOpenCodeDirs(ctx context.Context, cwd, id
 	slog.InfoContext(ctx, "cloneOpenCodeStorage", "cmd", strings.Join(cmd.Args, " "))
 	output, err = cmd.CombinedOutput()
 	if err != nil {
-		slog.InfoContext(ctx, "cloneOpenCodeStorage", "error", err, "output", string(output))
+		slog.ErrorContext(ctx, "cloneOpenCodeStorage", "error", err, "output", string(output))
 		return err
 	}
 
@@ -138,7 +179,40 @@ func (c *OpenCodeWorkspaceCloner) cloneOpenCodeDirs(ctx context.Context, cwd, id
 	slog.InfoContext(ctx, "cloneOpenCodeStorage", "cmd", strings.Join(cmd.Args, " "))
 	output, err = cmd.CombinedOutput()
 	if err != nil {
-		slog.InfoContext(ctx, "cloneOpenCodeStorage", "error", err, "output", string(output))
+		slog.ErrorContext(ctx, "cloneOpenCodeStorage", "error", err, "output", string(output))
+		return err
+	}
+
+	return err
+}
+
+const opencodeJSON = `
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "chrome-devtools": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "chrome-devtools-mcp@latest",
+        "--browserUrl",
+        "http://127.0.0.1:9222"
+      ],
+      "enabled": true,
+      "environment": {
+      }
+    }
+  }
+}`
+
+func (c *OpenCodeWorkspaceCloner) configureOpenCode(ctx context.Context, cwd, id string) error {
+	// TODO: read existing opencode.json files and merge them with the settings we want to override here.
+	cloneOpenCodeConfig := filepath.Join(c.cloneRoot, id, "dotfiles", ".local", "share", "opencode", "opencode.jsonc")
+
+	err := os.WriteFile(cloneOpenCodeConfig, []byte(opencodeJSON), 0o700)
+	if err != nil {
+		slog.ErrorContext(ctx, "configureOpenCode", "error", err)
 		return err
 	}
 
