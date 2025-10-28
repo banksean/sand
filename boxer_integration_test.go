@@ -398,11 +398,8 @@ func TestBoxer_Cleanup_EndToEnd(t *testing.T) {
 		}
 
 		err := boxer.Cleanup(ctx, box)
-		if err == nil {
-			t.Fatal("Expected error from git remote removal, got nil")
-		}
-		if !strings.Contains(err.Error(), "test-sandbox") {
-			t.Errorf("Error should contain sandbox ID, got: %v", err)
+		if err != nil {
+			t.Fatal("error from git remote removal should not cause Cleanupt to return an error")
 		}
 	})
 
@@ -431,11 +428,8 @@ func TestBoxer_Cleanup_EndToEnd(t *testing.T) {
 		}
 
 		err := boxer.Cleanup(ctx, box)
-		if err == nil {
-			t.Fatal("Expected error from file removal, got nil")
-		}
-		if !strings.Contains(err.Error(), "test-sandbox") {
-			t.Errorf("Error should contain sandbox ID, got: %v", err)
+		if err != nil {
+			t.Fatal("Error from file removal should not cause Cleanup to return an error")
 		}
 	})
 }

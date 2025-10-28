@@ -200,11 +200,11 @@ func (sb *Boxer) Cleanup(ctx context.Context, sbox *Box) error {
 	}
 
 	if err := sb.gitOps.RemoveRemote(ctx, sbox.HostOriginDir, ClonedWorkDirRemotePrefix+sbox.ID); err != nil {
-		return fmt.Errorf("failed to remove git remote for sandbox %s: %w", sbox.ID, err)
+		slog.ErrorContext(ctx, "Boxer Containers.Delete failed to remove git remote", "sandbox", sbox.ID, "error", err)
 	}
 
 	if err := sb.fileOps.RemoveAll(sbox.SandboxWorkDir); err != nil {
-		return fmt.Errorf("failed to remove workdir %s for sandbox %s: %w", sbox.SandboxWorkDir, sbox.ID, err)
+		slog.ErrorContext(ctx, "Boxer Containers.Delete failed to remove workdir", "sandbox", sbox.ID, "error", err)
 	}
 
 	// Finally, remove from database
