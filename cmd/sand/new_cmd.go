@@ -25,6 +25,10 @@ func (c *NewCmd) Run(cctx *Context) error {
 
 	slog.InfoContext(ctx, "NewCmd.Run")
 
+	if err := verifyPrerequisites(ctx, "git-dir", "git-ssh-checkout"); err != nil {
+		return err
+	}
+
 	if err := cctx.sber.EnsureImage(ctx, c.ImageName); err != nil {
 		slog.ErrorContext(ctx, "sber.Init", "error", err)
 		return err

@@ -35,6 +35,10 @@ type DiffCmd struct {
 func (c *DiffCmd) Run(cctx *Context) error {
 	ctx := cctx.Context
 
+	if err := verifyPrerequisites(ctx, "git-dir", "git-ssh-checkout"); err != nil {
+		return err
+	}
+
 	// Get the sandbox to verify it exists and get its metadata
 	mux := sand.NewMuxServer(cctx.AppBaseDir, cctx.sber)
 	mc, err := mux.NewClient(ctx)
@@ -195,6 +199,10 @@ func (c *DiffCmd) cleanupTempCommit(ctx context.Context, sandboxWorkDir string) 
 func (c *StatusCmd) Run(cctx *Context) error {
 	ctx := cctx.Context
 
+	if err := verifyPrerequisites(ctx, "git-dir", "git-ssh-checkout"); err != nil {
+		return err
+	}
+
 	// Get the sandbox to verify it exists and get its metadata
 	mux := sand.NewMuxServer(cctx.AppBaseDir, cctx.sber)
 	mc, err := mux.NewClient(ctx)
@@ -251,6 +259,10 @@ func (c *StatusCmd) Run(cctx *Context) error {
 
 func (c *LogCmd) Run(cctx *Context) error {
 	ctx := cctx.Context
+
+	if err := verifyPrerequisites(ctx, "git-dir", "git-ssh-checkout"); err != nil {
+		return err
+	}
 
 	// Get the sandbox to verify it exists and get its metadata
 	mux := sand.NewMuxServer(cctx.AppBaseDir, cctx.sber)

@@ -71,7 +71,6 @@ func (c *DaemonCmd) version(ctx context.Context, mux *sand.Mux) error {
 		}
 	}
 	return nil
-	return nil
 }
 
 func (c *DaemonCmd) checkStatus(ctx context.Context, mux *sand.Mux) error {
