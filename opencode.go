@@ -40,6 +40,9 @@ func (c *OpenCodeWorkspaceCloner) Prepare(ctx context.Context, req CloneRequest)
 		return nil, err
 	}
 
+	if err := c.cloneOpenCodeDirs(ctx, req.HostWorkDir, req.ID); err != nil {
+		return nil, err
+	}
 	return result, nil
 }
 
@@ -75,6 +78,67 @@ func (c *OpenCodeWorkspaceCloner) cloneOpenCodeAuth(ctx context.Context, cwd, id
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		slog.InfoContext(ctx, "cloneOpenCodeAuth", "error", err, "output", string(output))
+		return err
+	}
+
+	return err
+}
+
+func (c *OpenCodeWorkspaceCloner) cloneOpenCodeDirs(ctx context.Context, cwd, id string) error {
+	cloneOpenCodeStorage := filepath.Join(c.cloneRoot, id, "dotfiles", ".local", "share", "opencode", "storage")
+	openCodeStorage := filepath.Join(os.Getenv("HOME"), ".local", "share", "opencode", "storage")
+
+	if _, err := os.Stat(openCodeStorage); errors.Is(err, os.ErrNotExist) {
+		f, err := os.Create(cloneOpenCodeStorage)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		return nil
+	}
+	cmd := exec.CommandContext(ctx, "cp", "-Rc", openCodeStorage, cloneOpenCodeStorage)
+	slog.InfoContext(ctx, "cloneOpenCodeStorage", "cmd", strings.Join(cmd.Args, " "))
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		slog.InfoContext(ctx, "cloneOpenCodeStorage", "error", err, "output", string(output))
+		return err
+	}
+
+	cloneOpenCodeLog := filepath.Join(c.cloneRoot, id, "dotfiles", ".local", "share", "opencode", "log")
+	openCodeLog := filepath.Join(os.Getenv("HOME"), ".local", "share", "opencode", "log")
+
+	if _, err := os.Stat(openCodeLog); errors.Is(err, os.ErrNotExist) {
+		f, err := os.Create(cloneOpenCodeLog)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		return nil
+	}
+	cmd = exec.CommandContext(ctx, "cp", "-Rc", openCodeLog, cloneOpenCodeLog)
+	slog.InfoContext(ctx, "cloneOpenCodeStorage", "cmd", strings.Join(cmd.Args, " "))
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		slog.InfoContext(ctx, "cloneOpenCodeStorage", "error", err, "output", string(output))
+		return err
+	}
+
+	cloneOpenCodeSnapshot := filepath.Join(c.cloneRoot, id, "dotfiles", ".local", "share", "opencode", "snapshot")
+	openCodeSnapshot := filepath.Join(os.Getenv("HOME"), ".local", "share", "opencode", "snapshot")
+
+	if _, err := os.Stat(openCodeSnapshot); errors.Is(err, os.ErrNotExist) {
+		f, err := os.Create(cloneOpenCodeSnapshot)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		return nil
+	}
+	cmd = exec.CommandContext(ctx, "cp", "-Rc", openCodeSnapshot, cloneOpenCodeSnapshot)
+	slog.InfoContext(ctx, "cloneOpenCodeStorage", "cmd", strings.Join(cmd.Args, " "))
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		slog.InfoContext(ctx, "cloneOpenCodeStorage", "error", err, "output", string(output))
 		return err
 	}
 

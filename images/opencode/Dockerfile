@@ -23,6 +23,7 @@ RUN apk add --no-cache \
   ipset \
   iproute2 \
   jq \
+  tar \
   nano \
   vim \
   nodejs \
