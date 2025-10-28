@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 
 	"github.com/banksean/sand"
 	"github.com/google/uuid"
@@ -54,6 +55,10 @@ func (c *NewCmd) Run(cctx *Context) error {
 	if err != nil {
 		slog.ErrorContext(ctx, "NewClient", "error", err)
 		return err
+	}
+
+	if !filepath.IsAbs(c.EnvFile) {
+		c.EnvFile = filepath.Join(c.CloneFromDir, c.EnvFile)
 	}
 
 	// Try to get existing sandbox

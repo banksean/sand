@@ -160,6 +160,9 @@ func verifyPrerequisites(ctx context.Context, checkIDs ...string) error {
 			slog.InfoContext(ctx, "diagnosticCheck passed", "name", check.Description)
 		}
 	}
+	if len(failures) == 0 {
+		return nil
+	}
 	errs := []error{}
 	slog.ErrorContext(ctx, "prerequisite check(s) failed", "failures", failures)
 	for id, description := range failures {
