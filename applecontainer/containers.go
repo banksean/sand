@@ -151,11 +151,12 @@ func (c *ContainerSvc) Exec(ctx context.Context, opts *options.ExecContainer, co
 	args := options.ToArgs(opts)
 	args = append(args, append([]string{containerID, command}, cmdArgs...)...)
 	cmd := exec.CommandContext(ctx, "container", append([]string{"exec"}, args...)...)
+	cmd.Env = env
 	slog.InfoContext(ctx, "ContainerSvc.Exec", "cmd", strings.Join(cmd.Args, " "))
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		slog.ErrorContext(ctx, "ContainerSvc.Exec", "error", err, "out", string(out))
-		return "", err
+		return string(out), err
 	}
 
 	return string(out), nil

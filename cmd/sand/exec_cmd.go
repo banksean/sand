@@ -20,10 +20,6 @@ type ExecCmd struct {
 
 func (c *ExecCmd) Run(cctx *Context) error {
 	ctx := cctx.Context
-	if err := cctx.sber.EnsureImage(ctx, c.ImageName); err != nil {
-		slog.ErrorContext(ctx, "sber.Init", "error", err)
-		return err
-	}
 
 	cwd, err := os.Getwd()
 	if err != nil {

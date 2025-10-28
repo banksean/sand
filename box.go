@@ -185,8 +185,8 @@ func (sb *Box) Exec(ctx context.Context, shellCmd string, args ...string) (strin
 			},
 		}, sb.ContainerID, shellCmd, os.Environ(), args...)
 	if err != nil {
-		slog.ErrorContext(ctx, "shell: containerService.Exec", "sandbox", sb.ID, "error", err)
-		return "", fmt.Errorf("failed to execute command for sandbox %s: %w", sb.ID, err)
+		slog.ErrorContext(ctx, "shell: containerService.Exec", "sandbox", sb.ID, "error", err, "output", output)
+		return output, fmt.Errorf("failed to execute command for sandbox %s: %w", sb.ID, err)
 	}
 
 	return output, nil

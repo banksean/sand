@@ -128,6 +128,7 @@ func (p *DefaultWorkspaceCloner) Prepare(ctx context.Context, req CloneRequest) 
 	mounts := p.mountPlanFor(sandboxWorkDir)
 	hooks := []ContainerStartupHook{
 		p.defaultContainerHook(),
+		p.githubSSHContainerHook(),
 	}
 
 	return &CloneResult{
@@ -279,6 +280,21 @@ func (p *DefaultWorkspaceCloner) cloneDotfiles(ctx context.Context, id string) e
 	}
 
 	return nil
+}
+
+// Make sure `ssh git@github.com` can authenticate with ssh-agent.
+// TODO: make this work with other remotes that aren't hosted on github.com.
+func (p *DefaultWorkspaceCloner) githubSSHContainerHook() ContainerStartupHook {
+	return NewContainerStartupHook("git ssh auth check", func(ctx context.Context, b *Box) error {
+		var errs []error
+
+		sshOut, err := b.Exec(ctx, "/usr/bin/ssh", "-T", "git@github.com")
+		if err != nil && strings.Contains(sshOut, "git@github.com: Permission denied (publickey)") {
+			slog.ErrorContext(ctx, "DefaultContainerHook checking for ssh auth", "error", err, "sshOut", sshOut)
+			errs = append(errs, fmt.Errorf("you may need to run `ssh-add --apple-use-keychain ~/.ssh/<github ssh key>` for ssh-agent to work with your git remote: %w", err))
+		}
+		return errors.Join(errs...)
+	})
 }
 
 func (p *DefaultWorkspaceCloner) defaultContainerHook() ContainerStartupHook {

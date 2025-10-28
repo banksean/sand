@@ -997,8 +997,8 @@ func TestDefaultWorkspaceCloner_Prepare(t *testing.T) {
 			t.Errorf("Expected 3 mounts, got %d", len(result.Mounts))
 		}
 
-		if len(result.ContainerHooks) != 1 {
-			t.Errorf("Expected 1 hook, got %d", len(result.ContainerHooks))
+		if len(result.ContainerHooks) != 2 {
+			t.Errorf("Expected 2 hooks, got %d", len(result.ContainerHooks))
 		}
 	})
 
