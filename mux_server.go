@@ -24,9 +24,9 @@ const (
 type Mux struct {
 	AppBaseDir string
 	SocketPath string
-	MCP        *MCP
 
-	sber *Boxer
+	hostMCP *HostMCP
+	sber    *Boxer
 
 	listener net.Listener
 	lockFile *os.File
@@ -37,8 +37,11 @@ func NewMuxServer(appBaseDir string, sber *Boxer) *Mux {
 	return &Mux{
 		AppBaseDir: appBaseDir,
 		SocketPath: filepath.Join(appBaseDir, defaultSocketFile),
-		MCP:        &MCP{ChromeDevToolsPort: 9222},
-		sber:       sber,
+		hostMCP: &HostMCP{
+			ChromeDevToolsPort: 9222,
+			ChromeUserDataDir:  "/tmp/chrome-profile-stable", // TODO: different user data dirs for different Mux PIDs?
+		},
+		sber: sber,
 	}
 }
 
@@ -102,7 +105,7 @@ func (m *Mux) startDaemonServer(ctx context.Context) error {
 	go m.serveHTTP(ctx)
 
 	go func() {
-		if err := m.MCP.StartMCPDeps(ctx); err != nil {
+		if err := m.hostMCP.StartHostServices(ctx); err != nil {
 			slog.ErrorContext(ctx, "startDaemonServer MCP.StartMCPDeps", "error", err)
 		}
 	}()
@@ -134,8 +137,8 @@ func (m *Mux) Shutdown(ctx context.Context) {
 		m.listener.Close()
 	}
 
-	if m.MCP != nil {
-		if err := m.MCP.Cleanup(ctx); err != nil {
+	if m.hostMCP != nil {
+		if err := m.hostMCP.Cleanup(ctx); err != nil {
 			slog.ErrorContext(ctx, "Mux.Shutdown: MCP.Cleanup", "error", err)
 		}
 	}

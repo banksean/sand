@@ -110,6 +110,7 @@ func (c *ContainerSvc) Stop(ctx context.Context, opts *options.StopContainer, id
 	slog.InfoContext(ctx, "ContainerSvc.Stop", "cmd", strings.Join(cmd.Args, " "))
 	output, err := cmd.Output()
 	if err != nil {
+		slog.ErrorContext(ctx, "ContainerSvc.Stop", "error", err, "out", string(output))
 		return "", err
 	}
 	return strings.TrimSpace(string(output)), nil

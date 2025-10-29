@@ -208,8 +208,12 @@ const opencodeJSON = `
 
 func (c *OpenCodeWorkspaceCloner) configureOpenCode(ctx context.Context, cwd, id string) error {
 	// TODO: read existing opencode.json files and merge them with the settings we want to override here.
-	cloneOpenCodeConfig := filepath.Join(c.cloneRoot, id, "dotfiles", ".local", "share", "opencode", "opencode.jsonc")
+	cloneOpenCodeConfig := filepath.Join(c.cloneRoot, id, "dotfiles", ".config", "opencode", "opencode.json")
 
+	cloneOpenCodeDir := filepath.Dir(cloneOpenCodeConfig)
+	if err := os.MkdirAll(cloneOpenCodeDir, 0o750); err != nil {
+		return err
+	}
 	err := os.WriteFile(cloneOpenCodeConfig, []byte(opencodeJSON), 0o700)
 	if err != nil {
 		slog.ErrorContext(ctx, "configureOpenCode", "error", err)

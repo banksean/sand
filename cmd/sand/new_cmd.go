@@ -57,7 +57,7 @@ func (c *NewCmd) Run(cctx *Context) error {
 		return err
 	}
 
-	if !filepath.IsAbs(c.EnvFile) {
+	if c.EnvFile != "" && !filepath.IsAbs(c.EnvFile) {
 		c.EnvFile = filepath.Join(c.CloneFromDir, c.EnvFile)
 	}
 
