@@ -4,14 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"os"
 	"os/exec"
 	"strings"
 	"syscall"
 
-	"github.com/banksean/sand/applecontainer/options"
 	"github.com/banksean/sand/applecontainer/types"
 )
 
@@ -52,7 +50,7 @@ func (i *ImagesSvc) Inspect(ctx context.Context, name string) ([]*types.ImageMan
 	return entries, nil
 }
 
-// Pull pulls the image with the given name, or returns an error.
+// Pull pulls the image with the given name and returns a wait func to release the cmd resources, or returns an error.
 func (i *ImagesSvc) Pull(ctx context.Context, name string) (func() error, error) {
 	cmd := exec.CommandContext(ctx, "container", "image", "pull", name)
 	slog.InfoContext(ctx, "ImagesSvc.Pull", "cmd.Dir", cmd.Dir, "cmd", strings.Join(cmd.Args, " "))
@@ -68,37 +66,8 @@ func (i *ImagesSvc) Pull(ctx context.Context, name string) (func() error, error)
 	cmd.Stdout = os.Stdout
 
 	if err := cmd.Start(); err != nil {
-		return nil, err
+		return cmd.Wait, err
 	}
 
 	return cmd.Wait, nil
-}
-
-// Build builds an image. TODO: Since this can take a while, make it stream the command output
-// similar to how ContainerSvc.Logs works.
-func (i *ImagesSvc) Build(ctx context.Context, dockerFileDir string, opts *options.BuildOptions) (io.ReadCloser, io.ReadCloser, func() error, error) {
-	args := append(options.ToArgs(opts), dockerFileDir)
-	cmd := exec.CommandContext(ctx, "container", append([]string{"build"}, args...)...)
-	cmd.Dir = dockerFileDir
-	slog.InfoContext(ctx, "ImagesSvc.Build", "cmd.Dir", cmd.Dir, "cmd", strings.Join(cmd.Args, " "))
-
-	// This Setpgid business is basically PTSD-induced superstition learned through Linux debugging nightmares.
-	// It may not be necessary on MacOS at all.
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-
-	outPipe, err := cmd.StdoutPipe()
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	errPipe, err := cmd.StderrPipe()
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	if err := cmd.Start(); err != nil {
-		return nil, nil, nil, err
-	}
-
-	return outPipe, errPipe, cmd.Wait, nil
 }

@@ -508,13 +508,13 @@ func TestDefaultWorkspaceCloner_CloneHostKeyPair(t *testing.T) {
 			t.Fatalf("Expected 2 copy calls, got %d", len(copyCalls))
 		}
 
-		if copyCalls[0].src != "/app/ssh_host_ed25519_key" ||
-			copyCalls[0].dst != "/app/clones/test-id/hostkeys" {
+		if !strings.HasSuffix(copyCalls[0].src, ".config/sand/container_server_identity") ||
+			copyCalls[0].dst != "/app/clones/test-id/hostkeys/ssh_host_ed25519_key" {
 			t.Errorf("First copy: src=%s, dst=%s", copyCalls[0].src, copyCalls[0].dst)
 		}
 
-		if copyCalls[1].src != "/app/ssh_host_ed25519_key.pub" ||
-			copyCalls[1].dst != "/app/clones/test-id/hostkeys" {
+		if !strings.HasSuffix(copyCalls[1].src, ".config/sand/container_server_identity.pub") ||
+			copyCalls[1].dst != "/app/clones/test-id/hostkeys/ssh_host_ed25519_key.pub" {
 			t.Errorf("Second copy: src=%s, dst=%s", copyCalls[1].src, copyCalls[1].dst)
 		}
 	})

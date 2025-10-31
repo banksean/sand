@@ -6,6 +6,7 @@ require (
 	github.com/alecthomas/kong v1.12.1
 	github.com/creack/pty v1.1.24
 	github.com/google/uuid v1.6.0
+	github.com/kevinburke/ssh_config v1.4.0
 	golang.org/x/crypto v0.43.0
 	golang.org/x/term v0.36.0
 	modernc.org/sqlite v1.39.0

@@ -1,12 +1,15 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/banksean/sand"
+	"github.com/banksean/sand/sshimmer"
 	"github.com/google/uuid"
 )
 
@@ -23,7 +26,6 @@ type NewCmd struct {
 
 func (c *NewCmd) Run(cctx *Context) error {
 	ctx := cctx.Context
-
 	slog.InfoContext(ctx, "NewCmd.Run")
 
 	if err := verifyPrerequisites(ctx, "git-dir", "git-ssh-checkout"); err != nil {
@@ -116,6 +118,26 @@ func (c *NewCmd) Run(cctx *Context) error {
 		}
 	}
 
+	updateSSHConfFunc, err := sshimmer.CheckSSHReachability(ctx, hostname)
+	if err != nil {
+		slog.ErrorContext(ctx, "sshimmer.CheckSSHReachability", "error", err)
+	}
+	if updateSSHConfFunc != nil {
+		stdinReader := *bufio.NewReader(os.Stdin)
+		fmt.Printf("\nTo enable you to use ssh to connect to local sand containers, we need to add one line to the top of your ssh config. Proceed [y/N]? ")
+		text, err := stdinReader.ReadString('\n')
+		if err != nil {
+			return fmt.Errorf("couldn't read from stdin: %w", err)
+		}
+		text = strings.TrimSpace(strings.ToLower(text))
+		if text != "y" && text != "Y" {
+			return fmt.Errorf("User declined to edit ssh config file")
+		}
+		if err := updateSSHConfFunc(); err != nil {
+			return err
+		}
+
+	}
 	// Shell attachment is direct, not through daemon
 	if err := sbox.Shell(ctx, env, c.Shell, os.Stdin, os.Stdout, os.Stderr); err != nil {
 		slog.ErrorContext(ctx, "sbox.new", "error", err)

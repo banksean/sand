@@ -107,7 +107,7 @@ func (m *MuxClient) ListSandboxes(ctx context.Context) ([]Box, error) {
 		return nil, err
 	}
 	for i := range boxes {
-		boxes[i].containerService = m.Mux.sber.containerService
+		boxes[i].containerService = m.Mux.boxer.containerService
 	}
 	return boxes, nil
 }
@@ -120,7 +120,7 @@ func (m *MuxClient) GetSandbox(ctx context.Context, id string) (*Box, error) {
 		}
 		return nil, err
 	}
-	box.containerService = m.Mux.sber.containerService
+	box.containerService = m.Mux.boxer.containerService
 	return &box, nil
 }
 
@@ -137,30 +137,30 @@ func (m *MuxClient) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (
 	if err := m.doRequest(ctx, http.MethodPost, "/create", opts, &box); err != nil {
 		return nil, err
 	}
-	box.containerService = m.Mux.sber.containerService
+	box.containerService = m.Mux.boxer.containerService
 	return &box, nil
 }
 
 // ListSandboxes returns all sandboxes.
 func (m *Mux) ListSandboxes(ctx context.Context) ([]Box, error) {
-	return m.sber.List(ctx)
+	return m.boxer.List(ctx)
 }
 
 // GetSandbox retrieves a sandbox by ID.
 func (m *Mux) GetSandbox(ctx context.Context, id string) (*Box, error) {
-	return m.sber.Get(ctx, id)
+	return m.boxer.Get(ctx, id)
 }
 
 // RemoveSandbox removes a single sandbox.
 func (m *Mux) RemoveSandbox(ctx context.Context, id string) error {
-	sbox, err := m.sber.Get(ctx, id)
+	sbox, err := m.boxer.Get(ctx, id)
 	if err != nil {
 		return err
 	}
 	if sbox == nil {
 		return fmt.Errorf("sandbox not found: %s", id)
 	}
-	return m.sber.Cleanup(ctx, sbox)
+	return m.boxer.Cleanup(ctx, sbox)
 }
 
 func EnsureDaemon(ctx context.Context, appBaseDir, logFile string) error {

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/banksean/sand/db"
+	"github.com/banksean/sand/sshimmer"
 	"golang.org/x/crypto/ssh"
 	_ "modernc.org/sqlite"
 )
@@ -34,8 +35,6 @@ type Boxer struct {
 	gitOps           GitOps
 	fileOps          FileOps
 }
-
-const hostKeyFilename = "ssh_host_ed25519_key"
 
 func NewBoxer(appRoot string, terminalWriter io.Writer) (*Boxer, error) {
 	fileOps := NewDefaultFileOps()
@@ -59,11 +58,6 @@ func NewBoxer(appRoot string, terminalWriter io.Writer) (*Boxer, error) {
 	if _, err := sqlDB.Exec(schemaSQL); err != nil {
 		sqlDB.Close()
 		return nil, fmt.Errorf("failed to initialize schema: %w", err)
-	}
-
-	// Generate ssh host key pair if it doesn't exist already.
-	if _, err := createKeyPairIfMissing(fileOps, filepath.Join(appRoot, hostKeyFilename)); err != nil {
-		return nil, fmt.Errorf("could not create host key pair: %w", err)
 	}
 
 	sb := &Boxer{
@@ -120,6 +114,13 @@ func (sb *Boxer) Sync(ctx context.Context) error {
 func (sb *Boxer) NewSandbox(ctx context.Context, cloner WorkspaceCloner, id, hostWorkDir, imageName, envFile string) (*Box, error) {
 	slog.InfoContext(ctx, "Boxer.NewSandbox", "hostWorkDir", hostWorkDir, "id", id)
 
+	// TODO: move this to .Hydrate? Or make it a startup hook?
+	sshim, err := sshimmer.NewLocalSSHimmer(ctx, id, id+".test", "22")
+	slog.InfoContext(ctx, "Boxer.NewSandbox", "sshim", *sshim, "error", err)
+	if err != nil {
+		return nil, err
+	}
+
 	provisionResult, err := cloner.Prepare(ctx, CloneRequest{
 		ID:          id,
 		HostWorkDir: hostWorkDir,
@@ -138,6 +139,7 @@ func (sb *Boxer) NewSandbox(ctx context.Context, cloner WorkspaceCloner, id, hos
 		Mounts:           provisionResult.Mounts,
 		ContainerHooks:   provisionResult.ContainerHooks,
 		containerService: sb.containerService,
+		sshim:            sshim,
 	}
 
 	if err := sb.SaveSandbox(ctx, ret); err != nil {
@@ -207,6 +209,12 @@ func (sb *Boxer) Cleanup(ctx context.Context, sbox *Box) error {
 		slog.ErrorContext(ctx, "Boxer Containers.Delete failed to remove workdir", "sandbox", sbox.ID, "error", err)
 	}
 
+	if sbox.sshim != nil {
+		if err := sbox.sshim.Cleanup(); err != nil {
+			slog.ErrorContext(ctx, "Boxer Containers.Delete failed to clean up ssh shim", "sandbox", sbox.ID, "error", err)
+		}
+	}
+
 	// Finally, remove from database
 	if err := sb.queries.DeleteSandbox(ctx, sbox.ID); err != nil {
 		return fmt.Errorf("failed to delete sandbox %s from database: %w", sbox.ID, err)
@@ -269,6 +277,11 @@ func (sb *Boxer) pullImage(ctx context.Context, imageName string) error {
 	start := time.Now()
 
 	waitFn, err := sb.imageService.Pull(ctx, imageName)
+	defer func() {
+		if waitFn != nil {
+			waitFn()
+		}
+	}()
 	if err != nil {
 		slog.ErrorContext(ctx, "Boxer.pullImage", "error", err)
 		return err

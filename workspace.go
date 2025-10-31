@@ -203,19 +203,19 @@ func (p *DefaultWorkspaceCloner) cloneWorkDir(ctx context.Context, id, hostWorkD
 }
 
 func (p *DefaultWorkspaceCloner) cloneHostKeyPair(ctx context.Context, id string) error {
-	hostKey := filepath.Join(p.appRoot, hostKeyFilename)
-	hostKeyPub := filepath.Join(p.appRoot, hostKeyFilename+".pub")
+	hostKey := filepath.Join(os.Getenv("HOME"), ".config", "sand", "container_server_identity")
+	hostKeyPub := filepath.Join(os.Getenv("HOME"), ".config", "sand", "container_server_identity.pub")
 
 	cloneHostKeyDir := filepath.Join(p.cloneRoot, id, "hostkeys")
 	if err := p.fileOps.MkdirAll(cloneHostKeyDir, 0o750); err != nil {
 		return fmt.Errorf("failed to create hostkeys directory for sandbox %s: %w", id, err)
 	}
 
-	if err := p.fileOps.Copy(ctx, hostKey, cloneHostKeyDir); err != nil {
+	if err := p.fileOps.Copy(ctx, hostKey, filepath.Join(cloneHostKeyDir, "ssh_host_ed25519_key")); err != nil {
 		return fmt.Errorf("failed to copy host key for sandbox %s: %w", id, err)
 	}
 
-	if err := p.fileOps.Copy(ctx, hostKeyPub, cloneHostKeyDir); err != nil {
+	if err := p.fileOps.Copy(ctx, hostKeyPub, filepath.Join(cloneHostKeyDir, "ssh_host_ed25519_key.pub")); err != nil {
 		return fmt.Errorf("failed to copy host key pub for sandbox %s: %w", id, err)
 	}
 

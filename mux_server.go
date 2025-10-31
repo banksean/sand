@@ -26,7 +26,7 @@ type Mux struct {
 	SocketPath string
 
 	hostMCP *HostMCP
-	sber    *Boxer
+	boxer   *Boxer
 
 	listener net.Listener
 	lockFile *os.File
@@ -41,7 +41,7 @@ func NewMuxServer(appBaseDir string, sber *Boxer) *Mux {
 			ChromeDevToolsPort: 9222,
 			ChromeUserDataDir:  "/tmp/chrome-profile-stable", // TODO: different user data dirs for different Mux PIDs?
 		},
-		sber: sber,
+		boxer: sber,
 	}
 }
 
@@ -363,14 +363,14 @@ func acquireLock(lockFile string) (*os.File, error) {
 
 // StopSandbox stops a single sandbox container.
 func (m *Mux) StopSandbox(ctx context.Context, id string) error {
-	sbox, err := m.sber.Get(ctx, id)
+	sbox, err := m.boxer.Get(ctx, id)
 	if err != nil {
 		return err
 	}
 	if sbox == nil {
 		return fmt.Errorf("sandbox not found: %s", id)
 	}
-	return m.sber.StopContainer(ctx, sbox)
+	return m.boxer.StopContainer(ctx, sbox)
 }
 
 type CreateSandboxOpts struct {
@@ -391,7 +391,7 @@ func (m *Mux) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*Box, 
 	case "opencode":
 		cloner = NewOpenCodeWorkspaceCloner(cloner, m.AppBaseDir, os.Stderr)
 	}
-	sbox, err := m.sber.NewSandbox(ctx, cloner, opts.ID, opts.CloneFromDir, opts.ImageName, opts.EnvFile)
+	sbox, err := m.boxer.NewSandbox(ctx, cloner, opts.ID, opts.CloneFromDir, opts.ImageName, opts.EnvFile)
 	if err != nil {
 		return nil, err
 	}
@@ -405,7 +405,7 @@ func (m *Mux) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*Box, 
 		if err := sbox.CreateContainer(ctx); err != nil {
 			return nil, err
 		}
-		if err := m.sber.UpdateContainerID(ctx, sbox, sbox.ContainerID); err != nil {
+		if err := m.boxer.UpdateContainerID(ctx, sbox, sbox.ContainerID); err != nil {
 			return nil, err
 		}
 		ctr, err = sbox.GetContainer(ctx)

@@ -11,6 +11,7 @@ import (
 
 	"github.com/banksean/sand/applecontainer/options"
 	"github.com/banksean/sand/applecontainer/types"
+	"github.com/banksean/sand/sshimmer"
 )
 
 const (
@@ -52,6 +53,8 @@ type Box struct {
 	ContainerHooks []ContainerStartupHook `json:"-"`
 	// containerService is the service for interacting with containers
 	containerService ContainerOps
+
+	sshim *sshimmer.LocalSSHimmer
 }
 
 func (sb *Box) GetContainer(ctx context.Context) (*types.Container, error) {
