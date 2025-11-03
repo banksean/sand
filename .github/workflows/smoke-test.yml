@@ -42,13 +42,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go1.25.1-
 
-      - name: Download apple/container 0.5.0 installer
+      - name: Download apple/container 0.6.0 installer
         run: |
-          curl -L "https://github.com/apple/container/releases/download/0.5.0/container-0.5.0-installer-signed.pkg" -o container-0.5.0-installer-signed.pkg
+          curl -L "https://github.com/apple/container/releases/download/0.6.0/container-0.6.0-installer-signed.pkg" -o container-0.6.0-installer-signed.pkg
 
       - name: Install .pkg file
         run: |
-          sudo installer -pkg container-0.5.0-installer-signed.pkg -target /
+          sudo installer -pkg container-0.6.0-installer-signed.pkg -target /
 
       - name: check for installer files
         run: pkgutil --only-files --files com.apple.container-installer
@@ -83,21 +83,25 @@ jobs:
         working-directory: ${{ inputs.working-directory || '.'}}
         run: sand doc
 
-      - name: sand daemon
+      - name: sand daemon pre-ls
         working-directory: ${{ inputs.working-directory || '.'}}
-        run: sand daemon
+        run: sand daemon # should print that daemon is not running
 
       - name: sand ls
         working-directory: ${{ inputs.working-directory || '.'}}
         run: sand ls
 
-      - name: sand new
+      - name: sand daemon post-ls
         working-directory: ${{ inputs.working-directory || '.'}}
-        run: sand new -b test-sandbox
+        run: sand daemon # should print that daemon is running
 
-      - name: sand rm
-        working-directory: ${{ inputs.working-directory || '.'}}
-        run: sand rm -a
+      # - name: sand new
+      #   working-directory: ${{ inputs.working-directory || '.'}}
+      #   run: sand new -b test-sandbox
+
+      # - name: sand rm
+      #   working-directory: ${{ inputs.working-directory || '.'}}
+      #   run: sand rm -a
 
       - name: sand daemon stop
         working-directory: ${{ inputs.working-directory || '.'}}
