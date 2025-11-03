@@ -19,7 +19,8 @@ on:
     branches-ignore:
       - "queue-main-*"
       - "queue-dev-*"
-  pull_request:
+  workflow_dispatch:
+
 jobs:
   smoke-test:
     runs-on: macos-26
