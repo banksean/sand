@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	appleContainerVersion = "0.5.0"
+	appleContainerVersion = "0.6.0"
 	minimumMacOSVersion   = 26
 )
 
@@ -54,7 +54,7 @@ var (
 		},
 		{
 			ID:          "container-runtime",
-			Description: "Have https://github.com/apple/container runtime installed at the right version",
+			Description: fmt.Sprintf("Have https://github.com/apple/container runtime installed at version %s", appleContainerVersion),
 			Run: func(ctx context.Context) error {
 				version, err := applecontainer.System.Version(ctx)
 				if err != nil {
