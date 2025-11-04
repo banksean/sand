@@ -64,11 +64,11 @@ jobs:
       - name: brew install container
         run: brew install --cask container
 
-      - name: container status
-        run: sudo container --debug system status
-
       - name: container system logs
         run: container system logs --last 1d
+
+      - name: container status
+        run: sudo container --debug system status
 
       - name: start container system
         run: container --debug system start
