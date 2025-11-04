@@ -154,7 +154,7 @@ func verifyPrerequisites(ctx context.Context, checkIDs ...string) error {
 			continue
 		}
 		if err := check.Run(ctx); err != nil {
-			failures[check.ID] = check.Description
+			failures[check.ID] = fmt.Sprintf("%s: %s", check.Description, err.Error())
 			slog.ErrorContext(ctx, "diagnosticCheck failed", "name", check.Description, "error", err)
 		} else {
 			slog.InfoContext(ctx, "diagnosticCheck passed", "name", check.Description)
