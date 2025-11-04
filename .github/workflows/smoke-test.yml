@@ -71,7 +71,7 @@ jobs:
       #   run: sudo container --debug system status
 
       - name: start container system
-        run: sudo container --debug system start
+        run: container system start
 
       - name: Install sand
         run: go install github.com/banksean/sand/cmd/sand
