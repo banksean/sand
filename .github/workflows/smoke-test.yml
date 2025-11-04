@@ -43,26 +43,26 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go1.25.1-
 
-      # - name: Download apple/container 0.6.0 installer
-      #   run: |
-      #     curl -L "https://github.com/apple/container/releases/download/0.6.0/container-0.6.0-installer-signed.pkg" -o container-0.6.0-installer-signed.pkg
+      - name: Download apple/container 0.6.0 installer
+        run: |
+          curl -L "https://github.com/apple/container/releases/download/0.6.0/container-0.6.0-installer-signed.pkg" -o container-0.6.0-installer-signed.pkg
 
-      # - name: Install .pkg file
-      #   run: |
-      #     sudo installer -pkg container-0.6.0-installer-signed.pkg -target /
+      - name: Install .pkg file
+        run: |
+          sudo installer -pkg container-0.6.0-installer-signed.pkg -target /
 
-      # - name: check for installer files
-      #   run: pkgutil --only-files --files com.apple.container-installer
+      - name: check for installer files
+        run: pkgutil --only-files --files com.apple.container-installer
 
-      # - name: Verify "container" command installation
-      #   run: |
-      #     ls /usr/local/bin/container # Verify the app is present
+      - name: Verify "container" command installation
+        run: |
+          ls /usr/local/bin/container # Verify the app is present
 
       # - name: debug container status
       #   run: /bin/launchctl list
 
-      - name: brew install container
-        run: brew install --cask container
+      # - name: brew install container
+      #   run: brew install --cask container
 
       - name: container system logs
         run: container system logs --last 1d
