@@ -58,17 +58,14 @@ jobs:
         run: |
           ls /usr/local/bin/container # Verify the app is present
 
-      - name: container-apiserver start
-        run: sudo container-apiserver start
-
       - name: debug container status
         run: /bin/launchctl list
 
-      - name: container system logs
-        run: container system logs --last 1d
-
       - name: container status
         run: container --debug system status
+
+      - name: container system logs
+        run: container system logs --last 1d
 
       - name: start container system
         run: container --debug system start
