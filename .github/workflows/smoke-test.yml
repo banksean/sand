@@ -62,7 +62,7 @@ jobs:
       #   run: /bin/launchctl list
 
       - name: brew install container
-        run: sudo brew install --cask container
+        run: brew install --cask container
 
       - name: container status
         run: sudo container --debug system status
