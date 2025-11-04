@@ -1,5 +1,5 @@
-# This workflow will build a golang project
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
+# This workflow builds and installs the sand command, installs the apple/contaner command,
+# then runs some basic sand subcommands to verify that basic features work as expected.
 
 name: Smoke Test
 on:
@@ -58,18 +58,6 @@ jobs:
         run: |
           ls /usr/local/bin/container # Verify the app is present
 
-      # - name: debug container status
-      #   run: /bin/launchctl list
-
-      # - name: brew install container
-      #   run: brew install --cask container
-
-      - name: container system logs
-        run: container system logs --last 1d
-
-      # - name: container status
-      #   run: sudo container --debug system status
-
       - name: start container system
         run: yes | container system start
 
@@ -80,29 +68,21 @@ jobs:
         working-directory: ${{ inputs.working-directory || '.'}}
         run: sand version
 
-      - name: sand doc
+      - name: sand daemon
         working-directory: ${{ inputs.working-directory || '.'}}
-        run: sand doc
+        run: sand daemon # should print that daemon is running
 
-      - name: sand daemon pre-ls
+      - name: sand new and exit
         working-directory: ${{ inputs.working-directory || '.'}}
-        run: sand daemon # should print that daemon is not running
+        run: echo "exit" | sand new 
 
       - name: sand ls
         working-directory: ${{ inputs.working-directory || '.'}}
         run: sand ls
 
-      - name: sand daemon post-ls
+      - name: sand rm
         working-directory: ${{ inputs.working-directory || '.'}}
-        run: sand daemon # should print that daemon is running
-
-      # - name: sand new
-      #   working-directory: ${{ inputs.working-directory || '.'}}
-      #   run: sand new -b test-sandbox
-
-      # - name: sand rm
-      #   working-directory: ${{ inputs.working-directory || '.'}}
-      #   run: sand rm -a
+        run: sand rm -a
 
       - name: sand daemon stop
         working-directory: ${{ inputs.working-directory || '.'}}
