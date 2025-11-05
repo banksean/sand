@@ -28,7 +28,7 @@ func (c *NewCmd) Run(cctx *Context) error {
 	ctx := cctx.Context
 	slog.InfoContext(ctx, "NewCmd.Run")
 
-	if err := verifyPrerequisites(ctx, GitDir, GitRemoteIsSSH); err != nil {
+	if err := verifyPrerequisites(ctx, GitDir); err != nil {
 		return err
 	}
 
