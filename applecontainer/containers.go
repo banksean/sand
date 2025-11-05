@@ -3,6 +3,7 @@ package applecontainer
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -82,10 +83,11 @@ func (c *ContainerSvc) Create(ctx context.Context, opts *options.CreateContainer
 	cmd := exec.CommandContext(ctx, "container", append(args, initArgs...)...)
 	slog.InfoContext(ctx, "ContainerSvc.Create", "cmd", strings.Join(cmd.Args, " "))
 	output, err := cmd.CombinedOutput()
+	out := strings.TrimSpace(string(output))
 	if err != nil {
-		return string(output), err
+		return "", fmt.Errorf("%w: %s", err, out)
 	}
-	return strings.TrimSpace(string(output)), nil
+	return out, nil
 }
 
 // Start starts a container instance with a given ID. It returns the start command output, or an error.
