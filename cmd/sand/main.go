@@ -123,7 +123,7 @@ func main() {
 
 	cli.initSlog(kongCtx)
 
-	if err := verifyPrerequisites(ctx, "macos", "macos-version", "container-runtime"); err != nil {
+	if err := verifyPrerequisites(ctx, MacOS, MacOSVersion, ContainerCommand); err != nil {
 		fmt.Fprintf(os.Stderr, "Prerequisite check(s) failed: %s\r\n", err)
 		os.Exit(1)
 	}

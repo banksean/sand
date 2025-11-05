@@ -28,7 +28,7 @@ func (c *NewCmd) Run(cctx *Context) error {
 	ctx := cctx.Context
 	slog.InfoContext(ctx, "NewCmd.Run")
 
-	if err := verifyPrerequisites(ctx, "git-dir", "git-ssh-checkout"); err != nil {
+	if err := verifyPrerequisites(ctx, GitDir, GitRemoteIsSSH); err != nil {
 		return err
 	}
 

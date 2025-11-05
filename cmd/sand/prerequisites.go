@@ -20,16 +20,26 @@ const (
 )
 
 type diagnosticCheck struct {
-	ID          string
+	ID          PrerequID
 	Description string
 	Run         func(context.Context) error
 	// TODO: Severity, AffectedFeatures, Remedy
 }
 
+type PrerequID string
+
+const GitRemoteIsSSH = "git-ssh-checkout"
+const GitDir = "git-dir"
+const ContainerSystemDNSDomain = "container-dns-domain-set"
+const ContainerSystemDNSName = "container-dns-name"
+const ContainerCommand = "container-runtime"
+const MacOSVersion = "macos-version"
+const MacOS = "macos"
+
 var (
 	diagnosticChecks = []diagnosticCheck{
 		{
-			ID:          "macos",
+			ID:          MacOS,
 			Description: "Running on MacOS",
 			Run: func(ctx context.Context) error {
 				if runtime.GOOS != "darwin" {
@@ -39,7 +49,7 @@ var (
 			},
 		},
 		{
-			ID:          "macos-version",
+			ID:          MacOSVersion,
 			Description: fmt.Sprintf("Running MacOS version %d or greater", minimumMacOSVersion),
 			Run: func(ctx context.Context) error {
 				majorVersion, err := getMacOSMajorVersion(ctx)
@@ -53,7 +63,7 @@ var (
 			},
 		},
 		{
-			ID:          "container-runtime",
+			ID:          ContainerCommand,
 			Description: fmt.Sprintf("Have https://github.com/apple/container runtime installed at version %s", appleContainerVersion),
 			Run: func(ctx context.Context) error {
 				version, err := applecontainer.System.Version(ctx)
@@ -68,7 +78,7 @@ var (
 			},
 		},
 		{
-			ID:          "container-dns-name",
+			ID:          ContainerSystemDNSName,
 			Description: "Container system has at least one dns name configured",
 			Run: func(ctx context.Context) error {
 				domains, err := applecontainer.System.DNSList(ctx)
@@ -83,7 +93,7 @@ var (
 			},
 		},
 		{
-			ID:          "container-dns-domain-set",
+			ID:          ContainerSystemDNSDomain,
 			Description: "Container system has dns.domain property set",
 			Run: func(ctx context.Context) error {
 				systemProps, err := applecontainer.System.PropertyList(ctx)
@@ -106,7 +116,7 @@ var (
 			},
 		},
 		{
-			ID:          "git-dir",
+			ID:          GitDir,
 			Description: "should be invoked from a git directory",
 			Run: func(ctx context.Context) error {
 				gitCmd := exec.Command("git", "rev-parse", "--show-toplevel")
@@ -118,7 +128,7 @@ var (
 			},
 		},
 		{
-			ID:          "git-ssh-checkout",
+			ID:          GitRemoteIsSSH,
 			Description: "git checkout should be authenticated to origin with ssh",
 			Run: func(ctx context.Context) error {
 				gitCmd := exec.Command("git", "remote", "get-url", "origin")
@@ -136,7 +146,7 @@ var (
 			},
 		},
 	}
-	diagnosticCheckMap = map[string]diagnosticCheck{}
+	diagnosticCheckMap = map[PrerequID]diagnosticCheck{}
 )
 
 func init() {
@@ -145,8 +155,8 @@ func init() {
 	}
 }
 
-func verifyPrerequisites(ctx context.Context, checkIDs ...string) error {
-	failures := map[string]string{}
+func verifyPrerequisites(ctx context.Context, checkIDs ...PrerequID) error {
+	failures := map[PrerequID]string{}
 	for _, checkID := range checkIDs {
 		check, ok := diagnosticCheckMap[checkID]
 		if !ok {
