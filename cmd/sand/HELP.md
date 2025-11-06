@@ -2,7 +2,7 @@
 
 Manage lightweight linux container sandboxes on MacOS.
 
-Requires apple container CLI: https://github.com/apple/container/releases/tag/0.5.0
+Requires apple container CLI: https://github.com/apple/container/releases/tag/0.6.0
 
 ## Global Flags
 
@@ -27,6 +27,7 @@ sand new [flags] [ID]
 
 - `-i, --image-name` _`<container-image-name>`_ - name of container image to use (default: `ghcr.io/banksean/sand/default:latest`)
 - `-s, --shell` _`<shell-command>`_ - shell command to exec in the container (default: `/bin/zsh`)
+- `--cloner` _`<claude|default|opencode>`_ - name of workspace cloner to use (default: `default`)
 - `-c, --clone-from-dir` _`<project-dir>`_ - directory to clone into the sandbox. Defaults to current working directory, if unset.
 - `-e, --env-file` _`STRING`_ - path to env file to use when creating a new shell
 - `-b, --branch` - create a new git branch inside the sandbox _container_ (not on your host workdir)

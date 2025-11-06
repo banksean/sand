@@ -147,16 +147,19 @@ func main() {
 		cli.AppBaseDir = appBaseDir
 	}
 
-	sber, err := sand.NewBoxer(cli.AppBaseDir, os.Stderr)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to create Boxer: %v\n", err)
-		os.Exit(1)
+	var sber *sand.Boxer
+	if kongCtx.Command() != "doc" {
+		sber, err = sand.NewBoxer(cli.AppBaseDir, os.Stderr)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to create Boxer: %v\n", err)
+			os.Exit(1)
+		}
+		if err := sber.Sync(ctx); err != nil {
+			fmt.Fprintf(os.Stderr, "failed to sync Boxer db with current environment state: %v\n", err)
+			os.Exit(1)
+		}
+		defer sber.Close()
 	}
-	if err := sber.Sync(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "failed to sync Boxer db with current environment state: %v\n", err)
-		os.Exit(1)
-	}
-	defer sber.Close()
 
 	err = kongCtx.Run(&Context{
 		Context:    ctx,
