@@ -34,6 +34,7 @@ type Boxer struct {
 	imageService     ImageOps
 	gitOps           GitOps
 	fileOps          FileOps
+	sshim            *sshimmer.LocalSSHimmer
 }
 
 func NewBoxer(appRoot string, terminalWriter io.Writer) (*Boxer, error) {
@@ -59,6 +60,11 @@ func NewBoxer(appRoot string, terminalWriter io.Writer) (*Boxer, error) {
 		sqlDB.Close()
 		return nil, fmt.Errorf("failed to initialize schema: %w", err)
 	}
+	ctx := context.Background()
+	sshim, err := sshimmer.NewLocalSSHimmer(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create LocalSSHimmer: %w", err)
+	}
 
 	sb := &Boxer{
 		appRoot:          appRoot,
@@ -69,6 +75,7 @@ func NewBoxer(appRoot string, terminalWriter io.Writer) (*Boxer, error) {
 		imageService:     NewAppleImageOps(),
 		gitOps:           NewDefaultGitOps(),
 		fileOps:          fileOps,
+		sshim:            sshim,
 	}
 	return sb, nil
 }
@@ -81,7 +88,7 @@ func (sb *Boxer) Close() error {
 }
 
 // Sync tells Boxer to synchronize its internal database with the external states of
-// the clone rool directory and local container service.
+// the clone tool directory and local container service.
 func (sb *Boxer) Sync(ctx context.Context) error {
 	slog.InfoContext(ctx, "Boxer.Sync")
 	// First, iterate through the sandbox records in the DB and update the its fiels to
@@ -114,13 +121,6 @@ func (sb *Boxer) Sync(ctx context.Context) error {
 func (sb *Boxer) NewSandbox(ctx context.Context, cloner WorkspaceCloner, id, hostWorkDir, imageName, envFile string) (*Box, error) {
 	slog.InfoContext(ctx, "Boxer.NewSandbox", "hostWorkDir", hostWorkDir, "id", id)
 
-	// TODO: move this to .Hydrate? Or make it a startup hook?
-	sshim, err := sshimmer.NewLocalSSHimmer(ctx, id, id+".test", "22")
-	slog.InfoContext(ctx, "Boxer.NewSandbox", "sshim", *sshim, "error", err)
-	if err != nil {
-		return nil, err
-	}
-
 	provisionResult, err := cloner.Prepare(ctx, CloneRequest{
 		ID:          id,
 		HostWorkDir: hostWorkDir,
@@ -130,16 +130,33 @@ func (sb *Boxer) NewSandbox(ctx context.Context, cloner WorkspaceCloner, id, hos
 		return nil, err
 	}
 
+	// TODO: move this to .Hydrate? Or make it a startup hook?
+	keys, err := sb.sshim.NewKeys(ctx, id+".test")
+	if err != nil {
+		slog.ErrorContext(ctx, "Boxer.NewSanbox: sshim.Povision", "error", err)
+		return nil, err
+	}
+	// TODO: save the data in keys fields to sandboxWorkDir (or to the db)?
+
+	// TODO: write the data in keys fields to the container
+	sshKeysMountSpec := MountSpec{
+		Source:   filepath.Join(provisionResult.SandboxWorkDir, "sshkeys"),
+		Target:   "/sshkeys",
+		ReadOnly: true,
+	}
+	if err := sb.saveSSHKeys(sshKeysMountSpec.Source, keys); err != nil {
+		return nil, fmt.Errorf("saveSSHKeys: %w", err)
+	}
 	ret := &Box{
 		ID:               id,
 		HostOriginDir:    hostWorkDir,
 		SandboxWorkDir:   provisionResult.SandboxWorkDir,
 		ImageName:        imageName,
 		EnvFile:          envFile,
-		Mounts:           provisionResult.Mounts,
+		Mounts:           append(provisionResult.Mounts, sshKeysMountSpec),
 		ContainerHooks:   provisionResult.ContainerHooks,
+		Keys:             keys,
 		containerService: sb.containerService,
-		sshim:            sshim,
 	}
 
 	if err := sb.SaveSandbox(ctx, ret); err != nil {
@@ -147,6 +164,49 @@ func (sb *Boxer) NewSandbox(ctx context.Context, cloner WorkspaceCloner, id, hos
 	}
 
 	return ret, nil
+}
+
+func (sb *Boxer) saveSSHKeys(keysDir string, keys *sshimmer.Keys) error {
+	if err := sb.fileOps.MkdirAll(keysDir, 0o750); err != nil {
+		return err
+	}
+	hostPrivateKeyFile, err := sb.fileOps.Create(filepath.Join(keysDir, "ssh_host_key"))
+	if err != nil {
+		return err
+	}
+	defer hostPrivateKeyFile.Close()
+	if _, err := hostPrivateKeyFile.Write(keys.HostKey); err != nil {
+		return err
+	}
+
+	hostPublicKeyFile, err := sb.fileOps.Create(filepath.Join(keysDir, "ssh_host_key.pub"))
+	if err != nil {
+		return err
+	}
+	defer hostPublicKeyFile.Close()
+	if _, err := hostPublicKeyFile.Write(keys.HostKeyPub); err != nil {
+		return err
+	}
+
+	hostKeyCertFile, err := sb.fileOps.Create(filepath.Join(keysDir, "ssh_host_key.pub-cert"))
+	if err != nil {
+		return err
+	}
+	defer hostKeyCertFile.Close()
+	if _, err := hostKeyCertFile.Write(keys.HostKeyCert); err != nil {
+		return err
+	}
+
+	userCAFile, err := sb.fileOps.Create(filepath.Join(keysDir, "user_ca.pub"))
+	if err != nil {
+		return err
+	}
+	defer userCAFile.Close()
+	if _, err := userCAFile.Write(keys.UserCAPub); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // AttachSandbox re-connects to an existing container and sandboxWorkDir instead of creating a new one.
@@ -201,18 +261,12 @@ func (sb *Boxer) Cleanup(ctx context.Context, sbox *Box) error {
 		slog.ErrorContext(ctx, "Boxer Containers.Delete", "sandbox", sbox.ID, "error", err, "out", out)
 	}
 
-	if err := sb.gitOps.RemoveRemote(ctx, sbox.HostOriginDir, ClonedWorkDirRemotePrefix+sbox.ID); err != nil {
+	if err := sb.gitOps.RemoveRemote(ctx, sbox.HostOriginDir, ClonedWorkDirGitRemotePrefix+sbox.ID); err != nil {
 		slog.ErrorContext(ctx, "Boxer Containers.Delete failed to remove git remote", "sandbox", sbox.ID, "error", err)
 	}
 
 	if err := sb.fileOps.RemoveAll(sbox.SandboxWorkDir); err != nil {
 		slog.ErrorContext(ctx, "Boxer Containers.Delete failed to remove workdir", "sandbox", sbox.ID, "error", err)
-	}
-
-	if sbox.sshim != nil {
-		if err := sbox.sshim.Cleanup(); err != nil {
-			slog.ErrorContext(ctx, "Boxer Containers.Delete failed to clean up ssh shim", "sandbox", sbox.ID, "error", err)
-		}
 	}
 
 	// Finally, remove from database

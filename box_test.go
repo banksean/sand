@@ -105,14 +105,14 @@ func TestBox_EffectiveMounts(t *testing.T) {
 			},
 			wantLen: 3,
 			validate: func(t *testing.T, mounts []MountSpec) {
-				if mounts[0].Source != "/tmp/sandbox/hostkeys" {
-					t.Errorf("Expected hostkeys mount, got %s", mounts[0].Source)
+				if mounts[0].Source != "/tmp/sandbox/sshkeys" {
+					t.Errorf("Expected sshkeys mount, got %s", mounts[0].Source)
 				}
-				if mounts[0].Target != "/hostkeys" {
-					t.Errorf("Expected target /hostkeys, got %s", mounts[0].Target)
+				if mounts[0].Target != "/sshkeys" {
+					t.Errorf("Expected target /sshkeys, got %s", mounts[0].Target)
 				}
 				if !mounts[0].ReadOnly {
-					t.Error("Expected hostkeys mount to be readonly")
+					t.Error("Expected sshkeys mount to be readonly")
 				}
 
 				if mounts[1].Source != "/tmp/sandbox/dotfiles" {

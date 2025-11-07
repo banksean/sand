@@ -12,6 +12,7 @@ type GitOps interface {
 	AddRemote(ctx context.Context, dir, name, url string) error
 	RemoveRemote(ctx context.Context, dir, name string) error
 	Fetch(ctx context.Context, dir, remote string) error
+	TopLevel(ctx context.Context, dir string) string
 }
 
 type defaultGitOps struct{}
@@ -54,4 +55,17 @@ func (g *defaultGitOps) Fetch(ctx context.Context, dir, remote string) error {
 		return fmt.Errorf("git fetch failed: %w (output: %s)", err, output)
 	}
 	return nil
+}
+
+func (g *defaultGitOps) TopLevel(ctx context.Context, dir string) string {
+	cmd := exec.CommandContext(ctx, "git", "rev-parse", "--show-toplevel")
+	cmd.Dir = dir
+	slog.InfoContext(ctx, "GitOps.TopLevel", "cmd", strings.Join(cmd.Args, " "), "dir", dir)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		slog.InfoContext(ctx, "GitOps.TopLevel", "error", err, "output", string(output))
+		return ""
+	}
+
+	return strings.TrimSpace(string(output))
 }

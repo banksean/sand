@@ -51,10 +51,9 @@ type Box struct {
 	SandboxContainerError string
 	// ContainerHooks run after the container has started to perform any bootstrap logic.
 	ContainerHooks []ContainerStartupHook `json:"-"`
+	Keys           *sshimmer.Keys
 	// containerService is the service for interacting with containers
 	containerService ContainerOps
-
-	sshim *sshimmer.LocalSSHimmer
 }
 
 func (sb *Box) GetContainer(ctx context.Context) (*types.Container, error) {
@@ -204,8 +203,8 @@ func (sb *Box) effectiveMounts() []MountSpec {
 	}
 	return []MountSpec{
 		{
-			Source:   filepath.Join(sb.SandboxWorkDir, "hostkeys"),
-			Target:   "/hostkeys",
+			Source:   filepath.Join(sb.SandboxWorkDir, "sshkeys"),
+			Target:   "/sshkeys",
 			ReadOnly: true,
 		},
 		{

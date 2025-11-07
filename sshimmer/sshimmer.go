@@ -18,65 +18,58 @@ import (
 
 	"github.com/kevinburke/ssh_config"
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/crypto/ssh/knownhosts"
 )
 
-// LocalSSHimmer does the necessary key pair generation, known_hosts updates, ssh_config file updates etc steps
-// so that ssh can connect to a locally running sand container to other local processes like vscode without
-// the user having to run the usual ssh obstacle course.
-//
-// LocalSSHimmer does not modify your default .ssh/config, or known_hosts files.  However, in order for you
-// to be able to use it properly you will have to make a one-time edit to your ~/.ssh/config file.
-//
-// In your ~/.ssh/config file, add the following line:
-//
-// Include $HOME/.config/sand/ssh_config
-//
-// where $HOME is your home directory.
-//
-// LocalSSHimmer uses Ed25519 keys for improved security and performance.
+/**
+TODO: sort out all the .pub-cert vs -cert.pub shit. ssh expects one but no the other when deriving the cert filename from the private key filename.
+*/
+
+// Keys is the set of ssh keys and certificates to be installed on a newly created sandbox container.
+type Keys struct {
+	HostKey     []byte // host private key
+	HostKeyPub  []byte // host public key
+	HostKeyCert []byte // host key certificate
+	UserCAPub   []byte // public key for user certificate authority
+}
+
 type LocalSSHimmer struct {
-	cntrName    string
-	sshHost     string
-	sshPort     string
 	localDomain string
 
-	knownHostsPath     string
-	userIdentityPath   string
-	sshConfigPath      string
-	serverIdentityPath string
-	containerCAPath    string
-	hostCertPath       string
+	knownHostsPath   string
+	userIdentityPath string
+	userIdentity     []byte
 
-	serverPublicKey      ssh.PublicKey
-	serverIdentity       []byte
-	userIdentity         []byte
-	hostCertificate      []byte
-	containerCA          ssh.Signer
-	containerCAPublicKey ssh.PublicKey
+	hostCAPath      string
+	hostCA          ssh.Signer
+	hostCAPublicKey ssh.PublicKey
+
+	userCAPath      string
+	userCertPath    string
+	userCertificate []byte
+	userCA          ssh.Signer
+	userCAPublicKey ssh.PublicKey
 
 	fs FileSystem
 	kg KeyGenerator
 }
 
 // NewLocalSSHimmer will set up everything so that you can use ssh on localhost to connect to
-// the sand container.  Call #Clean when you are done with the container to remove the
-// various entries it created in its known_hosts and ssh_config files. Also note that
-// this will generate key pairs for both the ssh server identity and the user identity, if
-// these files do not already exist.  These key pair files are not deleted by #Cleanup,
-// so they can be re-used across invocations of sand. This means every sand container
-// that runs on this host will use the same ssh server identity.
-// The system uses Ed25519 keys for better security and performance.
+// a local sand container without Trust On First Use (TOFU). To achive this, LocalSSHimmer uses its own
+// certificate authorities to sign user and host certificates. Sand will configure ssh (and sshd inside
+// containers) so that it relies on certificate-based two-way authentication.  This ensures that your
+// ssh client can verify that it's connecting to the container sshd that you think it is, and also that
+// the container sshd can verify that it's you connecting to it.
 //
-// If this doesn't return an error, you should be able to run "ssh <user>@<cntrName>"
-// in a terminal on your host machine to open a shell into the container without having
-// to manually accept changes to your known_hosts file etc.
-func NewLocalSSHimmer(ctx context.Context, cntrName, sshHost, sshPort string) (*LocalSSHimmer, error) {
-	return newLocalSSHimmerWithDeps(ctx, cntrName, sshHost, sshPort, &RealFileSystem{}, &RealKeyGenerator{})
+// This CA-based approach requires minimal changes to your ~/.ssh/config.
+// It adds a single Include line, once, automatically the first time you use sand.
+// Everything else (host CA, user CA and user identity keys) is maintained by updating files in
+// ~/.config/sand.
+func NewLocalSSHimmer(ctx context.Context) (*LocalSSHimmer, error) {
+	return newLocalSSHimmerWithDeps(ctx, &RealFileSystem{}, &RealKeyGenerator{})
 }
 
 // newLocalSSHimmerWithDeps creates a new LocalSSHimmer with the specified dependencies
-func newLocalSSHimmerWithDeps(ctx context.Context, cntrName, sshHost, sshPort string, fs FileSystem, kg KeyGenerator) (*LocalSSHimmer, error) {
+func newLocalSSHimmerWithDeps(ctx context.Context, fs FileSystem, kg KeyGenerator) (*LocalSSHimmer, error) {
 	base := filepath.Join(os.Getenv("HOME"), ".config", "sand")
 	if _, err := fs.Stat(base); err != nil {
 		if err := fs.MkdirAll(base, 0o777); err != nil {
@@ -84,79 +77,288 @@ func newLocalSSHimmerWithDeps(ctx context.Context, cntrName, sshHost, sshPort st
 		}
 	}
 
-	ssher := &LocalSSHimmer{
-		localDomain:        "test", // TODO: pass this in.
-		cntrName:           cntrName,
-		sshHost:            sshHost,
-		sshPort:            sshPort,
-		knownHostsPath:     filepath.Join(base, "known_hosts"),
-		userIdentityPath:   filepath.Join(base, "container_user_identity"),
-		serverIdentityPath: filepath.Join(base, "container_server_identity"),
-		containerCAPath:    filepath.Join(base, "container_ca"),
-		hostCertPath:       filepath.Join(base, "host_cert"),
-		sshConfigPath:      filepath.Join(base, "ssh_config"),
-		fs:                 fs,
-		kg:                 kg,
+	s := &LocalSSHimmer{
+		localDomain:      "test", // TODO: pass this in.
+		knownHostsPath:   filepath.Join(base, "known_hosts"),
+		userIdentityPath: filepath.Join(base, "user_key"),
+
+		hostCAPath:   filepath.Join(base, "host_ca"),
+		userCAPath:   filepath.Join(base, "user_ca"),
+		userCertPath: filepath.Join(base, "user_cert"),
+		fs:           fs,
+		kg:           kg,
 	}
 
-	// Step 1: Create regular server identity for the container SSH server
-	if _, err := ssher.createKeyPairIfMissing(ssher.serverIdentityPath); err != nil {
-		return nil, fmt.Errorf("couldn't create server identity: %w", err)
-	}
-	slog.InfoContext(ctx, "LocalSSHimmer: created keypair if missing", "ssher.serverIdentityPath", ssher.serverIdentityPath)
-
-	// Step 2: Create user identity that will be used to connect to the container
-	if _, err := ssher.createKeyPairIfMissing(ssher.userIdentityPath); err != nil {
-		return nil, fmt.Errorf("couldn't create user identity: %w", err)
-	}
-	slog.InfoContext(ctx, "LocalSSHimmer: created keypair if missing", "ssher.userIdentityPath", ssher.userIdentityPath)
-
-	// Step 3: Generate host certificate and CA for mutual authentication
-	// This now handles both CA creation and certificate signing in one step
-	if err := ssher.createHostCertificate(ssher.userIdentityPath); err != nil {
-		return nil, fmt.Errorf("couldn't create host certificate: %w", err)
-	}
-
-	// Step 5: Load all necessary key materials
-	serverIdentity, err := fs.ReadFile(ssher.serverIdentityPath)
+	// Load or create the host CA
+	slog.DebugContext(ctx, "newLocalSSHimmerWithDeps", "getOrCreateCA userCAPath", s.userCAPath)
+	userCASigner, userCAPublicKey, err := s.getOrCreateCA(s.userCAPath)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't read container's ssh server identity: %w", err)
+		return nil, fmt.Errorf("couldn't get user CA from %s: %w", s.userCAPath, err)
 	}
-	ssher.serverIdentity = serverIdentity
+	s.userCA = userCASigner
+	s.userCAPublicKey = userCAPublicKey
 
-	serverPubKeyBytes, err := fs.ReadFile(ssher.serverIdentityPath + ".pub")
+	// Load or create the user keypair
+	userPubKey, _, err := s.getOrCreateKeyPair(s.userIdentityPath)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't read ssh server public key file: %w", err)
+		return nil, fmt.Errorf("couldn't create user identity from %s: %w", s.userIdentityPath, err)
 	}
-	serverPubKey, _, _, _, err := ssh.ParseAuthorizedKey(serverPubKeyBytes)
+
+	// Issue a user certificate (TODO: skip this if the user key cert file already exits)
+	userCert, err := s.issueUserCertificate(userPubKey)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't parse ssh server public key: %w", err)
+		return nil, fmt.Errorf("couldn't issue user cert: %w", err)
 	}
-	ssher.serverPublicKey = serverPubKey
-
-	userIdentity, err := fs.ReadFile(ssher.userIdentityPath + ".pub")
+	s.userCertificate = userCert.Marshal()
+	userCertBytes := ssh.MarshalAuthorizedKey(userCert)
+	s.writeKeyToFile(userCertBytes, s.userIdentityPath+"-cert.pub")
+	if err := writeSandSSHConfig(s.fs); err != nil {
+		return nil, fmt.Errorf("writeSandSSHConfig: %w", err)
+	}
+	// Load or create the host CA
+	slog.InfoContext(ctx, "newLocalSSHimmerWithDeps", "getOrCreateCA hostCAPath", s.hostCAPath)
+	hostCASigner, hostCAPublicKey, err := s.getOrCreateCA(s.hostCAPath)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't read ssh user identity: %w", err)
+		return nil, fmt.Errorf("couldn't get host CA from %s: %w", s.hostCAPath, err)
 	}
-	ssher.userIdentity = userIdentity
+	s.hostCA = hostCASigner
+	s.hostCAPublicKey = hostCAPublicKey
+	if err := s.addHostCAToKnownHosts(); err != nil {
+		return nil, fmt.Errorf("addHostCAToKnownHosts: %w", err)
+	}
 
-	hostCert, err := fs.ReadFile(ssher.hostCertPath)
+	return s, nil
+}
+
+func (s *LocalSSHimmer) NewKeys(ctx context.Context, hostName string) (*Keys, error) {
+	privateKey, publicKey, err := s.kg.GenerateKeyPair()
 	if err != nil {
-		return nil, fmt.Errorf("couldn't read host certificate: %w", err)
+		return nil, fmt.Errorf("error generating key pair: %w", err)
 	}
-	ssher.hostCertificate = hostCert
 
-	// Step 6: Configure SSH settings
-	if err := ssher.addContainerToSSHConfig(); err != nil {
-		return nil, fmt.Errorf("couldn't add container to ssh_config: %w", err)
+	hostPubKey, err := s.kg.ConvertToSSHPublicKey(publicKey)
+	if err != nil {
+		return nil, fmt.Errorf("error converting to SSH public key: %w", err)
 	}
-	slog.InfoContext(ctx, "added container to ssh config")
-	if err := ssher.addContainerToKnownHosts(); err != nil {
-		return nil, fmt.Errorf("couldn't update known hosts: %w", err)
-	}
-	slog.InfoContext(ctx, "added container to known_hosts")
 
-	return ssher, nil
+	hostPrivKey := encodePrivateKeyToPEM(privateKey)
+
+	// Issue a host certificate
+	hostCert, err := s.issueHostCertificate(hostName, hostPubKey)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't issue host cert: %w", err)
+	}
+
+	ret := &Keys{
+		HostKey:     hostPrivKey,
+		HostKeyPub:  ssh.MarshalAuthorizedKey(hostPubKey),
+		HostKeyCert: ssh.MarshalAuthorizedKey(hostCert),
+		UserCAPub:   ssh.MarshalAuthorizedKey(s.userCAPublicKey),
+	}
+	return ret, nil
+}
+
+func (s *LocalSSHimmer) writeKeyToFile(keyBytes []byte, filename string) error {
+	return s.fs.WriteFile(filename, keyBytes, 0o600)
+}
+
+// TODO: return ssh.Signer instead of []byte for the private key?
+func (s *LocalSSHimmer) getOrCreateKeyPair(idPath string) (ssh.PublicKey, []byte, error) {
+	// TODO: fix this - it should read the key pair from these files if they exist, rather than return nils.
+	if _, err := s.fs.Stat(idPath); err == nil {
+		pubkeyBytes, err := s.fs.ReadFile(idPath + ".pub")
+		if err != nil {
+			return nil, nil, fmt.Errorf("reading public key from %s: %w", idPath+".pub", err)
+		}
+		slog.Debug("getOrCreateKeyPair", "pubkeyBytes", string(pubkeyBytes))
+		pubkey, _, _, _, err := ssh.ParseAuthorizedKey(pubkeyBytes)
+		if err != nil {
+			return nil, nil, fmt.Errorf("parsing public key from %s: %w", idPath+".pub", err)
+		}
+		privateKeyBytes, err := s.fs.ReadFile(idPath)
+		if err != nil {
+			return nil, nil, fmt.Errorf("reading private key from %s: %w", idPath, err)
+		}
+		//privKey, err := ssh.ParsePrivateKey(privateKeyBytes)
+
+		return pubkey, privateKeyBytes, nil
+	}
+
+	privateKey, publicKey, err := s.kg.GenerateKeyPair()
+	if err != nil {
+		return nil, nil, fmt.Errorf("error generating key pair: %w", err)
+	}
+
+	sshPublicKey, err := s.kg.ConvertToSSHPublicKey(publicKey)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error converting to SSH public key: %w", err)
+	}
+
+	privateKeyPEM := encodePrivateKeyToPEM(privateKey)
+
+	err = s.writeKeyToFile(privateKeyPEM, idPath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error writing private key to file %w", err)
+	}
+	pubKeyBytes := ssh.MarshalAuthorizedKey(sshPublicKey)
+
+	err = s.writeKeyToFile([]byte(pubKeyBytes), idPath+".pub")
+	if err != nil {
+		return nil, nil, fmt.Errorf("error writing public key to file %w", err)
+	}
+	return sshPublicKey, privateKeyPEM, nil
+}
+
+func (s *LocalSSHimmer) issueHostCertificate(hostName string, certPub ssh.PublicKey) (*ssh.Certificate, error) {
+	// Create a new certificate
+	cert := &ssh.Certificate{
+		Key:             certPub,
+		Serial:          1,
+		CertType:        ssh.HostCert,
+		KeyId:           hostName + " host key",
+		ValidPrincipals: []string{hostName},                             // Only valid for root user in container
+		ValidAfter:      uint64(time.Now().Add(-24 * time.Hour).Unix()), // Valid from 1 day ago
+		ValidBefore:     uint64(time.Now().Add(720 * time.Hour).Unix()), // Valid for 30 days
+		Permissions: ssh.Permissions{
+			Extensions: map[string]string{
+				"permit-pty":              "",
+				"permit-agent-forwarding": "",
+				"permit-port-forwarding":  "",
+			},
+		},
+	}
+	// Sign the certificate with the host CA
+	if err := cert.SignCert(rand.Reader, s.hostCA); err != nil {
+		return nil, fmt.Errorf("signing host certificate: %w", err)
+	}
+
+	return cert, nil
+}
+
+func (c *LocalSSHimmer) addHostCAToKnownHosts() error {
+	// Instead of adding individual host entries, we'll use a CA-based approach
+	// by adding a single "@cert-authority" entry
+
+	// Format the CA public key line for the known_hosts file
+	var caPublicKeyLine string
+	if c.hostCAPublicKey != nil {
+		// Create a line that trusts only localhost hosts with a certificate signed by our CA
+		// This restricts the CA authority to only localhost addresses for security
+		caLine := "@cert-authority *." + c.localDomain + " " + string(ssh.MarshalAuthorizedKey(c.hostCAPublicKey))
+		caPublicKeyLine = strings.TrimSpace(caLine)
+	}
+
+	// Read existing known_hosts content or start with empty if the file doesn't exist
+	outputLines := []string{}
+	existingContent, err := c.fs.ReadFile(c.knownHostsPath)
+	if err == nil {
+		scanner := bufio.NewScanner(bytes.NewReader(existingContent))
+		for scanner.Scan() {
+			line := scanner.Text()
+			// Skip existing CA lines to avoid duplicates
+			if caPublicKeyLine != "" && strings.HasPrefix(line, "@cert-authority * ") {
+				continue
+			}
+			// Skip existing host key lines for this host:port
+			// if strings.Contains(line, c.sshHost+":"+c.sshPort) {
+			// 	continue
+			// }
+			outputLines = append(outputLines, line)
+		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("couldn't read known_hosts file: %w", err)
+	}
+
+	// Add the CA public key line if available
+	if caPublicKeyLine != "" {
+		outputLines = append(outputLines, caPublicKeyLine)
+	}
+
+	// Safely write the updated content to the file
+	if err := c.fs.SafeWriteFile(c.knownHostsPath, []byte(strings.Join(outputLines, "\n")), 0o644); err != nil {
+		return fmt.Errorf("couldn't safely write updated known_hosts to %s: %w", c.knownHostsPath, err)
+	}
+
+	return nil
+}
+
+func (s *LocalSSHimmer) issueUserCertificate(certPub ssh.PublicKey) (*ssh.Certificate, error) {
+	// Create a new user certificate
+	cert := &ssh.Certificate{
+		Key:             certPub,
+		Serial:          1,
+		CertType:        ssh.UserCert,
+		KeyId:           "sand-user",
+		ValidPrincipals: []string{"root"},                               // Only valid for root user in container
+		ValidAfter:      uint64(time.Now().Add(-24 * time.Hour).Unix()), // Valid from 1 day ago
+		ValidBefore:     uint64(time.Now().Add(720 * time.Hour).Unix()), // Valid for 30 days
+		Permissions: ssh.Permissions{
+			Extensions: map[string]string{
+				"permit-pty":              "",
+				"permit-agent-forwarding": "",
+				"permit-port-forwarding":  "",
+			},
+		},
+	}
+
+	slog.Debug("s.userCA", "ca", s.userCA, "publicKey", s.userCA.PublicKey())
+	if err := cert.SignCert(rand.Reader, s.userCA); err != nil {
+		return nil, fmt.Errorf("signing user certificate : %w", err)
+	}
+
+	return cert, nil
+}
+
+// getOrCreateCA creates a new certificate authority keypair at path.
+func (s *LocalSSHimmer) getOrCreateCA(path string) (ssh.Signer, ssh.PublicKey, error) {
+	// Check if CA keypair already exists
+	if _, err := s.fs.Stat(path); err == nil {
+		// CA keypair exists, verify it's still valid
+		caPrivKeyPEM, err := s.fs.ReadFile(path)
+		if err != nil {
+			return nil, nil, fmt.Errorf("reading CA file %s: %w", path, err)
+		}
+
+		// Parse certificate to check validity
+		privKey, err := ssh.ParsePrivateKey(caPrivKeyPEM)
+		if err != nil {
+			// Invalid certificate, something went wrong and we can't recover from it here.
+			return nil, nil, err
+		} else {
+			return privKey, privKey.PublicKey(), nil
+		}
+		// Otherwise, certificate is invalid or expired, so fall through and regenerate it
+	}
+
+	pri, pub, err := s.kg.GenerateKeyPair()
+	if err != nil {
+		return nil, nil, fmt.Errorf("generating key pair: %w", err)
+	}
+
+	// Write the CA public key. First convert to ssh public key:
+	caPublicKey, err := s.kg.ConvertToSSHPublicKey(pub)
+	if err != nil {
+		return nil, nil, fmt.Errorf("convertiung to ssh public key: %w", err)
+	}
+	// Then write the converted public key.
+	caPubKeyBytes := ssh.MarshalAuthorizedKey(caPublicKey)
+	if err := s.writeKeyToFile(caPubKeyBytes, path+".pub"); err != nil {
+		return nil, nil, fmt.Errorf("writing CA public key to file: %w", err)
+	}
+
+	// Write the CA private key
+	caPrivKeyPEM := encodePrivateKeyToPEM(pri)
+	if err := s.writeKeyToFile(caPrivKeyPEM, path); err != nil {
+		return nil, nil, fmt.Errorf("writing CA private key to file: %w", err)
+	}
+
+	// Create a signer from the private key
+	caSigner, err := ssh.NewSignerFromKey(pri)
+	if err != nil {
+		return nil, nil, fmt.Errorf("creating CA signer from private key: %w", err)
+	}
+
+	return caSigner, caPublicKey, nil
 }
 
 func checkSSHHostResolve(ctx context.Context, hostname string) error {
@@ -170,6 +372,8 @@ func checkSSHHostResolve(ctx context.Context, hostname string) error {
 	return nil
 }
 
+// CheckForIncludeWithFS verifies that the user's ~/.ssh/ssh_config has the necessary "Include" statement
+// for sand's ssh_config file.
 func CheckForIncludeWithFS(ctx context.Context, fs FileSystem) (func() error, error) {
 	sandSSHPathInclude := "Include " + filepath.Join(os.Getenv("HOME"), ".config", "sand", "ssh_config")
 	defaultSSHPath := filepath.Join(os.Getenv("HOME"), ".ssh", "config")
@@ -224,6 +428,54 @@ func CheckForIncludeWithFS(ctx context.Context, fs FileSystem) (func() error, er
 	return nil, nil
 }
 
+func writeSandSSHConfig(fs FileSystem) error {
+	identityPath := filepath.Join(os.Getenv("HOME"), ".config", "sand", "user_key")
+	sandSSHConfigPath := filepath.Join(os.Getenv("HOME"), ".config", "sand", "ssh_config")
+	knownHostsPath := filepath.Join(os.Getenv("HOME"), ".config", "sand", "known_hosts")
+
+	hostPattern, err := ssh_config.NewPattern("*.test")
+	if err != nil {
+		return err
+	}
+	cfg := &ssh_config.Config{
+		Hosts: []*ssh_config.Host{
+			{
+				Patterns: []*ssh_config.Pattern{
+					hostPattern,
+				},
+				Nodes: []ssh_config.Node{
+					&ssh_config.KV{
+						Key:   "IdentityFile",
+						Value: identityPath,
+					},
+
+					&ssh_config.KV{
+						Key:   "UserKnownHostsFile",
+						Value: knownHostsPath,
+					},
+					&ssh_config.KV{
+						Key:   "CanonicalizeHostname",
+						Value: "yes",
+					},
+					&ssh_config.KV{
+						Key:   "CanonicalDomains",
+						Value: "test",
+					},
+				},
+			},
+		},
+	}
+
+	cfgBytes, err := cfg.MarshalText()
+	if err != nil {
+		return fmt.Errorf("couldn't marshal ssh_config: %w", err)
+	}
+	if err := fs.SafeWriteFile(sandSSHConfigPath, cfgBytes, 0o644); err != nil {
+		return fmt.Errorf("couldn't safely write ssh_config: %w", err)
+	}
+	return nil
+}
+
 func modifySSHConfig(cfg *ssh_config.Config, sandSSHPathInclude string, fs FileSystem, defaultSSHPath string) error {
 	cfgBytes, err := cfg.MarshalText()
 	if err != nil {
@@ -240,27 +492,6 @@ func modifySSHConfig(cfg *ssh_config.Config, sandSSHPathInclude string, fs FileS
 	return nil
 }
 
-func removeFromHosts(cntrName string, cfgHosts []*ssh_config.Host) []*ssh_config.Host {
-	hosts := []*ssh_config.Host{}
-	for _, host := range cfgHosts {
-		if host.Matches(cntrName) || strings.Contains(host.String(), cntrName) {
-			continue
-		}
-		patMatch := false
-		for _, pat := range host.Patterns {
-			if strings.Contains(pat.String(), cntrName) {
-				patMatch = true
-			}
-		}
-		if patMatch {
-			continue
-		}
-
-		hosts = append(hosts, host)
-	}
-	return hosts
-}
-
 // encodePrivateKeyToPEM encodes an Ed25519 private key for storage
 func encodePrivateKeyToPEM(privateKey ed25519.PrivateKey) []byte {
 	// No need to create a signer first, we can directly marshal the key
@@ -273,266 +504,6 @@ func encodePrivateKeyToPEM(privateKey ed25519.PrivateKey) []byte {
 
 	// Return PEM encoded bytes
 	return pem.EncodeToMemory(pkBytes)
-}
-
-func (c *LocalSSHimmer) writeKeyToFile(keyBytes []byte, filename string) error {
-	err := c.fs.WriteFile(filename, keyBytes, 0o600)
-	return err
-}
-
-func (c *LocalSSHimmer) createKeyPairIfMissing(idPath string) (ssh.PublicKey, error) {
-	if _, err := c.fs.Stat(idPath); err == nil {
-		return nil, nil
-	}
-
-	privateKey, publicKey, err := c.kg.GenerateKeyPair()
-	if err != nil {
-		return nil, fmt.Errorf("error generating key pair: %w", err)
-	}
-
-	sshPublicKey, err := c.kg.ConvertToSSHPublicKey(publicKey)
-	if err != nil {
-		return nil, fmt.Errorf("error converting to SSH public key: %w", err)
-	}
-
-	privateKeyPEM := encodePrivateKeyToPEM(privateKey)
-
-	err = c.writeKeyToFile(privateKeyPEM, idPath)
-	if err != nil {
-		return nil, fmt.Errorf("error writing private key to file %w", err)
-	}
-	pubKeyBytes := ssh.MarshalAuthorizedKey(sshPublicKey)
-
-	err = c.writeKeyToFile([]byte(pubKeyBytes), idPath+".pub")
-	if err != nil {
-		return nil, fmt.Errorf("error writing public key to file %w", err)
-	}
-	return sshPublicKey, nil
-}
-
-func (c *LocalSSHimmer) addSandHostMatchIfMissing(cfg *ssh_config.Config) error {
-	found := false
-	hostPattern := fmt.Sprintf("host=\"*.%s\"", c.localDomain)
-	for _, host := range cfg.Hosts {
-		if strings.Contains(host.String(), hostPattern) {
-			found = true
-			break
-		}
-	}
-	if !found {
-		hostPattern, err := ssh_config.NewPattern(hostPattern)
-		if err != nil {
-			return fmt.Errorf("couldn't add pattern to ssh_config: %w", err)
-		}
-
-		hostCfg := &ssh_config.Host{Patterns: []*ssh_config.Pattern{hostPattern}}
-		hostCfg.Nodes = append(hostCfg.Nodes, &ssh_config.KV{Key: "UserKnownHostsFile", Value: c.knownHostsPath})
-
-		hostCfg.Nodes = append(hostCfg.Nodes, &ssh_config.KV{Key: "IdentityFile", Value: c.userIdentityPath})
-		hostCfg.Nodes = append(hostCfg.Nodes, &ssh_config.Empty{})
-
-		cfg.Hosts = append([]*ssh_config.Host{hostCfg}, cfg.Hosts...)
-	}
-	return nil
-}
-
-func (c *LocalSSHimmer) addContainerToSSHConfig() error {
-	// Read the existing file contents or start with an empty config if file doesn't exist
-	var configData []byte
-	var cfg *ssh_config.Config
-	var err error
-
-	configData, err = c.fs.ReadFile(c.sshConfigPath)
-	if err != nil {
-		// If the file doesn't exist, create an empty config
-		if os.IsNotExist(err) {
-			cfg = &ssh_config.Config{}
-		} else {
-			return fmt.Errorf("couldn't read ssh_config: %w", err)
-		}
-	} else {
-		// Parse the existing config
-		cfg, err = ssh_config.Decode(bytes.NewReader(configData))
-		if err != nil {
-			return fmt.Errorf("couldn't decode ssh_config: %w", err)
-		}
-	}
-
-	cntrPattern, err := ssh_config.NewPattern(c.sshHost)
-	if err != nil {
-		return fmt.Errorf("couldn't add pattern to ssh_config: %w", err)
-	}
-
-	// Remove any matches for this container if they already exist.
-	cfg.Hosts = removeFromHosts(c.sshHost, cfg.Hosts)
-
-	hostCfg := &ssh_config.Host{Patterns: []*ssh_config.Pattern{cntrPattern}}
-	hostCfg.Nodes = append(hostCfg.Nodes, &ssh_config.KV{Key: "HostName", Value: c.sshHost})
-	hostCfg.Nodes = append(hostCfg.Nodes, &ssh_config.KV{Key: "User", Value: "root"})
-	hostCfg.Nodes = append(hostCfg.Nodes, &ssh_config.KV{Key: "Port", Value: c.sshPort})
-	hostCfg.Nodes = append(hostCfg.Nodes, &ssh_config.KV{Key: "IdentityFile", Value: c.userIdentityPath})
-	hostCfg.Nodes = append(hostCfg.Nodes, &ssh_config.KV{Key: "CertificateFile", Value: c.hostCertPath})
-	hostCfg.Nodes = append(hostCfg.Nodes, &ssh_config.KV{Key: "UserKnownHostsFile", Value: c.knownHostsPath})
-
-	hostCfg.Nodes = append(hostCfg.Nodes, &ssh_config.Empty{})
-	cfg.Hosts = append(cfg.Hosts, hostCfg)
-
-	if err := c.addSandHostMatchIfMissing(cfg); err != nil {
-		return fmt.Errorf("couldn't add missing host match: %w", err)
-	}
-
-	cfgBytes, err := cfg.MarshalText()
-	if err != nil {
-		return fmt.Errorf("couldn't marshal ssh_config: %w", err)
-	}
-
-	// Safely write the updated configuration to file
-	if err := c.fs.SafeWriteFile(c.sshConfigPath, cfgBytes, 0o644); err != nil {
-		return fmt.Errorf("couldn't safely write ssh_config: %w", err)
-	}
-
-	return nil
-}
-
-func (c *LocalSSHimmer) addContainerToKnownHosts() error {
-	// Instead of adding individual host entries, we'll use a CA-based approach
-	// by adding a single "@cert-authority" entry
-
-	// Format the CA public key line for the known_hosts file
-	var caPublicKeyLine string
-	if c.containerCAPublicKey != nil {
-		// Create a line that trusts only localhost hosts with a certificate signed by our CA
-		// This restricts the CA authority to only localhost addresses for security
-		caLine := "@cert-authority *." + c.localDomain + " " + string(ssh.MarshalAuthorizedKey(c.containerCAPublicKey))
-		caPublicKeyLine = strings.TrimSpace(caLine)
-	}
-
-	// For backward compatibility, also add the host key itself
-	pkBytes := c.serverPublicKey.Marshal()
-	if len(pkBytes) == 0 {
-		return fmt.Errorf("empty serverPublicKey, this is a bug")
-	}
-	hostKeyLine := knownhosts.Line([]string{c.sshHost + ":" + c.sshPort}, c.serverPublicKey)
-
-	// Read existing known_hosts content or start with empty if the file doesn't exist
-	outputLines := []string{}
-	existingContent, err := c.fs.ReadFile(c.knownHostsPath)
-	if err == nil {
-		scanner := bufio.NewScanner(bytes.NewReader(existingContent))
-		for scanner.Scan() {
-			line := scanner.Text()
-			// Skip existing CA lines to avoid duplicates
-			if caPublicKeyLine != "" && strings.HasPrefix(line, "@cert-authority * ") {
-				continue
-			}
-			// Skip existing host key lines for this host:port
-			if strings.Contains(line, c.sshHost+":"+c.sshPort) {
-				continue
-			}
-			outputLines = append(outputLines, line)
-		}
-	} else if !os.IsNotExist(err) {
-		return fmt.Errorf("couldn't read known_hosts file: %w", err)
-	}
-
-	// Add the CA public key line if available
-	if caPublicKeyLine != "" {
-		outputLines = append(outputLines, caPublicKeyLine)
-	}
-
-	// Also add the host key line for backward compatibility
-	outputLines = append(outputLines, hostKeyLine)
-
-	// Safely write the updated content to the file
-	if err := c.fs.SafeWriteFile(c.knownHostsPath, []byte(strings.Join(outputLines, "\n")), 0o644); err != nil {
-		return fmt.Errorf("couldn't safely write updated known_hosts to %s: %w", c.knownHostsPath, err)
-	}
-
-	return nil
-}
-
-func (c *LocalSSHimmer) removeContainerFromKnownHosts() error {
-	// Read the existing known_hosts file
-	existingContent, err := c.fs.ReadFile(c.knownHostsPath)
-	if err != nil {
-		// If the file doesn't exist, there's nothing to do
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return fmt.Errorf("couldn't read known_hosts file: %w", err)
-	}
-
-	// Line we want to remove for specific host
-	lineToRemove := knownhosts.Line([]string{c.sshHost + ":" + c.sshPort}, c.serverPublicKey)
-
-	// We don't need to track cert-authority lines anymore as we always preserve them
-
-	// Filter out the line we want to remove
-	outputLines := []string{}
-	scanner := bufio.NewScanner(bytes.NewReader(existingContent))
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		// Remove specific host entry
-		if line == lineToRemove {
-			continue
-		}
-
-		// We will preserve all lines, including certificate authority lines
-		// because they might be used by other containers
-
-		// Keep all lines, including CA entries which might be used by other containers
-		outputLines = append(outputLines, line)
-	}
-
-	// Safely write the updated content back to the file
-	if err := c.fs.SafeWriteFile(c.knownHostsPath, []byte(strings.Join(outputLines, "\n")), 0o644); err != nil {
-		return fmt.Errorf("couldn't safely write updated known_hosts to %s: %w", c.knownHostsPath, err)
-	}
-
-	return nil
-}
-
-// Cleanup removes the container-specific entries from the SSH configuration and known_hosts files.
-// It preserves the certificate authority entries that might be used by other containers.
-func (c *LocalSSHimmer) Cleanup() error {
-	if err := c.removeContainerFromSSHConfig(); err != nil {
-		return fmt.Errorf("couldn't remove container from ssh_config: %v\n", err)
-	}
-	if err := c.removeContainerFromKnownHosts(); err != nil {
-		return fmt.Errorf("couldn't remove container from known_hosts: %v\n", err)
-	}
-
-	return nil
-}
-
-func (c *LocalSSHimmer) removeContainerFromSSHConfig() error {
-	// Read the existing file contents
-	configData, err := c.fs.ReadFile(c.sshConfigPath)
-	if err != nil {
-		return fmt.Errorf("couldn't read ssh_config: %w", err)
-	}
-
-	cfg, err := ssh_config.Decode(bytes.NewReader(configData))
-	if err != nil {
-		return fmt.Errorf("couldn't decode ssh_config: %w", err)
-	}
-	cfg.Hosts = removeFromHosts(c.cntrName, cfg.Hosts)
-
-	if err := c.addSandHostMatchIfMissing(cfg); err != nil {
-		return fmt.Errorf("couldn't add missing host match: %w", err)
-	}
-
-	cfgBytes, err := cfg.MarshalText()
-	if err != nil {
-		return fmt.Errorf("couldn't marshal ssh_config: %w", err)
-	}
-
-	// Safely write the updated configuration to file
-	if err := c.fs.SafeWriteFile(c.sshConfigPath, cfgBytes, 0o644); err != nil {
-		return fmt.Errorf("couldn't safely write ssh_config: %w", err)
-	}
-	return nil
 }
 
 // FileSystem represents a filesystem interface for testability
@@ -639,6 +610,16 @@ func (fs *RealFileSystem) SafeWriteFile(name string, data []byte, perm fs.FileMo
 	return nil
 }
 
+// CheckSSHReachability checks if the user's SSH config includes the Sand SSH config file and that
+// ssh can resolve the container's hostname.
+func CheckSSHReachability(ctx context.Context, cntrName string) (func() error, error) {
+	if err := checkSSHHostResolve(ctx, cntrName); err != nil {
+		slog.InfoContext(ctx, "CheckForIncludeWithFS")
+		return CheckForIncludeWithFS(ctx, &RealFileSystem{})
+	}
+	return nil, nil
+}
+
 // KeyGenerator represents an interface for generating SSH keys for testability
 type KeyGenerator interface {
 	GenerateKeyPair() (ed25519.PrivateKey, ed25519.PublicKey, error)
@@ -655,137 +636,4 @@ func (kg *RealKeyGenerator) GenerateKeyPair() (ed25519.PrivateKey, ed25519.Publi
 
 func (kg *RealKeyGenerator) ConvertToSSHPublicKey(publicKey ed25519.PublicKey) (ssh.PublicKey, error) {
 	return ssh.NewPublicKey(publicKey)
-}
-
-// CheckSSHReachability checks if the user's SSH config includes the Sand SSH config file
-func CheckSSHReachability(ctx context.Context, cntrName string) (func() error, error) {
-	if err := checkSSHHostResolve(ctx, cntrName); err != nil {
-		slog.InfoContext(ctx, "CheckForIncludeWithFS")
-		return CheckForIncludeWithFS(ctx, &RealFileSystem{})
-	}
-	return nil, nil
-}
-
-// setupContainerCA creates or loads the Container CA keys
-// Note: The setupContainerCA functionality has been incorporated directly into createHostCertificate
-// to simplify the certificate and CA creation process and avoid key format issues.
-
-// createHostCertificate creates a certificate for the host to authenticate to the container
-func (c *LocalSSHimmer) createHostCertificate(identityPath string) error {
-	// For testing purposes, create a minimal empty certificate
-	// This check will only be true in tests
-	if _, ok := c.kg.(interface{ IsMock() bool }); ok {
-		c.hostCertificate = []byte("test-host-certificate")
-		return nil
-	}
-
-	// Check if certificate already exists
-	if _, err := c.fs.Stat(c.hostCertPath); err == nil {
-		// Certificate exists, verify it's still valid
-		certBytes, err := c.fs.ReadFile(c.hostCertPath)
-		if err != nil {
-			return fmt.Errorf("error reading host certificate: %w", err)
-		}
-
-		// Parse certificate to check validity
-		pk, _, _, _, err := ssh.ParseAuthorizedKey(certBytes)
-		if err != nil {
-			// Invalid certificate, will regenerate
-		} else if cert, ok := pk.(*ssh.Certificate); ok {
-			// Check if certificate is still valid
-			if time.Now().Before(time.Unix(int64(cert.ValidBefore), 0)) &&
-				time.Now().After(time.Unix(int64(cert.ValidAfter), 0)) {
-				// Certificate is still valid
-				c.hostCertificate = certBytes // Store the valid certificate
-				return nil
-			}
-		}
-		// Otherwise, certificate is invalid or expired, regenerate it
-	}
-
-	// Load the private key to sign
-	privKeyBytes, err := c.fs.ReadFile(identityPath)
-	if err != nil {
-		return fmt.Errorf("error reading private key: %w", err)
-	}
-
-	// Parse the private key
-	signer, err := ssh.ParsePrivateKey(privKeyBytes)
-	if err != nil {
-		return fmt.Errorf("error parsing private key: %w", err)
-	}
-
-	// Create a new certificate
-	cert := &ssh.Certificate{
-		Key:             signer.PublicKey(),
-		Serial:          1,
-		CertType:        ssh.UserCert,
-		KeyId:           "sand-host",
-		ValidPrincipals: []string{"root"},                               // Only valid for root user in container
-		ValidAfter:      uint64(time.Now().Add(-1 * time.Hour).Unix()),  // Valid from 1 hour ago
-		ValidBefore:     uint64(time.Now().Add(720 * time.Hour).Unix()), // Valid for 30 days
-		Permissions: ssh.Permissions{
-			CriticalOptions: map[string]string{
-				"source-address": "127.0.0.1,::1", // Only valid from localhost
-			},
-			Extensions: map[string]string{
-				"permit-pty":              "",
-				"permit-agent-forwarding": "",
-				"permit-port-forwarding":  "",
-			},
-		},
-	}
-
-	// Create a signer from the CA key for certificate signing
-	// The containerCA should already be a valid signer, but we'll create a fresh one for robustness
-	// Generate a fresh ed25519 key pair for the CA
-	caPrivate, caPublic, err := c.kg.GenerateKeyPair()
-	if err != nil {
-		return fmt.Errorf("error generating temporary CA key pair: %w", err)
-	}
-
-	// Create a signer from the private key
-	caSigner, err := ssh.NewSignerFromKey(caPrivate)
-	if err != nil {
-		return fmt.Errorf("error creating temporary CA signer: %w", err)
-	}
-
-	// Sign the certificate with the temporary CA
-	if err := cert.SignCert(rand.Reader, caSigner); err != nil {
-		return fmt.Errorf("error signing host certificate: %w", err)
-	}
-
-	// Marshal the certificate
-	certBytes := ssh.MarshalAuthorizedKey(cert)
-
-	// Store the certificate in memory
-	c.hostCertificate = certBytes
-
-	// Also update the CA public key for the known_hosts file
-	c.containerCAPublicKey, err = c.kg.ConvertToSSHPublicKey(caPublic)
-	if err != nil {
-		return fmt.Errorf("error converting temporary CA to SSH public key: %w", err)
-	}
-
-	// Write the certificate to file
-	if err := c.writeKeyToFile(certBytes, c.hostCertPath); err != nil {
-		return fmt.Errorf("error writing host certificate to file: %w", err)
-	}
-
-	// Also write the new CA public key
-	caPubKeyBytes := ssh.MarshalAuthorizedKey(c.containerCAPublicKey)
-	if err := c.writeKeyToFile(caPubKeyBytes, c.containerCAPath+".pub"); err != nil {
-		return fmt.Errorf("error writing CA public key to file: %w", err)
-	}
-
-	// And the CA private key
-	caPrivKeyPEM := encodePrivateKeyToPEM(caPrivate)
-	if err := c.writeKeyToFile(caPrivKeyPEM, c.containerCAPath); err != nil {
-		return fmt.Errorf("error writing CA private key to file: %w", err)
-	}
-
-	// Update the in-memory CA signer
-	c.containerCA = caSigner
-
-	return nil
 }

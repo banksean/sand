@@ -71,16 +71,8 @@ func TestBoxer_NewSandbox_EndToEnd(t *testing.T) {
 		mockImage := &mockImageOps{}
 
 		boxer := newTestBoxer(t, mockContainer, mockImage)
-
-		mockCloner := &mockWorkspaceCloner{
-			prepareFunc: func(ctx context.Context, req CloneRequest) (*CloneResult, error) {
-				return &CloneResult{
-					SandboxWorkDir: filepath.Join(boxer.appRoot, "clones", req.ID),
-					Mounts:         []MountSpec{},
-					ContainerHooks: []ContainerStartupHook{},
-				}, nil
-			},
-		}
+		boxer.fileOps = NewDefaultFileOps()
+		mockCloner := NewDefaultWorkspaceCloner(boxer.appRoot, nil)
 
 		hostWorkDir := t.TempDir()
 		result, err := boxer.NewSandbox(ctx, mockCloner, "test-sandbox", hostWorkDir, "test-image:latest", "")

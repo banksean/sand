@@ -16,6 +16,7 @@ type mockGitOps struct {
 	addRemoteFunc    func(ctx context.Context, dir, name, url string) error
 	removeRemoteFunc func(ctx context.Context, dir, name string) error
 	fetchFunc        func(ctx context.Context, dir, remote string) error
+	topLevelFunc     func(ctx context.Context, dir string) string
 }
 
 func (m *mockGitOps) AddRemote(ctx context.Context, dir, name, url string) error {
@@ -37,6 +38,13 @@ func (m *mockGitOps) Fetch(ctx context.Context, dir, remote string) error {
 		return m.fetchFunc(ctx, dir, remote)
 	}
 	return nil
+}
+
+func (m *mockGitOps) TopLevel(ctx context.Context, dir string) string {
+	if m.topLevelFunc != nil {
+		return m.topLevelFunc(ctx, dir)
+	}
+	return ""
 }
 
 type mockFileOps struct {
@@ -208,8 +216,8 @@ func TestDefaultWorkspaceCloner_MountPlanFor(t *testing.T) {
 		t.Fatalf("Expected 3 mounts, got %d", len(mounts))
 	}
 
-	if mounts[0].Source != "/tmp/sandbox/hostkeys" || mounts[0].Target != "/hostkeys" || !mounts[0].ReadOnly {
-		t.Errorf("Invalid hostkeys mount: %+v", mounts[0])
+	if mounts[0].Source != "/tmp/sandbox/sshkeys" || mounts[0].Target != "/sshkeys" || !mounts[0].ReadOnly {
+		t.Errorf("Invalid sshkeys mount: %+v", mounts[0])
 	}
 
 	if mounts[1].Source != "/tmp/sandbox/dotfiles" || mounts[1].Target != "/dotfiles" || !mounts[1].ReadOnly {
@@ -326,6 +334,7 @@ func TestDefaultWorkspaceCloner_CloneWorkDir(t *testing.T) {
 				fetchCalls = append(fetchCalls, struct{ dir, remote string }{dir, remote})
 				return nil
 			},
+			topLevelFunc: func(ctx context.Context, dir string) string { return "/host/workdir" },
 		}
 
 		cloner := &DefaultWorkspaceCloner{
@@ -427,6 +436,7 @@ func TestDefaultWorkspaceCloner_CloneWorkDir(t *testing.T) {
 			addRemoteFunc: func(ctx context.Context, dir, name, url string) error {
 				return expectedErr
 			},
+			topLevelFunc: func(ctx context.Context, dir string) string { return "/some/git/dir" },
 		}
 
 		cloner := &DefaultWorkspaceCloner{
@@ -451,6 +461,7 @@ func TestDefaultWorkspaceCloner_CloneWorkDir(t *testing.T) {
 			fetchFunc: func(ctx context.Context, dir, remote string) error {
 				return expectedErr
 			},
+			topLevelFunc: func(ctx context.Context, dir string) string { return "/some/git/dir" },
 		}
 
 		cloner := &DefaultWorkspaceCloner{
@@ -495,28 +506,39 @@ func TestDefaultWorkspaceCloner_CloneHostKeyPair(t *testing.T) {
 			fileOps:   mockFile,
 		}
 
-		err := cloner.cloneHostKeyPair(ctx, "test-id")
+		err := cloner.cloneSSHIdentityKeys(ctx, "test-id")
 		if err != nil {
 			t.Fatalf("cloneHostKeyPair() error = %v", err)
 		}
 
-		if len(mkdirCalls) != 1 || mkdirCalls[0] != "/app/clones/test-id/hostkeys" {
-			t.Errorf("Expected MkdirAll('/app/clones/test-id/hostkeys'), got: %v", mkdirCalls)
+		if len(mkdirCalls) != 1 || mkdirCalls[0] != "/app/clones/test-id/sshkeys" {
+			t.Errorf("Expected MkdirAll('/app/clones/test-id/sshkeys'), got: %v", mkdirCalls)
 		}
 
-		if len(copyCalls) != 2 {
-			t.Fatalf("Expected 2 copy calls, got %d", len(copyCalls))
+		if len(copyCalls) != 4 {
+			t.Fatalf("Expected 4 copy calls, got %d", len(copyCalls))
 		}
 
-		if !strings.HasSuffix(copyCalls[0].src, ".config/sand/container_server_identity") ||
-			copyCalls[0].dst != "/app/clones/test-id/hostkeys/ssh_host_ed25519_key" {
+		if !strings.HasSuffix(copyCalls[0].src, ".config/sand/ssh_host_key") ||
+			copyCalls[0].dst != "/app/clones/test-id/sshkeys/ssh_host_key" {
 			t.Errorf("First copy: src=%s, dst=%s", copyCalls[0].src, copyCalls[0].dst)
 		}
 
-		if !strings.HasSuffix(copyCalls[1].src, ".config/sand/container_server_identity.pub") ||
-			copyCalls[1].dst != "/app/clones/test-id/hostkeys/ssh_host_ed25519_key.pub" {
+		if !strings.HasSuffix(copyCalls[1].src, ".config/sand/ssh_host_key.pub") ||
+			copyCalls[1].dst != "/app/clones/test-id/sshkeys/ssh_host_key.pub" {
 			t.Errorf("Second copy: src=%s, dst=%s", copyCalls[1].src, copyCalls[1].dst)
 		}
+
+		if !strings.HasSuffix(copyCalls[2].src, ".config/sand/ssh_host_key.pub-cert") ||
+			copyCalls[2].dst != "/app/clones/test-id/sshkeys/ssh_host_key.pub-cert" {
+			t.Errorf("Third copy: src=%s, dst=%s", copyCalls[2].src, copyCalls[2].dst)
+		}
+
+		if !strings.HasSuffix(copyCalls[3].src, ".config/sand/user_ca.pub") ||
+			copyCalls[3].dst != "/app/clones/test-id/sshkeys/user_ca.pub" {
+			t.Errorf("Fourth copy: src=%s, dst=%s", copyCalls[2].src, copyCalls[2].dst)
+		}
+
 	})
 
 	t.Run("mkdir error", func(t *testing.T) {
@@ -533,7 +555,7 @@ func TestDefaultWorkspaceCloner_CloneHostKeyPair(t *testing.T) {
 			fileOps:   mockFile,
 		}
 
-		err := cloner.cloneHostKeyPair(ctx, "test-id")
+		err := cloner.cloneSSHIdentityKeys(ctx, "test-id")
 		if err == nil {
 			t.Fatal("Expected error, got nil")
 		}
@@ -561,7 +583,7 @@ func TestDefaultWorkspaceCloner_CloneHostKeyPair(t *testing.T) {
 			fileOps:   mockFile,
 		}
 
-		err := cloner.cloneHostKeyPair(ctx, "test-id")
+		err := cloner.cloneSSHIdentityKeys(ctx, "test-id")
 		if err == nil {
 			t.Fatal("Expected error, got nil")
 		}
@@ -589,7 +611,7 @@ func TestDefaultWorkspaceCloner_CloneHostKeyPair(t *testing.T) {
 			fileOps:   mockFile,
 		}
 
-		err := cloner.cloneHostKeyPair(ctx, "test-id")
+		err := cloner.cloneSSHIdentityKeys(ctx, "test-id")
 		if err == nil {
 			t.Fatal("Expected error, got nil")
 		}
@@ -626,8 +648,8 @@ func TestDefaultWorkspaceCloner_CloneDotfiles(t *testing.T) {
 			t.Fatalf("cloneDotfiles() error = %v", err)
 		}
 
-		if len(copyCalls) != 5 {
-			t.Errorf("Expected 5 copy calls (one per dotfile), got %d", len(copyCalls))
+		if len(copyCalls) != 4 {
+			t.Errorf("Expected 4 copy calls (one per dotfile), got %d", len(copyCalls))
 		}
 	})
 
@@ -655,8 +677,8 @@ func TestDefaultWorkspaceCloner_CloneDotfiles(t *testing.T) {
 			t.Fatalf("cloneDotfiles() error = %v", err)
 		}
 
-		if len(createCalls) != 5 {
-			t.Errorf("Expected 5 create calls, got %d", len(createCalls))
+		if len(createCalls) != 4 {
+			t.Errorf("Expected 4 create calls, got %d", len(createCalls))
 		}
 	})
 
@@ -949,8 +971,8 @@ func TestDefaultWorkspaceCloner_DefaultContainerHook(t *testing.T) {
 		if !strings.Contains(errStr, "copy dotfiles") {
 			t.Error("Error should contain 'copy dotfiles'")
 		}
-		if !strings.Contains(errStr, "copy host keys") {
-			t.Error("Error should contain 'copy host keys'")
+		if !strings.Contains(errStr, "chmod host keys") {
+			t.Error("Error should contain 'chmod host keys'")
 		}
 	})
 }

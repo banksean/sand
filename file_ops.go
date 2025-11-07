@@ -54,7 +54,11 @@ func (f *defaultFileOps) Readlink(path string) (string, error) {
 }
 
 func (f *defaultFileOps) Create(path string) (*os.File, error) {
-	return os.Create(path)
+	ret, err := os.Create(path)
+	if err != nil {
+		return nil, err
+	}
+	return ret, nil
 }
 
 func (f *defaultFileOps) RemoveAll(path string) error {
