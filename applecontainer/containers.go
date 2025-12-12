@@ -98,7 +98,7 @@ func (c *ContainerSvc) Start(ctx context.Context, opts *options.StartContainer, 
 	slog.InfoContext(ctx, "ContainerSvc.Start", "cmd", strings.Join(cmd.Args, " "))
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("ContainerSvc.Start error: %w, output: %s", err, strings.TrimSpace(string(output)))
 	}
 	return strings.TrimSpace(string(output)), nil
 }
