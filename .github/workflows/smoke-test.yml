@@ -45,11 +45,11 @@ jobs:
 
       - name: Download apple/container 0.7.1 installer
         run: |
-          curl -L "https://github.com/apple/container/releases/download/0.7.1/container-0.7.1-installer-signed.pkg" -o container-0.7.1-installer-signed.pkg
+          curl -L "https://github.com/apple/container/releases/download/0.7.1/container-installer-signed.pkg" -o container-installer-signed.pkg
 
       - name: Install .pkg file
         run: |
-          sudo installer -pkg container-0.7.1-installer-signed.pkg -target /
+          sudo installer -pkg container-installer-signed.pkg -target /
 
       - name: check for installer files
         run: pkgutil --only-files --files com.apple.container-installer
