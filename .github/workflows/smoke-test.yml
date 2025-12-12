@@ -68,7 +68,7 @@ jobs:
         working-directory: ${{ inputs.working-directory || '.'}}
         run: sand version
 
-      - name: sand daemon
+      - name: sand daemon --log-file=/tmp/sand/log
         working-directory: ${{ inputs.working-directory || '.'}}
         run: sand daemon # should print that daemon is running
 
@@ -87,3 +87,11 @@ jobs:
       - name: sand daemon stop
         working-directory: ${{ inputs.working-directory || '.'}}
         run: sand daemon stop
+
+      - name: Print cli logs on failure
+        if: failure()
+        run: cat /tmp/sand/log
+
+      - name: Print daemon logs on failure
+        if: failure()
+        run: cat /tmp/sand/log.daemon
