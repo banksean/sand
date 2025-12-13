@@ -179,7 +179,6 @@ func (s *LocalSSHimmer) getOrCreateKeyPair(idPath string) (ssh.PublicKey, []byte
 		if err != nil {
 			return nil, nil, fmt.Errorf("reading private key from %s: %w", idPath, err)
 		}
-		//privKey, err := ssh.ParsePrivateKey(privateKeyBytes)
 
 		return pubkey, privateKeyBytes, nil
 	}
