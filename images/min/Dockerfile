@@ -43,7 +43,7 @@ RUN mkdir -p /root/.ssh && \
   echo "Host github.com\n\tPubkeyAuthentication yes" > /root/.ssh/config && \
   chmod 600 /root/.ssh/config
 
-# ADD sshd_config /etc/ssh/sshd_config
+ADD sshd_config /etc/ssh/sshd_config
 
 WORKDIR /workspace
 
