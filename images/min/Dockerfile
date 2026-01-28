@@ -1,4 +1,4 @@
-FROM alpine
+FROM docker.io/library/alpine
 
 ARG TZ
 ENV TZ="$TZ"

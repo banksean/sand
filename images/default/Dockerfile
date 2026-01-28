@@ -1,5 +1,5 @@
 # TODO: tune this to work more seamlessly with macOS, user settings etc
-FROM alpine
+FROM docker.io/library/alpine
 
 ARG TZ
 ENV TZ="$TZ"

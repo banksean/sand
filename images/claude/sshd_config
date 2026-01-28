@@ -16,6 +16,10 @@ Include /etc/ssh/sshd_config.d/*.conf
 #ListenAddress 0.0.0.0
 #ListenAddress ::
 
+HostKey /etc/ssh/ssh_host_key
+HostCertificate /etc/ssh/ssh_host_key.pub-cert
+TrustedUserCAKeys /etc/ssh/user_ca.pub
+
 #HostKey /etc/ssh/ssh_host_rsa_key
 #HostKey /etc/ssh/ssh_host_ecdsa_key
 #HostKey /etc/ssh/ssh_host_ed25519_key
@@ -24,8 +28,8 @@ Include /etc/ssh/sshd_config.d/*.conf
 #RekeyLimit default none
 
 # Logging
-#SyslogFacility AUTH
-#LogLevel INFO
+SyslogFacility AUTH
+LogLevel VERBOSE
 
 # Authentication:
 
@@ -38,13 +42,15 @@ Include /etc/ssh/sshd_config.d/*.conf
 #PubkeyAuthentication yes
 
 # Expect .ssh/authorized_keys2 to be disregarded by default in future.
-#AuthorizedKeysFile     .ssh/authorized_keys .ssh/authorized_keys2
-AuthorizedKeysFile      /root/.ssh/id_ed25519.pub
+AuthorizedKeysFile     .ssh/authorized_keys .ssh/authorized_keys2
+# AuthorizedKeysFile      /root/.ssh/id_ed25519.pub
 
 #AuthorizedPrincipalsFile none
 
 #AuthorizedKeysCommand none
 #AuthorizedKeysCommandUser nobody
+
+PubkeyAcceptedAlgorithms ssh-ed25519-cert-v01@openssh.com,ssh-ed25519
 
 # For this to work you will also need host keys in /etc/ssh/ssh_known_hosts
 #HostbasedAuthentication no
@@ -83,7 +89,7 @@ KbdInteractiveAuthentication no
 # If you just want the PAM account and session checks to run without
 # PAM authentication, then enable this but set PasswordAuthentication
 # and KbdInteractiveAuthentication to 'no'.
-UsePAM yes
+# UsePAM yes
 
 #AllowAgentForwarding yes
 AllowTcpForwarding yes
