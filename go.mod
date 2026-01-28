@@ -5,7 +5,7 @@ go 1.25.1
 require (
 	github.com/alecthomas/kong v1.12.1
 	github.com/creack/pty v1.1.24
-	github.com/google/uuid v1.6.0
+	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
 	github.com/kevinburke/ssh_config v1.4.0
 	golang.org/x/crypto v0.43.0
 	golang.org/x/term v0.36.0
@@ -15,6 +15,7 @@ require (
 require (
 	github.com/alecthomas/repr v0.5.2 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/ncruces/go-strftime v0.1.9 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect

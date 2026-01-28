@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/banksean/sand"
-	"github.com/google/uuid"
+	"github.com/goombaio/namegenerator"
 )
 
 type ExecCmd struct {
-	ImageName    string   `short:"i" default:"sandbox" placeholder:"<container-image-name>" help:"name of container image to use"`
+	ImageName    string   `short:"i" default:"ghcr.io/banksean/sand/default:latest" placeholder:"<container-image-name>" help:"name of container image to use"`
 	CloneFromDir string   `short:"c" placeholder:"<project-dir>" help:"directory to clone into the sandbox. Defaults to current working directory, if unset."`
 	EnvFile      string   `short:"e" placholder:"<file-path>" help:"path to env file to use when creating a new shell"`
 	Rm           bool     `help:"remove the sandbox after the shell terminates"`
@@ -32,7 +33,10 @@ func (c *ExecCmd) Run(cctx *Context) error {
 
 	// Generate ID if not provided
 	if c.ID == "" {
-		c.ID = uuid.NewString()
+		seed := time.Now().UTC().UnixNano()
+		nameGenerator := namegenerator.NewNameGenerator(seed)
+
+		c.ID = nameGenerator.Generate()
 	}
 
 	// Use MuxClient to check if sandbox exists or create it

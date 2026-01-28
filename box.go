@@ -110,7 +110,7 @@ func (sb *Box) CreateContainer(ctx context.Context) error {
 		},
 		sb.ImageName, nil)
 	if err != nil {
-		slog.ErrorContext(ctx, "createContainer", "sandbox", sb.ID, "error", err, "output", containerID)
+		slog.ErrorContext(ctx, "createContainer", "sandbox", sb.ID, "imageName", sb.ImageName, "error", err, "output", containerID)
 		return fmt.Errorf("failed to create container for sandbox %s: %w", sb.ID, err)
 	}
 	sb.ContainerID = containerID

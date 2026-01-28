@@ -116,7 +116,7 @@ func (m *MuxClient) GetSandbox(ctx context.Context, id string) (*Box, error) {
 	var box Box
 	if err := m.doRequest(ctx, http.MethodPost, "/get", map[string]string{"id": id}, &box); err != nil {
 		if strings.Contains(err.Error(), "404") {
-			return nil, nil
+			return nil, fmt.Errorf("id not found: %q", id)
 		}
 		return nil, err
 	}

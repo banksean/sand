@@ -7,10 +7,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/banksean/sand"
 	"github.com/banksean/sand/sshimmer"
-	"github.com/google/uuid"
+	"github.com/goombaio/namegenerator"
 )
 
 type NewCmd struct {
@@ -48,7 +49,9 @@ func (c *NewCmd) Run(cctx *Context) error {
 
 	// Generate ID if not provided
 	if c.ID == "" {
-		c.ID = uuid.NewString()
+		seed := time.Now().UTC().UnixNano()
+		nameGenerator := namegenerator.NewNameGenerator(seed)
+		c.ID = nameGenerator.Generate()
 	}
 
 	// Use MuxClient to check if sandbox exists or create it
