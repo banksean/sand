@@ -27,7 +27,7 @@ Git ssh authentication passes from your MacOS host through `sand` containers, vi
 
 Using `ssh-agent` also means you don't have to leave copies of your github credentials scattered around in places where they shouldn't be.
 
-See [cmd/sand/GIT_REMOTES.md](cmd/sand/GIT_REMOTES.md) for a more detailed explanation of how `sand` uses git locally to link the MacOS-side clones back to your original working directory.  If you are a git enthusiast, you can probably figure out how move changes around between your MacOS host and your sandbox containers without involving github at all.
+See [doc/GIT_REMOTES.md](doc/GIT_REMOTES.md) for a more detailed explanation of how `sand` uses git locally to link the MacOS-side clones back to your original working directory.  If you are a git enthusiast, you can probably figure out how move changes around between your MacOS host and your sandbox containers without involving github at all.
 
 ## Some other handy commands
 
