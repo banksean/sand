@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	appleContainerVersion = "0.8.0"
+	appleContainerVersion = "0.9.0"
 	minimumMacOSVersion   = 26
 )
 
