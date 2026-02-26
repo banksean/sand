@@ -59,7 +59,7 @@ type Box struct {
 	containerService ContainerOps
 }
 
-func (sb *Box) GetContainer(ctx context.Context) (interface{}, error) {
+func (sb *Box) getContainer(ctx context.Context) (interface{}, error) {
 	ctrs, err := sb.containerService.Inspect(ctx, sb.ContainerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to inspect container for sandbox %s: %w", sb.ID, err)
@@ -73,8 +73,8 @@ func (sb *Box) GetContainer(ctx context.Context) (interface{}, error) {
 
 // GetContainerTyped returns the container with its proper type.
 // This is a convenience method for code that needs the typed version.
-func (sb *Box) GetContainerTyped(ctx context.Context) (*types.Container, error) {
-	ctr, err := sb.GetContainer(ctx)
+func (sb *Box) GetContainer(ctx context.Context) (*types.Container, error) {
+	ctr, err := sb.getContainer(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +91,7 @@ func (sb *Box) Sync(ctx context.Context) error {
 		sb.SandboxWorkDirError = "NO CLONE DIR"
 	}
 	// What *should* this code do, if we get an error while trying to inspect the sandbox's container state?
-	_, err = sb.GetContainerTyped(ctx)
+	_, err = sb.GetContainer(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "Boxer.Sync GetContainer", "sandbox", sb.ID, "error", err)
 		sb.SandboxContainerError = fmt.Sprintf("NO CONTAINER: %q", err.Error())

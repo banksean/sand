@@ -36,7 +36,7 @@ func (c *LsCmd) Run(cctx *Context) error {
 	fmt.Fprintln(w, "SANDBOX ID\tSTATUS\tCONTAINER ID\tHOSTNAME\tORIGIN DIR\tIMAGE NAME\t")
 	for _, sbox := range list {
 		sbox.Sync(ctx)
-		ctr, err := sbox.GetContainerTyped(ctx)
+		ctr, err := sbox.GetContainer(ctx)
 		if err != nil {
 			return err
 		}

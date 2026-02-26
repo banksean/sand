@@ -58,15 +58,9 @@ func (c *OpenCodeContainerConfiguration) copyOpenCodeBinaryHook() sandtypes.Cont
 // openSSHTunnelHook sets up an SSH reverse tunnel for Chrome DevTools MCP.
 func (c *OpenCodeContainerConfiguration) openSSHTunnelHook() sandtypes.ContainerStartupHook {
 	return sandtypes.NewContainerStartupHook("open remote ssh tunnel for chrome-devtools mcp", func(ctx context.Context, box sandtypes.BoxOperations) error {
-		ctrIface, err := box.GetContainer(ctx)
+		ctr, err := box.GetContainer(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to get container: %w", err)
-		}
-
-		// Type assert to *types.Container
-		ctr, ok := ctrIface.(*types.Container)
-		if !ok {
-			return fmt.Errorf("unexpected container type: %T", ctrIface)
 		}
 
 		hostname := getContainerHostname(ctr)

@@ -395,7 +395,7 @@ func (m *Mux) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*Box, 
 		return nil, err
 	}
 
-	ctr, err := sbox.GetContainerTyped(ctx)
+	ctr, err := sbox.GetContainer(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -407,7 +407,7 @@ func (m *Mux) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*Box, 
 		if err := m.boxer.UpdateContainerID(ctx, sbox, sbox.ContainerID); err != nil {
 			return nil, err
 		}
-		ctr, err = sbox.GetContainerTyped(ctx)
+		ctr, err = sbox.GetContainer(ctx)
 		if err != nil || ctr == nil {
 			return nil, fmt.Errorf("failed to get container after creation")
 		}

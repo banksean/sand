@@ -31,7 +31,7 @@ func (c *VscCmd) Run(cctx *Context) error {
 		return fmt.Errorf("could not find sandbox with ID %s: %w", c.ID, err)
 	}
 
-	ctr, err := sbox.GetContainerTyped(ctx)
+	ctr, err := sbox.GetContainer(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "sbox.GetContainer", "error", err)
 		return err

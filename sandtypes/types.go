@@ -6,12 +6,14 @@ import (
 	"context"
 	"fmt"
 	"strings"
+
+	"github.com/banksean/sand/applecontainer/types"
 )
 
 // BoxOperations defines the operations that container startup hooks can perform on a sandbox.
 type BoxOperations interface {
 	Exec(ctx context.Context, shellCmd string, args ...string) (string, error)
-	GetContainer(ctx context.Context) (interface{}, error)
+	GetContainer(ctx context.Context) (*types.Container, error)
 }
 
 // MountSpec describes a bind mount that should be attached to a container.
