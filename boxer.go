@@ -5,11 +5,14 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"database/sql"
+	"embed"
 	_ "embed"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"net/url"
 	"path/filepath"
 	"time"
 
@@ -17,14 +20,17 @@ import (
 	"github.com/banksean/sand/db"
 	"github.com/banksean/sand/sandtypes"
 	"github.com/banksean/sand/sshimmer"
+	"github.com/golang-migrate/migrate/v4"
+	sqlite "github.com/golang-migrate/migrate/v4/database/sqlite"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"golang.org/x/crypto/ssh"
 	_ "modernc.org/sqlite"
 )
 
 //go:generate sh -c "sqlc generate"
 
-//go:embed db/schema.sql
-var schemaSQL string
+//go:embed db/migrations/*.sql
+var migrationsFS embed.FS
 
 // Boxer manages the lifecycle of sandboxes.
 type Boxer struct {
@@ -47,22 +53,38 @@ func NewBoxer(appRoot string, terminalWriter io.Writer) (*Boxer, error) {
 	}
 
 	dbPath := filepath.Join(appRoot, "sand.db")
+
+	// Initialize or migrate db schema
+	d, err := iofs.New(migrationsFS, "db/migrations")
+	if err != nil {
+		return nil, fmt.Errorf("could not read embedded db migration scripts: %w", err)
+	}
+
+	m, err := migrate.NewWithSourceInstance("iofs", d, "sqlite:"+url.PathEscape(dbPath))
+	if err != nil {
+		return nil, fmt.Errorf("could not create db migration: %w", err)
+	}
+
+	if err := m.Up(); errors.Is(err, migrate.ErrNoChange) {
+		fmt.Printf("err: %v\n", err)
+	} else if err != nil {
+		return nil, fmt.Errorf("db migration failed: %w", err)
+	}
 	sqlDB, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database at %s: %w", dbPath, err)
 	}
-
+	sqlite.WithInstance(sqlDB, &sqlite.Config{})
 	// Enable WAL mode for better concurrency
 	if _, err := sqlDB.Exec("PRAGMA journal_mode=WAL"); err != nil {
 		sqlDB.Close()
 		return nil, fmt.Errorf("failed to enable WAL mode: %w", err)
 	}
 
-	// Initialize schema
-	if _, err := sqlDB.Exec(schemaSQL); err != nil {
-		sqlDB.Close()
-		return nil, fmt.Errorf("failed to initialize schema: %w", err)
-	}
+	// if _, err := sqlDB.Exec(schemaSQL); err != nil {
+	// 	sqlDB.Close()
+	// 	return nil, fmt.Errorf("failed to initialize schema: %w", err)
+	// }
 	ctx := context.Background()
 	sshim, err := sshimmer.NewLocalSSHimmer(ctx)
 	if err != nil {
