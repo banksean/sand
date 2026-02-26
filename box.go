@@ -71,8 +71,7 @@ func (sb *Box) getContainer(ctx context.Context) (interface{}, error) {
 	return &ctrs[0], nil
 }
 
-// GetContainerTyped returns the container with its proper type.
-// This is a convenience method for code that needs the typed version.
+// GetContainer returns the container.
 func (sb *Box) GetContainer(ctx context.Context) (*types.Container, error) {
 	ctr, err := sb.getContainer(ctx)
 	if err != nil {

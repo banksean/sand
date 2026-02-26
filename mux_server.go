@@ -383,7 +383,6 @@ type CreateSandboxOpts struct {
 
 // CreateSandbox creates a new sandbox and starts its container.
 func (m *Mux) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*Box, error) {
-	// Use agent type string directly instead of building decorator cloner
 	agentType := opts.Cloner
 	if agentType == "" {
 		agentType = "default"
@@ -412,8 +411,6 @@ func (m *Mux) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*Box, 
 			return nil, fmt.Errorf("failed to get container after creation")
 		}
 	}
-
-	// Removed: Hydrate call is no longer needed - hooks are reconstructed in StartContainer
 
 	if ctr.Status != "running" {
 		if err := sbox.StartContainer(ctx); err != nil {

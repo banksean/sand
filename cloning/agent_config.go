@@ -15,7 +15,6 @@ type AgentConfig struct {
 }
 
 // AgentRegistry manages the available agent configurations.
-// It replaces the decorator pattern with a simple registry lookup.
 type AgentRegistry struct {
 	mu      sync.RWMutex
 	configs map[string]*AgentConfig
