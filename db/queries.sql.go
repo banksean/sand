@@ -21,7 +21,7 @@ func (q *Queries) DeleteSandbox(ctx context.Context, id string) error {
 }
 
 const getSandbox = `-- name: GetSandbox :one
-SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, agent_type, created_at, updated_at FROM sandboxes
+SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type FROM sandboxes
 WHERE id = ?
 LIMIT 1
 `
@@ -37,15 +37,15 @@ func (q *Queries) GetSandbox(ctx context.Context, id string) (Sandbox, error) {
 		&i.ImageName,
 		&i.DnsDomain,
 		&i.EnvFile,
-		&i.AgentType,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AgentType,
 	)
 	return i, err
 }
 
 const getSandboxesByImage = `-- name: GetSandboxesByImage :many
-SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, agent_type, created_at, updated_at FROM sandboxes
+SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type FROM sandboxes
 WHERE image_name = ?
 ORDER BY created_at DESC
 `
@@ -67,9 +67,9 @@ func (q *Queries) GetSandboxesByImage(ctx context.Context, imageName string) ([]
 			&i.ImageName,
 			&i.DnsDomain,
 			&i.EnvFile,
-			&i.AgentType,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.AgentType,
 		); err != nil {
 			return nil, err
 		}
@@ -85,7 +85,7 @@ func (q *Queries) GetSandboxesByImage(ctx context.Context, imageName string) ([]
 }
 
 const listSandboxes = `-- name: ListSandboxes :many
-SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, agent_type, created_at, updated_at FROM sandboxes
+SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type FROM sandboxes
 ORDER BY created_at DESC
 `
 
@@ -106,9 +106,9 @@ func (q *Queries) ListSandboxes(ctx context.Context) ([]Sandbox, error) {
 			&i.ImageName,
 			&i.DnsDomain,
 			&i.EnvFile,
-			&i.AgentType,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.AgentType,
 		); err != nil {
 			return nil, err
 		}

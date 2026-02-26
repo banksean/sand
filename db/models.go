@@ -16,7 +16,7 @@ type Sandbox struct {
 	ImageName      string         `json:"image_name"`
 	DnsDomain      sql.NullString `json:"dns_domain"`
 	EnvFile        sql.NullString `json:"env_file"`
-	AgentType      sql.NullString `json:"agent_type"`
 	CreatedAt      sql.NullTime   `json:"created_at"`
 	UpdatedAt      sql.NullTime   `json:"updated_at"`
+	AgentType      sql.NullString `json:"agent_type"`
 }
