@@ -13,7 +13,9 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/banksean/sand/cloning"
 	"github.com/banksean/sand/db"
+	"github.com/banksean/sand/sandtypes"
 	"github.com/banksean/sand/sshimmer"
 	"golang.org/x/crypto/ssh"
 	_ "modernc.org/sqlite"
@@ -35,6 +37,7 @@ type Boxer struct {
 	gitOps           GitOps
 	fileOps          FileOps
 	sshim            *sshimmer.LocalSSHimmer
+	agentRegistry    *cloning.AgentRegistry
 }
 
 func NewBoxer(appRoot string, terminalWriter io.Writer) (*Boxer, error) {
@@ -66,6 +69,10 @@ func NewBoxer(appRoot string, terminalWriter io.Writer) (*Boxer, error) {
 		return nil, fmt.Errorf("failed to create LocalSSHimmer: %w", err)
 	}
 
+	// Initialize global agent registry
+	messenger := NewTerminalMessenger(terminalWriter)
+	agentRegistry := cloning.InitializeGlobalRegistry(appRoot, messenger, NewDefaultGitOps(), fileOps)
+
 	sb := &Boxer{
 		appRoot:          appRoot,
 		messenger:        NewTerminalMessenger(terminalWriter),
@@ -76,6 +83,7 @@ func NewBoxer(appRoot string, terminalWriter io.Writer) (*Boxer, error) {
 		gitOps:           NewDefaultGitOps(),
 		fileOps:          fileOps,
 		sshim:            sshim,
+		agentRegistry:    agentRegistry,
 	}
 	return sb, nil
 }
@@ -118,10 +126,14 @@ func (sb *Boxer) Sync(ctx context.Context) error {
 // NewSandbox creates a new sandbox based on a clone of hostWorkDir.
 // TODO: clone envFile, if it exists, into the sandbox clone so every command exec'd in that sandbox container
 // uses the same env file, even if the original .env file has changed on the host machine.
-func (sb *Boxer) NewSandbox(ctx context.Context, cloner WorkspaceCloner, id, hostWorkDir, imageName, envFile string) (*Box, error) {
-	slog.InfoContext(ctx, "Boxer.NewSandbox", "hostWorkDir", hostWorkDir, "id", id)
+func (sb *Boxer) NewSandbox(ctx context.Context, agentType, id, hostWorkDir, imageName, envFile string) (*Box, error) {
+	slog.InfoContext(ctx, "Boxer.NewSandbox", "hostWorkDir", hostWorkDir, "id", id, "agentType", agentType)
 
-	provisionResult, err := cloner.Prepare(ctx, CloneRequest{
+	// Get agent configuration from registry
+	agentConfig := sb.agentRegistry.Get(agentType)
+
+	// Prepare workspace
+	artifacts, err := agentConfig.Preparation.Prepare(ctx, cloning.CloneRequest{
 		ID:          id,
 		HostWorkDir: hostWorkDir,
 		EnvFile:     envFile,
@@ -129,6 +141,10 @@ func (sb *Boxer) NewSandbox(ctx context.Context, cloner WorkspaceCloner, id, hos
 	if err != nil {
 		return nil, err
 	}
+
+	// Get mounts and hooks from configuration
+	mounts := agentConfig.Configuration.GetMounts(*artifacts)
+	hooks := agentConfig.Configuration.GetStartupHooks(*artifacts)
 
 	// TODO: move this to .Hydrate? Or make it a startup hook?
 	keys, err := sb.sshim.NewKeys(ctx, id+".test")
@@ -139,8 +155,8 @@ func (sb *Boxer) NewSandbox(ctx context.Context, cloner WorkspaceCloner, id, hos
 	// TODO: save the data in keys fields to sandboxWorkDir (or to the db)?
 
 	// TODO: write the data in keys fields to the container
-	sshKeysMountSpec := MountSpec{
-		Source:   filepath.Join(provisionResult.SandboxWorkDir, "sshkeys"),
+	sshKeysMountSpec := sandtypes.MountSpec{
+		Source:   filepath.Join(artifacts.SandboxWorkDir, "sshkeys"),
 		Target:   "/sshkeys",
 		ReadOnly: true,
 	}
@@ -149,12 +165,13 @@ func (sb *Boxer) NewSandbox(ctx context.Context, cloner WorkspaceCloner, id, hos
 	}
 	ret := &Box{
 		ID:               id,
+		AgentType:        agentType,
 		HostOriginDir:    hostWorkDir,
-		SandboxWorkDir:   provisionResult.SandboxWorkDir,
+		SandboxWorkDir:   artifacts.SandboxWorkDir,
 		ImageName:        imageName,
 		EnvFile:          envFile,
-		Mounts:           append(provisionResult.Mounts, sshKeysMountSpec),
-		ContainerHooks:   provisionResult.ContainerHooks,
+		Mounts:           append(mounts, sshKeysMountSpec),
+		ContainerHooks:   hooks,
 		Keys:             keys,
 		containerService: sb.containerService,
 	}
@@ -261,7 +278,7 @@ func (sb *Boxer) Cleanup(ctx context.Context, sbox *Box) error {
 		slog.ErrorContext(ctx, "Boxer Containers.Delete", "sandbox", sbox.ID, "error", err, "out", out)
 	}
 
-	if err := sb.gitOps.RemoveRemote(ctx, sbox.HostOriginDir, ClonedWorkDirGitRemotePrefix+sbox.ID); err != nil {
+	if err := sb.gitOps.RemoveRemote(ctx, sbox.HostOriginDir, cloning.ClonedWorkDirGitRemotePrefix+sbox.ID); err != nil {
 		slog.ErrorContext(ctx, "Boxer Containers.Delete failed to remove git remote", "sandbox", sbox.ID, "error", err)
 	}
 
@@ -280,8 +297,13 @@ func (sb *Boxer) Cleanup(ctx context.Context, sbox *Box) error {
 // Helper functions for converting between Box and db.Sandbox
 
 func (sb *Boxer) sandboxFromDB(s *db.Sandbox) *Box {
+	agentType := fromNullString(s.AgentType)
+	if agentType == "" {
+		agentType = "default" // Fallback for old sandboxes
+	}
 	return &Box{
 		ID:               s.ID,
+		AgentType:        agentType,
 		ContainerID:      fromNullString(s.ContainerID),
 		HostOriginDir:    s.HostOriginDir,
 		SandboxWorkDir:   s.SandboxWorkDir,
@@ -364,6 +386,7 @@ func (sb *Boxer) SaveSandbox(ctx context.Context, sbox *Box) error {
 		ImageName:      sbox.ImageName,
 		DnsDomain:      toNullString(sbox.DNSDomain),
 		EnvFile:        toNullString(sbox.EnvFile),
+		AgentType:      toNullString(sbox.AgentType),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to save sandbox: %w", err)

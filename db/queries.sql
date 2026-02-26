@@ -10,8 +10,8 @@ ORDER BY created_at DESC;
 -- name: UpsertSandbox :exec
 INSERT INTO sandboxes (
     id, container_id, host_origin_dir, sandbox_work_dir,
-    image_name, dns_domain, env_file
-) VALUES (?, ?, ?, ?, ?, ?, ?)
+    image_name, dns_domain, env_file, agent_type
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(id) DO UPDATE SET
     container_id = excluded.container_id,
     host_origin_dir = excluded.host_origin_dir,
@@ -19,6 +19,7 @@ ON CONFLICT(id) DO UPDATE SET
     image_name = excluded.image_name,
     dns_domain = excluded.dns_domain,
     env_file = excluded.env_file,
+    agent_type = excluded.agent_type,
     updated_at = CURRENT_TIMESTAMP;
 
 -- name: UpdateContainerID :exec

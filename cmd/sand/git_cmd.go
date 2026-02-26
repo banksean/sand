@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/banksean/sand"
+	"github.com/banksean/sand/cloning"
 )
 
 type GitCmd struct {
@@ -60,7 +61,7 @@ func (c *DiffCmd) Run(cctx *Context) error {
 	}
 
 	// Construct the remote name for the sandbox clone
-	remoteName := sand.ClonedWorkDirGitRemotePrefix + c.SandboxID
+	remoteName := cloning.ClonedWorkDirGitRemotePrefix + c.SandboxID
 
 	// First, fetch from the sandbox remote
 	gitFetch := exec.CommandContext(ctx, "git", "fetch", remoteName)
@@ -218,7 +219,7 @@ func (c *StatusCmd) Run(cctx *Context) error {
 	}
 
 	// Construct the remote name for the sandbox clone
-	remoteName := sand.ClonedWorkDirGitRemotePrefix + c.SandboxID
+	remoteName := cloning.ClonedWorkDirGitRemotePrefix + c.SandboxID
 
 	// Get current working directory
 	cwd, err := os.Getwd()
@@ -279,7 +280,7 @@ func (c *LogCmd) Run(cctx *Context) error {
 	}
 
 	// Construct the remote name for the sandbox clone
-	remoteName := sand.ClonedWorkDirGitRemotePrefix + c.SandboxID
+	remoteName := cloning.ClonedWorkDirGitRemotePrefix + c.SandboxID
 
 	// Get current working directory
 	cwd, err := os.Getwd()

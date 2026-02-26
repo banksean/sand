@@ -7,10 +7,11 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"path/filepath"
 
 	"github.com/banksean/sand/applecontainer/options"
 	"github.com/banksean/sand/applecontainer/types"
+	"github.com/banksean/sand/cloning"
+	"github.com/banksean/sand/sandtypes"
 	"github.com/banksean/sand/sshimmer"
 )
 
@@ -27,6 +28,8 @@ const (
 type Box struct {
 	// ID is an opaque identifier for the sandbox
 	ID string
+	// AgentType identifies which agent configuration to use (default, claude, opencode)
+	AgentType string
 	// ContainerID is the ID of the container
 	ContainerID string
 	// HostOriginDir is the origin of the sandbox, from which we clone its contents
@@ -40,7 +43,7 @@ type Box struct {
 	// EnvFile is the host filesystem path to the env file to use when executing commands in the container
 	EnvFile string
 	// Mounts defines bind mounts that should be attached when creating the container.
-	Mounts []MountSpec
+	Mounts []sandtypes.MountSpec
 	// SandboxWorkDirError and SandboxContainerError are the most recently updated error states of the sandbox
 	// work dir and container instance. In-memory only. Updated once either at
 	// server startup or sandbox creation time, and then updated periodically thereafter.
@@ -50,13 +53,13 @@ type Box struct {
 	SandboxWorkDirError   string
 	SandboxContainerError string
 	// ContainerHooks run after the container has started to perform any bootstrap logic.
-	ContainerHooks []ContainerStartupHook `json:"-"`
+	ContainerHooks []sandtypes.ContainerStartupHook `json:"-"`
 	Keys           *sshimmer.Keys
 	// containerService is the service for interacting with containers
 	containerService ContainerOps
 }
 
-func (sb *Box) GetContainer(ctx context.Context) (*types.Container, error) {
+func (sb *Box) GetContainer(ctx context.Context) (interface{}, error) {
 	ctrs, err := sb.containerService.Inspect(ctx, sb.ContainerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to inspect container for sandbox %s: %w", sb.ID, err)
@@ -68,6 +71,19 @@ func (sb *Box) GetContainer(ctx context.Context) (*types.Container, error) {
 	return &ctrs[0], nil
 }
 
+// GetContainerTyped returns the container with its proper type.
+// This is a convenience method for code that needs the typed version.
+func (sb *Box) GetContainerTyped(ctx context.Context) (*types.Container, error) {
+	ctr, err := sb.GetContainer(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if ctr == nil {
+		return nil, nil
+	}
+	return ctr.(*types.Container), nil
+}
+
 func (sb *Box) Sync(ctx context.Context) error {
 	fi, err := os.Stat(sb.SandboxWorkDir)
 	if err != nil || !fi.IsDir() {
@@ -75,7 +91,7 @@ func (sb *Box) Sync(ctx context.Context) error {
 		sb.SandboxWorkDirError = "NO CLONE DIR"
 	}
 	// What *should* this code do, if we get an error while trying to inspect the sandbox's container state?
-	_, err = sb.GetContainer(ctx)
+	_, err = sb.GetContainerTyped(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "Boxer.Sync GetContainer", "sandbox", sb.ID, "error", err)
 		sb.SandboxContainerError = fmt.Sprintf("NO CONTAINER: %q", err.Error())
@@ -119,11 +135,22 @@ func (sb *Box) CreateContainer(ctx context.Context) error {
 
 // StartContainer starts a container instance. The container must exist, and it should not be in the "running" state.
 func (sb *Box) StartContainer(ctx context.Context) error {
-	slog.InfoContext(ctx, "Box.StartContainer", "box", *sb, "ContainerHooks", len(sb.ContainerHooks))
+	// Reconstruct runtime configuration from agent type
+	pathRegistry := cloning.NewStandardPathRegistry(sb.SandboxWorkDir)
+	artifacts := cloning.CloneArtifacts{
+		SandboxWorkDir: sb.SandboxWorkDir,
+		PathRegistry:   pathRegistry,
+	}
+
+	// Get agent config to reconstruct hooks
+	agentConfig := cloning.GetGlobalRegistry().Get(sb.AgentType)
+	hooks := agentConfig.Configuration.GetStartupHooks(artifacts)
+
+	slog.InfoContext(ctx, "Box.StartContainer", "box", *sb, "ContainerHooks", len(hooks))
 	if err := sb.startContainerProcess(ctx); err != nil {
 		return err
 	}
-	return sb.executeHooks(ctx)
+	return sb.executeHooks(ctx, hooks)
 }
 
 func (sb *Box) startContainerProcess(ctx context.Context) error {
@@ -137,10 +164,10 @@ func (sb *Box) startContainerProcess(ctx context.Context) error {
 	return nil
 }
 
-func (sb *Box) executeHooks(ctx context.Context) error {
-	slog.InfoContext(ctx, "Box.executeHooks", "hookCount", len(sb.ContainerHooks))
+func (sb *Box) executeHooks(ctx context.Context, hooks []sandtypes.ContainerStartupHook) error {
+	slog.InfoContext(ctx, "Box.executeHooks", "hookCount", len(hooks))
 	var hookErrs []error
-	for _, hook := range sb.ContainerHooks {
+	for _, hook := range hooks {
 		slog.InfoContext(ctx, "Box.executeHooks running hook", "hook", hook.Name())
 		if err := hook.OnStart(ctx, sb); err != nil {
 			slog.ErrorContext(ctx, "Box.executeHooks hook error", "hook", hook.Name(), "error", err)
@@ -194,27 +221,19 @@ func (sb *Box) Exec(ctx context.Context, shellCmd string, args ...string) (strin
 	return output, nil
 }
 
-func (sb *Box) effectiveMounts() []MountSpec {
+func (sb *Box) effectiveMounts() []sandtypes.MountSpec {
 	if len(sb.Mounts) > 0 {
 		return sb.Mounts
 	}
 	if sb.SandboxWorkDir == "" {
 		return nil
 	}
-	return []MountSpec{
-		{
-			Source:   filepath.Join(sb.SandboxWorkDir, "sshkeys"),
-			Target:   "/sshkeys",
-			ReadOnly: true,
-		},
-		{
-			Source:   filepath.Join(sb.SandboxWorkDir, "dotfiles"),
-			Target:   "/dotfiles",
-			ReadOnly: true,
-		},
-		{
-			Source: filepath.Join(sb.SandboxWorkDir, "app"),
-			Target: "/app",
-		},
-	}
+
+	// Fallback: reconstruct mounts from PathRegistry
+	pathRegistry := cloning.NewStandardPathRegistry(sb.SandboxWorkDir)
+	baseConfig := cloning.NewBaseContainerConfiguration()
+	return baseConfig.GetMounts(cloning.CloneArtifacts{
+		SandboxWorkDir: sb.SandboxWorkDir,
+		PathRegistry:   pathRegistry,
+	})
 }

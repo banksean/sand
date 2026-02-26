@@ -90,7 +90,7 @@ func (c *NewCmd) Run(cctx *Context) error {
 
 	// At this point the sandbox and container exist and are running (created by daemon)
 	// Now attach to the shell directly (not through daemon)
-	ctr, err := sbox.GetContainer(ctx)
+	ctr, err := sbox.GetContainerTyped(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "sbox.GetContainer", "error", err)
 		return err
@@ -100,7 +100,7 @@ func (c *NewCmd) Run(cctx *Context) error {
 		if err := sbox.CreateContainer(ctx); err != nil {
 			return err
 		}
-		ctr, err = sbox.GetContainer(ctx)
+		ctr, err = sbox.GetContainerTyped(ctx)
 		if err != nil {
 			return err
 		}

@@ -35,7 +35,7 @@ func (c *ShellCmd) Run(cctx *Context) error {
 		return fmt.Errorf("could not find sandbox with ID %s", c.ID)
 	}
 
-	ctr, err := sbox.GetContainer(ctx)
+	ctr, err := sbox.GetContainerTyped(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "sbox.GetContainer", "error", err)
 		return err
@@ -52,7 +52,7 @@ func (c *ShellCmd) Run(cctx *Context) error {
 			return err
 		}
 		// Get the container *again* and this time it should not be nil
-		ctr, err = sbox.GetContainer(ctx)
+		ctr, err = sbox.GetContainerTyped(ctx)
 		if err != nil || ctr == nil {
 			slog.ErrorContext(ctx, "sbox.GetContainer", "error", err, "ctr", ctr)
 			return err
@@ -68,7 +68,7 @@ func (c *ShellCmd) Run(cctx *Context) error {
 			return err
 		}
 		// Get the container again to get the full struct details filled out now that it's running.
-		ctr, err = sbox.GetContainer(ctx)
+		ctr, err = sbox.GetContainerTyped(ctx)
 		if err != nil || ctr == nil {
 			slog.ErrorContext(ctx, "sbox.GetContainer", "error", err, "ctr", ctr)
 			return err

@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS sandboxes (
     image_name TEXT NOT NULL,
     dns_domain TEXT,
     env_file TEXT,
+    agent_type TEXT DEFAULT 'default',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );

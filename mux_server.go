@@ -383,20 +383,19 @@ type CreateSandboxOpts struct {
 
 // CreateSandbox creates a new sandbox and starts its container.
 func (m *Mux) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*Box, error) {
-	cloner := NewDefaultWorkspaceCloner(m.AppBaseDir, os.Stderr)
-	slog.Info("main", "cloner name", opts.Cloner)
-	switch opts.Cloner {
-	case "claude":
-		cloner = NewClaudeWorkspaceCloner(cloner, m.AppBaseDir, os.Stderr)
-	case "opencode":
-		cloner = NewOpenCodeWorkspaceCloner(cloner, m.AppBaseDir, os.Stderr)
+	// Use agent type string directly instead of building decorator cloner
+	agentType := opts.Cloner
+	if agentType == "" {
+		agentType = "default"
 	}
-	sbox, err := m.boxer.NewSandbox(ctx, cloner, opts.ID, opts.CloneFromDir, opts.ImageName, opts.EnvFile)
+	slog.InfoContext(ctx, "CreateSandbox", "agentType", agentType)
+
+	sbox, err := m.boxer.NewSandbox(ctx, agentType, opts.ID, opts.CloneFromDir, opts.ImageName, opts.EnvFile)
 	if err != nil {
 		return nil, err
 	}
 
-	ctr, err := sbox.GetContainer(ctx)
+	ctr, err := sbox.GetContainerTyped(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -408,15 +407,13 @@ func (m *Mux) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*Box, 
 		if err := m.boxer.UpdateContainerID(ctx, sbox, sbox.ContainerID); err != nil {
 			return nil, err
 		}
-		ctr, err = sbox.GetContainer(ctx)
+		ctr, err = sbox.GetContainerTyped(ctx)
 		if err != nil || ctr == nil {
 			return nil, fmt.Errorf("failed to get container after creation")
 		}
 	}
 
-	if err := cloner.Hydrate(ctx, sbox); err != nil {
-		slog.ErrorContext(ctx, "Mux.CreateSandbox cloner.Hydrate", "error", err, "sbox", sbox)
-	}
+	// Removed: Hydrate call is no longer needed - hooks are reconstructed in StartContainer
 
 	if ctr.Status != "running" {
 		if err := sbox.StartContainer(ctx); err != nil {
