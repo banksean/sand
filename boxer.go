@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"net/url"
 	"path/filepath"
 	"time"
 
@@ -21,7 +20,8 @@ import (
 	"github.com/banksean/sand/sandtypes"
 	"github.com/banksean/sand/sshimmer"
 	"github.com/golang-migrate/migrate/v4"
-	sqlite "github.com/golang-migrate/migrate/v4/database/sqlite"
+	"github.com/golang-migrate/migrate/v4/database/sqlite"
+	_ "github.com/golang-migrate/migrate/v4/database/sqlite"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"golang.org/x/crypto/ssh"
 	_ "modernc.org/sqlite"
@@ -52,39 +52,39 @@ func NewBoxer(appRoot string, terminalWriter io.Writer) (*Boxer, error) {
 		return nil, err
 	}
 
+	// TODO: move this db connection and migration code to a dedicated function.
 	dbPath := filepath.Join(appRoot, "sand.db")
-
-	// Initialize or migrate db schema
-	d, err := iofs.New(migrationsFS, "db/migrations")
-	if err != nil {
-		return nil, fmt.Errorf("could not read embedded db migration scripts: %w", err)
-	}
-
-	m, err := migrate.NewWithSourceInstance("iofs", d, "sqlite:"+url.PathEscape(dbPath))
-	if err != nil {
-		return nil, fmt.Errorf("could not create db migration: %w", err)
-	}
-
-	if err := m.Up(); errors.Is(err, migrate.ErrNoChange) {
-		fmt.Printf("err: %v\n", err)
-	} else if err != nil {
-		return nil, fmt.Errorf("db migration failed: %w", err)
-	}
 	sqlDB, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database at %s: %w", dbPath, err)
 	}
-	sqlite.WithInstance(sqlDB, &sqlite.Config{})
+	dbDriver, err := sqlite.WithInstance(sqlDB, &sqlite.Config{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to open database driver: %w", err)
+	}
 	// Enable WAL mode for better concurrency
 	if _, err := sqlDB.Exec("PRAGMA journal_mode=WAL"); err != nil {
 		sqlDB.Close()
 		return nil, fmt.Errorf("failed to enable WAL mode: %w", err)
 	}
 
-	// if _, err := sqlDB.Exec(schemaSQL); err != nil {
-	// 	sqlDB.Close()
-	// 	return nil, fmt.Errorf("failed to initialize schema: %w", err)
-	// }
+	// Initialize or migrate db schema
+	sourceDriver, err := iofs.New(migrationsFS, "db/migrations")
+	if err != nil {
+		return nil, fmt.Errorf("could not read embedded db migration scripts: %w", err)
+	}
+
+	m, err := migrate.NewWithInstance("iofs", sourceDriver, "sqlite", dbDriver)
+	if err != nil {
+		return nil, fmt.Errorf("could not create db migration: %w", err)
+	}
+
+	if err := m.Up(); errors.Is(err, migrate.ErrNoChange) {
+		// no-op
+	} else if err != nil {
+		return nil, fmt.Errorf("db migration failed: %w", err)
+	}
+
 	ctx := context.Background()
 	sshim, err := sshimmer.NewLocalSSHimmer(ctx)
 	if err != nil {
