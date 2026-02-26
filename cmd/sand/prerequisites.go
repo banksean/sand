@@ -28,13 +28,15 @@ type diagnosticCheck struct {
 
 type PrerequID string
 
-const GitRemoteIsSSH = "git-ssh-checkout"
-const GitDir = "git-dir"
-const ContainerSystemDNSDomain = "container-dns-domain-set"
-const ContainerSystemDNSName = "container-dns-name"
-const ContainerCommand = "container-runtime"
-const MacOSVersion = "macos-version"
-const MacOS = "macos"
+const (
+	GitRemoteIsSSH           = "git-ssh-checkout"
+	GitDir                   = "git-dir"
+	ContainerSystemDNSDomain = "container-dns-domain-set"
+	ContainerSystemDNSName   = "container-dns-name"
+	ContainerCommand         = "container-runtime"
+	MacOSVersion             = "macos-version"
+	MacOS                    = "macos"
+)
 
 var (
 	diagnosticChecks = []diagnosticCheck{
