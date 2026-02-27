@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strings"
 	"syscall"
 
 	"github.com/alecthomas/kong"
@@ -36,12 +35,11 @@ type CLI struct {
 	Stop    StopCmd    `cmd:"" help:"stop sandbox container"`
 	Git     GitCmd     `cmd:"" help:"git operations with sandboxes"`
 	Doc     DocCmd     `cmd:"" help:"print complete command help formatted as markdown"`
-	Daemon  DaemonCmd  `cmd:"" help:"start or stop the sandmux daemon"`
 	Version VersionCmd `cmd:"" help:"print version infomation about this command"`
 	Vsc     VscCmd     `cmd:"" help:"launch a vscode remote window connected to the sandbox's container"`
 }
 
-func (c *CLI) initSlog(cctx *kong.Context) {
+func (c *CLI) initSlog() {
 	var level slog.Level
 	switch c.LogLevel {
 	case "debug":
@@ -59,9 +57,6 @@ func (c *CLI) initSlog(cctx *kong.Context) {
 	// Create a new logger with a JSON handler writing to standard error
 	var f *os.File
 	var err error
-	if strings.HasPrefix(cctx.Command(), "daemon") {
-		c.LogFile = c.LogFile + ".daemon"
-	}
 	if c.LogFile == "" {
 		f, err = os.CreateTemp("/tmp", "sand-log")
 		if err != nil {
@@ -109,10 +104,8 @@ func appHomeDir() (string, error) {
 
 func main() {
 	var cli CLI
+	cli.initSlog()
 
-	kongCtx := kong.Parse(&cli,
-		kong.Configuration(kong.JSON, ".sand.json", "~/.sand.json"),
-		kong.Description(description))
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	// Catch control-C so if you break out of "sand new" because it's taking too long
@@ -121,44 +114,44 @@ func main() {
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	cli.initSlog(kongCtx)
+	appBaseDir, err := appHomeDir()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "unable to get application home directory: %v\n", err.Error())
+		os.Exit(1)
+	}
+	var sber *sand.Boxer
+	sber, err = sand.NewBoxer(appBaseDir, os.Stderr)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to create Boxer: %v\n", err)
+		os.Exit(1)
+	}
+	if err := sber.Sync(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "failed to sync Boxer db with current environment state: %v\n", err)
+		os.Exit(1)
+	}
+	defer sber.Close()
+
+	kongCtx := kong.Parse(&cli,
+		kong.Configuration(kong.JSON, ".sand.json", "~/.sand.json"),
+		kong.Description(description))
+
+	// Yes, we already called initSlog(), but this time we've parsed the cli flags which may specify other log settings than the defaults.
+	cli.initSlog()
 
 	if err := verifyPrerequisites(ctx, MacOS, MacOSVersion, ContainerCommand); err != nil {
 		fmt.Fprintf(os.Stderr, "Prerequisite check(s) failed: %s\r\n", err)
 		os.Exit(1)
 	}
 
-	appBaseDir, err := appHomeDir()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "unable to get application home directory: %v\n", err.Error())
-		os.Exit(1)
-	}
 	slog.Info("main", "appBaseDir", appBaseDir)
 
-	// Don't try to ensure the daemon is running if we're trying to start or stop it.
-	if !strings.HasPrefix(kongCtx.Command(), "daemon") && kongCtx.Command() != "doc" {
-		if err := sand.EnsureDaemon(ctx, appBaseDir, cli.LogFile); err != nil {
-			fmt.Fprintf(os.Stderr, "daemon not running, and failed to start it. error: %v\n", err)
-			os.Exit(1)
-		}
+	if err := sand.EnsureDaemon(ctx, appBaseDir, cli.LogFile); err != nil {
+		fmt.Fprintf(os.Stderr, "daemon not running, and failed to start it. error: %v\n", err)
+		os.Exit(1)
 	}
 
 	if cli.AppBaseDir == "" {
 		cli.AppBaseDir = appBaseDir
-	}
-
-	var sber *sand.Boxer
-	if kongCtx.Command() != "doc" {
-		sber, err = sand.NewBoxer(cli.AppBaseDir, os.Stderr)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed to create Boxer: %v\n", err)
-			os.Exit(1)
-		}
-		if err := sber.Sync(ctx); err != nil {
-			fmt.Fprintf(os.Stderr, "failed to sync Boxer db with current environment state: %v\n", err)
-			os.Exit(1)
-		}
-		defer sber.Close()
 	}
 
 	err = kongCtx.Run(&Context{

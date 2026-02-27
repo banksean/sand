@@ -186,7 +186,7 @@ func EnsureDaemon(ctx context.Context, appBaseDir, logFile string) error {
 	}
 
 	// Start daemon in background
-	cmd := exec.Command(os.Args[0], "daemon", "start", "--log-file", logFile, "--app-base-dir", appBaseDir)
+	cmd := exec.Command("sandd", "daemon", "start", "--log-file", logFile, "--app-base-dir", appBaseDir)
 	slog.Info("EnsureDaemon", "cmd", strings.Join(cmd.Args, " "))
 	cmd.Stdout = nil
 	cmd.Stderr = nil
