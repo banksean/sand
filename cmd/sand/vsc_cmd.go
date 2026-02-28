@@ -10,7 +10,7 @@ import (
 )
 
 type VscCmd struct {
-	ID string `arg:"" help:"ID of the sandbox to vsc remote to"`
+	ID string `arg:"" completion-predictor:"sandbox-name" help:"ID of the sandbox to vsc remote to"`
 }
 
 func (c *VscCmd) Run(cctx *Context) error {

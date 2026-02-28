@@ -11,6 +11,8 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/banksean/sand"
+	kongcompletion "github.com/jotaen/kong-completion"
+	"github.com/posener/complete"
 )
 
 type Context struct {
@@ -23,9 +25,10 @@ type Context struct {
 }
 
 type CLI struct {
-	LogFile    string `default:"/tmp/sand/log" placeholder:"<log-file-path>" help:"location of log file (leave empty for a random tmp/ path)"`
-	LogLevel   string `default:"info" placeholder:"<debug|info|warn|error>" help:"the logging level (debug, info, warn, error)"`
-	AppBaseDir string `default:"" placeholder:"<app-base-dir>" help:"root dir to store sandbox clones of working directories. Leave unset to use '~/Library/Application Support/Sand'"`
+	LogFile    string                    `default:"/tmp/sand/log" placeholder:"<log-file-path>" help:"location of log file (leave empty for a random tmp/ path)"`
+	LogLevel   string                    `default:"info" placeholder:"<debug|info|warn|error>" help:"the logging level (debug, info, warn, error)"`
+	AppBaseDir string                    `default:"" placeholder:"<app-base-dir>" help:"root dir to store sandbox clones of working directories. Leave unset to use '~/Library/Application Support/Sand'"`
+	Completion kongcompletion.Completion `cmd:"" help:"Outputs shell code for initialising tab completions"`
 
 	New     NewCmd     `cmd:"" help:"create a new sandbox and shell into its container"`
 	Shell   ShellCmd   `cmd:"" help:"shell into a sandbox container (and start the container, if necessary)"`
@@ -102,6 +105,23 @@ func appHomeDir() (string, error) {
 	return appSupportDir, nil
 }
 
+type sandboxNamePredictor struct {
+	sber *sand.Boxer
+}
+
+// Predict implements [complete.Predictor].
+func (s *sandboxNamePredictor) Predict(args complete.Args) []string {
+	sandboxes, err := s.sber.List(context.Background())
+	if err != nil {
+		return nil
+	}
+	ret := []string{}
+	for _, box := range sandboxes {
+		ret = append(ret, box.ID)
+	}
+	return ret
+}
+
 func main() {
 	var cli CLI
 	cli.initSlog()
@@ -130,7 +150,9 @@ func main() {
 		os.Exit(1)
 	}
 	defer sber.Close()
-
+	kongApp := kong.Must(&cli)
+	namePredictor := &sandboxNamePredictor{sber: sber}
+	kongcompletion.Register(kongApp, kongcompletion.WithPredictor("sandbox-name", namePredictor))
 	kongCtx := kong.Parse(&cli,
 		kong.Configuration(kong.JSON, ".sand.json", "~/.sand.json"),
 		kong.Description(description))

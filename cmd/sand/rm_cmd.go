@@ -9,7 +9,7 @@ import (
 )
 
 type RmCmd struct {
-	ID  string `arg:"" optional:"" help:"ID of the sandbox to remove"`
+	ID  string `arg:"" completion-predictor:"sandbox-name" optional:"" help:"ID of the sandbox to remove"`
 	All bool   `short:"a" help:"remove all sandboxes"`
 }
 

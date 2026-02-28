@@ -20,17 +20,17 @@ type GitCmd struct {
 }
 
 type StatusCmd struct {
-	SandboxID string `arg:"" help:"ID of the sandbox to get status from"`
+	SandboxID string `arg:"" completion-predictor:"sandbox-name" help:"ID of the sandbox to get status from"`
 }
 
 type LogCmd struct {
-	SandboxID string `arg:"" help:"ID of the sandbox to get log from"`
+	SandboxID string `arg:"" completion-predictor:"sandbox-name" help:"ID of the sandbox to get log from"`
 }
 
 type DiffCmd struct {
 	Branch             string `short:"b" default:"" placeholder:"<branch name>" help:"remote branch to diff against (default: active git branch name in cwd)"`
 	IncludeUncommitted bool   `short:"u" default:"false" help:"include uncommitted changes from sandbox working tree"`
-	SandboxID          string `arg:"" help:"ID of the sandbox to diff against"`
+	SandboxID          string `arg:"" completion-predictor:"sandbox-name" help:"ID of the sandbox to diff against"`
 }
 
 func (c *DiffCmd) Run(cctx *Context) error {

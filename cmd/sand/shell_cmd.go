@@ -11,7 +11,7 @@ import (
 type ShellCmd struct {
 	Shell   string `short:"s" default:"/bin/zsh" placeholder:"<shell-command>" help:"shell command to exec in the container"`
 	EnvFile string `short:"e" placholder:"<file-path>" help:"path to env file to use when creating a new shell"`
-	ID      string `arg:"" optional:"" help:"ID of the sandbox to create, or re-attach to"`
+	ID      string `arg:"" completion-predictor:"sandbox-name" optional:"" help:"ID of the sandbox to create, or re-attach to"`
 }
 
 func (c *ShellCmd) Run(cctx *Context) error {
