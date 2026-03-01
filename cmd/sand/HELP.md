@@ -2,7 +2,7 @@
 
 Manage lightweight linux container sandboxes on MacOS.
 
-Requires apple container CLI: https://github.com/apple/container/releases/tag/0.6.0
+Requires apple container CLI: https://github.com/apple/container/releases/tag/0.10.0
 
 ## Global Flags
 
@@ -12,6 +12,20 @@ Requires apple container CLI: https://github.com/apple/container/releases/tag/0.
 - `--app-base-dir` _`<app-base-dir>`_ - root dir to store sandbox clones of working directories. Leave unset to use '~/Library/Application Support/Sand'
 
 ## Subcommands
+
+## `sand completion`
+
+Outputs shell code for initialising tab completions
+
+**Usage:**
+
+```
+sand completion [flags] [SHELL]
+```
+
+**Flags:**
+
+- `-c, --code` - Generate the initialization code
 
 ## `sand new`
 
@@ -60,7 +74,7 @@ sand exec [flags] <ID> <ARG>...
 
 **Flags:**
 
-- `-i, --image-name` _`<container-image-name>`_ - name of container image to use (default: `sandbox`)
+- `-i, --image-name` _`<container-image-name>`_ - name of container image to use (default: `ghcr.io/banksean/sand/default:latest`)
 - `-c, --clone-from-dir` _`<project-dir>`_ - directory to clone into the sandbox. Defaults to current working directory, if unset.
 - `-e, --env-file` _`STRING`_ - path to env file to use when creating a new shell
 - `--rm` - remove the sandbox after the shell terminates
@@ -156,16 +170,6 @@ print complete command help formatted as markdown
 
 ```
 sand doc
-```
-
-## `sand daemon`
-
-start or stop the sandmux daemon
-
-**Usage:**
-
-```
-sand daemon [ACTION]
 ```
 
 ## `sand version`
