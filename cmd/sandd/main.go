@@ -4,14 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"net"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path/filepath"
-	"strings"
 	"syscall"
-	"time"
 
 	"github.com/alecthomas/kong"
 	"github.com/banksean/sand"
@@ -23,24 +19,37 @@ type Context struct {
 	LogLevel   string
 	CloneRoot  string
 	Context    context.Context
-	sber       *sand.Boxer
 }
+
 type DaemonCmd struct {
-	Action string `arg:"" optional:"" default:"status" enum:"start,stop,restart,status,version" help:"Action to perform: start, stop, restart, or status (default). Shows daemon status if omitted."`
+	LogFile    string `default:"/tmp/sand/log.daemon" placeholder:"<log-file-path>" help:"location of log file (leave empty for a random tmp/ path)"`
+	LogLevel   string `default:"info" placeholder:"<debug|info|warn|error>" help:"the logging level (debug, info, warn, error)"`
+	AppBaseDir string `default:"" placeholder:"<app-base-dir>" help:"root dir to store sandbox clones of working directories. Leave unset to use '~/Library/Application Support/Sand'"`
+
+	Action string `arg:"" optional:"" default:"status" enum:"start,stop,status,version" help:"Action to perform: start, stop, or status (default). Shows daemon status if omitted."`
 }
 
 // Run handles all daemon command variants
 func (c *DaemonCmd) Run(cctx *Context) error {
 	ctx := cctx.Context
-	mux := sand.NewMuxServer(cctx.AppBaseDir, cctx.sber)
+	var sber *sand.Boxer
+	sber, err := sand.NewBoxer(c.AppBaseDir, os.Stderr)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to create Boxer: %v\n", err)
+		os.Exit(1)
+	}
+	if err := sber.Sync(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "failed to sync Boxer db with current environment state: %v\n", err)
+		os.Exit(1)
+	}
+	defer sber.Close()
+	mux := sand.NewMuxServer(cctx.AppBaseDir, sber)
 
 	switch c.Action {
 	case "start":
 		return c.startDaemon(ctx, mux)
 	case "stop":
 		return c.stopDaemon(ctx, mux)
-	case "restart":
-		return c.restartDaemon(ctx, mux, cctx)
 	case "version":
 		return c.version(ctx, mux)
 	case "status":
@@ -131,55 +140,7 @@ func (c *DaemonCmd) stopDaemon(ctx context.Context, mux *sand.Mux) error {
 	return nil
 }
 
-func (c *DaemonCmd) restartDaemon(ctx context.Context, mux *sand.Mux, cctx *Context) error {
-	// First, attempt to stop the daemon if it's running
-	mc, err := mux.NewClient(ctx)
-	if err == nil {
-		// Daemon is running, try to stop it
-		if err := mc.Shutdown(ctx); err != nil {
-			return fmt.Errorf("failed to stop daemon: %w", err)
-		}
-		fmt.Println("Daemon stopped")
-	}
-
-	// Build the command to start the daemon
-	cmd := exec.CommandContext(ctx, os.Args[0], "daemon", "start", "--log-file", cctx.LogFile, "--clone-root", cctx.CloneRoot)
-	cmd.Stdout = nil
-	cmd.Stderr = nil
-	cmd.Stdin = nil
-
-	// Detach from parent process
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setpgid: true,
-	}
-
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("failed to start daemon: %w", err)
-	}
-
-	// Wait for daemon to be ready
-	for i := 0; i < 20; i++ {
-		time.Sleep(100 * time.Millisecond)
-		conn, err := net.DialTimeout("unix", mux.SocketPath, 100*time.Millisecond)
-		if err == nil {
-			conn.Close()
-			fmt.Println("Daemon restarted successfully")
-			return nil
-		}
-	}
-
-	return fmt.Errorf("daemon failed to start")
-}
-
-type CLI struct {
-	LogFile    string `default:"/tmp/sand/log.daemon" placeholder:"<log-file-path>" help:"location of log file (leave empty for a random tmp/ path)"`
-	LogLevel   string `default:"info" placeholder:"<debug|info|warn|error>" help:"the logging level (debug, info, warn, error)"`
-	AppBaseDir string `default:"" placeholder:"<app-base-dir>" help:"root dir to store sandbox clones of working directories. Leave unset to use '~/Library/Application Support/Sand'"`
-
-	Daemon DaemonCmd `cmd:"" help:"start or stop the sandmux daemon"`
-}
-
-func (c *CLI) initSlog(cctx *kong.Context) {
+func (c *DaemonCmd) initSlog() {
 	var level slog.Level
 	switch c.LogLevel {
 	case "debug":
@@ -241,7 +202,7 @@ func appHomeDir() (string, error) {
 const description = `Manage lightweight linux container sandboxes on MacOS.`
 
 func main() {
-	var cli CLI
+	var cli DaemonCmd
 
 	kongCtx := kong.Parse(&cli,
 		kong.Configuration(kong.JSON, ".sand.json", "~/.sand.json"),
@@ -254,7 +215,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	cli.initSlog(kongCtx)
+	cli.initSlog()
 
 	appBaseDir, err := appHomeDir()
 	if err != nil {
@@ -263,30 +224,8 @@ func main() {
 	}
 	slog.Info("main", "appBaseDir", appBaseDir)
 
-	// Don't try to ensure the daemon is running if we're trying to start or stop it.
-	if !strings.HasPrefix(kongCtx.Command(), "daemon") && kongCtx.Command() != "doc" {
-		if err := sand.EnsureDaemon(ctx, appBaseDir, cli.LogFile); err != nil {
-			fmt.Fprintf(os.Stderr, "daemon not running, and failed to start it. error: %v\n", err)
-			os.Exit(1)
-		}
-	}
-
 	if cli.AppBaseDir == "" {
 		cli.AppBaseDir = appBaseDir
-	}
-
-	var sber *sand.Boxer
-	if kongCtx.Command() != "doc" {
-		sber, err = sand.NewBoxer(cli.AppBaseDir, os.Stderr)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed to create Boxer: %v\n", err)
-			os.Exit(1)
-		}
-		if err := sber.Sync(ctx); err != nil {
-			fmt.Fprintf(os.Stderr, "failed to sync Boxer db with current environment state: %v\n", err)
-			os.Exit(1)
-		}
-		defer sber.Close()
 	}
 
 	err = kongCtx.Run(&Context{
@@ -295,7 +234,7 @@ func main() {
 		LogFile:    cli.LogFile,
 		LogLevel:   cli.LogLevel,
 		CloneRoot:  cli.AppBaseDir,
-		sber:       sber,
 	})
+
 	kongCtx.FatalIfErrorf(err)
 }
