@@ -56,7 +56,7 @@ type Box struct {
 	ContainerHooks []sandtypes.ContainerStartupHook `json:"-"`
 	Keys           *sshimmer.Keys
 	// ContainerService is the service for interacting with containers
-	ContainerService ContainerOps
+	ContainerService ContainerOps `json:"-"`
 }
 
 func (sb *Box) getContainer(ctx context.Context) (interface{}, error) {
