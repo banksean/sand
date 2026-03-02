@@ -10,7 +10,8 @@ import (
 	"syscall"
 
 	"github.com/alecthomas/kong"
-	"github.com/banksean/sand"
+	"github.com/banksean/sand/box"
+	"github.com/banksean/sand/mux"
 )
 
 type Context struct {
@@ -32,8 +33,8 @@ type DaemonCmd struct {
 // Run handles all daemon command variants
 func (c *DaemonCmd) Run(cctx *Context) error {
 	ctx := cctx.Context
-	var sber *sand.Boxer
-	sber, err := sand.NewBoxer(c.AppBaseDir, os.Stderr)
+	var sber *box.Boxer
+	sber, err := box.NewBoxer(c.AppBaseDir, os.Stderr)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to create Boxer: %v\n", err)
 		os.Exit(1)
@@ -43,25 +44,25 @@ func (c *DaemonCmd) Run(cctx *Context) error {
 		os.Exit(1)
 	}
 	defer sber.Close()
-	mux := sand.NewMuxServer(cctx.AppBaseDir, sber)
+	server := mux.NewMuxServer(cctx.AppBaseDir, sber)
 
 	switch c.Action {
 	case "start":
-		return c.startDaemon(ctx, mux)
+		return c.startDaemon(ctx, server)
 	case "stop":
-		return c.stopDaemon(ctx, mux)
+		return c.stopDaemon(ctx, server)
 	case "version":
-		return c.version(ctx, mux)
+		return c.version(ctx, server)
 	case "status":
 		fallthrough
 	default:
 		// Check status
-		return c.checkStatus(ctx, mux)
+		return c.checkStatus(ctx, server)
 	}
 }
 
-func (c *DaemonCmd) version(ctx context.Context, mux *sand.Mux) error {
-	mc, err := mux.NewClient(ctx)
+func (c *DaemonCmd) version(ctx context.Context, server *mux.Mux) error {
+	mc, err := server.NewClient(ctx)
 	if err != nil {
 		fmt.Println("Daemon is not running")
 		return nil
@@ -95,8 +96,8 @@ func (c *DaemonCmd) version(ctx context.Context, mux *sand.Mux) error {
 	return nil
 }
 
-func (c *DaemonCmd) checkStatus(ctx context.Context, mux *sand.Mux) error {
-	mc, err := mux.NewClient(ctx)
+func (c *DaemonCmd) checkStatus(ctx context.Context, server *mux.Mux) error {
+	mc, err := server.NewClient(ctx)
 	if err != nil {
 		fmt.Println("Daemon is not running")
 		return nil
@@ -111,9 +112,9 @@ func (c *DaemonCmd) checkStatus(ctx context.Context, mux *sand.Mux) error {
 	return nil
 }
 
-func (c *DaemonCmd) startDaemon(ctx context.Context, mux *sand.Mux) error {
+func (c *DaemonCmd) startDaemon(ctx context.Context, server *mux.Mux) error {
 	// Check if daemon is already running
-	mc, err := mux.NewClient(ctx)
+	mc, err := server.NewClient(ctx)
 	if err == nil {
 		if err := mc.Ping(ctx); err == nil {
 			fmt.Println("Daemon is already running")
@@ -122,11 +123,11 @@ func (c *DaemonCmd) startDaemon(ctx context.Context, mux *sand.Mux) error {
 	}
 
 	// Start the daemon
-	return mux.ServeUnixSocket(ctx)
+	return server.ServeUnixSocket(ctx)
 }
 
-func (c *DaemonCmd) stopDaemon(ctx context.Context, mux *sand.Mux) error {
-	mc, err := mux.NewClient(ctx)
+func (c *DaemonCmd) stopDaemon(ctx context.Context, server *mux.Mux) error {
+	mc, err := server.NewClient(ctx)
 	if err != nil {
 		fmt.Println("Daemon is not running")
 		return nil

@@ -1,4 +1,4 @@
-package sand
+package box
 
 import (
 	"context"
@@ -145,7 +145,7 @@ func newTestBoxer(t *testing.T, containerOps ContainerOps, imageOps ImageOps) *B
 	}
 	t.Cleanup(func() { boxer.Close() })
 
-	boxer.containerService = containerOps
+	boxer.ContainerService = containerOps
 	boxer.imageService = imageOps
 	boxer.gitOps = &mockGitOps{}
 	boxer.fileOps = &mockFileOps{

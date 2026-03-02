@@ -6,7 +6,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/banksean/sand"
+	"github.com/banksean/sand/box"
+	"github.com/banksean/sand/mux"
 	"github.com/goombaio/namegenerator"
 )
 
@@ -40,8 +41,8 @@ func (c *ExecCmd) Run(cctx *Context) error {
 	}
 
 	// Use MuxClient to check if sandbox exists or create it
-	mux := sand.NewMuxServer(cctx.AppBaseDir, cctx.sber)
-	mc, err := mux.NewClient(ctx)
+	server := mux.NewMuxServer(cctx.AppBaseDir, cctx.sber)
+	mc, err := server.NewClient(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "NewClient", "error", err)
 		return err
@@ -52,7 +53,7 @@ func (c *ExecCmd) Run(cctx *Context) error {
 	if err != nil {
 		// Sandbox doesn't exist, create it via daemon
 		slog.InfoContext(ctx, "Creating new sandbox via daemon", "id", c.ID)
-		sbox, err = mc.CreateSandbox(ctx, sand.CreateSandboxOpts{
+		sbox, err = mc.CreateSandbox(ctx, mux.CreateSandboxOpts{
 			ID:           c.ID,
 			CloneFromDir: c.CloneFromDir,
 			ImageName:    c.ImageName,
@@ -65,7 +66,7 @@ func (c *ExecCmd) Run(cctx *Context) error {
 	}
 
 	if sbox.ImageName == "" {
-		sbox.ImageName = sand.DefaultImageName
+		sbox.ImageName = box.DefaultImageName
 	}
 
 	// At this point the sandbox and container exist and are running (created by daemon)

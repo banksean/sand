@@ -1,4 +1,4 @@
-package sand
+package box
 
 import (
 	"context"
@@ -55,12 +55,12 @@ type Box struct {
 	// ContainerHooks run after the container has started to perform any bootstrap logic.
 	ContainerHooks []sandtypes.ContainerStartupHook `json:"-"`
 	Keys           *sshimmer.Keys
-	// containerService is the service for interacting with containers
-	containerService ContainerOps
+	// ContainerService is the service for interacting with containers
+	ContainerService ContainerOps
 }
 
 func (sb *Box) getContainer(ctx context.Context) (interface{}, error) {
-	ctrs, err := sb.containerService.Inspect(ctx, sb.ContainerID)
+	ctrs, err := sb.ContainerService.Inspect(ctx, sb.ContainerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to inspect container for sandbox %s: %w", sb.ID, err)
 	}
@@ -106,7 +106,7 @@ func (sb *Box) CreateContainer(ctx context.Context) error {
 		mountOpts = append(mountOpts, m.String())
 	}
 
-	containerID, err := sb.containerService.Create(ctx,
+	containerID, err := sb.ContainerService.Create(ctx,
 		&options.CreateContainer{
 			ProcessOptions: options.ProcessOptions{
 				Interactive: true,
@@ -154,7 +154,7 @@ func (sb *Box) StartContainer(ctx context.Context) error {
 
 func (sb *Box) startContainerProcess(ctx context.Context) error {
 	slog.InfoContext(ctx, "Box.startContainerProcess", "sandbox", sb.ID, "containerID", sb.ContainerID)
-	output, err := sb.containerService.Start(ctx, nil, sb.ContainerID)
+	output, err := sb.ContainerService.Start(ctx, nil, sb.ContainerID)
 	if err != nil {
 		slog.ErrorContext(ctx, "startContainerProcess", "sandbox", sb.ID, "containerID", sb.ContainerID, "error", err, "output", output)
 		return fmt.Errorf("failed to start container for sandbox %s: %w", sb.ID, err)
@@ -183,7 +183,7 @@ func (sb *Box) executeHooks(ctx context.Context, hooks []sandtypes.ContainerStar
 func (sb *Box) Shell(ctx context.Context, env map[string]string, shellCmd string, stdin io.Reader, stdout, stderr io.Writer) error {
 	slog.InfoContext(ctx, "Sandbox.Shell", "sandbox", sb.ID, "shellCmd", shellCmd)
 
-	wait, err := sb.containerService.ExecStream(ctx,
+	wait, err := sb.ContainerService.ExecStream(ctx,
 		&options.ExecContainer{
 			ProcessOptions: options.ProcessOptions{
 				Interactive: true,
@@ -203,7 +203,7 @@ func (sb *Box) Shell(ctx context.Context, env map[string]string, shellCmd string
 
 // Exec executes a command in the container. The container must be in state "running".
 func (sb *Box) Exec(ctx context.Context, shellCmd string, args ...string) (string, error) {
-	output, err := sb.containerService.Exec(ctx,
+	output, err := sb.ContainerService.Exec(ctx,
 		&options.ExecContainer{
 			ProcessOptions: options.ProcessOptions{
 				Interactive: false,

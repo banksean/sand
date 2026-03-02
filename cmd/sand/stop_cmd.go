@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"sync"
 
-	"github.com/banksean/sand"
+	"github.com/banksean/sand/mux"
 )
 
 type StopCmd struct {
@@ -16,8 +16,8 @@ type StopCmd struct {
 func (c *StopCmd) Run(cctx *Context) error {
 	ctx := cctx.Context
 
-	mux := sand.NewMuxServer(cctx.AppBaseDir, cctx.sber)
-	mc, err := mux.NewClient(ctx)
+	server := mux.NewMuxServer(cctx.AppBaseDir, cctx.sber)
+	mc, err := server.NewClient(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "NewClient", "error", err)
 		return err

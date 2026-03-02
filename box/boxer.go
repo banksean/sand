@@ -1,14 +1,12 @@
-package sand
+package box
 
 import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
 	"database/sql"
-	"embed"
 	_ "embed"
 	"encoding/pem"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -19,18 +17,10 @@ import (
 	"github.com/banksean/sand/db"
 	"github.com/banksean/sand/sandtypes"
 	"github.com/banksean/sand/sshimmer"
-	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database/sqlite"
 	_ "github.com/golang-migrate/migrate/v4/database/sqlite"
-	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"golang.org/x/crypto/ssh"
 	_ "modernc.org/sqlite"
 )
-
-//go:generate sh -c "sqlc generate"
-
-//go:embed db/migrations/*.sql
-var migrationsFS embed.FS
 
 // Boxer manages the lifecycle of sandboxes.
 type Boxer struct {
@@ -38,7 +28,7 @@ type Boxer struct {
 	messenger        UserMessenger
 	sqlDB            *sql.DB
 	queries          *db.Queries
-	containerService ContainerOps
+	ContainerService ContainerOps
 	imageService     ImageOps
 	gitOps           GitOps
 	fileOps          FileOps
@@ -52,37 +42,9 @@ func NewBoxer(appRoot string, terminalWriter io.Writer) (*Boxer, error) {
 		return nil, err
 	}
 
-	// TODO: move this db connection and migration code to a dedicated function.
-	dbPath := filepath.Join(appRoot, "sand.db")
-	sqlDB, err := sql.Open("sqlite", dbPath)
+	sqlDB, err := db.Connect(appRoot)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open database at %s: %w", dbPath, err)
-	}
-	dbDriver, err := sqlite.WithInstance(sqlDB, &sqlite.Config{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to open database driver: %w", err)
-	}
-	// Enable WAL mode for better concurrency
-	if _, err := sqlDB.Exec("PRAGMA journal_mode=WAL"); err != nil {
-		sqlDB.Close()
-		return nil, fmt.Errorf("failed to enable WAL mode: %w", err)
-	}
-
-	// Initialize or migrate db schema
-	sourceDriver, err := iofs.New(migrationsFS, "db/migrations")
-	if err != nil {
-		return nil, fmt.Errorf("could not read embedded db migration scripts: %w", err)
-	}
-
-	m, err := migrate.NewWithInstance("iofs", sourceDriver, "sqlite", dbDriver)
-	if err != nil {
-		return nil, fmt.Errorf("could not create db migration: %w", err)
-	}
-
-	if err := m.Up(); errors.Is(err, migrate.ErrNoChange) {
-		// no-op
-	} else if err != nil {
-		return nil, fmt.Errorf("db migration failed: %w", err)
+		return nil, err
 	}
 
 	ctx := context.Background()
@@ -100,7 +62,7 @@ func NewBoxer(appRoot string, terminalWriter io.Writer) (*Boxer, error) {
 		messenger:        NewTerminalMessenger(terminalWriter),
 		sqlDB:            sqlDB,
 		queries:          db.New(sqlDB),
-		containerService: NewAppleContainerOps(),
+		ContainerService: NewAppleContainerOps(),
 		imageService:     NewAppleImageOps(),
 		gitOps:           NewDefaultGitOps(),
 		fileOps:          fileOps,
@@ -195,7 +157,7 @@ func (sb *Boxer) NewSandbox(ctx context.Context, agentType, id, hostWorkDir, ima
 		Mounts:           append(mounts, sshKeysMountSpec),
 		ContainerHooks:   hooks,
 		Keys:             keys,
-		containerService: sb.containerService,
+		ContainerService: sb.ContainerService,
 	}
 
 	if err := sb.SaveSandbox(ctx, ret); err != nil {
@@ -290,12 +252,12 @@ func (sb *Boxer) Get(ctx context.Context, id string) (*Box, error) {
 func (sb *Boxer) Cleanup(ctx context.Context, sbox *Box) error {
 	slog.InfoContext(ctx, "Boxer.Cleanup", "id", sbox.ID)
 
-	out, err := sb.containerService.Stop(ctx, nil, sbox.ContainerID)
+	out, err := sb.ContainerService.Stop(ctx, nil, sbox.ContainerID)
 	if err != nil {
 		slog.ErrorContext(ctx, "Boxer Containers.Stop", "sandbox", sbox.ID, "error", err, "out", out)
 	}
 
-	out, err = sb.containerService.Delete(ctx, nil, sbox.ContainerID)
+	out, err = sb.ContainerService.Delete(ctx, nil, sbox.ContainerID)
 	if err != nil {
 		slog.ErrorContext(ctx, "Boxer Containers.Delete", "sandbox", sbox.ID, "error", err, "out", out)
 	}
@@ -332,7 +294,7 @@ func (sb *Boxer) sandboxFromDB(s *db.Sandbox) *Box {
 		ImageName:        s.ImageName,
 		DNSDomain:        fromNullString(s.DnsDomain),
 		EnvFile:          fromNullString(s.EnvFile),
-		containerService: sb.containerService,
+		ContainerService: sb.ContainerService,
 	}
 }
 
@@ -435,7 +397,7 @@ func (sb *Boxer) StopContainer(ctx context.Context, sbox *Box) error {
 		return fmt.Errorf("sandbox %s has no container ID", sbox.ID)
 	}
 
-	out, err := sb.containerService.Stop(ctx, nil, sbox.ContainerID)
+	out, err := sb.ContainerService.Stop(ctx, nil, sbox.ContainerID)
 	if err != nil {
 		slog.ErrorContext(ctx, "Boxer.StopContainer", "sandbox", sbox.ID, "containerID", sbox.ContainerID, "error", err, "out", out)
 		return fmt.Errorf("failed to stop container for sandbox %s: %w", sbox.ID, err)

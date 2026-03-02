@@ -1,4 +1,4 @@
-package sand
+package mux
 
 import (
 	"context"
@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/banksean/sand/box"
 	"github.com/banksean/sand/version"
 )
 
@@ -101,26 +102,26 @@ func (m *MuxClient) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-func (m *MuxClient) ListSandboxes(ctx context.Context) ([]Box, error) {
-	var boxes []Box
+func (m *MuxClient) ListSandboxes(ctx context.Context) ([]box.Box, error) {
+	var boxes []box.Box
 	if err := m.doRequest(ctx, http.MethodGet, "/list", nil, &boxes); err != nil {
 		return nil, err
 	}
 	for i := range boxes {
-		boxes[i].containerService = m.Mux.boxer.containerService
+		boxes[i].ContainerService = m.Mux.boxer.ContainerService
 	}
 	return boxes, nil
 }
 
-func (m *MuxClient) GetSandbox(ctx context.Context, id string) (*Box, error) {
-	var box Box
+func (m *MuxClient) GetSandbox(ctx context.Context, id string) (*box.Box, error) {
+	var box box.Box
 	if err := m.doRequest(ctx, http.MethodPost, "/get", map[string]string{"id": id}, &box); err != nil {
 		if strings.Contains(err.Error(), "404") {
 			return nil, fmt.Errorf("id not found: %q", id)
 		}
 		return nil, err
 	}
-	box.containerService = m.Mux.boxer.containerService
+	box.ContainerService = m.Mux.boxer.ContainerService
 	return &box, nil
 }
 
@@ -132,22 +133,22 @@ func (m *MuxClient) StopSandbox(ctx context.Context, id string) error {
 	return m.doRequest(ctx, http.MethodPost, "/stop", map[string]string{"id": id}, nil)
 }
 
-func (m *MuxClient) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*Box, error) {
-	var box Box
+func (m *MuxClient) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*box.Box, error) {
+	var box box.Box
 	if err := m.doRequest(ctx, http.MethodPost, "/create", opts, &box); err != nil {
 		return nil, err
 	}
-	box.containerService = m.Mux.boxer.containerService
+	box.ContainerService = m.Mux.boxer.ContainerService
 	return &box, nil
 }
 
 // ListSandboxes returns all sandboxes.
-func (m *Mux) ListSandboxes(ctx context.Context) ([]Box, error) {
+func (m *Mux) ListSandboxes(ctx context.Context) ([]box.Box, error) {
 	return m.boxer.List(ctx)
 }
 
 // GetSandbox retrieves a sandbox by ID.
-func (m *Mux) GetSandbox(ctx context.Context, id string) (*Box, error) {
+func (m *Mux) GetSandbox(ctx context.Context, id string) (*box.Box, error) {
 	return m.boxer.Get(ctx, id)
 }
 

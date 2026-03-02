@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/banksean/sand"
+	"github.com/banksean/sand/mux"
 )
 
 type VscCmd struct {
@@ -18,8 +18,8 @@ func (c *VscCmd) Run(cctx *Context) error {
 
 	slog.InfoContext(ctx, "VscCmd", "run", *c)
 
-	mux := sand.NewMuxServer(cctx.AppBaseDir, cctx.sber)
-	mc, err := mux.NewClient(ctx)
+	server := mux.NewMuxServer(cctx.AppBaseDir, cctx.sber)
+	mc, err := server.NewClient(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "NewClient", "error", err)
 		return err

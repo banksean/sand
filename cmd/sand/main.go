@@ -10,7 +10,8 @@ import (
 	"syscall"
 
 	"github.com/alecthomas/kong"
-	"github.com/banksean/sand"
+	"github.com/banksean/sand/box"
+	"github.com/banksean/sand/mux"
 	kongcompletion "github.com/jotaen/kong-completion"
 	"github.com/posener/complete"
 )
@@ -21,7 +22,7 @@ type Context struct {
 	LogLevel   string
 	CloneRoot  string
 	Context    context.Context
-	sber       *sand.Boxer
+	sber       *box.Boxer
 }
 
 type CLI struct {
@@ -106,7 +107,7 @@ func appHomeDir() (string, error) {
 }
 
 type sandboxNamePredictor struct {
-	sber *sand.Boxer
+	sber *box.Boxer
 }
 
 // Predict implements [complete.Predictor].
@@ -139,8 +140,8 @@ func main() {
 		fmt.Fprintf(os.Stderr, "unable to get application home directory: %v\n", err.Error())
 		os.Exit(1)
 	}
-	var sber *sand.Boxer
-	sber, err = sand.NewBoxer(appBaseDir, os.Stderr)
+	var sber *box.Boxer
+	sber, err = box.NewBoxer(appBaseDir, os.Stderr)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to create Boxer: %v\n", err)
 		os.Exit(1)
@@ -167,7 +168,7 @@ func main() {
 
 	slog.Info("main", "appBaseDir", appBaseDir)
 
-	if err := sand.EnsureDaemon(ctx, appBaseDir, cli.LogFile); err != nil {
+	if err := mux.EnsureDaemon(ctx, appBaseDir, cli.LogFile); err != nil {
 		fmt.Fprintf(os.Stderr, "daemon not running, and failed to start it. error: %v\n", err)
 		os.Exit(1)
 	}

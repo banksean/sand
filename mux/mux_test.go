@@ -1,4 +1,4 @@
-package sand
+package mux
 
 import (
 	"context"
@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/banksean/sand/box"
 )
 
 func TestMuxHTTPPing(t *testing.T) {
@@ -16,7 +18,7 @@ func TestMuxHTTPPing(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	sber, err := NewBoxer(tmpDir, nil)
+	sber, err := box.NewBoxer(tmpDir, nil)
 	if err != nil {
 		t.Fatalf("Failed to create Boxer: %v", err)
 	}
@@ -78,7 +80,7 @@ func TestMuxHTTPList(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	sber, err := NewBoxer(tmpDir, nil)
+	sber, err := box.NewBoxer(tmpDir, nil)
 	if err != nil {
 		t.Fatalf("Failed to create Boxer: %v", err)
 	}
@@ -134,7 +136,7 @@ func TestMuxHTTPVersion(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	sber, err := NewBoxer(tmpDir, nil)
+	sber, err := box.NewBoxer(tmpDir, nil)
 	if err != nil {
 		t.Fatalf("Failed to create Boxer: %v", err)
 	}
@@ -190,7 +192,7 @@ func TestMuxPingNotRunning(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	sber, err := NewBoxer(tmpDir, nil)
+	sber, err := box.NewBoxer(tmpDir, nil)
 	if err != nil {
 		t.Fatalf("Failed to create Boxer: %v", err)
 	}

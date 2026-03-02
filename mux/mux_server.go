@@ -1,4 +1,4 @@
-package sand
+package mux
 
 import (
 	"context"
@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/banksean/sand/box"
 	"github.com/banksean/sand/version"
 )
 
@@ -26,14 +27,14 @@ type Mux struct {
 	SocketPath string
 
 	hostMCP *HostMCP
-	boxer   *Boxer
+	boxer   *box.Boxer
 
 	listener net.Listener
 	lockFile *os.File
 	shutdown chan any
 }
 
-func NewMuxServer(appBaseDir string, sber *Boxer) *Mux {
+func NewMuxServer(appBaseDir string, sber *box.Boxer) *Mux {
 	return &Mux{
 		AppBaseDir: appBaseDir,
 		SocketPath: filepath.Join(appBaseDir, defaultSocketFile),
@@ -382,7 +383,7 @@ type CreateSandboxOpts struct {
 }
 
 // CreateSandbox creates a new sandbox and starts its container.
-func (m *Mux) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*Box, error) {
+func (m *Mux) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*box.Box, error) {
 	agentType := opts.Cloner
 	if agentType == "" {
 		agentType = "default"

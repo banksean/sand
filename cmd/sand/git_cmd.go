@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/banksean/sand"
 	"github.com/banksean/sand/cloning"
+	"github.com/banksean/sand/mux"
 )
 
 type GitCmd struct {
@@ -41,8 +41,8 @@ func (c *DiffCmd) Run(cctx *Context) error {
 	}
 
 	// Get the sandbox to verify it exists and get its metadata
-	mux := sand.NewMuxServer(cctx.AppBaseDir, cctx.sber)
-	mc, err := mux.NewClient(ctx)
+	server := mux.NewMuxServer(cctx.AppBaseDir, cctx.sber)
+	mc, err := server.NewClient(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "NewClient", "error", err)
 		return err
@@ -205,8 +205,8 @@ func (c *StatusCmd) Run(cctx *Context) error {
 	}
 
 	// Get the sandbox to verify it exists and get its metadata
-	mux := sand.NewMuxServer(cctx.AppBaseDir, cctx.sber)
-	mc, err := mux.NewClient(ctx)
+	server := mux.NewMuxServer(cctx.AppBaseDir, cctx.sber)
+	mc, err := server.NewClient(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "NewClient", "error", err)
 		return err
@@ -266,8 +266,8 @@ func (c *LogCmd) Run(cctx *Context) error {
 	}
 
 	// Get the sandbox to verify it exists and get its metadata
-	mux := sand.NewMuxServer(cctx.AppBaseDir, cctx.sber)
-	mc, err := mux.NewClient(ctx)
+	server := mux.NewMuxServer(cctx.AppBaseDir, cctx.sber)
+	mc, err := server.NewClient(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "NewClient", "error", err)
 		return err

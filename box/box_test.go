@@ -1,4 +1,4 @@
-package sand
+package box
 
 import (
 	"bytes"
@@ -205,7 +205,7 @@ func TestBox_GetContainer(t *testing.T) {
 			AgentType:        "default",
 			SandboxWorkDir:   "/tmp/test-sandbox",
 			ContainerID:      "test-container-123",
-			containerService: mockOps,
+			ContainerService: mockOps,
 		}
 
 		container, err := box.GetContainer(ctx)
@@ -232,7 +232,7 @@ func TestBox_GetContainer(t *testing.T) {
 			AgentType:        "default",
 			SandboxWorkDir:   "/tmp/test-sandbox",
 			ContainerID:      "nonexistent",
-			containerService: mockOps,
+			ContainerService: mockOps,
 		}
 
 		container, err := box.GetContainer(ctx)
@@ -257,7 +257,7 @@ func TestBox_GetContainer(t *testing.T) {
 			AgentType:        "default",
 			SandboxWorkDir:   "/tmp/test-sandbox",
 			ContainerID:      "error-container",
-			containerService: mockOps,
+			ContainerService: mockOps,
 		}
 
 		_, err := box.GetContainer(ctx)
@@ -285,7 +285,7 @@ func TestBox_Sync(t *testing.T) {
 			AgentType:        "default",
 			ContainerID:      "test-container",
 			SandboxWorkDir:   "/nonexistent/path/that/does/not/exist",
-			containerService: mockOps,
+			ContainerService: mockOps,
 		}
 
 		err := box.Sync(ctx)
@@ -311,7 +311,7 @@ func TestBox_Sync(t *testing.T) {
 			AgentType:        "default",
 			ContainerID:      "missing-container",
 			SandboxWorkDir:   tmpDir,
-			containerService: mockOps,
+			ContainerService: mockOps,
 		}
 
 		err := box.Sync(ctx)
@@ -337,7 +337,7 @@ func TestBox_Sync(t *testing.T) {
 			AgentType:        "default",
 			ContainerID:      "good-container",
 			SandboxWorkDir:   tmpDir,
-			containerService: mockOps,
+			ContainerService: mockOps,
 		}
 
 		err := box.Sync(ctx)
@@ -375,7 +375,7 @@ func TestBox_CreateContainer(t *testing.T) {
 			ImageName:        "test-image:latest",
 			DNSDomain:        "test.local",
 			EnvFile:          "/tmp/.env",
-			containerService: mockOps,
+			ContainerService: mockOps,
 		}
 
 		err := box.CreateContainer(ctx)
@@ -430,7 +430,7 @@ func TestBox_CreateContainer(t *testing.T) {
 			Mounts: []sandtypes.MountSpec{
 				{Source: "/host/path", Target: "/container/path", ReadOnly: true},
 			},
-			containerService: mockOps,
+			ContainerService: mockOps,
 		}
 
 		err := box.CreateContainer(ctx)
@@ -461,7 +461,7 @@ func TestBox_CreateContainer(t *testing.T) {
 			AgentType:        "default",
 			SandboxWorkDir:   "/tmp/test-sandbox",
 			ImageName:        "test-image",
-			containerService: mockOps,
+			ContainerService: mockOps,
 		}
 
 		err := box.CreateContainer(ctx)
@@ -492,7 +492,7 @@ func TestBox_StartContainer(t *testing.T) {
 			AgentType:        "default",
 			SandboxWorkDir:   "/tmp/test-sandbox",
 			ContainerID:      "test-container",
-			containerService: mockOps,
+			ContainerService: mockOps,
 		}
 
 		err := box.StartContainer(ctx)
@@ -520,7 +520,7 @@ func TestBox_executeHooks(t *testing.T) {
 			SandboxWorkDir:   "/tmp/test-sandbox",
 			ContainerID:      "test-container",
 			ContainerHooks:   []sandtypes.ContainerStartupHook{hook},
-			containerService: mockOps,
+			ContainerService: mockOps,
 		}
 
 		err := box.executeHooks(ctx, []sandtypes.ContainerStartupHook{hook})
@@ -552,7 +552,7 @@ func TestBox_executeHooks(t *testing.T) {
 			SandboxWorkDir:   "/tmp/test-sandbox",
 			ContainerID:      "test-container",
 			ContainerHooks:   []sandtypes.ContainerStartupHook{hook1, hook2},
-			containerService: mockOps,
+			ContainerService: mockOps,
 		}
 
 		err := box.executeHooks(ctx, []sandtypes.ContainerStartupHook{hook1, hook2})
@@ -581,7 +581,7 @@ func TestBox_executeHooks(t *testing.T) {
 			AgentType:        "default",
 			SandboxWorkDir:   "/tmp/test-sandbox",
 			ContainerID:      "test-container",
-			containerService: mockOps,
+			ContainerService: mockOps,
 		}
 
 		err := box.StartContainer(ctx)
@@ -607,7 +607,7 @@ func TestBox_executeHooks(t *testing.T) {
 			SandboxWorkDir:   "/tmp/test-sandbox",
 			ContainerID:      "test-container",
 			ContainerHooks:   []sandtypes.ContainerStartupHook{hook},
-			containerService: mockOps,
+			ContainerService: mockOps,
 		}
 
 		err := box.executeHooks(ctx, []sandtypes.ContainerStartupHook{hook})
@@ -635,7 +635,7 @@ func TestBox_executeHooks(t *testing.T) {
 			SandboxWorkDir:   "/tmp/test-sandbox",
 			ContainerID:      "test-container",
 			ContainerHooks:   []sandtypes.ContainerStartupHook{hook1, hook2},
-			containerService: mockOps,
+			ContainerService: mockOps,
 		}
 
 		err := box.executeHooks(ctx, []sandtypes.ContainerStartupHook{hook1, hook2})
@@ -674,7 +674,7 @@ func TestBox_executeHooks(t *testing.T) {
 			SandboxWorkDir:   "/tmp/test-sandbox",
 			ContainerID:      "test-container",
 			ContainerHooks:   []sandtypes.ContainerStartupHook{hook1, hook2, hook3},
-			containerService: mockOps,
+			ContainerService: mockOps,
 		}
 
 		err := box.executeHooks(ctx, []sandtypes.ContainerStartupHook{hook1, hook2, hook3})
@@ -732,7 +732,7 @@ func TestBox_Shell(t *testing.T) {
 			AgentType:        "default",
 			SandboxWorkDir:   "/tmp/test-sandbox",
 			ContainerID:      "test-container",
-			containerService: mockOps,
+			ContainerService: mockOps,
 		}
 
 		stdin := strings.NewReader("input")
@@ -776,7 +776,7 @@ func TestBox_Shell(t *testing.T) {
 			AgentType:        "default",
 			SandboxWorkDir:   "/tmp/test-sandbox",
 			ContainerID:      "test-container",
-			containerService: mockOps,
+			ContainerService: mockOps,
 		}
 
 		err := box.Shell(ctx, nil, "/bin/sh", nil, io.Discard, io.Discard)
@@ -803,7 +803,7 @@ func TestBox_Shell(t *testing.T) {
 			AgentType:        "default",
 			SandboxWorkDir:   "/tmp/test-sandbox",
 			ContainerID:      "test-container",
-			containerService: mockOps,
+			ContainerService: mockOps,
 		}
 
 		err := box.Shell(ctx, nil, "/bin/sh", nil, io.Discard, io.Discard)
@@ -850,7 +850,7 @@ func TestBox_Exec(t *testing.T) {
 			AgentType:        "default",
 			SandboxWorkDir:   "/tmp/test-sandbox",
 			ContainerID:      "test-container",
-			containerService: mockOps,
+			ContainerService: mockOps,
 		}
 
 		output, err := box.Exec(ctx, "ls", "-la", "/tmp")
@@ -887,7 +887,7 @@ func TestBox_Exec(t *testing.T) {
 			AgentType:        "default",
 			SandboxWorkDir:   "/tmp/test-sandbox",
 			ContainerID:      "test-container",
-			containerService: mockOps,
+			ContainerService: mockOps,
 		}
 
 		_, err := box.Exec(ctx, "failing-command")
@@ -915,7 +915,7 @@ func TestBox_Exec(t *testing.T) {
 			SandboxWorkDir:   "/tmp/test-sandbox",
 			ContainerID:      "test-container",
 			EnvFile:          "/path/to/.env",
-			containerService: mockOps,
+			ContainerService: mockOps,
 		}
 
 		_, err := box.Exec(ctx, "echo", "test")

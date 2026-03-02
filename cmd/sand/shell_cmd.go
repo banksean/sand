@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/banksean/sand"
+	"github.com/banksean/sand/mux"
 )
 
 type ShellCmd struct {
@@ -18,8 +18,8 @@ func (c *ShellCmd) Run(cctx *Context) error {
 	ctx := cctx.Context
 
 	// Use MuxClient to get sandbox info
-	mux := sand.NewMuxServer(cctx.AppBaseDir, cctx.sber)
-	mc, err := mux.NewClient(ctx)
+	server := mux.NewMuxServer(cctx.AppBaseDir, cctx.sber)
+	mc, err := server.NewClient(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "NewClient", "error", err)
 		return err

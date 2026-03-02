@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"sync"
 
-	"github.com/banksean/sand"
+	"github.com/banksean/sand/mux"
 )
 
 type RmCmd struct {
@@ -18,8 +18,8 @@ func (c *RmCmd) Run(cctx *Context) error {
 
 	slog.InfoContext(ctx, "RmCmd", "run", *c)
 
-	mux := sand.NewMuxServer(cctx.AppBaseDir, cctx.sber)
-	mc, err := mux.NewClient(ctx)
+	server := mux.NewMuxServer(cctx.AppBaseDir, cctx.sber)
+	mc, err := server.NewClient(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "NewClient", "error", err)
 		return err
