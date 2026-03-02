@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"fmt"
@@ -41,8 +41,8 @@ func (c *ExecCmd) Run(cctx *Context) error {
 	}
 
 	// Use MuxClient to check if sandbox exists or create it
-	server := mux.NewMuxServer(cctx.AppBaseDir, cctx.sber)
-	mc, err := server.NewClient(ctx)
+	server := mux.NewMuxServer(cctx.AppBaseDir, cctx.Boxer)
+	mc, err := server.NewUnixSocketClient(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "NewClient", "error", err)
 		return err

@@ -148,6 +148,7 @@ func (sb *Boxer) NewSandbox(ctx context.Context, agentType, id, hostWorkDir, ima
 		return nil, fmt.Errorf("saveSSHKeys: %w", err)
 	}
 	ret := &Box{
+		boxer:            sb,
 		ID:               id,
 		AgentType:        agentType,
 		HostOriginDir:    hostWorkDir,

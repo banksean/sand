@@ -46,7 +46,7 @@ func TestMuxHTTPPing(t *testing.T) {
 	}
 
 	// Create a client
-	client, err := mux.NewClient(ctx)
+	client, err := mux.NewUnixSocketClient(ctx)
 	if err != nil {
 		t.Fatalf("Failed to create client: %v", err)
 	}
@@ -107,7 +107,7 @@ func TestMuxHTTPList(t *testing.T) {
 	}
 
 	// Create a client
-	client, err := mux.NewClient(ctx)
+	client, err := mux.NewUnixSocketClient(ctx)
 	if err != nil {
 		t.Fatalf("Failed to create client: %v", err)
 	}
@@ -164,7 +164,7 @@ func TestMuxHTTPVersion(t *testing.T) {
 	}
 
 	// Create a client
-	client, err := mux.NewClient(ctx)
+	client, err := mux.NewUnixSocketClient(ctx)
 	if err != nil {
 		t.Fatalf("Failed to create client: %v", err)
 	}
@@ -203,7 +203,7 @@ func TestMuxPingNotRunning(t *testing.T) {
 	ctx := context.Background()
 
 	// Try to create a client when daemon is not running
-	client, err := mux.NewClient(ctx)
+	client, err := mux.NewUnixSocketClient(ctx)
 	if err != nil {
 		// Creating client itself might succeed, but ping should fail
 		t.Logf("NewClient returned error (expected): %v", err)

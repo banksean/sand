@@ -6,20 +6,23 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/banksean/sand/cli"
 	"github.com/banksean/sand/mux"
 )
+
+// TODO: make 'sand vsc' work from inside the container, so that it tells the outie to run `code --remote=` etc on the host
 
 type VscCmd struct {
 	ID string `arg:"" completion-predictor:"sandbox-name" help:"ID of the sandbox to vsc remote to"`
 }
 
-func (c *VscCmd) Run(cctx *Context) error {
+func (c *VscCmd) Run(cctx *cli.Context) error {
 	ctx := cctx.Context
 
 	slog.InfoContext(ctx, "VscCmd", "run", *c)
 
-	server := mux.NewMuxServer(cctx.AppBaseDir, cctx.sber)
-	mc, err := server.NewClient(ctx)
+	server := mux.NewMuxServer(cctx.AppBaseDir, cctx.Boxer)
+	mc, err := server.NewUnixSocketClient(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "NewClient", "error", err)
 		return err
@@ -41,7 +44,7 @@ func (c *VscCmd) Run(cctx *Context) error {
 		return fmt.Errorf("cannot connect to sandbox %q becacuse it is not currently running", c.ID)
 	}
 
-	hostname := getContainerHostname(ctr)
+	hostname := cli.GetContainerHostname(ctr)
 	vscCmd := exec.Command("code", "--remote", fmt.Sprintf("ssh-remote+root@%s", hostname), "/app", "-n")
 	slog.InfoContext(ctx, "main: running vsc with", "cmd", strings.Join(vscCmd.Args, " "))
 	out, err := vscCmd.CombinedOutput()

@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -19,8 +18,9 @@ import (
 )
 
 type MuxClient struct {
-	Mux        *Mux
-	httpClient *http.Client
+	ContainerService box.ContainerOps
+	base             string
+	httpClient       *http.Client
 }
 
 func (m *MuxClient) doRequest(ctx context.Context, method, path string, body any, result any) error {
@@ -32,13 +32,13 @@ func (m *MuxClient) doRequest(ctx context.Context, method, path string, body any
 		if err != nil {
 			return err
 		}
-		req, err = http.NewRequestWithContext(ctx, method, "http://unix"+path, strings.NewReader(string(reqBody)))
+		req, err = http.NewRequestWithContext(ctx, method, m.base+path, strings.NewReader(string(reqBody)))
 		if err != nil {
 			return err
 		}
 		req.Header.Set("Content-Type", "application/json")
 	} else {
-		req, err = http.NewRequestWithContext(ctx, method, "http://unix"+path, nil)
+		req, err = http.NewRequestWithContext(ctx, method, m.base+path, nil)
 		if err != nil {
 			return err
 		}
@@ -91,14 +91,6 @@ func (m *MuxClient) Shutdown(ctx context.Context) error {
 		return err
 	}
 
-	// Wait briefly to verify daemon stopped
-	time.Sleep(200 * time.Millisecond)
-
-	// Verify socket is gone
-	if _, err := os.Stat(m.Mux.SocketPath); err == nil {
-		return fmt.Errorf("daemon may not have shut down cleanly")
-	}
-
 	return nil
 }
 
@@ -108,7 +100,7 @@ func (m *MuxClient) ListSandboxes(ctx context.Context) ([]box.Box, error) {
 		return nil, err
 	}
 	for i := range boxes {
-		boxes[i].ContainerService = m.Mux.boxer.ContainerService
+		boxes[i].ContainerService = m.ContainerService
 	}
 	return boxes, nil
 }
@@ -121,7 +113,7 @@ func (m *MuxClient) GetSandbox(ctx context.Context, id string) (*box.Box, error)
 		}
 		return nil, err
 	}
-	box.ContainerService = m.Mux.boxer.ContainerService
+	box.ContainerService = m.ContainerService
 	return &box, nil
 }
 
@@ -138,7 +130,7 @@ func (m *MuxClient) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (
 	if err := m.doRequest(ctx, http.MethodPost, "/create", opts, &box); err != nil {
 		return nil, err
 	}
-	box.ContainerService = m.Mux.boxer.ContainerService
+	box.ContainerService = m.ContainerService
 	return &box, nil
 }
 
@@ -217,7 +209,7 @@ func EnsureDaemon(ctx context.Context, appBaseDir, logFile string) error {
 
 func checkDaemonVersion(ctx context.Context, appBaseDir string) error {
 	mux := NewMuxServer(appBaseDir, nil)
-	client, err := mux.NewClient(ctx)
+	client, err := mux.NewUnixSocketClient(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
@@ -240,7 +232,7 @@ func shutdownDaemon(appBaseDir string) error {
 	defer cancel()
 
 	mux := NewMuxServer(appBaseDir, nil)
-	client, err := mux.NewClient(ctx)
+	client, err := mux.NewUnixSocketClient(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}

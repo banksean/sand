@@ -32,6 +32,7 @@ type Mux struct {
 	listener net.Listener
 	lockFile *os.File
 	shutdown chan any
+	httpSrv  http.Server
 }
 
 func NewMuxServer(appBaseDir string, sber *box.Boxer) *Mux {
@@ -46,7 +47,16 @@ func NewMuxServer(appBaseDir string, sber *box.Boxer) *Mux {
 	}
 }
 
-func (m *Mux) NewClient(ctx context.Context) (*MuxClient, error) {
+func (m *Mux) NewHTTPClient(ctx context.Context) (*MuxClient, error) {
+	return &MuxClient{
+		ContainerService: m.boxer.ContainerService,
+		base:             "http://host.container.internal",
+		httpClient:       http.DefaultClient,
+	}, nil
+
+}
+
+func (m *Mux) NewUnixSocketClient(ctx context.Context) (*MuxClient, error) {
 	httpClient := &http.Client{
 		Timeout: 30 * time.Second,
 		Transport: &http.Transport{
@@ -55,13 +65,18 @@ func (m *Mux) NewClient(ctx context.Context) (*MuxClient, error) {
 			},
 		},
 	}
+	var csvc box.ContainerOps
+	if m.boxer != nil {
+		csvc = m.boxer.ContainerService
+	}
 	return &MuxClient{
-		Mux:        m,
-		httpClient: httpClient,
+		ContainerService: csvc,
+		base:             "http://unix",
+		httpClient:       httpClient,
 	}, nil
 }
 
-// ServeUnixSocket serves the unix domain socket that sandmux clients (the CLI, e.g.) connect to.
+// ServeUnixSocket serves the unix domain socket that sandmux clients (the host-side CLI, e.g.) connect to.
 func (m *Mux) ServeUnixSocket(ctx context.Context) error {
 	lockFilePath := filepath.Join(m.AppBaseDir, defaultLockFile)
 	slog.InfoContext(ctx, "Mux.ServeUnix", "mux", m, "pid", os.Getpid(), "lockFilePath", lockFilePath)
@@ -102,7 +117,10 @@ func (m *Mux) startDaemonServer(ctx context.Context) error {
 	// Handle cleanup on shutdown
 	go m.waitForShutdown(ctx)
 
-	// Start HTTP server
+	// Start unix domain socket HTTP server
+	go m.serveUnixSocketHTTP(ctx)
+
+	// Start net HTTP server
 	go m.serveHTTP(ctx)
 
 	go func() {
@@ -161,7 +179,7 @@ func (m *Mux) Shutdown(ctx context.Context) {
 	close(m.shutdown)
 }
 
-func (m *Mux) serveHTTP(ctx context.Context) {
+func (m *Mux) serveUnixSocketHTTP(ctx context.Context) {
 	mux := http.NewServeMux()
 
 	// Register handlers
@@ -177,8 +195,37 @@ func (m *Mux) serveHTTP(ctx context.Context) {
 	server := &http.Server{
 		Handler: mux,
 	}
+	slog.InfoContext(ctx, "Mux.serveUnixSocketHTTP starting up")
 
-	server.Serve(m.listener)
+	err := server.Serve(m.listener)
+	if err != nil {
+		slog.ErrorContext(ctx, "Mux.serveUnixSocketHTTP", "error", err)
+	}
+}
+
+func (m *Mux) serveHTTP(ctx context.Context) {
+	mux := http.NewServeMux()
+
+	// Register handlers
+	mux.HandleFunc("/shutdown", m.handleShutdown)
+	mux.HandleFunc("/ping", m.handlePing)
+	mux.HandleFunc("/version", m.handleVersion)
+	mux.HandleFunc("/list", m.handleHTTPList)
+	mux.HandleFunc("/get", m.handleGet)
+	mux.HandleFunc("/remove", m.handleRemove)
+	mux.HandleFunc("/stop", m.handleStop)
+	mux.HandleFunc("/create", m.handleCreate)
+
+	server := &http.Server{
+		Handler: mux,
+		Addr:    ":4242",
+	}
+
+	slog.InfoContext(ctx, "Mux.serveHTTP starting up")
+	err := server.ListenAndServe()
+	if err != nil {
+		slog.ErrorContext(ctx, "Mux.serveHTTP", "error", err)
+	}
 }
 
 // HTTP handler helpers

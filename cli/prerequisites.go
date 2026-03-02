@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"context"
@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	appleContainerVersion = "0.10.0"
-	minimumMacOSVersion   = 26
+	AppleContainerVersion = "0.10.0"
+	MinimumMacOSVersion   = 26
 )
 
 type diagnosticCheck struct {
@@ -45,36 +45,36 @@ var (
 			Description: "Running on MacOS",
 			Run: func(ctx context.Context) error {
 				if runtime.GOOS != "darwin" {
-					return fmt.Errorf("this program requires macOS %d or greater, but detected OS: %s", minimumMacOSVersion, runtime.GOOS)
+					return fmt.Errorf("this program requires macOS %d or greater, but detected OS: %s", MinimumMacOSVersion, runtime.GOOS)
 				}
 				return nil
 			},
 		},
 		{
 			ID:          MacOSVersion,
-			Description: fmt.Sprintf("Running MacOS version %d or greater", minimumMacOSVersion),
+			Description: fmt.Sprintf("Running MacOS version %d or greater", MinimumMacOSVersion),
 			Run: func(ctx context.Context) error {
 				majorVersion, err := getMacOSMajorVersion(ctx)
 				if err != nil {
 					return fmt.Errorf("failed to get macOS version: %w", err)
 				}
-				if majorVersion < minimumMacOSVersion {
-					return fmt.Errorf("MacOS version %d detected, but version %d or greater is required", majorVersion, minimumMacOSVersion)
+				if majorVersion < MinimumMacOSVersion {
+					return fmt.Errorf("MacOS version %d detected, but version %d or greater is required", majorVersion, MinimumMacOSVersion)
 				}
 				return nil
 			},
 		},
 		{
 			ID:          ContainerCommand,
-			Description: fmt.Sprintf("Have https://github.com/apple/container runtime installed at version %s", appleContainerVersion),
+			Description: fmt.Sprintf("Have https://github.com/apple/container runtime installed at version %s", AppleContainerVersion),
 			Run: func(ctx context.Context) error {
 				version, err := applecontainer.System.Version(ctx)
 				if err != nil {
-					return fmt.Errorf("could not locate Apple's `container` command from the releases published at https://github.com/apple/container/releases/tag/%s", appleContainerVersion)
+					return fmt.Errorf("could not locate Apple's `container` command from the releases published at https://github.com/apple/container/releases/tag/%s", AppleContainerVersion)
 				}
 				slog.InfoContext(ctx, "verifyPrerequisites", "version", version)
-				if !strings.Contains("container CLI version "+version, appleContainerVersion) {
-					return fmt.Errorf("expected container command version %q, but got %q", appleContainerVersion, version)
+				if !strings.Contains("container CLI version "+version, AppleContainerVersion) {
+					return fmt.Errorf("expected container command version %q, but got %q", AppleContainerVersion, version)
 				}
 				return nil
 			},
@@ -157,7 +157,7 @@ func init() {
 	}
 }
 
-func verifyPrerequisites(ctx context.Context, checkIDs ...PrerequID) error {
+func VerifyPrerequisites(ctx context.Context, checkIDs ...PrerequID) error {
 	failures := map[PrerequID]string{}
 	for _, checkID := range checkIDs {
 		check, ok := diagnosticCheckMap[checkID]

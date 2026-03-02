@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"fmt"
@@ -15,8 +15,8 @@ type LsCmd struct{}
 func (c *LsCmd) Run(cctx *Context) error {
 	ctx := cctx.Context
 
-	server := mux.NewMuxServer(cctx.AppBaseDir, cctx.sber)
-	mc, err := server.NewClient(ctx)
+	server := mux.NewMuxServer(cctx.AppBaseDir, cctx.Boxer)
+	mc, err := server.NewUnixSocketClient(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "NewClient", "error", err)
 		return err
@@ -44,7 +44,7 @@ func (c *LsCmd) Run(cctx *Context) error {
 		hostname := ""
 		if ctr != nil {
 			status[0] = ctr.Status
-			hostname = getContainerHostname(ctr)
+			hostname = GetContainerHostname(ctr)
 		}
 		if sbox.SandboxContainerError != "" {
 			status = append(status, sbox.SandboxContainerError)

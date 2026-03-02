@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"fmt"
@@ -18,8 +18,8 @@ func (c *ShellCmd) Run(cctx *Context) error {
 	ctx := cctx.Context
 
 	// Use MuxClient to get sandbox info
-	server := mux.NewMuxServer(cctx.AppBaseDir, cctx.sber)
-	mc, err := server.NewClient(ctx)
+	server := mux.NewMuxServer(cctx.AppBaseDir, cctx.Boxer)
+	mc, err := server.NewUnixSocketClient(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "NewClient", "error", err)
 		return err
@@ -47,7 +47,7 @@ func (c *ShellCmd) Run(cctx *Context) error {
 			slog.ErrorContext(ctx, "sbox.createContainer", "error", err)
 			return err
 		}
-		if err := cctx.sber.UpdateContainerID(ctx, sbox, sbox.ContainerID); err != nil {
+		if err := cctx.Boxer.UpdateContainerID(ctx, sbox, sbox.ContainerID); err != nil {
 			slog.ErrorContext(ctx, "sber.UpdateContainerID", "error", err)
 			return err
 		}
@@ -75,7 +75,7 @@ func (c *ShellCmd) Run(cctx *Context) error {
 		}
 	}
 
-	hostname := getContainerHostname(ctr)
+	hostname := GetContainerHostname(ctr)
 	env := map[string]string{
 		"HOSTNAME": hostname,
 	}

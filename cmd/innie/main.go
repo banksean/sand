@@ -12,10 +12,18 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/banksean/sand/box"
 	"github.com/banksean/sand/cli"
-	"github.com/banksean/sand/mux"
 	kongcompletion "github.com/jotaen/kong-completion"
 	"github.com/posener/complete"
 )
+
+// TODO:
+// - figure out where the innie should send its logs to, if anywhere.
+// - sort out the protocol for connecting the innie running in the container to the sandd process running on the host.
+//.  - placeholder: mount host:.../Application Support/Sand as sandbox:/outie and try to have innie open /outie/sandmux.sock to talk to sandd on the host.
+// - sort out how `sand new` should work when you run it from inside a sandbox container.
+//.  - A: should it create a clone from the sandbox's original parent, or
+//   - B: should it create a new clone using this sandbox's current state as its parent
+//.  - if we want it to do the latter, can appple's container system clone the entire sandbox container (including FS changes, running processes etc)?
 
 type CLI struct {
 	LogFile    string                    `default:"/tmp/sand/log" placeholder:"<log-file-path>" help:"location of log file (leave empty for a random tmp/ path)"`
@@ -30,9 +38,8 @@ type CLI struct {
 	Rm      cli.RmCmd      `cmd:"" help:"remove sandbox container and its clone directory"`
 	Stop    cli.StopCmd    `cmd:"" help:"stop sandbox container"`
 	Git     cli.GitCmd     `cmd:"" help:"git operations with sandboxes"`
-	Doc     DocCmd         `cmd:"" help:"print complete command help formatted as markdown"`
 	Version cli.VersionCmd `cmd:"" help:"print version infomation about this command"`
-	Vsc     VscCmd         `cmd:"" help:"launch a vscode remote window connected to the sandbox's container"`
+	// TODO: VSCCmd should work here too. "%sandbox-vm> sand vsc" should open a vsc remote window on the host OS.
 }
 
 func (c *CLI) initSlog() {
@@ -76,27 +83,7 @@ func (c *CLI) initSlog() {
 	slog.Info("slog initialized")
 }
 
-const description = `Manage lightweight linux container sandboxes on MacOS.
-
-Requires apple container CLI: https://github.com/apple/container/releases/tag/` + cli.AppleContainerVersion
-
-func appHomeDir() (string, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "", fmt.Errorf("error getting home directory: %w", err)
-	}
-
-	// Construct the path to the application support directory
-	appSupportDir := filepath.Join(homeDir, "Library", "Application Support", "Sand")
-
-	// Create the directory if it doesn't exist
-	err = os.MkdirAll(appSupportDir, 0o755) // 0755 grants read/write/execute for owner, read/execute for group/others
-	if err != nil {
-		return "", fmt.Errorf("error creating application support directory: %w", err)
-	}
-
-	return appSupportDir, nil
-}
+const description = `The "innie" side of the "sand" command, communicates with the host OS to execute sandbox related commands.`
 
 type sandboxNamePredictor struct {
 	sber *box.Boxer
@@ -127,13 +114,10 @@ func main() {
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	appBaseDir, err := appHomeDir()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "unable to get application home directory: %v\n", err.Error())
-		os.Exit(1)
-	}
+	appBaseDir := "/outie" // connect to the sandd process running on the host via socket.
+
 	var sber *box.Boxer
-	sber, err = box.NewBoxer(appBaseDir, os.Stderr)
+	sber, err := box.NewBoxer(appBaseDir, os.Stderr)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to create Boxer: %v\n", err)
 		os.Exit(1)
@@ -153,17 +137,12 @@ func main() {
 	// Yes, we already called initSlog(), but this time we've parsed the cli flags which may specify other log settings than the defaults.
 	app.initSlog()
 
-	if err := cli.VerifyPrerequisites(ctx, cli.MacOS, cli.MacOSVersion, cli.ContainerCommand); err != nil {
-		fmt.Fprintf(os.Stderr, "Prerequisite check(s) failed: %s\r\n", err)
-		os.Exit(1)
-	}
-
 	slog.Info("main", "appBaseDir", appBaseDir)
 
-	if err := mux.EnsureDaemon(ctx, appBaseDir, app.LogFile); err != nil {
-		fmt.Fprintf(os.Stderr, "daemon not running, and failed to start it. error: %v\n", err)
-		os.Exit(1)
-	}
+	// if err := mux.EnsureDaemon(ctx, appBaseDir, app.LogFile); err != nil {
+	// 	fmt.Fprintf(os.Stderr, "daemon not running, and failed to start it. error: %v\n", err)
+	// 	os.Exit(1)
+	// }
 
 	if app.AppBaseDir == "" {
 		app.AppBaseDir = appBaseDir

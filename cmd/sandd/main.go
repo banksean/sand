@@ -62,7 +62,7 @@ func (c *DaemonCmd) Run(cctx *Context) error {
 }
 
 func (c *DaemonCmd) version(ctx context.Context, server *mux.Mux) error {
-	mc, err := server.NewClient(ctx)
+	mc, err := server.NewUnixSocketClient(ctx)
 	if err != nil {
 		fmt.Println("Daemon is not running")
 		return nil
@@ -97,7 +97,7 @@ func (c *DaemonCmd) version(ctx context.Context, server *mux.Mux) error {
 }
 
 func (c *DaemonCmd) checkStatus(ctx context.Context, server *mux.Mux) error {
-	mc, err := server.NewClient(ctx)
+	mc, err := server.NewUnixSocketClient(ctx)
 	if err != nil {
 		fmt.Println("Daemon is not running")
 		return nil
@@ -114,7 +114,7 @@ func (c *DaemonCmd) checkStatus(ctx context.Context, server *mux.Mux) error {
 
 func (c *DaemonCmd) startDaemon(ctx context.Context, server *mux.Mux) error {
 	// Check if daemon is already running
-	mc, err := server.NewClient(ctx)
+	mc, err := server.NewUnixSocketClient(ctx)
 	if err == nil {
 		if err := mc.Ping(ctx); err == nil {
 			fmt.Println("Daemon is already running")
@@ -127,7 +127,7 @@ func (c *DaemonCmd) startDaemon(ctx context.Context, server *mux.Mux) error {
 }
 
 func (c *DaemonCmd) stopDaemon(ctx context.Context, server *mux.Mux) error {
-	mc, err := server.NewClient(ctx)
+	mc, err := server.NewUnixSocketClient(ctx)
 	if err != nil {
 		fmt.Println("Daemon is not running")
 		return nil

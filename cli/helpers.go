@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"strings"
@@ -6,7 +6,7 @@ import (
 	"github.com/banksean/sand/applecontainer/types"
 )
 
-func getContainerHostname(ctr *types.Container) string {
+func GetContainerHostname(ctr *types.Container) string {
 	for _, n := range ctr.Networks {
 		return strings.TrimSuffix(n.Hostname, ".")
 	}

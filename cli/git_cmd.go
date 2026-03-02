@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"context"
@@ -36,13 +36,13 @@ type DiffCmd struct {
 func (c *DiffCmd) Run(cctx *Context) error {
 	ctx := cctx.Context
 
-	if err := verifyPrerequisites(ctx, GitDir, GitRemoteIsSSH); err != nil {
+	if err := VerifyPrerequisites(ctx, GitDir, GitRemoteIsSSH); err != nil {
 		return err
 	}
 
 	// Get the sandbox to verify it exists and get its metadata
-	server := mux.NewMuxServer(cctx.AppBaseDir, cctx.sber)
-	mc, err := server.NewClient(ctx)
+	server := mux.NewMuxServer(cctx.AppBaseDir, cctx.Boxer)
+	mc, err := server.NewUnixSocketClient(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "NewClient", "error", err)
 		return err
@@ -200,13 +200,13 @@ func (c *DiffCmd) cleanupTempCommit(ctx context.Context, sandboxWorkDir string) 
 func (c *StatusCmd) Run(cctx *Context) error {
 	ctx := cctx.Context
 
-	if err := verifyPrerequisites(ctx, GitDir, GitRemoteIsSSH); err != nil {
+	if err := VerifyPrerequisites(ctx, GitDir, GitRemoteIsSSH); err != nil {
 		return err
 	}
 
 	// Get the sandbox to verify it exists and get its metadata
-	server := mux.NewMuxServer(cctx.AppBaseDir, cctx.sber)
-	mc, err := server.NewClient(ctx)
+	server := mux.NewMuxServer(cctx.AppBaseDir, cctx.Boxer)
+	mc, err := server.NewUnixSocketClient(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "NewClient", "error", err)
 		return err
@@ -261,13 +261,13 @@ func (c *StatusCmd) Run(cctx *Context) error {
 func (c *LogCmd) Run(cctx *Context) error {
 	ctx := cctx.Context
 
-	if err := verifyPrerequisites(ctx, GitDir, GitRemoteIsSSH); err != nil {
+	if err := VerifyPrerequisites(ctx, GitDir, GitRemoteIsSSH); err != nil {
 		return err
 	}
 
 	// Get the sandbox to verify it exists and get its metadata
-	server := mux.NewMuxServer(cctx.AppBaseDir, cctx.sber)
-	mc, err := server.NewClient(ctx)
+	server := mux.NewMuxServer(cctx.AppBaseDir, cctx.Boxer)
+	mc, err := server.NewUnixSocketClient(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "NewClient", "error", err)
 		return err

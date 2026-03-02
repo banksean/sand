@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"fmt"
@@ -8,16 +8,18 @@ import (
 	"github.com/banksean/sand/mux"
 )
 
-type StopCmd struct {
-	ID  string `arg:"" completion-predictor:"sandbox-name" optional:"" help:"ID of the sandbox to stop"`
-	All bool   `short:"a" help:"stop all sandboxes"`
+type RmCmd struct {
+	ID  string `arg:"" completion-predictor:"sandbox-name" optional:"" help:"ID of the sandbox to remove"`
+	All bool   `short:"a" help:"remove all sandboxes"`
 }
 
-func (c *StopCmd) Run(cctx *Context) error {
+func (c *RmCmd) Run(cctx *Context) error {
 	ctx := cctx.Context
 
-	server := mux.NewMuxServer(cctx.AppBaseDir, cctx.sber)
-	mc, err := server.NewClient(ctx)
+	slog.InfoContext(ctx, "RmCmd", "run", *c)
+
+	server := mux.NewMuxServer(cctx.AppBaseDir, cctx.Boxer)
+	mc, err := server.NewUnixSocketClient(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "NewClient", "error", err)
 		return err
@@ -43,8 +45,7 @@ func (c *StopCmd) Run(cctx *Context) error {
 		wg.Add(1)
 		go func(id string) {
 			defer wg.Done()
-			if err := mc.StopSandbox(ctx, id); err != nil {
-				slog.ErrorContext(ctx, "StopSandbox", "error", err, "id", id)
+			if err := mc.RemoveSandbox(ctx, id); err != nil {
 				errChan <- err
 				return
 			}

@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"bufio"
@@ -30,11 +30,11 @@ func (c *NewCmd) Run(cctx *Context) error {
 	ctx := cctx.Context
 	slog.InfoContext(ctx, "NewCmd.Run")
 
-	if err := verifyPrerequisites(ctx, GitDir); err != nil {
+	if err := VerifyPrerequisites(ctx, GitDir); err != nil {
 		return err
 	}
 
-	if err := cctx.sber.EnsureImage(ctx, c.ImageName); err != nil {
+	if err := cctx.Boxer.EnsureImage(ctx, c.ImageName); err != nil {
 		slog.ErrorContext(ctx, "sber.Init", "error", err)
 		return err
 	}
@@ -56,8 +56,8 @@ func (c *NewCmd) Run(cctx *Context) error {
 	}
 
 	// Use MuxClient to check if sandbox exists or create it
-	server := mux.NewMuxServer(cctx.AppBaseDir, cctx.sber)
-	mc, err := server.NewClient(ctx)
+	server := mux.NewMuxServer(cctx.AppBaseDir, cctx.Boxer)
+	mc, err := server.NewUnixSocketClient(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "NewClient", "error", err)
 		return err
@@ -106,7 +106,7 @@ func (c *NewCmd) Run(cctx *Context) error {
 			return err
 		}
 	}
-	hostname := getContainerHostname(ctr)
+	hostname := GetContainerHostname(ctr)
 	env := map[string]string{
 		"HOSTNAME": hostname,
 	}
