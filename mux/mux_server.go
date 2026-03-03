@@ -20,6 +20,7 @@ import (
 const (
 	defaultSocketFile = "sandmux.sock"
 	defaultLockFile   = "sandmux.lock"
+	httpAddr          = "host.container.internal:4242"
 )
 
 type Mux struct {
@@ -48,12 +49,15 @@ func NewMuxServer(appBaseDir string, sber *box.Boxer) *Mux {
 }
 
 func (m *Mux) NewHTTPClient(ctx context.Context) (*MuxClient, error) {
+	var csvc box.ContainerOps
+	if m.boxer != nil {
+		csvc = m.boxer.ContainerService
+	}
 	return &MuxClient{
-		ContainerService: m.boxer.ContainerService,
-		base:             "http://host.container.internal",
+		ContainerService: csvc,
+		base:             "http://" + httpAddr,
 		httpClient:       http.DefaultClient,
 	}, nil
-
 }
 
 func (m *Mux) NewUnixSocketClient(ctx context.Context) (*MuxClient, error) {
@@ -186,7 +190,7 @@ func (m *Mux) serveUnixSocketHTTP(ctx context.Context) {
 	mux.HandleFunc("/shutdown", m.handleShutdown)
 	mux.HandleFunc("/ping", m.handlePing)
 	mux.HandleFunc("/version", m.handleVersion)
-	mux.HandleFunc("/list", m.handleHTTPList)
+	mux.HandleFunc("/list", m.handleList)
 	mux.HandleFunc("/get", m.handleGet)
 	mux.HandleFunc("/remove", m.handleRemove)
 	mux.HandleFunc("/stop", m.handleStop)
@@ -203,18 +207,25 @@ func (m *Mux) serveUnixSocketHTTP(ctx context.Context) {
 	}
 }
 
+func slogHandler(ctx context.Context, h http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		slog.InfoContext(ctx, "http request", "url", r.URL.String())
+		h(w, r)
+	}
+}
+
 func (m *Mux) serveHTTP(ctx context.Context) {
 	mux := http.NewServeMux()
 
 	// Register handlers
-	mux.HandleFunc("/shutdown", m.handleShutdown)
-	mux.HandleFunc("/ping", m.handlePing)
-	mux.HandleFunc("/version", m.handleVersion)
-	mux.HandleFunc("/list", m.handleHTTPList)
-	mux.HandleFunc("/get", m.handleGet)
-	mux.HandleFunc("/remove", m.handleRemove)
-	mux.HandleFunc("/stop", m.handleStop)
-	mux.HandleFunc("/create", m.handleCreate)
+	mux.HandleFunc("/shutdown", slogHandler(ctx, m.handleShutdown))
+	mux.HandleFunc("/ping", slogHandler(ctx, m.handlePing))
+	mux.HandleFunc("/version", slogHandler(ctx, m.handleVersion))
+	mux.HandleFunc("/list", slogHandler(ctx, m.handleList))
+	mux.HandleFunc("/get", slogHandler(ctx, m.handleGet))
+	mux.HandleFunc("/remove", slogHandler(ctx, m.handleRemove))
+	mux.HandleFunc("/stop", slogHandler(ctx, m.handleStop))
+	mux.HandleFunc("/create", slogHandler(ctx, m.handleCreate))
 
 	server := &http.Server{
 		Handler: mux,
@@ -272,7 +283,7 @@ func (m *Mux) handleVersion(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, version.Get())
 }
 
-func (m *Mux) handleHTTPList(w http.ResponseWriter, r *http.Request) {
+func (m *Mux) handleList(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -306,10 +317,13 @@ func (m *Mux) handleGet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sbox, err := m.GetSandbox(r.Context(), args.ID)
+	sbox.Sync(r.Context())
+
 	if err != nil {
 		writeJSONError(w, err, http.StatusInternalServerError)
 		return
 	}
+
 	if sbox == nil {
 		http.Error(w, "Not found", http.StatusNotFound)
 		return

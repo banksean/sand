@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/banksean/sand/cli"
-	"github.com/banksean/sand/mux"
 )
 
 // TODO: make 'sand vsc' work from inside the container, so that it tells the outie to run `code --remote=` etc on the host
@@ -18,15 +17,9 @@ type VscCmd struct {
 
 func (c *VscCmd) Run(cctx *cli.Context) error {
 	ctx := cctx.Context
+	mc := cctx.MuxClient
 
 	slog.InfoContext(ctx, "VscCmd", "run", *c)
-
-	server := mux.NewMuxServer(cctx.AppBaseDir, cctx.Boxer)
-	mc, err := server.NewUnixSocketClient(ctx)
-	if err != nil {
-		slog.ErrorContext(ctx, "NewClient", "error", err)
-		return err
-	}
 
 	sbox, err := mc.GetSandbox(ctx, c.ID)
 	if err != nil {

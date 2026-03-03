@@ -12,9 +12,13 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/banksean/sand/box"
 	"github.com/banksean/sand/cli"
+	"github.com/banksean/sand/mux"
 	kongcompletion "github.com/jotaen/kong-completion"
 	"github.com/posener/complete"
 )
+
+// Cross-compile this for use inside the linux container like so:
+// CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o ./bin/innie ./cmd/innie
 
 // TODO:
 // - figure out where the innie should send its logs to, if anywhere.
@@ -147,8 +151,15 @@ func main() {
 	if app.AppBaseDir == "" {
 		app.AppBaseDir = appBaseDir
 	}
+	server := mux.NewMuxServer(appBaseDir, sber)
 
+	mc, err := server.NewHTTPClient(ctx)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to create sandmux client, error: %v\n", err)
+		os.Exit(1)
+	}
 	err = kongCtx.Run(&cli.Context{
+		MuxClient:  mc,
 		Context:    ctx,
 		AppBaseDir: appBaseDir,
 		LogFile:    app.LogFile,

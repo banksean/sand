@@ -6,21 +6,13 @@ import (
 	"os"
 	"strings"
 	"text/tabwriter"
-
-	"github.com/banksean/sand/mux"
 )
 
 type LsCmd struct{}
 
 func (c *LsCmd) Run(cctx *Context) error {
 	ctx := cctx.Context
-
-	server := mux.NewMuxServer(cctx.AppBaseDir, cctx.Boxer)
-	mc, err := server.NewUnixSocketClient(ctx)
-	if err != nil {
-		slog.ErrorContext(ctx, "NewClient", "error", err)
-		return err
-	}
+	mc := cctx.MuxClient
 
 	list, err := mc.ListSandboxes(ctx)
 	if err != nil {
@@ -35,7 +27,7 @@ func (c *LsCmd) Run(cctx *Context) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "SANDBOX ID\tSTATUS\tCONTAINER ID\tHOSTNAME\tORIGIN DIR\tIMAGE NAME\t")
 	for _, sbox := range list {
-		sbox.Sync(ctx)
+		mc.GetSandbox(ctx, sbox.ID)
 		ctr, err := sbox.GetContainer(ctx)
 		if err != nil {
 			return err

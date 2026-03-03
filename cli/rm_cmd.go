@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
-
-	"github.com/banksean/sand/mux"
 )
 
 type RmCmd struct {
@@ -15,15 +13,9 @@ type RmCmd struct {
 
 func (c *RmCmd) Run(cctx *Context) error {
 	ctx := cctx.Context
+	mc := cctx.MuxClient
 
 	slog.InfoContext(ctx, "RmCmd", "run", *c)
-
-	server := mux.NewMuxServer(cctx.AppBaseDir, cctx.Boxer)
-	mc, err := server.NewUnixSocketClient(ctx)
-	if err != nil {
-		slog.ErrorContext(ctx, "NewClient", "error", err)
-		return err
-	}
 
 	ids := []string{}
 	if !c.All {

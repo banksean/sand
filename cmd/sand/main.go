@@ -168,8 +168,14 @@ func main() {
 	if app.AppBaseDir == "" {
 		app.AppBaseDir = appBaseDir
 	}
-
+	server := mux.NewMuxServer(appBaseDir, sber)
+	mc, err := server.NewUnixSocketClient(ctx)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to create sandmux client, error: %v\n", err)
+		os.Exit(1)
+	}
 	err = kongCtx.Run(&cli.Context{
+		MuxClient:  mc,
 		Context:    ctx,
 		AppBaseDir: appBaseDir,
 		LogFile:    app.LogFile,

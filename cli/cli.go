@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/banksean/sand/box"
+	"github.com/banksean/sand/mux"
 )
 
 type Context struct {
@@ -13,4 +14,5 @@ type Context struct {
 	CloneRoot  string
 	Context    context.Context
 	Boxer      *box.Boxer
+	MuxClient  *mux.MuxClient
 }

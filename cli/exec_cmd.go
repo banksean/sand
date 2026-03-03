@@ -22,6 +22,7 @@ type ExecCmd struct {
 
 func (c *ExecCmd) Run(cctx *Context) error {
 	ctx := cctx.Context
+	mc := cctx.MuxClient
 
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -38,14 +39,6 @@ func (c *ExecCmd) Run(cctx *Context) error {
 		nameGenerator := namegenerator.NewNameGenerator(seed)
 
 		c.ID = nameGenerator.Generate()
-	}
-
-	// Use MuxClient to check if sandbox exists or create it
-	server := mux.NewMuxServer(cctx.AppBaseDir, cctx.Boxer)
-	mc, err := server.NewUnixSocketClient(ctx)
-	if err != nil {
-		slog.ErrorContext(ctx, "NewClient", "error", err)
-		return err
 	}
 
 	// Try to get existing sandbox

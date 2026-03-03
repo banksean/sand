@@ -28,6 +28,8 @@ type NewCmd struct {
 
 func (c *NewCmd) Run(cctx *Context) error {
 	ctx := cctx.Context
+	mc := cctx.MuxClient
+
 	slog.InfoContext(ctx, "NewCmd.Run")
 
 	if err := VerifyPrerequisites(ctx, GitDir); err != nil {
@@ -53,14 +55,6 @@ func (c *NewCmd) Run(cctx *Context) error {
 		seed := time.Now().UTC().UnixNano()
 		nameGenerator := namegenerator.NewNameGenerator(seed)
 		c.ID = nameGenerator.Generate()
-	}
-
-	// Use MuxClient to check if sandbox exists or create it
-	server := mux.NewMuxServer(cctx.AppBaseDir, cctx.Boxer)
-	mc, err := server.NewUnixSocketClient(ctx)
-	if err != nil {
-		slog.ErrorContext(ctx, "NewClient", "error", err)
-		return err
 	}
 
 	if c.EnvFile != "" && !filepath.IsAbs(c.EnvFile) {

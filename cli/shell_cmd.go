@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-
-	"github.com/banksean/sand/mux"
 )
 
 type ShellCmd struct {
@@ -16,14 +14,7 @@ type ShellCmd struct {
 
 func (c *ShellCmd) Run(cctx *Context) error {
 	ctx := cctx.Context
-
-	// Use MuxClient to get sandbox info
-	server := mux.NewMuxServer(cctx.AppBaseDir, cctx.Boxer)
-	mc, err := server.NewUnixSocketClient(ctx)
-	if err != nil {
-		slog.ErrorContext(ctx, "NewClient", "error", err)
-		return err
-	}
+	mc := cctx.MuxClient
 
 	sbox, err := mc.GetSandbox(ctx, c.ID)
 	if err != nil {

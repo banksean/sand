@@ -26,26 +26,30 @@ type MuxClient struct {
 func (m *MuxClient) doRequest(ctx context.Context, method, path string, body any, result any) error {
 	var req *http.Request
 	var err error
-
+	slog.InfoContext(ctx, "MuxClient.doRequest", "method", method, "path", path)
 	if body != nil {
 		reqBody, err := json.Marshal(body)
 		if err != nil {
+			slog.ErrorContext(ctx, "MuxClient.doRequest", "error", err)
 			return err
 		}
 		req, err = http.NewRequestWithContext(ctx, method, m.base+path, strings.NewReader(string(reqBody)))
 		if err != nil {
+			slog.ErrorContext(ctx, "MuxClient.doRequest", "error", err)
 			return err
 		}
 		req.Header.Set("Content-Type", "application/json")
 	} else {
 		req, err = http.NewRequestWithContext(ctx, method, m.base+path, nil)
 		if err != nil {
+			slog.ErrorContext(ctx, "MuxClient.doRequest", "error", err)
 			return err
 		}
 	}
 
 	resp, err := m.httpClient.Do(req)
 	if err != nil {
+		slog.ErrorContext(ctx, "MuxClient.doRequest", "error", err)
 		return fmt.Errorf("daemon not running: %w", err)
 	}
 	defer resp.Body.Close()
@@ -57,8 +61,11 @@ func (m *MuxClient) doRequest(ctx context.Context, method, path string, body any
 		if json.NewDecoder(resp.Body).Decode(&errResp) == nil && errResp.Error != "" {
 			return fmt.Errorf("%s", errResp.Error)
 		}
+		slog.ErrorContext(ctx, "MuxClient.doRequest", "errorResp", errResp)
+
 		return fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
+	slog.InfoContext(ctx, "MuxClient.doRequest", "method", method, "path", path, "resp.StatusCode", resp.StatusCode)
 
 	if result != nil {
 		if err := json.NewDecoder(resp.Body).Decode(result); err != nil {
