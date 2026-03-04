@@ -14,8 +14,19 @@ import (
 	"github.com/banksean/sand/mux"
 )
 
-type Context struct {
+// `sandd start` runs a long-lived process that manages sandboxes' lifecycles.
+//
+// When you run the `sand` CLI, it is actually making IPC calls to this daemon in order
+// to do all of the actual work of managing sandboxes.
+//
+// At startup, it will:
+// - acquire a lock file at $AppBaseDir/sandmux.lock
+// - open a unix domain socket at $AppBaseDir/sandmux.sock to accept IPC from the sand cli on the host OS
+// - start an http server listening at :4242 to accept IPC from the sand cli running inside containers
+
+type App struct {
 	AppBaseDir string
+	HTTPPort   string
 	LogFile    string
 	LogLevel   string
 	CloneRoot  string
@@ -26,12 +37,12 @@ type DaemonCmd struct {
 	LogFile    string `default:"/tmp/sand/log.daemon" placeholder:"<log-file-path>" help:"location of log file (leave empty for a random tmp/ path)"`
 	LogLevel   string `default:"info" placeholder:"<debug|info|warn|error>" help:"the logging level (debug, info, warn, error)"`
 	AppBaseDir string `default:"" placeholder:"<app-base-dir>" help:"root dir to store sandbox clones of working directories. Leave unset to use '~/Library/Application Support/Sand'"`
-
-	Action string `arg:"" optional:"" default:"status" enum:"start,stop,status,version" help:"Action to perform: start, stop, or status (default). Shows daemon status if omitted."`
+	HTTPPort   string `default:"4242" placeholder:"<local port>" help:"local http port to listen on, for commands running inside containers"`
+	Action     string `arg:"" optional:"" default:"status" enum:"start,stop,status,version" help:"Action to perform: start, stop, or status (default). Shows daemon status if omitted."`
 }
 
 // Run handles all daemon command variants
-func (c *DaemonCmd) Run(cctx *Context) error {
+func (c *DaemonCmd) Run(cctx *App) error {
 	ctx := cctx.Context
 	var sber *box.Boxer
 	sber, err := box.NewBoxer(c.AppBaseDir, os.Stderr)
@@ -44,7 +55,7 @@ func (c *DaemonCmd) Run(cctx *Context) error {
 		os.Exit(1)
 	}
 	defer sber.Close()
-	server := mux.NewMuxServer(cctx.AppBaseDir, sber)
+	server := mux.NewMuxServer(cctx.AppBaseDir, cctx.HTTPPort, sber)
 
 	switch c.Action {
 	case "start":
@@ -62,7 +73,7 @@ func (c *DaemonCmd) Run(cctx *Context) error {
 }
 
 func (c *DaemonCmd) version(ctx context.Context, server *mux.Mux) error {
-	mc, err := server.NewUnixSocketClient(ctx)
+	mc, err := mux.NewUnixSocketClient(ctx, c.AppBaseDir)
 	if err != nil {
 		fmt.Println("Daemon is not running")
 		return nil
@@ -97,7 +108,7 @@ func (c *DaemonCmd) version(ctx context.Context, server *mux.Mux) error {
 }
 
 func (c *DaemonCmd) checkStatus(ctx context.Context, server *mux.Mux) error {
-	mc, err := server.NewUnixSocketClient(ctx)
+	mc, err := mux.NewUnixSocketClient(ctx, c.AppBaseDir)
 	if err != nil {
 		fmt.Println("Daemon is not running")
 		return nil
@@ -114,7 +125,7 @@ func (c *DaemonCmd) checkStatus(ctx context.Context, server *mux.Mux) error {
 
 func (c *DaemonCmd) startDaemon(ctx context.Context, server *mux.Mux) error {
 	// Check if daemon is already running
-	mc, err := server.NewUnixSocketClient(ctx)
+	mc, err := mux.NewUnixSocketClient(ctx, c.AppBaseDir)
 	if err == nil {
 		if err := mc.Ping(ctx); err == nil {
 			fmt.Println("Daemon is already running")
@@ -127,7 +138,7 @@ func (c *DaemonCmd) startDaemon(ctx context.Context, server *mux.Mux) error {
 }
 
 func (c *DaemonCmd) stopDaemon(ctx context.Context, server *mux.Mux) error {
-	mc, err := server.NewUnixSocketClient(ctx)
+	mc, err := mux.NewUnixSocketClient(ctx, c.AppBaseDir)
 	if err != nil {
 		fmt.Println("Daemon is not running")
 		return nil
@@ -229,8 +240,9 @@ func main() {
 		cli.AppBaseDir = appBaseDir
 	}
 
-	err = kongCtx.Run(&Context{
+	err = kongCtx.Run(&App{
 		Context:    ctx,
+		HTTPPort:   cli.HTTPPort,
 		AppBaseDir: appBaseDir,
 		LogFile:    cli.LogFile,
 		LogLevel:   cli.LogLevel,

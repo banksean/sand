@@ -33,6 +33,7 @@ type CLI struct {
 	LogFile    string                    `default:"/tmp/sand/log" placeholder:"<log-file-path>" help:"location of log file (leave empty for a random tmp/ path)"`
 	LogLevel   string                    `default:"info" placeholder:"<debug|info|warn|error>" help:"the logging level (debug, info, warn, error)"`
 	AppBaseDir string                    `default:"" placeholder:"<app-base-dir>" help:"root dir to store sandbox clones of working directories. Leave unset to use '~/Library/Application Support/Sand'"`
+	HTTPPort   string                    `default:"4242" placeholder:"<local port>" help:"local http port to listen on, for commands running inside containers"`
 	Completion kongcompletion.Completion `cmd:"" help:"Outputs shell code for initialising tab completions"`
 
 	New     cli.NewCmd     `cmd:"" help:"create a new sandbox and shell into its container"`
@@ -151,7 +152,7 @@ func main() {
 	if app.AppBaseDir == "" {
 		app.AppBaseDir = appBaseDir
 	}
-	server := mux.NewMuxServer(appBaseDir, sber)
+	server := mux.NewMuxServer(appBaseDir, app.HTTPPort, sber)
 
 	mc, err := server.NewHTTPClient(ctx)
 	if err != nil {
@@ -165,7 +166,6 @@ func main() {
 		LogFile:    app.LogFile,
 		LogLevel:   app.LogLevel,
 		CloneRoot:  app.AppBaseDir,
-		Boxer:      sber,
 	})
 	kongCtx.FatalIfErrorf(err)
 }

@@ -18,9 +18,9 @@ import (
 )
 
 type MuxClient struct {
-	ContainerService box.ContainerOps
-	base             string
-	httpClient       *http.Client
+	//ContainerService box.ContainerOps
+	base       string
+	httpClient *http.Client
 }
 
 func (m *MuxClient) doRequest(ctx context.Context, method, path string, body any, result any) error {
@@ -106,9 +106,9 @@ func (m *MuxClient) ListSandboxes(ctx context.Context) ([]box.Box, error) {
 	if err := m.doRequest(ctx, http.MethodGet, "/list", nil, &boxes); err != nil {
 		return nil, err
 	}
-	for i := range boxes {
-		boxes[i].ContainerService = m.ContainerService
-	}
+	// for i := range boxes {
+	// 	boxes[i].ContainerService = m.ContainerService
+	// }
 	return boxes, nil
 }
 
@@ -120,7 +120,7 @@ func (m *MuxClient) GetSandbox(ctx context.Context, id string) (*box.Box, error)
 		}
 		return nil, err
 	}
-	box.ContainerService = m.ContainerService
+	// box.ContainerService = m.ContainerService
 	return &box, nil
 }
 
@@ -137,7 +137,7 @@ func (m *MuxClient) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (
 	if err := m.doRequest(ctx, http.MethodPost, "/create", opts, &box); err != nil {
 		return nil, err
 	}
-	box.ContainerService = m.ContainerService
+	// box.ContainerService = m.ContainerService
 	return &box, nil
 }
 
@@ -215,8 +215,7 @@ func EnsureDaemon(ctx context.Context, appBaseDir, logFile string) error {
 }
 
 func checkDaemonVersion(ctx context.Context, appBaseDir string) error {
-	mux := NewMuxServer(appBaseDir, nil)
-	client, err := mux.NewUnixSocketClient(ctx)
+	client, err := NewUnixSocketClient(ctx, appBaseDir)
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
@@ -238,8 +237,7 @@ func shutdownDaemon(appBaseDir string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	mux := NewMuxServer(appBaseDir, nil)
-	client, err := mux.NewUnixSocketClient(ctx)
+	client, err := NewUnixSocketClient(ctx, appBaseDir)
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}

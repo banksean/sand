@@ -10,7 +10,6 @@ import (
 	"syscall"
 
 	"github.com/alecthomas/kong"
-	"github.com/banksean/sand/box"
 	"github.com/banksean/sand/cli"
 	"github.com/banksean/sand/mux"
 	kongcompletion "github.com/jotaen/kong-completion"
@@ -99,19 +98,21 @@ func appHomeDir() (string, error) {
 }
 
 type sandboxNamePredictor struct {
-	sber *box.Boxer
+	// sber *box.Boxer
 }
 
 // Predict implements [complete.Predictor].
 func (s *sandboxNamePredictor) Predict(args complete.Args) []string {
-	sandboxes, err := s.sber.List(context.Background())
-	if err != nil {
-		return nil
-	}
+	// sandboxes, err := s.sber.List(context.Background())
+	// if err != nil {
+	// 	return nil
+	// }
+	// ret := []string{}
+	// for _, box := range sandboxes {
+	// 	ret = append(ret, box.ID)
+	// }
+	// TODO: implement this by making mux.MuxClient#List calls instead of using box.Boxer directly.
 	ret := []string{}
-	for _, box := range sandboxes {
-		ret = append(ret, box.ID)
-	}
 	return ret
 }
 
@@ -132,19 +133,19 @@ func main() {
 		fmt.Fprintf(os.Stderr, "unable to get application home directory: %v\n", err.Error())
 		os.Exit(1)
 	}
-	var sber *box.Boxer
-	sber, err = box.NewBoxer(appBaseDir, os.Stderr)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to create Boxer: %v\n", err)
-		os.Exit(1)
-	}
-	if err := sber.Sync(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "failed to sync Boxer db with current environment state: %v\n", err)
-		os.Exit(1)
-	}
-	defer sber.Close()
+	// var sber *box.Boxer
+	// sber, err = box.NewBoxer(appBaseDir, os.Stderr)
+	// if err != nil {
+	// 	fmt.Fprintf(os.Stderr, "failed to create Boxer: %v\n", err)
+	// 	os.Exit(1)
+	// }
+	// if err := sber.Sync(ctx); err != nil {
+	// 	fmt.Fprintf(os.Stderr, "failed to sync Boxer db with current environment state: %v\n", err)
+	// 	os.Exit(1)
+	// }
+	// defer sber.Close()
 	kongApp := kong.Must(&app)
-	namePredictor := &sandboxNamePredictor{sber: sber}
+	namePredictor := &sandboxNamePredictor{}
 	kongcompletion.Register(kongApp, kongcompletion.WithPredictor("sandbox-name", namePredictor))
 	kongCtx := kong.Parse(&app,
 		kong.Configuration(kong.JSON, ".sand.json", "~/.sand.json"),
@@ -168,8 +169,8 @@ func main() {
 	if app.AppBaseDir == "" {
 		app.AppBaseDir = appBaseDir
 	}
-	server := mux.NewMuxServer(appBaseDir, sber)
-	mc, err := server.NewUnixSocketClient(ctx)
+	//server := mux.NewMuxServer(appBaseDir, "", sber)
+	mc, err := mux.NewUnixSocketClient(ctx, appBaseDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create sandmux client, error: %v\n", err)
 		os.Exit(1)
@@ -181,7 +182,6 @@ func main() {
 		LogFile:    app.LogFile,
 		LogLevel:   app.LogLevel,
 		CloneRoot:  app.AppBaseDir,
-		Boxer:      sber,
 	})
 	kongCtx.FatalIfErrorf(err)
 }

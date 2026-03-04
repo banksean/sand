@@ -27,11 +27,12 @@ func (c *LsCmd) Run(cctx *Context) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "SANDBOX ID\tSTATUS\tCONTAINER ID\tHOSTNAME\tORIGIN DIR\tIMAGE NAME\t")
 	for _, sbox := range list {
-		mc.GetSandbox(ctx, sbox.ID)
-		ctr, err := sbox.GetContainer(ctx)
-		if err != nil {
-			return err
-		}
+		// box, err := mc.GetSandbox(ctx, sbox.ID)
+		// if err != nil {
+		// 	return err
+		// }
+
+		ctr := sbox.Container
 		status := []string{"dormant"}
 		hostname := ""
 		if ctr != nil {

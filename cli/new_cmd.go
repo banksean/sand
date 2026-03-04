@@ -36,10 +36,10 @@ func (c *NewCmd) Run(cctx *Context) error {
 		return err
 	}
 
-	if err := cctx.Boxer.EnsureImage(ctx, c.ImageName); err != nil {
-		slog.ErrorContext(ctx, "sber.Init", "error", err)
-		return err
-	}
+	// if err := cctx.Boxer.EnsureImage(ctx, c.ImageName); err != nil {
+	// 	slog.ErrorContext(ctx, "sber.Init", "error", err)
+	// 	return err
+	// }
 
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -85,21 +85,17 @@ func (c *NewCmd) Run(cctx *Context) error {
 
 	// At this point the sandbox and container exist and are running (created by daemon)
 	// Now attach to the shell directly (not through daemon)
-	ctr, err := sbox.GetContainer(ctx)
-	if err != nil {
-		slog.ErrorContext(ctx, "sbox.GetContainer", "error", err)
-		return err
-	}
+	ctr := sbox.Container
 
-	if ctr == nil {
-		if err := sbox.CreateContainer(ctx); err != nil {
-			return err
-		}
-		ctr, err = sbox.GetContainer(ctx)
-		if err != nil {
-			return err
-		}
-	}
+	// if ctr == nil {
+	// 	if err := sbox.CreateContainer(ctx); err != nil {
+	// 		return err
+	// 	}
+	// 	ctr, err = sbox.GetContainer(ctx)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// }
 	hostname := GetContainerHostname(ctr)
 	env := map[string]string{
 		"HOSTNAME": hostname,

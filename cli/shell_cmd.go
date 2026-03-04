@@ -32,23 +32,23 @@ func (c *ShellCmd) Run(cctx *Context) error {
 		return err
 	}
 
-	if ctr == nil { // The container doesn't exist.
-		slog.InfoContext(ctx, "main: sbox.createContainer")
-		if err := sbox.CreateContainer(ctx); err != nil {
-			slog.ErrorContext(ctx, "sbox.createContainer", "error", err)
-			return err
-		}
-		if err := cctx.Boxer.UpdateContainerID(ctx, sbox, sbox.ContainerID); err != nil {
-			slog.ErrorContext(ctx, "sber.UpdateContainerID", "error", err)
-			return err
-		}
-		// Get the container *again* and this time it should not be nil
-		ctr, err = sbox.GetContainer(ctx)
-		if err != nil || ctr == nil {
-			slog.ErrorContext(ctx, "sbox.GetContainer", "error", err, "ctr", ctr)
-			return err
-		}
-	}
+	// if ctr == nil { // The container doesn't exist.
+	// 	slog.InfoContext(ctx, "main: sbox.createContainer")
+	// 	if err := sbox.CreateContainer(ctx); err != nil {
+	// 		slog.ErrorContext(ctx, "sbox.createContainer", "error", err)
+	// 		return err
+	// 	}
+	// 	if err := cctx.Boxer.UpdateContainerID(ctx, sbox, sbox.ContainerID); err != nil {
+	// 		slog.ErrorContext(ctx, "sber.UpdateContainerID", "error", err)
+	// 		return err
+	// 	}
+	// 	// Get the container *again* and this time it should not be nil
+	// 	ctr, err = sbox.GetContainer(ctx)
+	// 	if err != nil || ctr == nil {
+	// 		slog.ErrorContext(ctx, "sbox.GetContainer", "error", err, "ctr", ctr)
+	// 		return err
+	// 	}
+	// }
 
 	slog.InfoContext(ctx, "ShellCmd.Run", "ctr", ctr)
 

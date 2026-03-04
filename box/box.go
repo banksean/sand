@@ -19,6 +19,10 @@ const (
 	DefaultImageName = "ghcr.io/banksean/sand/default:latest"
 )
 
+// This package should only be imported by code that runs inside the sandd daemon.
+// As a general rule, CLI apps should not depend on this package but rather use mux.MuxClient
+// calls to a sandd instance in order to acheive the same results.
+//
 // Box is a "sandbox" - it represents the connection between
 // - a local filesystem clone of a local dev workspace directory
 // - a local container instance (whose state is managed by a separate container service)
@@ -55,6 +59,7 @@ type Box struct {
 	SandboxContainerError string
 	// ContainerHooks run after the container has started to perform any bootstrap logic.
 	ContainerHooks []sandtypes.ContainerStartupHook `json:"-"`
+	Container      *types.Container
 	Keys           *sshimmer.Keys
 	// ContainerService is the service for interacting with containers
 	ContainerService ContainerOps `json:"-"`
@@ -181,6 +186,9 @@ func (sb *Box) executeHooks(ctx context.Context, hooks []sandtypes.ContainerStar
 }
 
 // Shell executes a command in the container. The container must be in state "running".
+// TODO: sort out how this should work after removing all the box/... dependencies from the cli.
+// sb.ContainerService should probably be nil after we remove those deps, so we need some other way
+// to do the ExecStream stuff.
 func (sb *Box) Shell(ctx context.Context, env map[string]string, shellCmd string, stdin io.Reader, stdout, stderr io.Writer) error {
 	slog.InfoContext(ctx, "Sandbox.Shell", "sandbox", sb.ID, "shellCmd", shellCmd)
 

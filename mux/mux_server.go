@@ -18,14 +18,15 @@ import (
 )
 
 const (
-	defaultSocketFile = "sandmux.sock"
-	defaultLockFile   = "sandmux.lock"
-	httpAddr          = "host.container.internal:4242"
+	defaultSocketFile     = "sandmux.sock"
+	defaultLockFile       = "sandmux.lock"
+	internalContainerHost = "host.container.internal"
 )
 
 type Mux struct {
-	AppBaseDir string
-	SocketPath string
+	AppBaseDir    string
+	SocketPath    string
+	LocalHTTPPort string
 
 	hostMCP *HostMCP
 	boxer   *box.Boxer
@@ -36,10 +37,11 @@ type Mux struct {
 	httpSrv  http.Server
 }
 
-func NewMuxServer(appBaseDir string, sber *box.Boxer) *Mux {
+func NewMuxServer(appBaseDir, httpPort string, sber *box.Boxer) *Mux {
 	return &Mux{
-		AppBaseDir: appBaseDir,
-		SocketPath: filepath.Join(appBaseDir, defaultSocketFile),
+		AppBaseDir:    appBaseDir,
+		SocketPath:    filepath.Join(appBaseDir, defaultSocketFile),
+		LocalHTTPPort: httpPort,
 		hostMCP: &HostMCP{
 			ChromeDevToolsPort: 9222,
 			ChromeUserDataDir:  "/tmp/chrome-profile-stable", // TODO: different user data dirs for different Mux PIDs?
@@ -49,34 +51,34 @@ func NewMuxServer(appBaseDir string, sber *box.Boxer) *Mux {
 }
 
 func (m *Mux) NewHTTPClient(ctx context.Context) (*MuxClient, error) {
-	var csvc box.ContainerOps
-	if m.boxer != nil {
-		csvc = m.boxer.ContainerService
-	}
+	// var csvc box.ContainerOps
+	// if m.boxer != nil {
+	// 	csvc = m.boxer.ContainerService
+	// }
 	return &MuxClient{
-		ContainerService: csvc,
-		base:             "http://" + httpAddr,
-		httpClient:       http.DefaultClient,
+		//	ContainerService: csvc,
+		base:       "http://" + internalContainerHost + ":" + m.LocalHTTPPort,
+		httpClient: http.DefaultClient,
 	}, nil
 }
 
-func (m *Mux) NewUnixSocketClient(ctx context.Context) (*MuxClient, error) {
+func NewUnixSocketClient(ctx context.Context, appBaseDir string) (*MuxClient, error) {
 	httpClient := &http.Client{
 		Timeout: 30 * time.Second,
 		Transport: &http.Transport{
 			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				return net.Dial("unix", m.SocketPath)
+				return net.Dial("unix", filepath.Join(appBaseDir, defaultSocketFile))
 			},
 		},
 	}
-	var csvc box.ContainerOps
-	if m.boxer != nil {
-		csvc = m.boxer.ContainerService
-	}
+	//	var csvc box.ContainerOps
+	// if m.boxer != nil {
+	// 	csvc = m.boxer.ContainerService
+	// }
 	return &MuxClient{
-		ContainerService: csvc,
-		base:             "http://unix",
-		httpClient:       httpClient,
+		//		ContainerService: csvc,
+		base:       "http://unix",
+		httpClient: httpClient,
 	}, nil
 }
 
@@ -229,7 +231,7 @@ func (m *Mux) serveHTTP(ctx context.Context) {
 
 	server := &http.Server{
 		Handler: mux,
-		Addr:    ":4242",
+		Addr:    ":" + m.LocalHTTPPort,
 	}
 
 	slog.InfoContext(ctx, "Mux.serveHTTP starting up")
@@ -317,17 +319,23 @@ func (m *Mux) handleGet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sbox, err := m.GetSandbox(r.Context(), args.ID)
-	sbox.Sync(r.Context())
-
 	if err != nil {
-		writeJSONError(w, err, http.StatusInternalServerError)
+		writeJSONError(w, fmt.Errorf("couldn't get sandbox ID %s", args.ID), http.StatusInternalServerError)
 		return
 	}
+	sbox.Sync(r.Context())
 
 	if sbox == nil {
 		http.Error(w, "Not found", http.StatusNotFound)
 		return
 	}
+
+	ctr, err := sbox.GetContainer(r.Context())
+	if err != nil {
+		http.Error(w, "couldn't get container", http.StatusInternalServerError)
+		return
+	}
+	sbox.Container = ctr
 	writeJSON(w, sbox)
 }
 
@@ -479,6 +487,6 @@ func (m *Mux) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*box.B
 			return nil, err
 		}
 	}
-
+	sbox.Container = ctr
 	return sbox, nil
 }

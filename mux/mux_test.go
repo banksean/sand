@@ -25,7 +25,7 @@ func TestMuxHTTPPing(t *testing.T) {
 	defer sber.Close()
 
 	// Create and start mux
-	mux := NewMuxServer(tmpDir, sber)
+	mux := NewMuxServer(tmpDir, "", sber)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -46,7 +46,7 @@ func TestMuxHTTPPing(t *testing.T) {
 	}
 
 	// Create a client
-	client, err := mux.NewUnixSocketClient(ctx)
+	client, err := NewUnixSocketClient(ctx, tmpDir)
 	if err != nil {
 		t.Fatalf("Failed to create client: %v", err)
 	}
@@ -87,7 +87,7 @@ func TestMuxHTTPList(t *testing.T) {
 	defer sber.Close()
 
 	// Create and start mux
-	mux := NewMuxServer(tmpDir, sber)
+	mux := NewMuxServer(tmpDir, "", sber)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -107,7 +107,7 @@ func TestMuxHTTPList(t *testing.T) {
 	}
 
 	// Create a client
-	client, err := mux.NewUnixSocketClient(ctx)
+	client, err := NewUnixSocketClient(ctx, tmpDir)
 	if err != nil {
 		t.Fatalf("Failed to create client: %v", err)
 	}
@@ -143,7 +143,7 @@ func TestMuxHTTPVersion(t *testing.T) {
 	defer sber.Close()
 
 	// Create and start mux
-	mux := NewMuxServer(tmpDir, sber)
+	mux := NewMuxServer(tmpDir, "", sber)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -164,7 +164,7 @@ func TestMuxHTTPVersion(t *testing.T) {
 	}
 
 	// Create a client
-	client, err := mux.NewUnixSocketClient(ctx)
+	client, err := NewUnixSocketClient(ctx, tmpDir)
 	if err != nil {
 		t.Fatalf("Failed to create client: %v", err)
 	}
@@ -198,12 +198,10 @@ func TestMuxPingNotRunning(t *testing.T) {
 	}
 	defer sber.Close()
 
-	// Create mux but don't start it
-	mux := NewMuxServer(tmpDir, sber)
 	ctx := context.Background()
 
 	// Try to create a client when daemon is not running
-	client, err := mux.NewUnixSocketClient(ctx)
+	client, err := NewUnixSocketClient(ctx, tmpDir)
 	if err != nil {
 		// Creating client itself might succeed, but ping should fail
 		t.Logf("NewClient returned error (expected): %v", err)
