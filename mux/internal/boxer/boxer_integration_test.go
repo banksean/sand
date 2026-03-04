@@ -1,4 +1,4 @@
-package box
+package boxer
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 
 	"github.com/banksean/sand/applecontainer/options"
 	"github.com/banksean/sand/applecontainer/types"
+	"github.com/banksean/sand/box"
 	"github.com/banksean/sand/cloning"
 	"github.com/banksean/sand/sandtypes"
 )
@@ -136,7 +137,7 @@ func (m *mockFileOps) WriteFile(path string, data []byte, perm os.FileMode) erro
 	return nil
 }
 
-func newTestBoxer(t *testing.T, containerOps ContainerOps, imageOps ImageOps) *Boxer {
+func newTestBoxer(t *testing.T, containerOps box.ContainerOps, imageOps box.ImageOps) *Boxer {
 	t.Helper()
 	tmpDir := path.Join(t.TempDir(), "Application Support", "Sand")
 	boxer, err := NewBoxer(tmpDir, nil)
@@ -168,8 +169,8 @@ func TestBoxer_NewSandbox_EndToEnd(t *testing.T) {
 
 	t.Run("success creates sandbox with all components", func(t *testing.T) {
 		var createdContainerID string
-		mockContainer := &mockContainerOps{
-			createFunc: func(ctx context.Context, opts *options.CreateContainer, image string, args []string) (string, error) {
+		mockContainer := &box.MockContainerOps{
+			CreateFunc: func(ctx context.Context, opts *options.CreateContainer, image string, args []string) (string, error) {
 				createdContainerID = "test-container-123"
 				return createdContainerID, nil
 			},
@@ -178,7 +179,7 @@ func TestBoxer_NewSandbox_EndToEnd(t *testing.T) {
 		mockImage := &mockImageOps{}
 
 		boxer := newTestBoxer(t, mockContainer, mockImage)
-		boxer.fileOps = NewDefaultFileOps()
+		boxer.fileOps = box.NewDefaultFileOps()
 
 		// Register a test agent in the registry
 		testPrep := &mockWorkspacePreparation{
@@ -232,7 +233,7 @@ func TestBoxer_NewSandbox_EndToEnd(t *testing.T) {
 	})
 
 	t.Run("preparation error propagates", func(t *testing.T) {
-		mockContainer := &mockContainerOps{}
+		mockContainer := &box.MockContainerOps{}
 		mockImage := &mockImageOps{}
 		boxer := newTestBoxer(t, mockContainer, mockImage)
 
@@ -307,8 +308,8 @@ func TestBoxer_Sync(t *testing.T) {
 	t.Run("syncs all sandboxes", func(t *testing.T) {
 		var inspectCalls []string
 
-		mockContainer := &mockContainerOps{
-			inspectFunc: func(ctx context.Context, containerID string) ([]types.Container, error) {
+		mockContainer := &box.MockContainerOps{
+			InspectFunc: func(ctx context.Context, containerID string) ([]types.Container, error) {
 				inspectCalls = append(inspectCalls, containerID)
 				return []types.Container{{Status: "running"}}, nil
 			},
@@ -317,7 +318,7 @@ func TestBoxer_Sync(t *testing.T) {
 
 		boxer := newTestBoxer(t, mockContainer, mockImage)
 
-		box1 := &Box{
+		box1 := &box.Box{
 			ID:             "sandbox-1",
 			ContainerID:    "container-1",
 			SandboxWorkDir: t.TempDir(),
@@ -327,7 +328,7 @@ func TestBoxer_Sync(t *testing.T) {
 			t.Fatalf("SaveSandbox() error = %v", err)
 		}
 
-		box2 := &Box{
+		box2 := &box.Box{
 			ID:             "sandbox-2",
 			ContainerID:    "container-2",
 			SandboxWorkDir: t.TempDir(),
@@ -348,8 +349,8 @@ func TestBoxer_Sync(t *testing.T) {
 	})
 
 	t.Run("handles sandbox sync errors gracefully", func(t *testing.T) {
-		mockContainer := &mockContainerOps{
-			inspectFunc: func(ctx context.Context, containerID string) ([]types.Container, error) {
+		mockContainer := &box.MockContainerOps{
+			InspectFunc: func(ctx context.Context, containerID string) ([]types.Container, error) {
 				return nil, errors.New("inspect failed")
 			},
 		}
@@ -357,7 +358,7 @@ func TestBoxer_Sync(t *testing.T) {
 
 		boxer := newTestBoxer(t, mockContainer, mockImage)
 
-		box := &Box{
+		box := &box.Box{
 			ID:             "sandbox-1",
 			ContainerID:    "bad-container",
 			SandboxWorkDir: "/nonexistent/path",
@@ -383,12 +384,12 @@ func TestBoxer_Cleanup_EndToEnd(t *testing.T) {
 		var removeRemoteCalls []struct{ dir, name string }
 		var removeAllCalls []string
 
-		mockContainer := &mockContainerOps{
-			stopFunc: func(ctx context.Context, opts *options.StopContainer, containerID string) (string, error) {
+		mockContainer := &box.MockContainerOps{
+			StopFunc: func(ctx context.Context, opts *options.StopContainer, containerID string) (string, error) {
 				stopCalls = append(stopCalls, containerID)
 				return "stopped", nil
 			},
-			deleteFunc: func(ctx context.Context, opts *options.DeleteContainer, containerID string) (string, error) {
+			DeleteFunc: func(ctx context.Context, opts *options.DeleteContainer, containerID string) (string, error) {
 				deleteCalls = append(deleteCalls, containerID)
 				return "deleted", nil
 			},
@@ -414,7 +415,7 @@ func TestBoxer_Cleanup_EndToEnd(t *testing.T) {
 		boxer.fileOps = mockFile
 
 		sandboxDir := filepath.Join(boxer.appRoot, "clones", "test-sandbox")
-		box := &Box{
+		box := &box.Box{
 			ID:             "test-sandbox",
 			ContainerID:    "test-container",
 			HostOriginDir:  "/host/origin",
@@ -464,11 +465,11 @@ func TestBoxer_Cleanup_EndToEnd(t *testing.T) {
 
 	t.Run("cleanup logs container errors but continues", func(t *testing.T) {
 		var removeAllCalled bool
-		mockContainer := &mockContainerOps{
-			stopFunc: func(ctx context.Context, opts *options.StopContainer, containerID string) (string, error) {
+		mockContainer := &box.MockContainerOps{
+			StopFunc: func(ctx context.Context, opts *options.StopContainer, containerID string) (string, error) {
 				return "", errors.New("stop failed")
 			},
-			deleteFunc: func(ctx context.Context, opts *options.DeleteContainer, containerID string) (string, error) {
+			DeleteFunc: func(ctx context.Context, opts *options.DeleteContainer, containerID string) (string, error) {
 				return "", errors.New("delete failed")
 			},
 		}
@@ -484,7 +485,7 @@ func TestBoxer_Cleanup_EndToEnd(t *testing.T) {
 		boxer := newTestBoxer(t, mockContainer, mockImage)
 		boxer.fileOps = mockFile
 
-		box := &Box{
+		box := &box.Box{
 			ID:             "test-sandbox",
 			ContainerID:    "test-container",
 			HostOriginDir:  "/host/origin",
@@ -507,7 +508,7 @@ func TestBoxer_Cleanup_EndToEnd(t *testing.T) {
 
 	t.Run("cleanup returns error on git failure", func(t *testing.T) {
 		expectedErr := errors.New("git remove remote failed")
-		mockContainer := &mockContainerOps{}
+		mockContainer := &box.MockContainerOps{}
 		mockGit := &mockGitOps{
 			removeRemoteFunc: func(ctx context.Context, dir, name string) error {
 				return expectedErr
@@ -518,7 +519,7 @@ func TestBoxer_Cleanup_EndToEnd(t *testing.T) {
 		boxer := newTestBoxer(t, mockContainer, mockImage)
 		boxer.gitOps = mockGit
 
-		box := &Box{
+		box := &box.Box{
 			ID:             "test-sandbox",
 			ContainerID:    "test-container",
 			HostOriginDir:  "/host/origin",
@@ -537,7 +538,7 @@ func TestBoxer_Cleanup_EndToEnd(t *testing.T) {
 
 	t.Run("cleanup returns error on file removal failure", func(t *testing.T) {
 		expectedErr := errors.New("remove all failed")
-		mockContainer := &mockContainerOps{}
+		mockContainer := &box.MockContainerOps{}
 		mockFile := &mockFileOps{
 			removeAllFunc: func(path string) error {
 				return expectedErr
@@ -548,7 +549,7 @@ func TestBoxer_Cleanup_EndToEnd(t *testing.T) {
 		boxer := newTestBoxer(t, mockContainer, mockImage)
 		boxer.fileOps = mockFile
 
-		box := &Box{
+		box := &box.Box{
 			ID:             "test-sandbox",
 			ContainerID:    "test-container",
 			HostOriginDir:  "/host/origin",
@@ -570,11 +571,11 @@ func TestBoxer_AttachSandbox(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("reattaches to existing sandbox", func(t *testing.T) {
-		mockContainer := &mockContainerOps{}
+		mockContainer := &box.MockContainerOps{}
 		mockImage := &mockImageOps{}
 		boxer := newTestBoxer(t, mockContainer, mockImage)
 
-		originalBox := &Box{
+		originalBox := &box.Box{
 			ID:             "existing-sandbox",
 			ContainerID:    "existing-container",
 			HostOriginDir:  "/host/origin",
@@ -607,7 +608,7 @@ func TestBoxer_AttachSandbox(t *testing.T) {
 	})
 
 	t.Run("returns error for nonexistent sandbox", func(t *testing.T) {
-		mockContainer := &mockContainerOps{}
+		mockContainer := &box.MockContainerOps{}
 		mockImage := &mockImageOps{}
 		boxer := newTestBoxer(t, mockContainer, mockImage)
 
@@ -634,7 +635,7 @@ func TestBoxer_EnsureImage(t *testing.T) {
 			},
 		}
 
-		mockContainer := &mockContainerOps{}
+		mockContainer := &box.MockContainerOps{}
 		boxer := newTestBoxer(t, mockContainer, mockImage)
 
 		err := boxer.EnsureImage(ctx, "test-image:latest")
@@ -665,7 +666,7 @@ func TestBoxer_EnsureImage(t *testing.T) {
 			},
 		}
 
-		mockContainer := &mockContainerOps{}
+		mockContainer := &box.MockContainerOps{}
 		boxer := newTestBoxer(t, mockContainer, mockImage)
 
 		err := boxer.EnsureImage(ctx, "new-image:latest")
@@ -689,7 +690,7 @@ func TestBoxer_EnsureImage(t *testing.T) {
 			},
 		}
 
-		mockContainer := &mockContainerOps{}
+		mockContainer := &box.MockContainerOps{}
 		boxer := newTestBoxer(t, mockContainer, mockImage)
 
 		err := boxer.EnsureImage(ctx, "test-image:latest")
@@ -709,7 +710,7 @@ func TestBoxer_EnsureImage(t *testing.T) {
 			},
 		}
 
-		mockContainer := &mockContainerOps{}
+		mockContainer := &box.MockContainerOps{}
 		boxer := newTestBoxer(t, mockContainer, mockImage)
 
 		err := boxer.EnsureImage(ctx, "test-image:latest")
@@ -731,7 +732,7 @@ func TestBoxer_EnsureImage(t *testing.T) {
 			},
 		}
 
-		mockContainer := &mockContainerOps{}
+		mockContainer := &box.MockContainerOps{}
 		boxer := newTestBoxer(t, mockContainer, mockImage)
 
 		err := boxer.EnsureImage(ctx, "test-image:latest")
@@ -746,8 +747,8 @@ func TestBoxer_StopContainer(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		var stopCalls []string
-		mockContainer := &mockContainerOps{
-			stopFunc: func(ctx context.Context, opts *options.StopContainer, containerID string) (string, error) {
+		mockContainer := &box.MockContainerOps{
+			StopFunc: func(ctx context.Context, opts *options.StopContainer, containerID string) (string, error) {
 				stopCalls = append(stopCalls, containerID)
 				return "stopped", nil
 			},
@@ -756,7 +757,7 @@ func TestBoxer_StopContainer(t *testing.T) {
 		mockImage := &mockImageOps{}
 		boxer := newTestBoxer(t, mockContainer, mockImage)
 
-		box := &Box{
+		box := &box.Box{
 			ID:          "test-sandbox",
 			ContainerID: "test-container",
 		}
@@ -772,11 +773,11 @@ func TestBoxer_StopContainer(t *testing.T) {
 	})
 
 	t.Run("missing container ID", func(t *testing.T) {
-		mockContainer := &mockContainerOps{}
+		mockContainer := &box.MockContainerOps{}
 		mockImage := &mockImageOps{}
 		boxer := newTestBoxer(t, mockContainer, mockImage)
 
-		box := &Box{
+		box := &box.Box{
 			ID:          "test-sandbox",
 			ContainerID: "",
 		}
@@ -792,8 +793,8 @@ func TestBoxer_StopContainer(t *testing.T) {
 
 	t.Run("stop error", func(t *testing.T) {
 		expectedErr := errors.New("stop failed")
-		mockContainer := &mockContainerOps{
-			stopFunc: func(ctx context.Context, opts *options.StopContainer, containerID string) (string, error) {
+		mockContainer := &box.MockContainerOps{
+			StopFunc: func(ctx context.Context, opts *options.StopContainer, containerID string) (string, error) {
 				return "", expectedErr
 			},
 		}
@@ -801,7 +802,7 @@ func TestBoxer_StopContainer(t *testing.T) {
 		mockImage := &mockImageOps{}
 		boxer := newTestBoxer(t, mockContainer, mockImage)
 
-		box := &Box{
+		box := &box.Box{
 			ID:          "test-sandbox",
 			ContainerID: "test-container",
 		}

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/banksean/sand/box"
+	"github.com/banksean/sand/mux/internal/boxer"
 	"github.com/banksean/sand/version"
 )
 
@@ -29,7 +30,7 @@ type Mux struct {
 	LocalHTTPPort string
 
 	hostMCP *HostMCP
-	boxer   *box.Boxer
+	boxer   *boxer.Boxer
 
 	listener net.Listener
 	lockFile *os.File
@@ -37,7 +38,7 @@ type Mux struct {
 	httpSrv  http.Server
 }
 
-func NewMuxServer(appBaseDir, httpPort string, sber *box.Boxer) *Mux {
+func NewMuxServer(appBaseDir, httpPort string) *Mux {
 	return &Mux{
 		AppBaseDir:    appBaseDir,
 		SocketPath:    filepath.Join(appBaseDir, defaultSocketFile),
@@ -46,7 +47,7 @@ func NewMuxServer(appBaseDir, httpPort string, sber *box.Boxer) *Mux {
 			ChromeDevToolsPort: 9222,
 			ChromeUserDataDir:  "/tmp/chrome-profile-stable", // TODO: different user data dirs for different Mux PIDs?
 		},
-		boxer: sber,
+		//		boxer: sber,
 	}
 }
 
@@ -119,7 +120,15 @@ func (m *Mux) startDaemonServer(ctx context.Context) error {
 
 	m.listener = listener
 	m.shutdown = make(chan any)
+	sber, err := boxer.NewBoxer(m.AppBaseDir, os.Stderr)
+	if err != nil {
+		return err
+	}
+	if err := sber.Sync(ctx); err != nil {
+		return fmt.Errorf("failed to sync Boxer db with current environment state: %v\n", err)
+	}
 
+	m.boxer = sber
 	// Handle cleanup on shutdown
 	go m.waitForShutdown(ctx)
 

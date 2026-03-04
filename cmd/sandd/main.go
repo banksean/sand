@@ -10,7 +10,6 @@ import (
 	"syscall"
 
 	"github.com/alecthomas/kong"
-	"github.com/banksean/sand/box"
 	"github.com/banksean/sand/mux"
 )
 
@@ -44,18 +43,7 @@ type DaemonCmd struct {
 // Run handles all daemon command variants
 func (c *DaemonCmd) Run(cctx *App) error {
 	ctx := cctx.Context
-	var sber *box.Boxer
-	sber, err := box.NewBoxer(c.AppBaseDir, os.Stderr)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to create Boxer: %v\n", err)
-		os.Exit(1)
-	}
-	if err := sber.Sync(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "failed to sync Boxer db with current environment state: %v\n", err)
-		os.Exit(1)
-	}
-	defer sber.Close()
-	server := mux.NewMuxServer(cctx.AppBaseDir, cctx.HTTPPort, sber)
+	server := mux.NewMuxServer(cctx.AppBaseDir, cctx.HTTPPort)
 
 	switch c.Action {
 	case "start":

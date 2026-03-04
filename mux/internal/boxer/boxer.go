@@ -1,4 +1,4 @@
-package box
+package boxer
 
 import (
 	"context"
@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/banksean/sand/box"
 	"github.com/banksean/sand/cloning"
 	"github.com/banksean/sand/db"
 	"github.com/banksean/sand/sandtypes"
@@ -25,19 +26,19 @@ import (
 // Boxer manages the lifecycle of sandboxes.
 type Boxer struct {
 	appRoot          string
-	messenger        UserMessenger
+	messenger        box.UserMessenger
 	sqlDB            *sql.DB
 	queries          *db.Queries
-	ContainerService ContainerOps
-	imageService     ImageOps
-	gitOps           GitOps
-	fileOps          FileOps
+	ContainerService box.ContainerOps
+	imageService     box.ImageOps
+	gitOps           box.GitOps
+	fileOps          box.FileOps
 	sshim            *sshimmer.LocalSSHimmer
 	agentRegistry    *cloning.AgentRegistry
 }
 
 func NewBoxer(appRoot string, terminalWriter io.Writer) (*Boxer, error) {
-	fileOps := NewDefaultFileOps()
+	fileOps := box.NewDefaultFileOps()
 	if err := fileOps.MkdirAll(appRoot, 0o750); err != nil {
 		return nil, err
 	}
@@ -54,17 +55,17 @@ func NewBoxer(appRoot string, terminalWriter io.Writer) (*Boxer, error) {
 	}
 
 	// Initialize global agent registry
-	messenger := NewTerminalMessenger(terminalWriter)
-	agentRegistry := cloning.InitializeGlobalRegistry(appRoot, messenger, NewDefaultGitOps(), fileOps)
+	messenger := box.NewTerminalMessenger(terminalWriter)
+	agentRegistry := cloning.InitializeGlobalRegistry(appRoot, messenger, box.NewDefaultGitOps(), fileOps)
 
 	sb := &Boxer{
 		appRoot:          appRoot,
-		messenger:        NewTerminalMessenger(terminalWriter),
+		messenger:        box.NewTerminalMessenger(terminalWriter),
 		sqlDB:            sqlDB,
 		queries:          db.New(sqlDB),
-		ContainerService: NewAppleContainerOps(),
-		imageService:     NewAppleImageOps(),
-		gitOps:           NewDefaultGitOps(),
+		ContainerService: box.NewAppleContainerOps(),
+		imageService:     box.NewAppleImageOps(),
+		gitOps:           box.NewDefaultGitOps(),
 		fileOps:          fileOps,
 		sshim:            sshim,
 		agentRegistry:    agentRegistry,
@@ -110,7 +111,7 @@ func (sb *Boxer) Sync(ctx context.Context) error {
 // NewSandbox creates a new sandbox based on a clone of hostWorkDir.
 // TODO: clone envFile, if it exists, into the sandbox clone so every command exec'd in that sandbox container
 // uses the same env file, even if the original .env file has changed on the host machine.
-func (sb *Boxer) NewSandbox(ctx context.Context, agentType, id, hostWorkDir, imageName, envFile string) (*Box, error) {
+func (sb *Boxer) NewSandbox(ctx context.Context, agentType, id, hostWorkDir, imageName, envFile string) (*box.Box, error) {
 	slog.InfoContext(ctx, "Boxer.NewSandbox", "hostWorkDir", hostWorkDir, "id", id, "agentType", agentType)
 
 	// Get agent configuration from registry
@@ -147,8 +148,7 @@ func (sb *Boxer) NewSandbox(ctx context.Context, agentType, id, hostWorkDir, ima
 	if err := sb.saveSSHKeys(sshKeysMountSpec.Source, keys); err != nil {
 		return nil, fmt.Errorf("saveSSHKeys: %w", err)
 	}
-	ret := &Box{
-		boxer:            sb,
+	ret := &box.Box{
 		ID:               id,
 		AgentType:        agentType,
 		HostOriginDir:    hostWorkDir,
@@ -212,7 +212,7 @@ func (sb *Boxer) saveSSHKeys(keysDir string, keys *sshimmer.Keys) error {
 }
 
 // AttachSandbox re-connects to an existing container and sandboxWorkDir instead of creating a new one.
-func (sb *Boxer) AttachSandbox(ctx context.Context, id string) (*Box, error) {
+func (sb *Boxer) AttachSandbox(ctx context.Context, id string) (*box.Box, error) {
 	slog.InfoContext(ctx, "Boxer.AttachSandbox", "id", id)
 	ret, err := sb.loadSandbox(ctx, id)
 	if err != nil {
@@ -221,13 +221,13 @@ func (sb *Boxer) AttachSandbox(ctx context.Context, id string) (*Box, error) {
 	return ret, nil
 }
 
-func (sb *Boxer) List(ctx context.Context) ([]Box, error) {
+func (sb *Boxer) List(ctx context.Context) ([]box.Box, error) {
 	sandboxes, err := sb.queries.ListSandboxes(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list sandboxes: %w", err)
 	}
 
-	boxes := make([]Box, len(sandboxes))
+	boxes := make([]box.Box, len(sandboxes))
 	for i, s := range sandboxes {
 		box := sb.sandboxFromDB(&s)
 		boxes[i] = *box
@@ -235,7 +235,7 @@ func (sb *Boxer) List(ctx context.Context) ([]Box, error) {
 	return boxes, nil
 }
 
-func (sb *Boxer) Get(ctx context.Context, id string) (*Box, error) {
+func (sb *Boxer) Get(ctx context.Context, id string) (*box.Box, error) {
 	slog.InfoContext(ctx, "Boxer.Get", "id", id)
 	sandbox, err := sb.queries.GetSandbox(ctx, id)
 	if err == sql.ErrNoRows {
@@ -250,7 +250,7 @@ func (sb *Boxer) Get(ctx context.Context, id string) (*Box, error) {
 	return box, nil
 }
 
-func (sb *Boxer) Cleanup(ctx context.Context, sbox *Box) error {
+func (sb *Boxer) Cleanup(ctx context.Context, sbox *box.Box) error {
 	slog.InfoContext(ctx, "Boxer.Cleanup", "id", sbox.ID)
 
 	out, err := sb.ContainerService.Stop(ctx, nil, sbox.ContainerID)
@@ -281,12 +281,12 @@ func (sb *Boxer) Cleanup(ctx context.Context, sbox *Box) error {
 
 // Helper functions for converting between Box and db.Sandbox
 
-func (sb *Boxer) sandboxFromDB(s *db.Sandbox) *Box {
+func (sb *Boxer) sandboxFromDB(s *db.Sandbox) *box.Box {
 	agentType := fromNullString(s.AgentType)
 	if agentType == "" {
 		agentType = "default" // Fallback for old sandboxes
 	}
-	return &Box{
+	return &box.Box{
 		ID:               s.ID,
 		AgentType:        agentType,
 		ContainerID:      fromNullString(s.ContainerID),
@@ -360,7 +360,7 @@ func (sb *Boxer) pullImage(ctx context.Context, imageName string) error {
 }
 
 // SaveSandbox persists the Sandbox to the database.
-func (sb *Boxer) SaveSandbox(ctx context.Context, sbox *Box) error {
+func (sb *Boxer) SaveSandbox(ctx context.Context, sbox *box.Box) error {
 	slog.InfoContext(ctx, "Boxer.SaveSandbox", "id", sbox.ID)
 
 	err := sb.queries.UpsertSandbox(ctx, db.UpsertSandboxParams{
@@ -380,7 +380,7 @@ func (sb *Boxer) SaveSandbox(ctx context.Context, sbox *Box) error {
 }
 
 // UpdateContainerID updates the ContainerID field of a sandbox and persists it.
-func (sb *Boxer) UpdateContainerID(ctx context.Context, sbox *Box, containerID string) error {
+func (sb *Boxer) UpdateContainerID(ctx context.Context, sbox *box.Box, containerID string) error {
 	sbox.ContainerID = containerID
 	err := sb.queries.UpdateContainerID(ctx, db.UpdateContainerIDParams{
 		ContainerID: toNullString(containerID),
@@ -393,7 +393,7 @@ func (sb *Boxer) UpdateContainerID(ctx context.Context, sbox *Box, containerID s
 }
 
 // StopContainer stops a sandbox's container without deleting it.
-func (sb *Boxer) StopContainer(ctx context.Context, sbox *Box) error {
+func (sb *Boxer) StopContainer(ctx context.Context, sbox *box.Box) error {
 	if sbox.ContainerID == "" {
 		return fmt.Errorf("sandbox %s has no container ID", sbox.ID)
 	}
@@ -408,7 +408,7 @@ func (sb *Boxer) StopContainer(ctx context.Context, sbox *Box) error {
 }
 
 // loadSandbox reads a Sandbox from the database.
-func (sb *Boxer) loadSandbox(ctx context.Context, id string) (*Box, error) {
+func (sb *Boxer) loadSandbox(ctx context.Context, id string) (*box.Box, error) {
 	slog.InfoContext(ctx, "Boxer.loadSandbox", "id", id)
 
 	sandbox, err := sb.queries.GetSandbox(ctx, id)
@@ -424,7 +424,7 @@ func (sb *Boxer) loadSandbox(ctx context.Context, id string) (*Box, error) {
 	return box, nil
 }
 
-func writeKeyToFile(fileOps FileOps, keyBytes []byte, filename string) error {
+func writeKeyToFile(fileOps box.FileOps, keyBytes []byte, filename string) error {
 	err := fileOps.WriteFile(filename, keyBytes, 0o600)
 	return err
 }
@@ -448,7 +448,7 @@ func encodePrivateKeyToPEM(privateKey ed25519.PrivateKey) []byte {
 	return pem.EncodeToMemory(pkBytes)
 }
 
-func createKeyPairIfMissing(fileOps FileOps, idPath string) (ssh.PublicKey, error) {
+func createKeyPairIfMissing(fileOps box.FileOps, idPath string) (ssh.PublicKey, error) {
 	if _, err := fileOps.Stat(idPath); err == nil {
 		return nil, nil
 	}

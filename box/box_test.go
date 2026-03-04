@@ -22,65 +22,6 @@ func init() {
 	cloning.InitializeGlobalRegistry("/tmp/sand-test", messenger, NewDefaultGitOps(), NewDefaultFileOps())
 }
 
-type mockContainerOps struct {
-	createFunc     func(ctx context.Context, opts *options.CreateContainer, image string, args []string) (string, error)
-	startFunc      func(ctx context.Context, opts *options.StartContainer, containerID string) (string, error)
-	stopFunc       func(ctx context.Context, opts *options.StopContainer, containerID string) (string, error)
-	deleteFunc     func(ctx context.Context, opts *options.DeleteContainer, containerID string) (string, error)
-	execFunc       func(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, args ...string) (string, error)
-	execStreamFunc func(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, stdin io.Reader, stdout, stderr io.Writer) (func() error, error)
-	inspectFunc    func(ctx context.Context, containerID string) ([]types.Container, error)
-}
-
-func (m *mockContainerOps) Create(ctx context.Context, opts *options.CreateContainer, image string, args []string) (string, error) {
-	if m.createFunc != nil {
-		return m.createFunc(ctx, opts, image, args)
-	}
-	return "mock-container-id", nil
-}
-
-func (m *mockContainerOps) Start(ctx context.Context, opts *options.StartContainer, containerID string) (string, error) {
-	if m.startFunc != nil {
-		return m.startFunc(ctx, opts, containerID)
-	}
-	return "started", nil
-}
-
-func (m *mockContainerOps) Stop(ctx context.Context, opts *options.StopContainer, containerID string) (string, error) {
-	if m.stopFunc != nil {
-		return m.stopFunc(ctx, opts, containerID)
-	}
-	return "stopped", nil
-}
-
-func (m *mockContainerOps) Delete(ctx context.Context, opts *options.DeleteContainer, containerID string) (string, error) {
-	if m.deleteFunc != nil {
-		return m.deleteFunc(ctx, opts, containerID)
-	}
-	return "deleted", nil
-}
-
-func (m *mockContainerOps) Exec(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, args ...string) (string, error) {
-	if m.execFunc != nil {
-		return m.execFunc(ctx, opts, containerID, cmd, env, args...)
-	}
-	return "exec output", nil
-}
-
-func (m *mockContainerOps) ExecStream(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, stdin io.Reader, stdout, stderr io.Writer) (func() error, error) {
-	if m.execStreamFunc != nil {
-		return m.execStreamFunc(ctx, opts, containerID, cmd, env, stdin, stdout, stderr)
-	}
-	return func() error { return nil }, nil
-}
-
-func (m *mockContainerOps) Inspect(ctx context.Context, containerID string) ([]types.Container, error) {
-	if m.inspectFunc != nil {
-		return m.inspectFunc(ctx, containerID)
-	}
-	return []types.Container{{Status: "running"}}, nil
-}
-
 func TestBox_EffectiveMounts(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -191,8 +132,8 @@ func TestBox_GetContainer(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("container found", func(t *testing.T) {
-		mockOps := &mockContainerOps{
-			inspectFunc: func(ctx context.Context, containerID string) ([]types.Container, error) {
+		mockOps := &MockContainerOps{
+			InspectFunc: func(ctx context.Context, containerID string) ([]types.Container, error) {
 				if containerID != "test-container-123" {
 					t.Errorf("Expected containerID test-container-123, got %s", containerID)
 				}
@@ -221,8 +162,8 @@ func TestBox_GetContainer(t *testing.T) {
 	})
 
 	t.Run("container not found", func(t *testing.T) {
-		mockOps := &mockContainerOps{
-			inspectFunc: func(ctx context.Context, containerID string) ([]types.Container, error) {
+		mockOps := &MockContainerOps{
+			InspectFunc: func(ctx context.Context, containerID string) ([]types.Container, error) {
 				return []types.Container{}, nil
 			},
 		}
@@ -246,8 +187,8 @@ func TestBox_GetContainer(t *testing.T) {
 
 	t.Run("inspect error", func(t *testing.T) {
 		expectedErr := errors.New("inspect failed")
-		mockOps := &mockContainerOps{
-			inspectFunc: func(ctx context.Context, containerID string) ([]types.Container, error) {
+		mockOps := &MockContainerOps{
+			InspectFunc: func(ctx context.Context, containerID string) ([]types.Container, error) {
 				return nil, expectedErr
 			},
 		}
@@ -274,8 +215,8 @@ func TestBox_Sync(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("work dir missing", func(t *testing.T) {
-		mockOps := &mockContainerOps{
-			inspectFunc: func(ctx context.Context, containerID string) ([]types.Container, error) {
+		mockOps := &MockContainerOps{
+			InspectFunc: func(ctx context.Context, containerID string) ([]types.Container, error) {
 				return []types.Container{{Status: "running"}}, nil
 			},
 		}
@@ -300,8 +241,8 @@ func TestBox_Sync(t *testing.T) {
 	t.Run("container missing", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
-		mockOps := &mockContainerOps{
-			inspectFunc: func(ctx context.Context, containerID string) ([]types.Container, error) {
+		mockOps := &MockContainerOps{
+			InspectFunc: func(ctx context.Context, containerID string) ([]types.Container, error) {
 				return nil, errors.New("container not found")
 			},
 		}
@@ -326,8 +267,8 @@ func TestBox_Sync(t *testing.T) {
 	t.Run("both present", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
-		mockOps := &mockContainerOps{
-			inspectFunc: func(ctx context.Context, containerID string) ([]types.Container, error) {
+		mockOps := &MockContainerOps{
+			InspectFunc: func(ctx context.Context, containerID string) ([]types.Container, error) {
 				return []types.Container{{Status: "running"}}, nil
 			},
 		}
@@ -361,8 +302,8 @@ func TestBox_CreateContainer(t *testing.T) {
 		var capturedOpts *options.CreateContainer
 		var capturedImage string
 
-		mockOps := &mockContainerOps{
-			createFunc: func(ctx context.Context, opts *options.CreateContainer, image string, args []string) (string, error) {
+		mockOps := &MockContainerOps{
+			CreateFunc: func(ctx context.Context, opts *options.CreateContainer, image string, args []string) (string, error) {
 				capturedOpts = opts
 				capturedImage = image
 				return "new-container-id", nil
@@ -415,8 +356,8 @@ func TestBox_CreateContainer(t *testing.T) {
 	t.Run("success with custom mounts", func(t *testing.T) {
 		var capturedOpts *options.CreateContainer
 
-		mockOps := &mockContainerOps{
-			createFunc: func(ctx context.Context, opts *options.CreateContainer, image string, args []string) (string, error) {
+		mockOps := &MockContainerOps{
+			CreateFunc: func(ctx context.Context, opts *options.CreateContainer, image string, args []string) (string, error) {
 				capturedOpts = opts
 				return "custom-container-id", nil
 			},
@@ -450,8 +391,8 @@ func TestBox_CreateContainer(t *testing.T) {
 
 	t.Run("create error", func(t *testing.T) {
 		expectedErr := errors.New("create failed")
-		mockOps := &mockContainerOps{
-			createFunc: func(ctx context.Context, opts *options.CreateContainer, image string, args []string) (string, error) {
+		mockOps := &MockContainerOps{
+			CreateFunc: func(ctx context.Context, opts *options.CreateContainer, image string, args []string) (string, error) {
 				return "", expectedErr
 			},
 		}
@@ -478,8 +419,8 @@ func TestBox_StartContainer(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("success without hooks", func(t *testing.T) {
-		mockOps := &mockContainerOps{
-			startFunc: func(ctx context.Context, opts *options.StartContainer, containerID string) (string, error) {
+		mockOps := &MockContainerOps{
+			StartFunc: func(ctx context.Context, opts *options.StartContainer, containerID string) (string, error) {
 				if containerID != "test-container" {
 					t.Errorf("Expected containerID 'test-container', got %s", containerID)
 				}
@@ -506,7 +447,7 @@ func TestBox_executeHooks(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("success with hooks", func(t *testing.T) {
-		mockOps := &mockContainerOps{}
+		mockOps := &MockContainerOps{}
 
 		hookCalled := 0
 		hook := sandtypes.NewContainerStartupHook("test-hook", func(ctx context.Context, box sandtypes.BoxOperations) error {
@@ -534,7 +475,7 @@ func TestBox_executeHooks(t *testing.T) {
 	})
 
 	t.Run("multiple hooks success", func(t *testing.T) {
-		mockOps := &mockContainerOps{}
+		mockOps := &MockContainerOps{}
 
 		callOrder := []string{}
 		hook1 := sandtypes.NewContainerStartupHook("hook1", func(ctx context.Context, box sandtypes.BoxOperations) error {
@@ -570,8 +511,8 @@ func TestBox_executeHooks(t *testing.T) {
 
 	t.Run("start error", func(t *testing.T) {
 		expectedErr := errors.New("start failed")
-		mockOps := &mockContainerOps{
-			startFunc: func(ctx context.Context, opts *options.StartContainer, containerID string) (string, error) {
+		mockOps := &MockContainerOps{
+			StartFunc: func(ctx context.Context, opts *options.StartContainer, containerID string) (string, error) {
 				return "", expectedErr
 			},
 		}
@@ -594,7 +535,7 @@ func TestBox_executeHooks(t *testing.T) {
 	})
 
 	t.Run("hook error", func(t *testing.T) {
-		mockOps := &mockContainerOps{}
+		mockOps := &MockContainerOps{}
 
 		expectedErr := errors.New("hook failed")
 		hook := sandtypes.NewContainerStartupHook("failing-hook", func(ctx context.Context, box sandtypes.BoxOperations) error {
@@ -620,7 +561,7 @@ func TestBox_executeHooks(t *testing.T) {
 	})
 
 	t.Run("multiple hook failures", func(t *testing.T) {
-		mockOps := &mockContainerOps{}
+		mockOps := &MockContainerOps{}
 
 		hook1 := sandtypes.NewContainerStartupHook("hook1", func(ctx context.Context, box sandtypes.BoxOperations) error {
 			return errors.New("error1")
@@ -653,7 +594,7 @@ func TestBox_executeHooks(t *testing.T) {
 	})
 
 	t.Run("partial hook failure", func(t *testing.T) {
-		mockOps := &mockContainerOps{}
+		mockOps := &MockContainerOps{}
 
 		successCount := 0
 		hook1 := sandtypes.NewContainerStartupHook("hook1", func(ctx context.Context, box sandtypes.BoxOperations) error {
@@ -700,8 +641,8 @@ func TestBox_Shell(t *testing.T) {
 		var capturedStdin io.Reader
 		var capturedStdout, capturedStderr io.Writer
 
-		mockOps := &mockContainerOps{
-			execStreamFunc: func(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, stdin io.Reader, stdout, stderr io.Writer) (func() error, error) {
+		mockOps := &MockContainerOps{
+			ExecStreamFunc: func(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, stdin io.Reader, stdout, stderr io.Writer) (func() error, error) {
 				capturedCmd = cmd
 				capturedStdin = stdin
 				capturedStdout = stdout
@@ -765,8 +706,8 @@ func TestBox_Shell(t *testing.T) {
 
 	t.Run("execstream error", func(t *testing.T) {
 		expectedErr := errors.New("exec stream failed")
-		mockOps := &mockContainerOps{
-			execStreamFunc: func(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, stdin io.Reader, stdout, stderr io.Writer) (func() error, error) {
+		mockOps := &MockContainerOps{
+			ExecStreamFunc: func(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, stdin io.Reader, stdout, stderr io.Writer) (func() error, error) {
 				return nil, expectedErr
 			},
 		}
@@ -790,8 +731,8 @@ func TestBox_Shell(t *testing.T) {
 
 	t.Run("wait error", func(t *testing.T) {
 		expectedErr := errors.New("wait failed")
-		mockOps := &mockContainerOps{
-			execStreamFunc: func(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, stdin io.Reader, stdout, stderr io.Writer) (func() error, error) {
+		mockOps := &MockContainerOps{
+			ExecStreamFunc: func(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, stdin io.Reader, stdout, stderr io.Writer) (func() error, error) {
 				return func() error {
 					return expectedErr
 				}, nil
@@ -823,8 +764,8 @@ func TestBox_Exec(t *testing.T) {
 		var capturedCmd string
 		var capturedArgs []string
 
-		mockOps := &mockContainerOps{
-			execFunc: func(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, args ...string) (string, error) {
+		mockOps := &MockContainerOps{
+			ExecFunc: func(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, args ...string) (string, error) {
 				capturedCmd = cmd
 				capturedArgs = args
 
@@ -876,8 +817,8 @@ func TestBox_Exec(t *testing.T) {
 
 	t.Run("exec error", func(t *testing.T) {
 		expectedErr := errors.New("exec failed")
-		mockOps := &mockContainerOps{
-			execFunc: func(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, args ...string) (string, error) {
+		mockOps := &MockContainerOps{
+			ExecFunc: func(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, args ...string) (string, error) {
 				return "", expectedErr
 			},
 		}
@@ -902,8 +843,8 @@ func TestBox_Exec(t *testing.T) {
 	t.Run("with envfile", func(t *testing.T) {
 		var capturedOpts *options.ExecContainer
 
-		mockOps := &mockContainerOps{
-			execFunc: func(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, args ...string) (string, error) {
+		mockOps := &MockContainerOps{
+			ExecFunc: func(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, args ...string) (string, error) {
 				capturedOpts = opts
 				return "output", nil
 			},

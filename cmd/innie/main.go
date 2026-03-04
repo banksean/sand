@@ -10,7 +10,6 @@ import (
 	"syscall"
 
 	"github.com/alecthomas/kong"
-	"github.com/banksean/sand/box"
 	"github.com/banksean/sand/cli"
 	"github.com/banksean/sand/mux"
 	kongcompletion "github.com/jotaen/kong-completion"
@@ -91,20 +90,20 @@ func (c *CLI) initSlog() {
 const description = `The "innie" side of the "sand" command, communicates with the host OS to execute sandbox related commands.`
 
 type sandboxNamePredictor struct {
-	sber *box.Boxer
 }
 
 // Predict implements [complete.Predictor].
 func (s *sandboxNamePredictor) Predict(args complete.Args) []string {
-	sandboxes, err := s.sber.List(context.Background())
-	if err != nil {
-		return nil
-	}
-	ret := []string{}
-	for _, box := range sandboxes {
-		ret = append(ret, box.ID)
-	}
-	return ret
+	// sandboxes, err := s.sber.List(context.Background())
+	// if err != nil {
+	// 	return nil
+	// }
+	// ret := []string{}
+	// for _, box := range sandboxes {
+	// 	ret = append(ret, box.ID)
+	// }
+	// return ret
+	return nil
 }
 
 func main() {
@@ -121,19 +120,8 @@ func main() {
 
 	appBaseDir := "/outie" // connect to the sandd process running on the host via socket.
 
-	var sber *box.Boxer
-	sber, err := box.NewBoxer(appBaseDir, os.Stderr)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to create Boxer: %v\n", err)
-		os.Exit(1)
-	}
-	if err := sber.Sync(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "failed to sync Boxer db with current environment state: %v\n", err)
-		os.Exit(1)
-	}
-	defer sber.Close()
 	kongApp := kong.Must(&app)
-	namePredictor := &sandboxNamePredictor{sber: sber}
+	namePredictor := &sandboxNamePredictor{}
 	kongcompletion.Register(kongApp, kongcompletion.WithPredictor("sandbox-name", namePredictor))
 	kongCtx := kong.Parse(&app,
 		kong.Configuration(kong.JSON, ".sand.json", "~/.sand.json"),
@@ -152,7 +140,7 @@ func main() {
 	if app.AppBaseDir == "" {
 		app.AppBaseDir = appBaseDir
 	}
-	server := mux.NewMuxServer(appBaseDir, app.HTTPPort, sber)
+	server := mux.NewMuxServer(appBaseDir, app.HTTPPort)
 
 	mc, err := server.NewHTTPClient(ctx)
 	if err != nil {

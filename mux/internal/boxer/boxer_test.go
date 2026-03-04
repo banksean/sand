@@ -1,10 +1,12 @@
-package box
+package boxer
 
 import (
 	"context"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/banksean/sand/box"
 )
 
 func TestSaveSandbox(t *testing.T) {
@@ -23,7 +25,7 @@ func TestSaveSandbox(t *testing.T) {
 	defer sb.Close()
 
 	// Create a test sandbox
-	testSandbox := &Box{
+	testSandbox := &box.Box{
 		ID:             "test-id",
 		ContainerID:    "container-123",
 		HostOriginDir:  "/tmp/host-origin",
@@ -114,7 +116,7 @@ func TestLoadSandbox(t *testing.T) {
 	}
 
 	// Create a test sandbox struct
-	testSandbox := &Box{
+	testSandbox := &box.Box{
 		ID:             testID,
 		ContainerID:    "container-456",
 		HostOriginDir:  "/tmp/host-load",
@@ -212,7 +214,7 @@ func TestListSandboxes(t *testing.T) {
 		sandboxDir := filepath.Join(tmpDir, "test-"+string(rune('0'+i)))
 		os.MkdirAll(sandboxDir, 0o755)
 
-		testBox := &Box{
+		testBox := &box.Box{
 			ID:             "test-" + string(rune('0'+i)),
 			ContainerID:    "container-" + string(rune('0'+i)),
 			HostOriginDir:  "/tmp/host",
@@ -252,7 +254,7 @@ func TestUpdateContainerID(t *testing.T) {
 	sandboxDir := filepath.Join(tmpDir, "test-update")
 	os.MkdirAll(sandboxDir, 0o755)
 
-	testBox := &Box{
+	testBox := &box.Box{
 		ID:             "test-update",
 		ContainerID:    "original-container",
 		HostOriginDir:  "/tmp/host",
@@ -305,7 +307,7 @@ func TestGetSandboxesByImage(t *testing.T) {
 			imageName = "image-b"
 		}
 
-		testBox := &Box{
+		testBox := &box.Box{
 			ID:             "test-" + string(rune('0'+i)),
 			ContainerID:    "container-" + string(rune('0'+i)),
 			HostOriginDir:  "/tmp/host",

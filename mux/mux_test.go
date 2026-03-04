@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/banksean/sand/box"
+	"github.com/banksean/sand/mux/internal/boxer"
 )
 
 func TestMuxHTTPPing(t *testing.T) {
@@ -18,14 +18,8 @@ func TestMuxHTTPPing(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	sber, err := box.NewBoxer(tmpDir, nil)
-	if err != nil {
-		t.Fatalf("Failed to create Boxer: %v", err)
-	}
-	defer sber.Close()
-
 	// Create and start mux
-	mux := NewMuxServer(tmpDir, "", sber)
+	mux := NewMuxServer(tmpDir, "")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -80,14 +74,8 @@ func TestMuxHTTPList(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	sber, err := box.NewBoxer(tmpDir, nil)
-	if err != nil {
-		t.Fatalf("Failed to create Boxer: %v", err)
-	}
-	defer sber.Close()
-
 	// Create and start mux
-	mux := NewMuxServer(tmpDir, "", sber)
+	mux := NewMuxServer(tmpDir, "")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -136,14 +124,8 @@ func TestMuxHTTPVersion(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	sber, err := box.NewBoxer(tmpDir, nil)
-	if err != nil {
-		t.Fatalf("Failed to create Boxer: %v", err)
-	}
-	defer sber.Close()
-
 	// Create and start mux
-	mux := NewMuxServer(tmpDir, "", sber)
+	mux := NewMuxServer(tmpDir, "")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -192,7 +174,7 @@ func TestMuxPingNotRunning(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	sber, err := box.NewBoxer(tmpDir, nil)
+	sber, err := boxer.NewBoxer(tmpDir, nil)
 	if err != nil {
 		t.Fatalf("Failed to create Boxer: %v", err)
 	}

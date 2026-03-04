@@ -30,7 +30,6 @@ const (
 // At startup, the sand.Mux server will synchronize its internal database with the current
 // observed state of the local filesystem clone root and the local container service.
 type Box struct {
-	boxer *Boxer
 	// ID is an opaque identifier for the sandbox
 	ID string
 	// AgentType identifies which agent configuration to use (default, claude, opencode)
