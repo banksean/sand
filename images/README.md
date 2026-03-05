@@ -9,7 +9,6 @@
 - sshd_config
 
 Images that extend `base` (`ghcr.io/banksean/sand/base:latest`):
-- **min** — bare sandbox, no agent installed
 - **claude** — adds Claude Code
 - **codex** — adds OpenAI Codex
 - **default** — adds Claude Code, Go toolchain, github-cli, and sketch
