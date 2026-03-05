@@ -27,6 +27,10 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+const (
+	containerGetErrorMsg = "[error getting]"
+)
+
 // Boxer manages the lifecycle of sandboxes.
 type Boxer struct {
 	appRoot          string
@@ -58,7 +62,6 @@ func NewBoxer(appRoot string, terminalWriter io.Writer) (*Boxer, error) {
 		return nil, fmt.Errorf("failed to create LocalSSHimmer: %w", err)
 	}
 
-	// Initialize global agent registry
 	messenger := box.NewTerminalMessenger(terminalWriter)
 	agentRegistry := cloning.InitializeGlobalRegistry(appRoot, messenger, box.NewDefaultGitOps(), fileOps)
 
@@ -162,7 +165,6 @@ func (sb *Boxer) NewSandbox(ctx context.Context, agentType, id, hostWorkDir, ima
 		Mounts:         append(mounts, sshKeysMountSpec),
 		ContainerHooks: hooks,
 		Keys:           keys,
-		//ContainerService: sb.ContainerService,
 	}
 
 	if err := sb.SaveSandbox(ctx, ret); err != nil {
@@ -234,6 +236,11 @@ func (sb *Boxer) List(ctx context.Context) ([]box.Box, error) {
 	boxes := make([]box.Box, len(sandboxes))
 	for i, s := range sandboxes {
 		box := sb.sandboxFromDB(&s)
+		ctr, err := sb.GetContainer(ctx, box.ContainerID)
+		if err != nil {
+			box.SandboxContainerError = containerGetErrorMsg
+		}
+		box.Container = ctr
 		boxes[i] = *box
 	}
 	return boxes, nil
@@ -250,6 +257,11 @@ func (sb *Boxer) Get(ctx context.Context, id string) (*box.Box, error) {
 	}
 
 	box := sb.sandboxFromDB(&sandbox)
+	ctr, err := sb.GetContainer(ctx, box.ContainerID)
+	if err != nil {
+		box.SandboxContainerError = containerGetErrorMsg
+	}
+	box.Container = ctr
 	slog.InfoContext(ctx, "Boxer.Get", "ret", box)
 	return box, nil
 }
@@ -299,7 +311,6 @@ func (sb *Boxer) sandboxFromDB(s *db.Sandbox) *box.Box {
 		ImageName:      s.ImageName,
 		DNSDomain:      fromNullString(s.DnsDomain),
 		EnvFile:        fromNullString(s.EnvFile),
-		//ContainerService: sb.ContainerService,
 	}
 }
 
@@ -326,8 +337,6 @@ func (sb *Boxer) getContainer(ctx context.Context, containerID string) (interfac
 	return &ctrs[0], nil
 }
 
-// TODO: Move this code to mux/internal/boxer#Boxer.GetContainer and change callers of this function to use mux.MuxClient instead
-// GetContainer returns the container.
 func (sb *Boxer) GetContainer(ctx context.Context, containerID string) (*types.Container, error) {
 	ctr, err := sb.getContainer(ctx, containerID)
 	if err != nil {
@@ -578,6 +587,7 @@ func encodePrivateKeyToPEM(privateKey ed25519.PrivateKey) []byte {
 	return pem.EncodeToMemory(pkBytes)
 }
 
+// TODO: Remove this
 func createKeyPairIfMissing(fileOps box.FileOps, idPath string) (ssh.PublicKey, error) {
 	if _, err := fileOps.Stat(idPath); err == nil {
 		return nil, nil

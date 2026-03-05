@@ -17,16 +17,14 @@ const (
 	DefaultImageName = "ghcr.io/banksean/sand/default:latest"
 )
 
-// This package should only be imported by code that runs inside the sandd daemon.
-// As a general rule, CLI apps should not depend on this package but rather use mux.MuxClient
-// calls to a sandd instance in order to acheive the same results.
-//
 // Box is a "sandbox" - it represents the connection between
 // - a local filesystem clone of a local dev workspace directory
 // - a local container instance (whose state is managed by a separate container service)
 //
 // At startup, the sand.Mux server will synchronize its internal database with the current
 // observed state of the local filesystem clone root and the local container service.
+//
+// TODO: Move this struct to package sandtypes, but make sure all the instances of it are treated as dumb structs first.
 type Box struct {
 	// ID is an opaque identifier for the sandbox
 	ID string
@@ -58,174 +56,31 @@ type Box struct {
 	ContainerHooks []sandtypes.ContainerStartupHook `json:"-"`
 	Container      *types.Container
 	Keys           *sshimmer.Keys
-	// ContainerService is the service for interacting with containers
-	//ContainerService ContainerOps `json:"-"`
 }
 
-// func (sb *Box) getContainer(ctx context.Context) (interface{}, error) {
-// 	ctrs, err := sb.ContainerService.Inspect(ctx, sb.ContainerID)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("failed to inspect container for sandbox %s: %w", sb.ID, err)
-// 	}
-// 	if len(ctrs) == 0 {
-// 		return nil, nil
-// 	}
-
-// 	return &ctrs[0], nil
-// }
-
-// // TODO: Move this code to mux/internal/boxer#Boxer.GetContainer and change callers of this function to use mux.MuxClient instead
-// // GetContainer returns the container.
-// func (sb *Box) GetContainer(ctx context.Context) (*types.Container, error) {
-// 	ctr, err := sb.getContainer(ctx)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	if ctr == nil {
-// 		return nil, nil
-// 	}
-// 	return ctr.(*types.Container), nil
-// }
-
+// Sync checks to see if the SandboxWorkDir exists, an d sets SandboxWorkDirError if not.
+// TODO: Move this method to something in mux/internal/boxer/...
 func (sb *Box) Sync(ctx context.Context) error {
 	fi, err := os.Stat(sb.SandboxWorkDir)
 	if err != nil || !fi.IsDir() {
 		slog.ErrorContext(ctx, "Boxer.Sync SandboxWorkDir stat", "sandbox", sb.ID, "workdir", sb.SandboxWorkDir, "fi", fi, "error", err)
 		sb.SandboxWorkDirError = "NO CLONE DIR"
 	}
-	// // What *should* this code do, if we get an error while trying to inspect the sandbox's container state?
-	// _, err = sb.GetContainer(ctx)
-	// if err != nil {
-	// 	slog.ErrorContext(ctx, "Boxer.Sync GetContainer", "sandbox", sb.ID, "error", err)
-	// 	sb.SandboxContainerError = fmt.Sprintf("NO CONTAINER: %q", err.Error())
-	// }
+
 	return nil
 }
 
-// CreateContainer creates a new container instance. The container image must exist.
-// func (sb *Box) CreateContainer(ctx context.Context) error {
-// 	mounts := sb.EffectiveMounts()
-// 	mountOpts := make([]string, 0, len(mounts))
-// 	for _, m := range mounts {
-// 		mountOpts = append(mountOpts, m.String())
-// 	}
-
-// 	containerID, err := sb.ContainerService.Create(ctx,
-// 		&options.CreateContainer{
-// 			ProcessOptions: options.ProcessOptions{
-// 				Interactive: true,
-// 				TTY:         true,
-// 				EnvFile:     sb.EnvFile,
-// 			},
-// 			ManagementOptions: options.ManagementOptions{
-// 				// TODO: Try to name the container after the sandbox, and handle collisions
-// 				// if the name is already in use (e.g. append random chars to sb.ID).
-// 				Name:      sb.ID,
-// 				SSH:       true,
-// 				DNSDomain: sb.DNSDomain,
-// 				Remove:    false,
-// 				Mount:     mountOpts,
-// 			},
-// 		},
-// 		sb.ImageName, nil)
-// 	if err != nil {
-// 		slog.ErrorContext(ctx, "createContainer", "sandbox", sb.ID, "imageName", sb.ImageName, "error", err, "output", containerID)
-// 		return fmt.Errorf("failed to create container for sandbox %s: %w", sb.ID, err)
-// 	}
-// 	sb.ContainerID = containerID
-// 	return nil
-// }
-
-// // StartContainer starts a container instance. The container must exist, and it should not be in the "running" state.
-// func (sb *Box) StartContainer(ctx context.Context) error {
-// 	// Reconstruct runtime configuration from agent type
-// 	pathRegistry := cloning.NewStandardPathRegistry(sb.SandboxWorkDir)
-// 	artifacts := cloning.CloneArtifacts{
-// 		SandboxWorkDir: sb.SandboxWorkDir,
-// 		PathRegistry:   pathRegistry,
-// 	}
-
-// 	// Get agent config to reconstruct hooks
-// 	agentConfig := cloning.GetGlobalRegistry().Get(sb.AgentType)
-// 	hooks := agentConfig.Configuration.GetStartupHooks(artifacts)
-
-// 	slog.InfoContext(ctx, "Box.StartContainer", "box", *sb, "ContainerHooks", len(hooks))
-// 	if err := sb.startContainerProcess(ctx); err != nil {
-// 		return err
-// 	}
-// 	return sb.executeHooks(ctx, hooks)
-// }
-
-// func (sb *Box) startContainerProcess(ctx context.Context) error {
-// 	slog.InfoContext(ctx, "Box.startContainerProcess", "sandbox", sb.ID, "containerID", sb.ContainerID)
-// 	output, err := sb.ContainerService.Start(ctx, nil, sb.ContainerID)
-// 	if err != nil {
-// 		slog.ErrorContext(ctx, "startContainerProcess", "sandbox", sb.ID, "containerID", sb.ContainerID, "error", err, "output", output)
-// 		return fmt.Errorf("failed to start container for sandbox %s: %w", sb.ID, err)
-// 	}
-// 	slog.InfoContext(ctx, "Box.startContainerProcess succeeded", "sandbox", sb.ID, "output", output)
-// 	return nil
-// }
-
-// func (sb *Box) executeHooks(ctx context.Context, hooks []sandtypes.ContainerStartupHook) error {
-// 	slog.InfoContext(ctx, "Box.executeHooks", "hookCount", len(hooks))
-// 	var hookErrs []error
-// 	for _, hook := range hooks {
-// 		slog.InfoContext(ctx, "Box.executeHooks running hook", "hook", hook.Name())
-// 		if err := hook.OnStart(ctx, sb); err != nil {
-// 			slog.ErrorContext(ctx, "Box.executeHooks hook error", "hook", hook.Name(), "error", err)
-// 			hookErrs = append(hookErrs, fmt.Errorf("%s: %w", hook.Name(), err))
-// 		}
-// 	}
-// 	if len(hookErrs) > 0 {
-// 		return errors.Join(hookErrs...)
-// 	}
-// 	return nil
-// }
-
 // Shell executes a command in the container. The container must be in state "running".
-// TODO: sort out how this should work after removing all the box/... dependencies from the cli.
-// sb.ContainerService should probably be nil after we remove those deps, so we need some other way
-// to do the ExecStream stuff.
+// TODO: Remove this method.
 func (sb *Box) Shell(ctx context.Context, env map[string]string, shellCmd string, stdin io.Reader, stdout, stderr io.Writer) error {
 	slog.InfoContext(ctx, "Sandbox.Shell", "sandbox", sb.ID, "shellCmd", shellCmd)
-	return fmt.Errorf("Box.Shell not implemented")
-	// wait, err := sb.ContainerService.ExecStream(ctx,
-	// 	&options.ExecContainer{
-	// 		ProcessOptions: options.ProcessOptions{
-	// 			Interactive: true,
-	// 			TTY:         true,
-	// 			WorkDir:     "/app",
-	// 			Env:         env,
-	// 			EnvFile:     sb.EnvFile,
-	// 		},
-	// 	}, sb.ContainerID, shellCmd, os.Environ(), stdin, stdout, stderr)
-	// if err != nil {
-	// 	slog.ErrorContext(ctx, "shell: containerService.ExecStream", "sandbox", sb.ID, "error", err)
-	// 	return fmt.Errorf("failed to execute shell command for sandbox %s: %w", sb.ID, err)
-	// }
-
-	// return wait()
+	return fmt.Errorf("Don't call Box.Shell. Use e.g. applecontainer.NewContainerService().ExecStream(...) on the host OS")
 }
 
 // Exec executes a command in the container. The container must be in state "running".
+// TODO: Remove this method.
 func (sb *Box) Exec(ctx context.Context, shellCmd string, args ...string) (string, error) {
-	return "", fmt.Errorf("Box.Exec not implemented")
-	// output, err := sb.ContainerService.Exec(ctx,
-	// 	&options.ExecContainer{
-	// 		ProcessOptions: options.ProcessOptions{
-	// 			Interactive: false,
-	// 			TTY:         true,
-	// 			WorkDir:     "/app",
-	// 			EnvFile:     sb.EnvFile,
-	// 		},
-	// 	}, sb.ContainerID, shellCmd, os.Environ(), args...)
-	// if err != nil {
-	// 	slog.ErrorContext(ctx, "shell: containerService.Exec", "sandbox", sb.ID, "error", err, "output", output)
-	// 	return output, fmt.Errorf("failed to execute command for sandbox %s: %w", sb.ID, err)
-	// }
-
-	// return output, nil
+	return "", fmt.Errorf("Don't call Box.Exec. Use e.g. applecontainer.NewContainerService().Exec(...) on the host OS.  ")
 }
 
 func (sb *Box) EffectiveMounts() []sandtypes.MountSpec {

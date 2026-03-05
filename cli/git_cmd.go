@@ -32,7 +32,7 @@ type DiffCmd struct {
 	SandboxID          string `arg:"" completion-predictor:"sandbox-name" help:"ID of the sandbox to diff against"`
 }
 
-func (c *DiffCmd) Run(cctx *Context) error {
+func (c *DiffCmd) Run(cctx *CLIContext) error {
 	ctx := cctx.Context
 	mc := cctx.MuxClient
 
@@ -189,7 +189,7 @@ func (c *DiffCmd) cleanupTempCommit(ctx context.Context, sandboxWorkDir string) 
 	return nil
 }
 
-func (c *StatusCmd) Run(cctx *Context) error {
+func (c *StatusCmd) Run(cctx *CLIContext) error {
 	ctx := cctx.Context
 	mc := cctx.MuxClient
 
@@ -243,7 +243,7 @@ func (c *StatusCmd) Run(cctx *Context) error {
 	return nil
 }
 
-func (c *LogCmd) Run(cctx *Context) error {
+func (c *LogCmd) Run(cctx *CLIContext) error {
 	ctx := cctx.Context
 	mc := cctx.MuxClient
 

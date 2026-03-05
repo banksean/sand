@@ -15,7 +15,7 @@ type ShellCmd struct {
 	ID      string `arg:"" completion-predictor:"sandbox-name" optional:"" help:"ID of the sandbox to create, or re-attach to"`
 }
 
-func (c *ShellCmd) Run(cctx *Context) error {
+func (c *ShellCmd) Run(cctx *CLIContext) error {
 	ctx := cctx.Context
 	mc := cctx.MuxClient
 
@@ -36,7 +36,9 @@ func (c *ShellCmd) Run(cctx *Context) error {
 	fmt.Printf("container hostname: %s\n", hostname)
 
 	slog.InfoContext(ctx, "main: sbox.shell starting")
-	var containerSvc box.ContainerOps = box.NewAppleContainerOps()
+	// This will only work on the *host* OS, since it makes calls to apple's container service.
+	// TODO: Sort out how "new" and "shell" should work when invoked inside a container.
+	containerSvc := box.NewAppleContainerOps()
 	wait, err := containerSvc.ExecStream(ctx,
 		&options.ExecContainer{
 			ProcessOptions: options.ProcessOptions{

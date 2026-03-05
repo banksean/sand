@@ -11,7 +11,7 @@ type StopCmd struct {
 	All bool   `short:"a" help:"stop all sandboxes"`
 }
 
-func (c *StopCmd) Run(cctx *Context) error {
+func (c *StopCmd) Run(cctx *CLIContext) error {
 	ctx := cctx.Context
 	mc := cctx.MuxClient
 

@@ -11,7 +11,7 @@ type RmCmd struct {
 	All bool   `short:"a" help:"remove all sandboxes"`
 }
 
-func (c *RmCmd) Run(cctx *Context) error {
+func (c *RmCmd) Run(cctx *CLIContext) error {
 	ctx := cctx.Context
 	mc := cctx.MuxClient
 

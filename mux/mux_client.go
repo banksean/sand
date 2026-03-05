@@ -17,10 +17,33 @@ import (
 	"github.com/banksean/sand/version"
 )
 
+// MuxClient invokes methods on the sandd process via IPC, whether the client is running on the same MacOS
+// instance as sandd, or if it is running inside a linux container.
 type MuxClient struct {
-	//ContainerService box.ContainerOps
 	base       string
 	httpClient *http.Client
+}
+
+func NewHTTPClient(ctx context.Context, containerHostPort string) (*MuxClient, error) {
+	return &MuxClient{
+		base:       "http://" + internalContainerHost + ":" + containerHostPort,
+		httpClient: http.DefaultClient,
+	}, nil
+}
+
+func NewUnixSocketClient(ctx context.Context, appBaseDir string) (*MuxClient, error) {
+	httpClient := &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				return net.Dial("unix", filepath.Join(appBaseDir, defaultSocketFile))
+			},
+		},
+	}
+	return &MuxClient{
+		base:       "http://unix",
+		httpClient: httpClient,
+	}, nil
 }
 
 func (m *MuxClient) doRequest(ctx context.Context, method, path string, body any, result any) error {
@@ -106,9 +129,6 @@ func (m *MuxClient) ListSandboxes(ctx context.Context) ([]box.Box, error) {
 	if err := m.doRequest(ctx, http.MethodGet, "/list", nil, &boxes); err != nil {
 		return nil, err
 	}
-	// for i := range boxes {
-	// 	boxes[i].ContainerService = m.ContainerService
-	// }
 	return boxes, nil
 }
 
@@ -120,7 +140,6 @@ func (m *MuxClient) GetSandbox(ctx context.Context, id string) (*box.Box, error)
 		}
 		return nil, err
 	}
-	// box.ContainerService = m.ContainerService
 	return &box, nil
 }
 
@@ -137,7 +156,6 @@ func (m *MuxClient) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (
 	if err := m.doRequest(ctx, http.MethodPost, "/create", opts, &box); err != nil {
 		return nil, err
 	}
-	// box.ContainerService = m.ContainerService
 	return &box, nil
 }
 
@@ -163,6 +181,11 @@ func (m *Mux) RemoveSandbox(ctx context.Context, id string) error {
 	return m.boxer.Cleanup(ctx, sbox)
 }
 
+// EnsureDaemon attempts to verify that the sandd daemon is running, and if not,
+// starting a new instance of it.
+//
+// TODO: Make sure this doesn't get called from an innie.  That probably means moving
+// this function to somewhere under mux/internal/...
 func EnsureDaemon(ctx context.Context, appBaseDir, logFile string) error {
 	socketPath := filepath.Join(appBaseDir, defaultSocketFile)
 	slog.Info("EnsureDaemon", "socketPath", socketPath)

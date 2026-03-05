@@ -20,7 +20,7 @@ type ExecCmd struct {
 	Arg          []string `arg:"" passthrough:"" help:"command args to exec in the container"`
 }
 
-func (c *ExecCmd) Run(cctx *Context) error {
+func (c *ExecCmd) Run(cctx *CLIContext) error {
 	ctx := cctx.Context
 	mc := cctx.MuxClient
 

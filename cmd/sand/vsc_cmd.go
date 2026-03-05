@@ -9,13 +9,13 @@ import (
 	"github.com/banksean/sand/cli"
 )
 
-// TODO: make 'sand vsc' work from inside the container, so that it tells the outie to run `code --remote=` etc on the host
+// TODO: make 'sand vsc' work from inside the container as well, so that it tells the outie to run `code --remote=` etc on the host
 
 type VscCmd struct {
 	ID string `arg:"" completion-predictor:"sandbox-name" help:"ID of the sandbox to vsc remote to"`
 }
 
-func (c *VscCmd) Run(cctx *cli.Context) error {
+func (c *VscCmd) Run(cctx *cli.CLIContext) error {
 	ctx := cctx.Context
 	mc := cctx.MuxClient
 
@@ -28,11 +28,6 @@ func (c *VscCmd) Run(cctx *cli.Context) error {
 	}
 
 	ctr := sbox.Container
-	// ctr, err := sbox.GetContainer(ctx)
-	// if err != nil {
-	// 	slog.ErrorContext(ctx, "sbox.GetContainer", "error", err)
-	// 	return err
-	// }
 
 	if ctr == nil || ctr.Status != "running" {
 		return fmt.Errorf("cannot connect to sandbox %q becacuse it is not currently running", c.ID)

@@ -11,7 +11,7 @@ import (
 type DocCmd struct{}
 
 func (c *DocCmd) Run() error {
-	var cli CLI
+	var cli Outie
 
 	ctx := kong.Parse(&cli, kong.Help(MarkdownHelpPrinter), kong.Description(description))
 	return ctx.PrintUsage(false)

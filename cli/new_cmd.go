@@ -27,7 +27,7 @@ type NewCmd struct {
 	ID           string `arg:"" optional:"" help:"ID of the sandbox to create, or re-attach to"`
 }
 
-func (c *NewCmd) Run(cctx *Context) error {
+func (c *NewCmd) Run(cctx *CLIContext) error {
 	ctx := cctx.Context
 	mc := cctx.MuxClient
 
@@ -37,21 +37,17 @@ func (c *NewCmd) Run(cctx *Context) error {
 		return err
 	}
 
-	// if err := cctx.Boxer.EnsureImage(ctx, c.ImageName); err != nil {
-	// 	slog.ErrorContext(ctx, "sber.Init", "error", err)
-	// 	return err
-	// }
-
 	cwd, err := os.Getwd()
 	if err != nil {
 		slog.ErrorContext(ctx, "os.Getwd", "error", err)
 		return err
 	}
+
 	if c.CloneFromDir == "" {
 		c.CloneFromDir = cwd
 	}
 
-	// Generate ID if not provided
+	// Generate a new ID if one was not provided
 	if c.ID == "" {
 		seed := time.Now().UTC().UnixNano()
 		nameGenerator := namegenerator.NewNameGenerator(seed)
@@ -62,7 +58,8 @@ func (c *NewCmd) Run(cctx *Context) error {
 		c.EnvFile = filepath.Join(c.CloneFromDir, c.EnvFile)
 	}
 
-	// Try to get existing sandbox
+	// Try to get existing sandbox.
+	// TODO: Consider returning an error here, rather than trying to "do the right thing" despite what the user asked for.
 	sbox, err := mc.GetSandbox(ctx, c.ID)
 	if sbox == nil || err != nil {
 		// Sandbox doesn't exist, create it via daemon
@@ -88,15 +85,10 @@ func (c *NewCmd) Run(cctx *Context) error {
 	// Now attach to the shell directly (not through daemon)
 	ctr := sbox.Container
 
-	// if ctr == nil {
-	// 	if err := sbox.CreateContainer(ctx); err != nil {
-	// 		return err
-	// 	}
-	// 	ctr, err = sbox.GetContainer(ctx)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// }
+	if ctr == nil {
+		return fmt.Errorf("sandbox's container field is nil")
+	}
+
 	hostname := GetContainerHostname(ctr)
 	env := map[string]string{
 		"HOSTNAME": hostname,
@@ -133,7 +125,10 @@ func (c *NewCmd) Run(cctx *Context) error {
 		}
 
 	}
-	var containerSvc box.ContainerOps = box.NewAppleContainerOps()
+
+	// This will only work on the *host* OS, since it makes calls to apple's container service.
+	// TODO: Sort out how "new" and "shell" should work when invoked inside a container.
+	containerSvc := box.NewAppleContainerOps()
 	wait, err := containerSvc.ExecStream(ctx,
 		&options.ExecContainer{
 			ProcessOptions: options.ProcessOptions{
@@ -148,15 +143,12 @@ func (c *NewCmd) Run(cctx *Context) error {
 		slog.ErrorContext(ctx, "shell: containerService.ExecStream", "sandbox", sbox.ID, "error", err)
 		return fmt.Errorf("failed to execute shell command for sandbox %s: %w", sbox.ID, err)
 	}
-
-	// Shell attachment is direct, not through daemon
 	if err := wait(); err != nil {
 		slog.ErrorContext(ctx, "sbox.new", "error", err)
 	}
 
 	if c.Rm {
 		slog.InfoContext(ctx, "sbox.new finished, cleaning up...")
-		// Use daemon for cleanup
 		if err := mc.RemoveSandbox(ctx, sbox.ID); err != nil {
 			slog.ErrorContext(ctx, "RemoveSandbox", "error", err)
 		}

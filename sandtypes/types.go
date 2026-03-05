@@ -10,12 +10,6 @@ import (
 	"github.com/banksean/sand/applecontainer/types"
 )
 
-// // BoxOperations defines the operations that container startup hooks can perform on a sandbox.
-// type BoxOperations interface {
-// 	Exec(ctx context.Context, shellCmd string, args ...string) (string, error)
-// 	GetContainer(ctx context.Context) (*types.Container, error)
-// }
-
 // MountSpec describes a bind mount that should be attached to a container.
 type MountSpec struct {
 	Source   string
@@ -36,28 +30,28 @@ func (m MountSpec) String() string {
 	return strings.Join(parts, ",")
 }
 
-type StartupHook func(ctx context.Context, shellCmd string, args ...string) (string, error)
+type StartupHookFunc func(ctx context.Context, shellCmd string, args ...string) (string, error)
 
 // ContainerStartupHook allows callers to inject container startup customisation.
 type ContainerStartupHook interface {
 	Name() string
-	OnStart(ctx context.Context, ctr *types.Container, exec StartupHook) error
+	OnStart(ctx context.Context, ctr *types.Container, exec StartupHookFunc) error
 }
 
 type containerHook struct {
 	name string
-	fn   func(ctx context.Context, ctr *types.Container, exec StartupHook) error
+	fn   func(ctx context.Context, ctr *types.Container, exec StartupHookFunc) error
 }
 
 func (h containerHook) Name() string {
 	return h.name
 }
 
-func (h containerHook) OnStart(ctx context.Context, ctr *types.Container, exec StartupHook) error {
+func (h containerHook) OnStart(ctx context.Context, ctr *types.Container, exec StartupHookFunc) error {
 	return h.fn(ctx, ctr, exec)
 }
 
 // NewContainerStartupHook helps callers construct hook instances without exporting internals.
-func NewContainerStartupHook(name string, fn func(ctx context.Context, ctr *types.Container, exec StartupHook) error) ContainerStartupHook {
+func NewContainerStartupHook(name string, fn func(ctx context.Context, ctr *types.Container, exec StartupHookFunc) error) ContainerStartupHook {
 	return containerHook{name: name, fn: fn}
 }

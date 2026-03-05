@@ -10,7 +10,7 @@ import (
 
 type LsCmd struct{}
 
-func (c *LsCmd) Run(cctx *Context) error {
+func (c *LsCmd) Run(cctx *CLIContext) error {
 	ctx := cctx.Context
 	mc := cctx.MuxClient
 
@@ -27,11 +27,6 @@ func (c *LsCmd) Run(cctx *Context) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "SANDBOX ID\tSTATUS\tCONTAINER ID\tHOSTNAME\tORIGIN DIR\tIMAGE NAME\t")
 	for _, sbox := range list {
-		// box, err := mc.GetSandbox(ctx, sbox.ID)
-		// if err != nil {
-		// 	return err
-		// }
-
 		ctr := sbox.Container
 		status := []string{"dormant"}
 		hostname := ""

@@ -15,7 +15,7 @@ import (
 	kongcompletion "github.com/jotaen/kong-completion"
 )
 
-type CLI struct {
+type Outie struct {
 	LogFile    string                    `default:"/tmp/sand/log" placeholder:"<log-file-path>" help:"location of log file (leave empty for a random tmp/ path)"`
 	LogLevel   string                    `default:"info" placeholder:"<debug|info|warn|error>" help:"the logging level (debug, info, warn, error)"`
 	AppBaseDir string                    `default:"" placeholder:"<app-base-dir>" help:"root dir to store sandbox clones of working directories. Leave unset to use '~/Library/Application Support/Sand'"`
@@ -33,7 +33,7 @@ type CLI struct {
 	Vsc     VscCmd         `cmd:"" help:"launch a vscode remote window connected to the sandbox's container"`
 }
 
-func (c *CLI) initSlog() {
+func (c *Outie) initSlog() {
 	var level slog.Level
 	switch c.LogLevel {
 	case "debug":
@@ -97,7 +97,7 @@ func appHomeDir() (string, error) {
 }
 
 func main() {
-	var app CLI
+	var app Outie
 	app.initSlog()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -151,7 +151,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Failed to create sandmux client, error: %v\n", err)
 		os.Exit(1)
 	}
-	err = kongCtx.Run(&cli.Context{
+	err = kongCtx.Run(&cli.CLIContext{
 		MuxClient:  mc,
 		Context:    ctx,
 		AppBaseDir: appBaseDir,

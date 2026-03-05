@@ -48,7 +48,7 @@ func (c *BaseContainerConfiguration) GetStartupHooks(artifacts CloneArtifacts) [
 
 // defaultContainerHook sets up dotfiles and SSH in the container.
 func (c *BaseContainerConfiguration) defaultContainerHook() sandtypes.ContainerStartupHook {
-	return sandtypes.NewContainerStartupHook("default container bootstrap", func(ctx context.Context, ctr *types.Container, exec sandtypes.StartupHook) error {
+	return sandtypes.NewContainerStartupHook("default container bootstrap", func(ctx context.Context, ctr *types.Container, exec sandtypes.StartupHookFunc) error {
 		var errs []error
 
 		// Copy dotfiles to /root
@@ -92,9 +92,9 @@ func (c *BaseContainerConfiguration) defaultContainerHook() sandtypes.ContainerS
 	})
 }
 
-// githubSSHContainerHook verifies that SSH authentication to GitHub works.
+// githubSSHContainerHook verifies that SSH authentication to GitHub works (via ssh-agent calling back out to the host OS).
 func (c *BaseContainerConfiguration) githubSSHContainerHook() sandtypes.ContainerStartupHook {
-	return sandtypes.NewContainerStartupHook("git ssh auth check", func(ctx context.Context, ctr *types.Container, exec sandtypes.StartupHook) error {
+	return sandtypes.NewContainerStartupHook("git ssh auth check", func(ctx context.Context, ctr *types.Container, exec sandtypes.StartupHookFunc) error {
 		var errs []error
 
 		sshOut, err := exec(ctx, "/usr/bin/ssh", "-T", "git@github.com")

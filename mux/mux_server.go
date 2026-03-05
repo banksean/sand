@@ -45,38 +45,9 @@ func NewMuxServer(appBaseDir, httpPort string) *Mux {
 		LocalHTTPPort: httpPort,
 		hostMCP: &HostMCP{
 			ChromeDevToolsPort: 9222,
-			ChromeUserDataDir:  "/tmp/chrome-profile-stable", // TODO: different user data dirs for different Mux PIDs?
-		},
-		//		boxer: sber,
-	}
-}
-
-func NewHTTPClient(ctx context.Context, containerHostPort string) (*MuxClient, error) {
-	return &MuxClient{
-		//	ContainerService: csvc,
-		base:       "http://" + internalContainerHost + ":" + containerHostPort,
-		httpClient: http.DefaultClient,
-	}, nil
-}
-
-func NewUnixSocketClient(ctx context.Context, appBaseDir string) (*MuxClient, error) {
-	httpClient := &http.Client{
-		Timeout: 30 * time.Second,
-		Transport: &http.Transport{
-			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				return net.Dial("unix", filepath.Join(appBaseDir, defaultSocketFile))
-			},
+			ChromeUserDataDir:  "/tmp/chrome-profile-stable",
 		},
 	}
-	//	var csvc box.ContainerOps
-	// if m.boxer != nil {
-	// 	csvc = m.boxer.ContainerService
-	// }
-	return &MuxClient{
-		//		ContainerService: csvc,
-		base:       "http://unix",
-		httpClient: httpClient,
-	}, nil
 }
 
 // ServeUnixSocket serves the unix domain socket that sandmux clients (the host-side CLI, e.g.) connect to.
@@ -107,13 +78,6 @@ func (m *Mux) startDaemonServer(ctx context.Context) error {
 		return err
 	}
 
-	if false { // TODO: do we need this?
-		// Set permissions so CLI can connect
-		if err := os.Chmod(m.SocketPath, 0o600); err != nil {
-			return err
-		}
-	}
-
 	m.listener = listener
 	m.shutdown = make(chan any)
 	sber, err := boxer.NewBoxer(m.AppBaseDir, os.Stderr)
@@ -129,10 +93,10 @@ func (m *Mux) startDaemonServer(ctx context.Context) error {
 	go m.waitForShutdown(ctx)
 
 	// Start unix domain socket HTTP server
-	go m.serveUnixSocketHTTP(ctx)
+	go m.serveUnixSocket(ctx)
 
 	// Start net HTTP server
-	go m.serveHTTP(ctx)
+	go m.serveTCPSocket(ctx)
 
 	go func() {
 		if err := m.hostMCP.StartHostServices(ctx); err != nil {
@@ -190,7 +154,7 @@ func (m *Mux) Shutdown(ctx context.Context) {
 	close(m.shutdown)
 }
 
-func (m *Mux) serveUnixSocketHTTP(ctx context.Context) {
+func (m *Mux) serveUnixSocket(ctx context.Context) {
 	mux := http.NewServeMux()
 
 	// Register handlers
@@ -221,7 +185,12 @@ func slogHandler(ctx context.Context, h http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func (m *Mux) serveHTTP(ctx context.Context) {
+// TODO: auth these requests and limit access only to known sandbox instances.
+// We're already creating keypairs for ssh, so we can probably use those to
+// make sure that we know which sandbox container is making the call.
+// As-is, sandboxes make requests to mutate eachother, as can anything else that
+// has access to port 4242 on the host OS.
+func (m *Mux) serveTCPSocket(ctx context.Context) {
 	mux := http.NewServeMux()
 
 	// Register handlers
@@ -408,7 +377,7 @@ func (m *Mux) handleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sbox, err := m.CreateSandbox(r.Context(), opts)
+	sbox, err := m.createSandbox(r.Context(), opts)
 	if err != nil {
 		writeJSONError(w, err, http.StatusInternalServerError)
 		return
@@ -456,8 +425,8 @@ type CreateSandboxOpts struct {
 	Cloner       string `json:"cloner,omitempty"`
 }
 
-// CreateSandbox creates a new sandbox and starts its container.
-func (m *Mux) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*box.Box, error) {
+// createSandbox creates a new sandbox and starts its container.
+func (m *Mux) createSandbox(ctx context.Context, opts CreateSandboxOpts) (*box.Box, error) {
 	agentType := opts.Cloner
 	if agentType == "" {
 		agentType = "default"

@@ -8,7 +8,7 @@ import (
 
 type VersionCmd struct{}
 
-func (c *VersionCmd) Run(cctx *Context) error {
+func (c *VersionCmd) Run(cctx *CLIContext) error {
 	versionInfo := version.Get()
 	fmt.Printf("Git Repository: %s\n", versionInfo.GitRepo)
 	fmt.Printf("Git Branch: %s\n", versionInfo.GitBranch)

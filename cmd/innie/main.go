@@ -17,17 +17,29 @@ import (
 
 // Cross-compile this for use inside the linux container like so:
 // CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o ./bin/innie ./cmd/innie
+//
+// The host OS must already have dns entry in the apple container system, created like so:
+// `sudo container system dns create host.container.internal`
+//
+// TODO: Evaluate SSH local port forwarding (make `sand exec` use `ssh -L 4242:4242 ...`) to
+// replace the above "container system dns create ..." approach. SSH would require less apple container
+// service futzing, but is probably more prone to losing connections as ssh port forward is known
+// to do.
+
+// type Innie is the container-side cli to work with sand.  It shares a lot of the same subcommands
+// with the host-side sand command, but they work slightly differently when invoked in a container.
+// Notably, the innie connects to the sandd process running on the host via HTTP+JSON over TCP,
+// rather than via unix domain socket.
 
 // TODO:
+// - Automate the ./bin/innie cross-compilation step.  Might have to bake this into the default image or some such.
 // - figure out where the innie should send its logs to, if anywhere.
-// - sort out the protocol for connecting the innie running in the container to the sandd process running on the host.
-//.  - placeholder: mount host:.../Application Support/Sand as sandbox:/outie and try to have innie open /outie/sandmux.sock to talk to sandd on the host.
-// - sort out how `sand new` should work when you run it from inside a sandbox container.
-//.  - A: should it create a clone from the sandbox's original parent, or
-//   - B: should it create a new clone using this sandbox's current state as its parent
-//.  - if we want it to do the latter, can appple's container system clone the entire sandbox container (including FS changes, running processes etc)?
+// - sort out how `sand new` should work when you run it from inside a sandbox container. There are multiple ways to do this. Some options:
+//.  - A: should it create a clone from the innie's sandbox's original parent, or
+//   - B: should it create a new clone using the innie's sandbox's current state as its parent
+//.  - if we want it to do the latter, do we know if apple's container system can clone the entire sandbox container (including FS changes, running processes etc)?
 
-type CLI struct {
+type Innie struct {
 	LogFile    string                    `default:"/tmp/sand/log" placeholder:"<log-file-path>" help:"location of log file (leave empty for a random tmp/ path)"`
 	LogLevel   string                    `default:"info" placeholder:"<debug|info|warn|error>" help:"the logging level (debug, info, warn, error)"`
 	AppBaseDir string                    `default:"" placeholder:"<app-base-dir>" help:"root dir to store sandbox clones of working directories. Leave unset to use '~/Library/Application Support/Sand'"`
@@ -42,10 +54,10 @@ type CLI struct {
 	Stop    cli.StopCmd    `cmd:"" help:"stop sandbox container"`
 	Git     cli.GitCmd     `cmd:"" help:"git operations with sandboxes"`
 	Version cli.VersionCmd `cmd:"" help:"print version infomation about this command"`
-	// TODO: VSCCmd should work here too. "%sandbox-vm> sand vsc" should open a vsc remote window on the host OS.
+	// TODO: VSCCmd should work here too. "%sandbox-vm> sand vsc" should open a vsc remote window on the host OS as though the user had run "%host> sand vsc <this sandbox name>".
 }
 
-func (c *CLI) initSlog() {
+func (c *Innie) initSlog() {
 	var level slog.Level
 	switch c.LogLevel {
 	case "debug":
@@ -89,7 +101,7 @@ func (c *CLI) initSlog() {
 const description = `The "innie" side of the "sand" command, communicates with the host OS to execute sandbox related commands.`
 
 func main() {
-	var app CLI
+	var app Innie
 	app.initSlog()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -129,7 +141,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Failed to create sandmux client, error: %v\n", err)
 		os.Exit(1)
 	}
-	err = kongCtx.Run(&cli.Context{
+	err = kongCtx.Run(&cli.CLIContext{
 		MuxClient:  mc,
 		Context:    ctx,
 		AppBaseDir: appBaseDir,
