@@ -19,12 +19,12 @@ import (
 // CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o ./bin/innie ./cmd/innie
 //
 // The host OS must already have dns entry in the apple container system, created like so:
-// `sudo container system dns create host.container.internal`
+// `sudo container system dns create host.container.internal --localhost 203.0.113.113`
 //
 // TODO: Evaluate SSH local port forwarding (make `sand exec` use `ssh -L 4242:4242 ...`) to
 // replace the above "container system dns create ..." approach. SSH would require less apple container
 // service futzing, but is probably more prone to losing connections as ssh port forward is known
-// to do.
+// to do. It also wouldn't have to use a host name from innie - just localhost:4242.
 
 // type Innie is the container-side cli to work with sand.  It shares a lot of the same subcommands
 // with the host-side sand command, but they work slightly differently when invoked in a container.

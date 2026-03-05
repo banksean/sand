@@ -1,7 +1,7 @@
 
 # opencode's installation instructions don't produce a working installation on alpine,
 # since it relies on glibc. Use frolvlad/alpine-glibc as the base image to provide glibc.
-FROM frolvlad/alpine-glibc
+FROM docker.io/frolvlad/alpine-glibc
 
 ARG TZ
 ENV TZ="$TZ"

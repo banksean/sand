@@ -16,9 +16,9 @@ Include /etc/ssh/sshd_config.d/*.conf
 #ListenAddress 0.0.0.0
 #ListenAddress ::
 
-#HostKey /etc/ssh/ssh_host_rsa_key
-#HostKey /etc/ssh/ssh_host_ecdsa_key
-#HostKey /etc/ssh/ssh_host_ed25519_key
+HostKey /etc/ssh/ssh_host_key
+HostCertificate /etc/ssh/ssh_host_key.pub-cert
+TrustedUserCAKeys /etc/ssh/user_ca.pub
 
 # Ciphers and keying
 #RekeyLimit default none

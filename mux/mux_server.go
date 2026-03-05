@@ -297,6 +297,10 @@ func (m *Mux) handleGet(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, fmt.Errorf("couldn't get sandbox ID %s", args.ID), http.StatusInternalServerError)
 		return
 	}
+	if sbox == nil {
+		writeJSONError(w, fmt.Errorf("got a nil sandbox for ID %s", args.ID), http.StatusInternalServerError)
+		return
+	}
 	sbox.Sync(r.Context())
 
 	if sbox == nil {
