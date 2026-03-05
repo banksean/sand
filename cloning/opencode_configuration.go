@@ -58,7 +58,6 @@ func (c *OpenCodeContainerConfiguration) copyOpenCodeBinaryHook() sandtypes.Cont
 // openSSHTunnelHook sets up an SSH reverse tunnel for Chrome DevTools MCP.
 func (c *OpenCodeContainerConfiguration) openSSHTunnelHook() sandtypes.ContainerStartupHook {
 	return sandtypes.NewContainerStartupHook("open remote ssh tunnel for chrome-devtools mcp", func(ctx context.Context, ctr *types.Container, execFn sandtypes.StartupHookFunc) error {
-
 		hostname := getContainerHostname(ctr)
 
 		// No context - this should run in a separate process that outlives the cloner startup hook invocations.
