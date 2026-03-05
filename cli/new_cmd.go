@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/banksean/sand/applecontainer/options"
 	"github.com/banksean/sand/box"
 	"github.com/banksean/sand/mux"
 	"github.com/banksean/sand/sshimmer"
@@ -132,8 +133,24 @@ func (c *NewCmd) Run(cctx *Context) error {
 		}
 
 	}
+	var containerSvc box.ContainerOps = box.NewAppleContainerOps()
+	wait, err := containerSvc.ExecStream(ctx,
+		&options.ExecContainer{
+			ProcessOptions: options.ProcessOptions{
+				Interactive: true,
+				TTY:         true,
+				WorkDir:     "/app",
+				Env:         env,
+				EnvFile:     sbox.EnvFile,
+			},
+		}, sbox.ContainerID, c.Shell, os.Environ(), os.Stdin, os.Stdout, os.Stderr)
+	if err != nil {
+		slog.ErrorContext(ctx, "shell: containerService.ExecStream", "sandbox", sbox.ID, "error", err)
+		return fmt.Errorf("failed to execute shell command for sandbox %s: %w", sbox.ID, err)
+	}
+
 	// Shell attachment is direct, not through daemon
-	if err := sbox.Shell(ctx, env, c.Shell, os.Stdin, os.Stdout, os.Stderr); err != nil {
+	if err := wait(); err != nil {
 		slog.ErrorContext(ctx, "sbox.new", "error", err)
 	}
 

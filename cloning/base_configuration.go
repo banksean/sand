@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/banksean/sand/applecontainer/types"
 	"github.com/banksean/sand/sandtypes"
 )
 
@@ -47,25 +48,25 @@ func (c *BaseContainerConfiguration) GetStartupHooks(artifacts CloneArtifacts) [
 
 // defaultContainerHook sets up dotfiles and SSH in the container.
 func (c *BaseContainerConfiguration) defaultContainerHook() sandtypes.ContainerStartupHook {
-	return sandtypes.NewContainerStartupHook("default container bootstrap", func(ctx context.Context, box sandtypes.BoxOperations) error {
+	return sandtypes.NewContainerStartupHook("default container bootstrap", func(ctx context.Context, ctr *types.Container, exec sandtypes.StartupHook) error {
 		var errs []error
 
 		// Copy dotfiles to /root
-		cpOut, err := box.Exec(ctx, "cp", "-r", "/dotfiles/.", "/root/.")
+		cpOut, err := exec(ctx, "cp", "-r", "/dotfiles/.", "/root/.")
 		if err != nil {
 			slog.ErrorContext(ctx, "defaultContainerHook copying dotfiles", "error", err, "cpOut", cpOut)
 			errs = append(errs, fmt.Errorf("copy dotfiles: %w", err))
 		}
 
 		// Copy SSH keys to /etc/ssh
-		sshkeysOut, err := box.Exec(ctx, "cp", "-r", "/sshkeys/.", "/etc/ssh/.")
+		sshkeysOut, err := exec(ctx, "cp", "-r", "/sshkeys/.", "/etc/ssh/.")
 		if err != nil {
 			slog.ErrorContext(ctx, "defaultContainerHook copying host keys", "error", err, "sshkeysOut", sshkeysOut)
 			errs = append(errs, fmt.Errorf("copy host keys: %w", err))
 		}
 
 		// Set SSH key permissions
-		sshkeysChmodOut, err := box.Exec(ctx, "chmod", "600",
+		sshkeysChmodOut, err := exec(ctx, "chmod", "600",
 			"/etc/ssh/ssh_host_key",
 			"/etc/ssh/ssh_host_key.pub",
 			"/etc/ssh/ssh_host_key.pub-cert",
@@ -76,7 +77,7 @@ func (c *BaseContainerConfiguration) defaultContainerHook() sandtypes.ContainerS
 		}
 
 		// Start sshd
-		sshdOut, err := box.Exec(ctx, "/usr/sbin/sshd", "-f", "/etc/ssh/sshd_config")
+		sshdOut, err := exec(ctx, "/usr/sbin/sshd", "-f", "/etc/ssh/sshd_config")
 		if err != nil {
 			slog.ErrorContext(ctx, "defaultContainerHook starting sshd", "error", err, "sshdOut", sshdOut)
 			errs = append(errs, fmt.Errorf("start sshd: %w", err))
@@ -93,10 +94,10 @@ func (c *BaseContainerConfiguration) defaultContainerHook() sandtypes.ContainerS
 
 // githubSSHContainerHook verifies that SSH authentication to GitHub works.
 func (c *BaseContainerConfiguration) githubSSHContainerHook() sandtypes.ContainerStartupHook {
-	return sandtypes.NewContainerStartupHook("git ssh auth check", func(ctx context.Context, box sandtypes.BoxOperations) error {
+	return sandtypes.NewContainerStartupHook("git ssh auth check", func(ctx context.Context, ctr *types.Container, exec sandtypes.StartupHook) error {
 		var errs []error
 
-		sshOut, err := box.Exec(ctx, "/usr/bin/ssh", "-T", "git@github.com")
+		sshOut, err := exec(ctx, "/usr/bin/ssh", "-T", "git@github.com")
 		if err != nil && strings.Contains(sshOut, "git@github.com: Permission denied (publickey)") {
 			slog.ErrorContext(ctx, "githubSSHContainerHook checking for ssh auth", "error", err, "sshOut", sshOut)
 			errs = append(errs, fmt.Errorf("you may need to run `ssh-add --apple-use-keychain ~/.ssh/<github ssh key>` for ssh-agent to work with your git remote: %w", err))

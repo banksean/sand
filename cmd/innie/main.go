@@ -13,7 +13,6 @@ import (
 	"github.com/banksean/sand/cli"
 	"github.com/banksean/sand/mux"
 	kongcompletion "github.com/jotaen/kong-completion"
-	"github.com/posener/complete"
 )
 
 // Cross-compile this for use inside the linux container like so:
@@ -32,7 +31,7 @@ type CLI struct {
 	LogFile    string                    `default:"/tmp/sand/log" placeholder:"<log-file-path>" help:"location of log file (leave empty for a random tmp/ path)"`
 	LogLevel   string                    `default:"info" placeholder:"<debug|info|warn|error>" help:"the logging level (debug, info, warn, error)"`
 	AppBaseDir string                    `default:"" placeholder:"<app-base-dir>" help:"root dir to store sandbox clones of working directories. Leave unset to use '~/Library/Application Support/Sand'"`
-	HTTPPort   string                    `default:"4242" placeholder:"<local port>" help:"local http port to listen on, for commands running inside containers"`
+	HTTPPort   string                    `default:"4242" placeholder:"<local port>" help:"container host http port to connect to, for commands running inside containers"`
 	Completion kongcompletion.Completion `cmd:"" help:"Outputs shell code for initialising tab completions"`
 
 	New     cli.NewCmd     `cmd:"" help:"create a new sandbox and shell into its container"`
@@ -89,23 +88,6 @@ func (c *CLI) initSlog() {
 
 const description = `The "innie" side of the "sand" command, communicates with the host OS to execute sandbox related commands.`
 
-type sandboxNamePredictor struct {
-}
-
-// Predict implements [complete.Predictor].
-func (s *sandboxNamePredictor) Predict(args complete.Args) []string {
-	// sandboxes, err := s.sber.List(context.Background())
-	// if err != nil {
-	// 	return nil
-	// }
-	// ret := []string{}
-	// for _, box := range sandboxes {
-	// 	ret = append(ret, box.ID)
-	// }
-	// return ret
-	return nil
-}
-
 func main() {
 	var app CLI
 	app.initSlog()
@@ -121,7 +103,13 @@ func main() {
 	appBaseDir := "/outie" // connect to the sandd process running on the host via socket.
 
 	kongApp := kong.Must(&app)
-	namePredictor := &sandboxNamePredictor{}
+	predictorMC, err := mux.NewHTTPClient(ctx, "4242")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to create sandmux client, error: %v\n", err)
+		os.Exit(1)
+	}
+	namePredictor := cli.NewSandboxNamePredictor(predictorMC)
+
 	kongcompletion.Register(kongApp, kongcompletion.WithPredictor("sandbox-name", namePredictor))
 	kongCtx := kong.Parse(&app,
 		kong.Configuration(kong.JSON, ".sand.json", "~/.sand.json"),
@@ -132,17 +120,11 @@ func main() {
 
 	slog.Info("main", "appBaseDir", appBaseDir)
 
-	// if err := mux.EnsureDaemon(ctx, appBaseDir, app.LogFile); err != nil {
-	// 	fmt.Fprintf(os.Stderr, "daemon not running, and failed to start it. error: %v\n", err)
-	// 	os.Exit(1)
-	// }
-
 	if app.AppBaseDir == "" {
 		app.AppBaseDir = appBaseDir
 	}
-	server := mux.NewMuxServer(appBaseDir, app.HTTPPort)
 
-	mc, err := server.NewHTTPClient(ctx)
+	mc, err := mux.NewHTTPClient(ctx, app.HTTPPort)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create sandmux client, error: %v\n", err)
 		os.Exit(1)

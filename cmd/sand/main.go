@@ -13,7 +13,6 @@ import (
 	"github.com/banksean/sand/cli"
 	"github.com/banksean/sand/mux"
 	kongcompletion "github.com/jotaen/kong-completion"
-	"github.com/posener/complete"
 )
 
 type CLI struct {
@@ -97,25 +96,6 @@ func appHomeDir() (string, error) {
 	return appSupportDir, nil
 }
 
-type sandboxNamePredictor struct {
-	// sber *box.Boxer
-}
-
-// Predict implements [complete.Predictor].
-func (s *sandboxNamePredictor) Predict(args complete.Args) []string {
-	// sandboxes, err := s.sber.List(context.Background())
-	// if err != nil {
-	// 	return nil
-	// }
-	// ret := []string{}
-	// for _, box := range sandboxes {
-	// 	ret = append(ret, box.ID)
-	// }
-	// TODO: implement this by making mux.MuxClient#List calls instead of using box.Boxer directly.
-	ret := []string{}
-	return ret
-}
-
 func main() {
 	var app CLI
 	app.initSlog()
@@ -133,19 +113,15 @@ func main() {
 		fmt.Fprintf(os.Stderr, "unable to get application home directory: %v\n", err.Error())
 		os.Exit(1)
 	}
-	// var sber *box.Boxer
-	// sber, err = box.NewBoxer(appBaseDir, os.Stderr)
-	// if err != nil {
-	// 	fmt.Fprintf(os.Stderr, "failed to create Boxer: %v\n", err)
-	// 	os.Exit(1)
-	// }
-	// if err := sber.Sync(ctx); err != nil {
-	// 	fmt.Fprintf(os.Stderr, "failed to sync Boxer db with current environment state: %v\n", err)
-	// 	os.Exit(1)
-	// }
-	// defer sber.Close()
+
+	predictorMC, err := mux.NewUnixSocketClient(ctx, appBaseDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to create sandmux client, error: %v\n", err)
+		os.Exit(1)
+	}
+	namePredictor := cli.NewSandboxNamePredictor(predictorMC)
+
 	kongApp := kong.Must(&app)
-	namePredictor := &sandboxNamePredictor{}
 	kongcompletion.Register(kongApp, kongcompletion.WithPredictor("sandbox-name", namePredictor))
 	kongCtx := kong.Parse(&app,
 		kong.Configuration(kong.JSON, ".sand.json", "~/.sand.json"),
@@ -169,7 +145,7 @@ func main() {
 	if app.AppBaseDir == "" {
 		app.AppBaseDir = appBaseDir
 	}
-	//server := mux.NewMuxServer(appBaseDir, "", sber)
+
 	mc, err := mux.NewUnixSocketClient(ctx, appBaseDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create sandmux client, error: %v\n", err)

@@ -7,12 +7,16 @@ import (
 	"database/sql"
 	_ "embed"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/banksean/sand/applecontainer/options"
+	"github.com/banksean/sand/applecontainer/types"
 	"github.com/banksean/sand/box"
 	"github.com/banksean/sand/cloning"
 	"github.com/banksean/sand/db"
@@ -149,16 +153,16 @@ func (sb *Boxer) NewSandbox(ctx context.Context, agentType, id, hostWorkDir, ima
 		return nil, fmt.Errorf("saveSSHKeys: %w", err)
 	}
 	ret := &box.Box{
-		ID:               id,
-		AgentType:        agentType,
-		HostOriginDir:    hostWorkDir,
-		SandboxWorkDir:   artifacts.SandboxWorkDir,
-		ImageName:        imageName,
-		EnvFile:          envFile,
-		Mounts:           append(mounts, sshKeysMountSpec),
-		ContainerHooks:   hooks,
-		Keys:             keys,
-		ContainerService: sb.ContainerService,
+		ID:             id,
+		AgentType:      agentType,
+		HostOriginDir:  hostWorkDir,
+		SandboxWorkDir: artifacts.SandboxWorkDir,
+		ImageName:      imageName,
+		EnvFile:        envFile,
+		Mounts:         append(mounts, sshKeysMountSpec),
+		ContainerHooks: hooks,
+		Keys:           keys,
+		//ContainerService: sb.ContainerService,
 	}
 
 	if err := sb.SaveSandbox(ctx, ret); err != nil {
@@ -287,15 +291,15 @@ func (sb *Boxer) sandboxFromDB(s *db.Sandbox) *box.Box {
 		agentType = "default" // Fallback for old sandboxes
 	}
 	return &box.Box{
-		ID:               s.ID,
-		AgentType:        agentType,
-		ContainerID:      fromNullString(s.ContainerID),
-		HostOriginDir:    s.HostOriginDir,
-		SandboxWorkDir:   s.SandboxWorkDir,
-		ImageName:        s.ImageName,
-		DNSDomain:        fromNullString(s.DnsDomain),
-		EnvFile:          fromNullString(s.EnvFile),
-		ContainerService: sb.ContainerService,
+		ID:             s.ID,
+		AgentType:      agentType,
+		ContainerID:    fromNullString(s.ContainerID),
+		HostOriginDir:  s.HostOriginDir,
+		SandboxWorkDir: s.SandboxWorkDir,
+		ImageName:      s.ImageName,
+		DNSDomain:      fromNullString(s.DnsDomain),
+		EnvFile:        fromNullString(s.EnvFile),
+		//ContainerService: sb.ContainerService,
 	}
 }
 
@@ -308,6 +312,132 @@ func fromNullString(ns sql.NullString) string {
 		return ns.String
 	}
 	return ""
+}
+
+func (sb *Boxer) getContainer(ctx context.Context, containerID string) (interface{}, error) {
+	ctrs, err := sb.ContainerService.Inspect(ctx, containerID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to inspect container for sandbox %s: %w", containerID, err)
+	}
+	if len(ctrs) == 0 {
+		return nil, nil
+	}
+
+	return &ctrs[0], nil
+}
+
+// TODO: Move this code to mux/internal/boxer#Boxer.GetContainer and change callers of this function to use mux.MuxClient instead
+// GetContainer returns the container.
+func (sb *Boxer) GetContainer(ctx context.Context, containerID string) (*types.Container, error) {
+	ctr, err := sb.getContainer(ctx, containerID)
+	if err != nil {
+		return nil, err
+	}
+	if ctr == nil {
+		return nil, nil
+	}
+	return ctr.(*types.Container), nil
+}
+
+// CreateContainer creates a new container instance. The container image must exist.
+func (sber *Boxer) CreateContainer(ctx context.Context, sb *box.Box) error {
+	mounts := sb.EffectiveMounts()
+	mountOpts := make([]string, 0, len(mounts))
+	for _, m := range mounts {
+		mountOpts = append(mountOpts, m.String())
+	}
+
+	containerID, err := sber.ContainerService.Create(ctx,
+		&options.CreateContainer{
+			ProcessOptions: options.ProcessOptions{
+				Interactive: true,
+				TTY:         true,
+				EnvFile:     sb.EnvFile,
+			},
+			ManagementOptions: options.ManagementOptions{
+				// TODO: Try to name the container after the sandbox, and handle collisions
+				// if the name is already in use (e.g. append random chars to sb.ID).
+				Name:      sb.ID,
+				SSH:       true,
+				DNSDomain: sb.DNSDomain,
+				Remove:    false,
+				Mount:     mountOpts,
+			},
+		},
+		sb.ImageName, nil)
+	if err != nil {
+		slog.ErrorContext(ctx, "createContainer", "sandbox", sb.ID, "imageName", sb.ImageName, "error", err, "output", containerID)
+		return fmt.Errorf("failed to create container for sandbox %s: %w", sb.ID, err)
+	}
+	sb.ContainerID = containerID
+	return nil
+}
+
+// StartContainer starts a container instance. The container must exist, and it should not be in the "running" state.
+func (sber *Boxer) StartContainer(ctx context.Context, sb *box.Box) error {
+	// Reconstruct runtime configuration from agent type
+	pathRegistry := cloning.NewStandardPathRegistry(sb.SandboxWorkDir)
+	artifacts := cloning.CloneArtifacts{
+		SandboxWorkDir: sb.SandboxWorkDir,
+		PathRegistry:   pathRegistry,
+	}
+
+	// Get agent config to reconstruct hooks
+	agentConfig := cloning.GetGlobalRegistry().Get(sb.AgentType)
+	hooks := agentConfig.Configuration.GetStartupHooks(artifacts)
+
+	slog.InfoContext(ctx, "Box.StartContainer", "box", *sb, "ContainerHooks", len(hooks))
+	if err := sber.startContainerProcess(ctx, sb.ContainerID); err != nil {
+		return err
+	}
+
+	return sber.executeHooks(ctx, sb, hooks)
+}
+
+func (sb *Boxer) startContainerProcess(ctx context.Context, containerID string) error {
+	slog.InfoContext(ctx, "Box.startContainerProcess", "containerID", containerID)
+	output, err := sb.ContainerService.Start(ctx, nil, containerID)
+	if err != nil {
+		slog.ErrorContext(ctx, "startContainerProcess", "containerID", containerID, "error", err, "output", output)
+		return fmt.Errorf("failed to start container for sandbox %s: %w", containerID, err)
+	}
+	slog.InfoContext(ctx, "Box.startContainerProcess succeeded", "sandbox", containerID, "output", output)
+	return nil
+}
+
+func (sber *Boxer) executeHooks(ctx context.Context, sb *box.Box, hooks []sandtypes.ContainerStartupHook) error {
+	var hookErrs []error
+	for _, hook := range hooks {
+		slog.InfoContext(ctx, "Box.executeHooks running hook", "hook", hook.Name())
+		// Need something that can call GetContaner and Exec on sb, since sb can no longer do those things.
+		ctr, err := sber.GetContainer(ctx, sb.ContainerID)
+		if err != nil {
+			return err
+		}
+		if err := hook.OnStart(ctx, ctr, func(ctx context.Context, shellCmd string, args ...string) (string, error) {
+			output, err := sber.ContainerService.Exec(ctx,
+				&options.ExecContainer{
+					ProcessOptions: options.ProcessOptions{
+						Interactive: false,
+						TTY:         true,
+						WorkDir:     "/app",
+						EnvFile:     sb.EnvFile,
+					},
+				}, sb.ContainerID, shellCmd, os.Environ(), args...)
+			if err != nil {
+				slog.ErrorContext(ctx, "shell: containerService.Exec", "sandbox", sb.ID, "error", err, "output", output)
+				return output, fmt.Errorf("failed to execute command for sandbox %s: %w", sb.ID, err)
+			}
+			return output, nil
+		}); err != nil {
+			slog.ErrorContext(ctx, "Box.executeHooks hook error", "hook", hook.Name(), "error", err)
+			hookErrs = append(hookErrs, fmt.Errorf("%s: %w", hook.Name(), err))
+		}
+	}
+	if len(hookErrs) > 0 {
+		return errors.Join(hookErrs...)
+	}
+	return nil
 }
 
 // EnsureImage makes sure the requested container image is present locally, pulling it if required.

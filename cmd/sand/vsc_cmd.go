@@ -27,11 +27,12 @@ func (c *VscCmd) Run(cctx *cli.Context) error {
 		return fmt.Errorf("could not find sandbox with ID %s: %w", c.ID, err)
 	}
 
-	ctr, err := sbox.GetContainer(ctx)
-	if err != nil {
-		slog.ErrorContext(ctx, "sbox.GetContainer", "error", err)
-		return err
-	}
+	ctr := sbox.Container
+	// ctr, err := sbox.GetContainer(ctx)
+	// if err != nil {
+	// 	slog.ErrorContext(ctx, "sbox.GetContainer", "error", err)
+	// 	return err
+	// }
 
 	if ctr == nil || ctr.Status != "running" {
 		return fmt.Errorf("cannot connect to sandbox %q becacuse it is not currently running", c.ID)

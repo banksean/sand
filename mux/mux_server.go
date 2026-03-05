@@ -51,14 +51,10 @@ func NewMuxServer(appBaseDir, httpPort string) *Mux {
 	}
 }
 
-func (m *Mux) NewHTTPClient(ctx context.Context) (*MuxClient, error) {
-	// var csvc box.ContainerOps
-	// if m.boxer != nil {
-	// 	csvc = m.boxer.ContainerService
-	// }
+func NewHTTPClient(ctx context.Context, containerHostPort string) (*MuxClient, error) {
 	return &MuxClient{
 		//	ContainerService: csvc,
-		base:       "http://" + internalContainerHost + ":" + m.LocalHTTPPort,
+		base:       "http://" + internalContainerHost + ":" + containerHostPort,
 		httpClient: http.DefaultClient,
 	}, nil
 }
@@ -339,7 +335,7 @@ func (m *Mux) handleGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctr, err := sbox.GetContainer(r.Context())
+	ctr, err := m.boxer.GetContainer(r.Context(), sbox.ContainerID)
 	if err != nil {
 		http.Error(w, "couldn't get container", http.StatusInternalServerError)
 		return
@@ -473,26 +469,25 @@ func (m *Mux) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*box.B
 		return nil, err
 	}
 
-	ctr, err := sbox.GetContainer(ctx)
-	if err != nil {
-		return nil, err
-	}
+	ctr, err := m.boxer.GetContainer(ctx, sbox.ContainerID)
 
 	if ctr == nil {
-		if err := sbox.CreateContainer(ctx); err != nil {
+		err := m.boxer.CreateContainer(ctx, sbox)
+		if err != nil {
 			return nil, err
 		}
 		if err := m.boxer.UpdateContainerID(ctx, sbox, sbox.ContainerID); err != nil {
 			return nil, err
 		}
-		ctr, err = sbox.GetContainer(ctx)
+		ctr, err = m.boxer.GetContainer(ctx, sbox.ContainerID)
 		if err != nil || ctr == nil {
 			return nil, fmt.Errorf("failed to get container after creation")
 		}
 	}
 
 	if ctr.Status != "running" {
-		if err := sbox.StartContainer(ctx); err != nil {
+		err := m.boxer.StartContainer(ctx, sbox)
+		if err != nil {
 			return nil, err
 		}
 	}
