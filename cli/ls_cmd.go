@@ -40,7 +40,10 @@ func (c *LsCmd) Run(cctx *CLIContext) error {
 		if sbox.SandboxWorkDirError != "" {
 			status = append(status, sbox.SandboxWorkDirError)
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t\n", sbox.ID, strings.Join(status, ", "), sbox.ContainerID, hostname, sbox.HostOriginDir, sbox.ImageName)
+		userHomeDir, _ := os.UserHomeDir()
+		imgName := strings.TrimPrefix(sbox.ImageName, "ghcr.io/banksean/sand/")
+		hostOriginDir := strings.Replace(sbox.HostOriginDir, userHomeDir, "~", 1)
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t\n", sbox.ID, strings.Join(status, ", "), sbox.ContainerID, hostname, hostOriginDir, imgName)
 	}
 	w.Flush()
 	return nil
