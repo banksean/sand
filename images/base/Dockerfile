@@ -1,6 +1,4 @@
-# opencode's installation instructions don't produce a working installation on alpine,
-# since it relies on glibc. Use frolvlad/alpine-glibc as the base image to provide glibc.
-FROM docker.io/frolvlad/alpine-glibc
+FROM docker.io/library/alpine
 
 ARG TZ
 ENV TZ="$TZ"
@@ -10,23 +8,17 @@ RUN apk add --no-cache \
   curl \
   fzf \
   git \
-  go \
   iproute2 \
   ipset \
   iptables \
   jq \
   less \
-  make \
   man-db \
   nano \
-  nodejs \
-  npm \
   openssh-client \
   openssh-server \
   procps \
-  python3 \
   sudo \
-  tar \
   unzip \
   vim \
   zsh
@@ -60,6 +52,3 @@ RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/
   -a '[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh'
 
 RUN curl -s https://ohmyposh.dev/install.sh | bash -s -- -d /usr/local/bin
-
-# Install OpenCode
-RUN curl -fsSL https://opencode.ai/install | OPENCODE_INSTALL_DIR=/usr/local/bin bash
