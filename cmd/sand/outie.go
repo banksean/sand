@@ -1,3 +1,5 @@
+//go:build darwin
+
 package main
 
 import (
@@ -15,35 +17,10 @@ import (
 	kongcompletion "github.com/jotaen/kong-completion"
 )
 
-// Cross-compile this for use inside the linux container like so:
-// CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o ./bin/innie ./cmd/innie
-//
-// The host OS must already have dns entry in the apple container system, created like so:
-// `sudo container system dns create host.container.internal --localhost 203.0.113.113`
-//
-// TODO: Evaluate SSH local port forwarding (make `sand exec` use `ssh -L 4242:4242 ...`) to
-// replace the above "container system dns create ..." approach. SSH would require less apple container
-// service futzing, but is probably more prone to losing connections as ssh port forward is known
-// to do. It also wouldn't have to use a host name from innie - just localhost:4242.
-
-// type Innie is the container-side cli to work with sand.  It shares a lot of the same subcommands
-// with the host-side sand command, but they work slightly differently when invoked in a container.
-// Notably, the innie connects to the sandd process running on the host via HTTP+JSON over TCP,
-// rather than via unix domain socket.
-
-// TODO:
-// - Automate the ./bin/innie cross-compilation step.  Might have to bake this into the default image or some such.
-// - figure out where the innie should send its logs to, if anywhere.
-// - sort out how `sand new` should work when you run it from inside a sandbox container. There are multiple ways to do this. Some options:
-//.  - A: should it create a clone from the innie's sandbox's original parent, or
-//   - B: should it create a new clone using the innie's sandbox's current state as its parent
-//.  - if we want it to do the latter, do we know if apple's container system can clone the entire sandbox container (including FS changes, running processes etc)?
-
-type Innie struct {
-	LogFile    string                    `default:"/tmp/sand/innie/log" placeholder:"<log-file-path>" help:"location of log file (leave empty for a random tmp/ path)"`
+type Outie struct {
+	LogFile    string                    `default:"/tmp/sand/outie/log" placeholder:"<log-file-path>" help:"location of log file (leave empty for a random tmp/ path)"`
 	LogLevel   string                    `default:"info" placeholder:"<debug|info|warn|error>" help:"the logging level (debug, info, warn, error)"`
 	AppBaseDir string                    `default:"" placeholder:"<app-base-dir>" help:"root dir to store sandbox clones of working directories. Leave unset to use '~/Library/Application Support/Sand'"`
-	HTTPPort   string                    `default:"4242" placeholder:"<local port>" help:"container host http port to connect to, for commands running inside containers"`
 	Completion kongcompletion.Completion `cmd:"" help:"Outputs shell code for initialising tab completions"`
 
 	New     cli.NewCmd     `cmd:"" help:"create a new sandbox and shell into its container"`
@@ -53,11 +30,12 @@ type Innie struct {
 	Rm      cli.RmCmd      `cmd:"" help:"remove sandbox container and its clone directory"`
 	Stop    cli.StopCmd    `cmd:"" help:"stop sandbox container"`
 	Git     cli.GitCmd     `cmd:"" help:"git operations with sandboxes"`
+	Doc     DocCmd         `cmd:"" help:"print complete command help formatted as markdown"`
 	Version cli.VersionCmd `cmd:"" help:"print version infomation about this command"`
-	// TODO: VSCCmd should work here too. "%sandbox-vm> sand vsc" should open a vsc remote window on the host OS as though the user had run "%host> sand vsc <this sandbox name>".
+	Vsc     VscCmd         `cmd:"" help:"launch a vscode remote window connected to the sandbox's container"`
 }
 
-func (c *Innie) initSlog() {
+func (c *Outie) initSlog() {
 	var level slog.Level
 	switch c.LogLevel {
 	case "debug":
@@ -76,10 +54,11 @@ func (c *Innie) initSlog() {
 	var f *os.File
 	var err error
 	if c.LogFile == "" {
-		f, err = os.CreateTemp("/tmp/sand/innie", "log")
+		f, err = os.CreateTemp("/tmp/sand/outie", "log")
 		if err != nil {
 			panic(err)
 		}
+		c.LogFile = f.Name()
 	} else {
 		logDir := filepath.Dir(c.LogFile)
 		if err := os.MkdirAll(logDir, 0o755); err != nil {
@@ -95,13 +74,33 @@ func (c *Innie) initSlog() {
 		Level: level,
 	}))
 	slog.SetDefault(logger)
-	slog.Info("innie slog initialized")
+	slog.Info("outie slog initialized")
 }
 
-const description = `The "innie" side of the "sand" command, communicates with the host OS to execute sandbox related commands.`
+const description = `Manage lightweight linux container sandboxes on MacOS.
+
+Requires apple container CLI: https://github.com/apple/container/releases/tag/` + cli.AppleContainerVersion
+
+func appHomeDir() (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("error getting home directory: %w", err)
+	}
+
+	// Construct the path to the application support directory
+	appSupportDir := filepath.Join(homeDir, "Library", "Application Support", "Sand")
+
+	// Create the directory if it doesn't exist
+	err = os.MkdirAll(appSupportDir, 0o755) // 0755 grants read/write/execute for owner, read/execute for group/others
+	if err != nil {
+		return "", fmt.Errorf("error creating application support directory: %w", err)
+	}
+
+	return appSupportDir, nil
+}
 
 func main() {
-	var app Innie
+	var app Outie
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -111,16 +110,20 @@ func main() {
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	appBaseDir := "/outie" // connect to the sandd process running on the host via socket.
+	appBaseDir, err := appHomeDir()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "unable to get application home directory: %v\n", err.Error())
+		os.Exit(1)
+	}
 
-	kongApp := kong.Must(&app)
-	predictorMC, err := mux.NewHTTPClient(ctx, "4242")
+	predictorMC, err := mux.NewUnixSocketClient(ctx, appBaseDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create sandmux client, error: %v\n", err)
 		os.Exit(1)
 	}
 	namePredictor := cli.NewSandboxNamePredictor(predictorMC)
 
+	kongApp := kong.Must(&app)
 	kongcompletion.Register(kongApp, kongcompletion.WithPredictor("sandbox-name", namePredictor))
 	kongCtx := kong.Parse(&app,
 		kong.Configuration(kong.JSON, ".sand.json", "~/.sand.json"),
@@ -128,13 +131,23 @@ func main() {
 
 	app.initSlog()
 
+	if err := cli.VerifyPrerequisites(ctx, cli.MacOS, cli.MacOSVersion, cli.ContainerCommand); err != nil {
+		fmt.Fprintf(os.Stderr, "Prerequisite check(s) failed: %s\r\n", err)
+		os.Exit(1)
+	}
+
 	slog.Info("main", "appBaseDir", appBaseDir)
+
+	if err := mux.EnsureDaemon(ctx, appBaseDir); err != nil {
+		fmt.Fprintf(os.Stderr, "daemon not running, and failed to start it. error: %v\n", err)
+		os.Exit(1)
+	}
 
 	if app.AppBaseDir == "" {
 		app.AppBaseDir = appBaseDir
 	}
 
-	mc, err := mux.NewHTTPClient(ctx, app.HTTPPort)
+	mc, err := mux.NewUnixSocketClient(ctx, appBaseDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create sandmux client, error: %v\n", err)
 		os.Exit(1)
