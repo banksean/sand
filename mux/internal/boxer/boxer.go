@@ -155,6 +155,15 @@ func (sb *Boxer) NewSandbox(ctx context.Context, agentType, id, hostWorkDir, ima
 	if err := sb.saveSSHKeys(sshKeysMountSpec.Source, keys); err != nil {
 		return nil, fmt.Errorf("saveSSHKeys: %w", err)
 	}
+
+	// hostWorkDir may not be the same as the git root - should we save both here instead of
+	// only saving the gitTopLevel?
+	gitTopLevel := sb.gitOps.TopLevel(ctx, hostWorkDir)
+	slog.InfoContext(ctx, "NewSandbox", "gitTopLevel", gitTopLevel, "hostWorkDir", hostWorkDir)
+	if gitTopLevel != "" {
+		// Clone from git top level instead
+		hostWorkDir = gitTopLevel
+	}
 	ret := &box.Box{
 		ID:             id,
 		AgentType:      agentType,

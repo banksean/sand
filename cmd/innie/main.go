@@ -40,7 +40,7 @@ import (
 //.  - if we want it to do the latter, do we know if apple's container system can clone the entire sandbox container (including FS changes, running processes etc)?
 
 type Innie struct {
-	LogFile    string                    `default:"/tmp/sand/log" placeholder:"<log-file-path>" help:"location of log file (leave empty for a random tmp/ path)"`
+	LogFile    string                    `default:"/tmp/sand/innie/log" placeholder:"<log-file-path>" help:"location of log file (leave empty for a random tmp/ path)"`
 	LogLevel   string                    `default:"info" placeholder:"<debug|info|warn|error>" help:"the logging level (debug, info, warn, error)"`
 	AppBaseDir string                    `default:"" placeholder:"<app-base-dir>" help:"root dir to store sandbox clones of working directories. Leave unset to use '~/Library/Application Support/Sand'"`
 	HTTPPort   string                    `default:"4242" placeholder:"<local port>" help:"container host http port to connect to, for commands running inside containers"`
@@ -76,7 +76,7 @@ func (c *Innie) initSlog() {
 	var f *os.File
 	var err error
 	if c.LogFile == "" {
-		f, err = os.CreateTemp("/tmp", "sand-log")
+		f, err = os.CreateTemp("/tmp/sand/innie", "log")
 		if err != nil {
 			panic(err)
 		}
@@ -95,14 +95,13 @@ func (c *Innie) initSlog() {
 		Level: level,
 	}))
 	slog.SetDefault(logger)
-	slog.Info("slog initialized")
+	slog.Info("innie slog initialized")
 }
 
 const description = `The "innie" side of the "sand" command, communicates with the host OS to execute sandbox related commands.`
 
 func main() {
 	var app Innie
-	app.initSlog()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -127,7 +126,6 @@ func main() {
 		kong.Configuration(kong.JSON, ".sand.json", "~/.sand.json"),
 		kong.Description(description))
 
-	// Yes, we already called initSlog(), but this time we've parsed the cli flags which may specify other log settings than the defaults.
 	app.initSlog()
 
 	slog.Info("main", "appBaseDir", appBaseDir)

@@ -80,10 +80,6 @@ jobs:
         working-directory: ${{ inputs.working-directory || '.'}}
         run: sand daemon stop
 
-      - name: Print cli logs on failure
+      - name: Print logs on failure
         if: failure()
         run: cat /tmp/sand/log
-
-      - name: Print daemon logs on failure
-        if: failure()
-        run: cat /tmp/sand/log.daemon

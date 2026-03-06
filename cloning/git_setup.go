@@ -3,6 +3,7 @@ package cloning
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/banksean/sand/sandtypes"
 )
@@ -30,6 +31,7 @@ func NewGitSetup(gitOps sandtypes.GitOps) *GitSetup {
 //
 // Returns nil if hostDir is not a git repository (no error).
 func (g *GitSetup) SetupGitRemotes(ctx context.Context, sandboxID, hostDir, cloneDir string) error {
+	slog.InfoContext(ctx, "GitSetup.SetupGitRemotes", "hostDir", hostDir, "cloneDir", cloneDir)
 	// Check if hostDir is part of a git repository
 	gitTopLevel := g.gitOps.TopLevel(ctx, hostDir)
 	if gitTopLevel == "" {
@@ -68,5 +70,7 @@ func (g *GitSetup) SetupGitRemotes(ctx context.Context, sandboxID, hostDir, clon
 // GetGitTopLevel returns the top-level directory of the git repository containing the given directory.
 // Returns empty string if the directory is not part of a git repository.
 func (g *GitSetup) GetGitTopLevel(ctx context.Context, dir string) string {
+	slog.InfoContext(ctx, "GitSetup.GetGitTopLevel", "dir", dir)
+
 	return g.gitOps.TopLevel(ctx, dir)
 }

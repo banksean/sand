@@ -16,7 +16,7 @@ import (
 )
 
 type Outie struct {
-	LogFile    string                    `default:"/tmp/sand/log" placeholder:"<log-file-path>" help:"location of log file (leave empty for a random tmp/ path)"`
+	LogFile    string                    `default:"/tmp/sand/outie/log" placeholder:"<log-file-path>" help:"location of log file (leave empty for a random tmp/ path)"`
 	LogLevel   string                    `default:"info" placeholder:"<debug|info|warn|error>" help:"the logging level (debug, info, warn, error)"`
 	AppBaseDir string                    `default:"" placeholder:"<app-base-dir>" help:"root dir to store sandbox clones of working directories. Leave unset to use '~/Library/Application Support/Sand'"`
 	Completion kongcompletion.Completion `cmd:"" help:"Outputs shell code for initialising tab completions"`
@@ -52,10 +52,11 @@ func (c *Outie) initSlog() {
 	var f *os.File
 	var err error
 	if c.LogFile == "" {
-		f, err = os.CreateTemp("/tmp", "sand-log")
+		f, err = os.CreateTemp("/tmp/sand/outie", "log")
 		if err != nil {
 			panic(err)
 		}
+		c.LogFile = f.Name()
 	} else {
 		logDir := filepath.Dir(c.LogFile)
 		if err := os.MkdirAll(logDir, 0o755); err != nil {
@@ -71,7 +72,7 @@ func (c *Outie) initSlog() {
 		Level: level,
 	}))
 	slog.SetDefault(logger)
-	slog.Info("slog initialized")
+	slog.Info("outie slog initialized")
 }
 
 const description = `Manage lightweight linux container sandboxes on MacOS.
@@ -98,7 +99,6 @@ func appHomeDir() (string, error) {
 
 func main() {
 	var app Outie
-	app.initSlog()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -127,7 +127,6 @@ func main() {
 		kong.Configuration(kong.JSON, ".sand.json", "~/.sand.json"),
 		kong.Description(description))
 
-	// Yes, we already called initSlog(), but this time we've parsed the cli flags which may specify other log settings than the defaults.
 	app.initSlog()
 
 	if err := cli.VerifyPrerequisites(ctx, cli.MacOS, cli.MacOSVersion, cli.ContainerCommand); err != nil {
@@ -137,7 +136,7 @@ func main() {
 
 	slog.Info("main", "appBaseDir", appBaseDir)
 
-	if err := mux.EnsureDaemon(ctx, appBaseDir, app.LogFile); err != nil {
+	if err := mux.EnsureDaemon(ctx, appBaseDir); err != nil {
 		fmt.Fprintf(os.Stderr, "daemon not running, and failed to start it. error: %v\n", err)
 		os.Exit(1)
 	}

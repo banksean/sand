@@ -186,7 +186,7 @@ func (m *Mux) RemoveSandbox(ctx context.Context, id string) error {
 //
 // TODO: Make sure this doesn't get called from an innie.  That probably means moving
 // this function to somewhere under mux/internal/...
-func EnsureDaemon(ctx context.Context, appBaseDir, logFile string) error {
+func EnsureDaemon(ctx context.Context, appBaseDir string) error {
 	socketPath := filepath.Join(appBaseDir, defaultSocketFile)
 	slog.Info("EnsureDaemon", "socketPath", socketPath)
 
@@ -209,7 +209,7 @@ func EnsureDaemon(ctx context.Context, appBaseDir, logFile string) error {
 	}
 
 	// Start daemon in background
-	cmd := exec.Command("sandd", "start", "--log-file", logFile, "--app-base-dir", appBaseDir)
+	cmd := exec.Command("sandd", "start", "--app-base-dir", appBaseDir)
 	slog.Info("EnsureDaemon", "cmd", strings.Join(cmd.Args, " "))
 	cmd.Stdout = nil
 	cmd.Stderr = nil

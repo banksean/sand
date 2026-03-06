@@ -67,6 +67,7 @@ func (p *BaseWorkspacePreparation) cloneWorkDir(ctx context.Context, id, hostWor
 
 	// Check if hostWorkDir is part of a git repository
 	gitTopLevel := p.gitSetup.GetGitTopLevel(ctx, hostWorkDir)
+	slog.InfoContext(ctx, "BaseWorkspacePreparation.cloneWorkDir", "gitTopLevel", gitTopLevel, "hostWorkDir", hostWorkDir)
 	if gitTopLevel != "" {
 		// Clone from git top level instead
 		hostWorkDir = gitTopLevel
@@ -74,6 +75,8 @@ func (p *BaseWorkspacePreparation) cloneWorkDir(ctx context.Context, id, hostWor
 
 	// Copy files from host to sandbox
 	hostCloneDir := pathRegistry.WorkDir()
+	slog.InfoContext(ctx, "BaseWorkspacePreparation.cloneWorkDir", "hostCloneDir", hostCloneDir)
+
 	if err := p.fileOps.Copy(ctx, hostWorkDir, hostCloneDir); err != nil {
 		return fmt.Errorf("failed to copy workdir %s to %s for sandbox %s: %w", hostWorkDir, hostCloneDir, id, err)
 	}

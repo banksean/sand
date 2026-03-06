@@ -33,7 +33,7 @@ type App struct {
 }
 
 type DaemonCmd struct {
-	LogFile    string `default:"/tmp/sand/log.daemon" placeholder:"<log-file-path>" help:"location of log file (leave empty for a random tmp/ path)"`
+	LogFile    string `default:"/tmp/sand/daemon/log" placeholder:"<log-file-path>" help:"location of log file"`
 	LogLevel   string `default:"info" placeholder:"<debug|info|warn|error>" help:"the logging level (debug, info, warn, error)"`
 	AppBaseDir string `default:"" placeholder:"<app-base-dir>" help:"root dir to store sandbox clones of working directories. Leave unset to use '~/Library/Application Support/Sand'"`
 	HTTPPort   string `default:"4242" placeholder:"<local port>" help:"local http port to listen on, for commands running inside containers"`
@@ -159,7 +159,7 @@ func (c *DaemonCmd) initSlog() {
 	var f *os.File
 	var err error
 	if c.LogFile == "" {
-		f, err = os.CreateTemp("/tmp", "sand-log")
+		f, err = os.CreateTemp("/tmp/sand/daemon", "log")
 		if err != nil {
 			panic(err)
 		}
@@ -172,13 +172,14 @@ func (c *DaemonCmd) initSlog() {
 		if err != nil {
 			panic(err)
 		}
+		c.LogFile = f.Name()
 	}
 
 	logger := slog.New(slog.NewJSONHandler(f, &slog.HandlerOptions{
 		Level: level,
 	}))
 	slog.SetDefault(logger)
-	slog.Info("slog initialized")
+	slog.Info("daemon slog initialized")
 }
 
 func appHomeDir() (string, error) {
