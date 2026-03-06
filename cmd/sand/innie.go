@@ -17,9 +17,6 @@ import (
 	kongcompletion "github.com/jotaen/kong-completion"
 )
 
-// Cross-compile this for use inside the linux container like so:
-// CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o ./bin/innie ./cmd/innie
-//
 // The host OS must already have dns entry in the apple container system, created like so:
 // `sudo container system dns create host.container.internal --localhost 203.0.113.113`
 //
@@ -34,8 +31,6 @@ import (
 // rather than via unix domain socket.
 
 // TODO:
-// - Automate the ./bin/innie cross-compilation step.  Might have to bake this into the default image or some such.
-// - figure out where the innie should send its logs to, if anywhere.
 // - sort out how `sand new` should work when you run it from inside a sandbox container. There are multiple ways to do this. Some options:
 //.  - A: should it create a clone from the innie's sandbox's original parent, or
 //   - B: should it create a new clone using the innie's sandbox's current state as its parent
