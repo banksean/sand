@@ -151,6 +151,10 @@ func (m *MuxClient) StopSandbox(ctx context.Context, id string) error {
 	return m.doRequest(ctx, http.MethodPost, "/stop", map[string]string{"id": id}, nil)
 }
 
+func (m *MuxClient) VSC(ctx context.Context, id string) error {
+	return m.doRequest(ctx, http.MethodPost, "/vsc", map[string]string{"id": id}, nil)
+}
+
 func (m *MuxClient) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*box.Box, error) {
 	var box box.Box
 	if err := m.doRequest(ctx, http.MethodPost, "/create", opts, &box); err != nil {

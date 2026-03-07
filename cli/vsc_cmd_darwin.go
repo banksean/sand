@@ -1,6 +1,6 @@
 //go:build darwin
 
-package main
+package cli
 
 import (
 	"fmt"
@@ -8,7 +8,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/banksean/sand/cli"
+	"github.com/banksean/sand/applecontainer/types"
 )
 
 // TODO: make 'sand vsc' work from inside the container as well, so that it tells the outie to run `code --remote=` etc on the host
@@ -17,7 +17,7 @@ type VscCmd struct {
 	ID string `arg:"" completion-predictor:"sandbox-name" help:"ID of the sandbox to vsc remote to"`
 }
 
-func (c *VscCmd) Run(cctx *cli.CLIContext) error {
+func (c *VscCmd) Run(cctx *CLIContext) error {
 	ctx := cctx.Context
 	mc := cctx.MuxClient
 
@@ -35,7 +35,7 @@ func (c *VscCmd) Run(cctx *cli.CLIContext) error {
 		return fmt.Errorf("cannot connect to sandbox %q becacuse it is not currently running", c.ID)
 	}
 
-	hostname := cli.GetContainerHostname(ctr)
+	hostname := types.GetContainerHostname(ctr)
 	vscCmd := exec.Command("code", "--remote", fmt.Sprintf("ssh-remote+root@%s", hostname), "/app", "-n")
 	slog.InfoContext(ctx, "main: running vsc with", "cmd", strings.Join(vscCmd.Args, " "))
 	out, err := vscCmd.CombinedOutput()

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/banksean/sand/applecontainer/options"
+	"github.com/banksean/sand/applecontainer/types"
 	"github.com/banksean/sand/box"
 	"github.com/banksean/sand/mux"
 	"github.com/banksean/sand/sshimmer"
@@ -89,7 +90,7 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 		return fmt.Errorf("sandbox's container field is nil")
 	}
 
-	hostname := GetContainerHostname(ctr)
+	hostname := types.GetContainerHostname(ctr)
 	env := map[string]string{
 		"HOSTNAME": hostname,
 	}

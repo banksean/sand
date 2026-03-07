@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 	"text/tabwriter"
+
+	"github.com/banksean/sand/applecontainer/types"
 )
 
 type LsCmd struct{}
@@ -32,7 +34,7 @@ func (c *LsCmd) Run(cctx *CLIContext) error {
 		hostname := ""
 		if ctr != nil {
 			status[0] = ctr.Status
-			hostname = GetContainerHostname(ctr)
+			hostname = types.GetContainerHostname(ctr)
 		}
 		if sbox.SandboxContainerError != "" {
 			status = append(status, sbox.SandboxContainerError)

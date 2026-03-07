@@ -1,7 +1,10 @@
 // package types defines structs for unmashaling the output from various `container` commands.
 package types
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 type Container struct {
 	Networks []struct {
@@ -189,4 +192,11 @@ func (s *SystemProperty) StringValue() (string, bool) {
 func (s *SystemProperty) BoolValue() (bool, bool) {
 	ret, ok := s.Value.(bool)
 	return ret, ok
+}
+
+func GetContainerHostname(ctr *Container) string {
+	for _, n := range ctr.Networks {
+		return strings.TrimSuffix(n.Hostname, ".")
+	}
+	return ctr.Configuration.ID
 }

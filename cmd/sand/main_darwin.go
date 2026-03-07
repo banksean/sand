@@ -32,7 +32,7 @@ type Outie struct {
 	Git     cli.GitCmd     `cmd:"" help:"git operations with sandboxes"`
 	Doc     DocCmd         `cmd:"" help:"print complete command help formatted as markdown"`
 	Version cli.VersionCmd `cmd:"" help:"print version infomation about this command"`
-	Vsc     VscCmd         `cmd:"" help:"launch a vscode remote window connected to the sandbox's container"`
+	Vsc     cli.VscCmd     `cmd:"" help:"launch a vscode remote window connected to the sandbox's container"`
 }
 
 func (c *Outie) initSlog() {

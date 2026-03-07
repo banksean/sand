@@ -51,7 +51,7 @@ type Innie struct {
 	Stop    cli.StopCmd    `cmd:"" help:"stop sandbox container"`
 	Git     cli.GitCmd     `cmd:"" help:"git operations with sandboxes"`
 	Version cli.VersionCmd `cmd:"" help:"print version infomation about this command"`
-	// TODO: VSCCmd should work here too. "%sandbox-vm> sand vsc" should open a vsc remote window on the host OS as though the user had run "%host> sand vsc <this sandbox name>".
+	Vsc     cli.VscCmd     `cmd:"" help:"launch a vscode window on your host OS desktop, connected to this sandbox's container via ssh"`
 }
 
 func (c *Innie) initSlog() {

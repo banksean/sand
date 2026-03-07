@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/banksean/sand/applecontainer/options"
+	"github.com/banksean/sand/applecontainer/types"
 	"github.com/banksean/sand/box"
 )
 
@@ -29,7 +30,7 @@ func (c *ShellCmd) Run(cctx *CLIContext) error {
 		return fmt.Errorf("could not find sandbox with ID %s", c.ID)
 	}
 
-	hostname := GetContainerHostname(sbox.Container)
+	hostname := types.GetContainerHostname(sbox.Container)
 	env := map[string]string{
 		"HOSTNAME": hostname,
 	}

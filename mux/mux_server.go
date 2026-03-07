@@ -8,11 +8,14 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
+	"github.com/banksean/sand/applecontainer/types"
 	"github.com/banksean/sand/box"
 	"github.com/banksean/sand/mux/internal/boxer"
 	"github.com/banksean/sand/version"
@@ -202,6 +205,7 @@ func (m *Mux) serveTCPSocket(ctx context.Context) {
 	mux.HandleFunc("/remove", slogHandler(ctx, m.handleRemove))
 	mux.HandleFunc("/stop", slogHandler(ctx, m.handleStop))
 	mux.HandleFunc("/create", slogHandler(ctx, m.handleCreate))
+	mux.HandleFunc("/vsc", slogHandler(ctx, m.handleVSC))
 
 	server := &http.Server{
 		Handler: mux,
@@ -387,6 +391,45 @@ func (m *Mux) handleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, sbox)
+}
+
+func (m *Mux) handleVSC(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var c struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
+		writeJSONError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	if c.ID == "" {
+		writeJSONError(w, fmt.Errorf("missing id"), http.StatusBadRequest)
+		return
+	}
+	sbox, err := m.GetSandbox(ctx, c.ID)
+	if err != nil {
+		slog.ErrorContext(ctx, "GetSandbox", "error", err, "id", c.ID)
+		writeJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	ctr := sbox.Container
+
+	if ctr == nil || ctr.Status != "running" {
+		writeJSONError(w, fmt.Errorf("cannot connect to sandbox %q becacuse it is not currently running", c.ID), http.StatusInternalServerError)
+		return
+	}
+
+	hostname := types.GetContainerHostname(ctr)
+	vscCmd := exec.Command("code", "--remote", fmt.Sprintf("ssh-remote+root@%s", hostname), "/app", "-n")
+	slog.InfoContext(ctx, "main: running vsc with", "cmd", strings.Join(vscCmd.Args, " "))
+	out, err := vscCmd.CombinedOutput()
+	if err != nil {
+		writeJSONError(w, fmt.Errorf("failed to start vsc for %q: %w", c.ID, err), http.StatusInternalServerError)
+		slog.ErrorContext(ctx, "VscCmd.Run cmd", "out", out, "error", err)
+	}
 }
 
 func acquireLock(lockFile string) (*os.File, error) {
