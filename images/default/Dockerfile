@@ -2,8 +2,6 @@
 FROM ghcr.io/banksean/sand/base:latest
 
 ARG CLAUDE_CODE_VERSION=latest
-# TODO: get this from a build arg, passed in from boxer, based on whatever is in the cloned dir's go.mod
-ARG GO_VERSION=1.25.1
 
 RUN apk add --no-cache \
   github-cli \
@@ -11,16 +9,6 @@ RUN apk add --no-cache \
   make \
   nodejs \
   npm
-
-# Install Go toolchain
-RUN ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') && \
-  wget "https://go.dev/dl/go${GO_VERSION}.linux-${ARCH}.tar.gz" && \
-  tar -C /usr/local -xzf "go${GO_VERSION}.linux-${ARCH}.tar.gz" && \
-  rm "go${GO_VERSION}.linux-${ARCH}.tar.gz"
-
-ENV PATH=$PATH:/usr/local/go/bin
-ENV GOPATH=/root/go
-ENV PATH=$PATH:/root/go/bin
 
 ENV NPM_CONFIG_PREFIX=/usr/local/share/npm-global
 ENV PATH=$PATH:/usr/local/share/npm-global/bin
