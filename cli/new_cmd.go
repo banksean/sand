@@ -20,13 +20,21 @@ import (
 type NewCmd struct {
 	ImageName    string `short:"i" default:"ghcr.io/banksean/sand/default:latest" placeholder:"<container-image-name>" help:"name of container image to use"`
 	Shell        string `short:"s" default:"/bin/zsh" placeholder:"<shell-command>" help:"shell command to exec in the container"`
-	Cloner       string `default:"default" placeholder:"<claude|default|opencode>" help:"name of workspace cloner to use"`
-	CloneFromDir string `short:"c" placeholder:"<project-dir>" help:"directory to clone into the sandbox. Defaults to current working directory, if unset."`
+	Cloner       string `short:"c" default:"default" placeholder:"<claude|default|opencode>" help:"name of workspace cloner to use"`
+	CloneFromDir string `short:"d" placeholder:"<project-dir>" help:"directory to clone into the sandbox. Defaults to current working directory, if unset."`
 	EnvFile      string `short:"e" placholder:"<file-path>" help:"path to env file to use when creating a new shell"`
 	Branch       bool   `short:"b" help:"create a new git branch inside the sandbox _container_ (not on your host workdir)"`
 	Rm           bool   `help:"remove the sandbox after the shell terminates"`
 	ID           string `arg:"" optional:"" help:"ID of the sandbox to create, or re-attach to"`
 }
+
+var (
+	defaultImageForCloner = map[string]string{
+		"claude":   "ghcr.io/banksean/sand/default:latest",
+		"opencode": "ghcr.io/banksean/sand/opencode:latest",
+		"codex":    "ghcr.io/banksean/sand/codex:latest",
+	}
+)
 
 func (c *NewCmd) Run(cctx *CLIContext) error {
 	ctx := cctx.Context
@@ -57,6 +65,13 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 
 	if c.EnvFile != "" && !filepath.IsAbs(c.EnvFile) {
 		c.EnvFile = filepath.Join(c.CloneFromDir, c.EnvFile)
+	}
+
+	if c.ImageName == "" && c.Cloner != "" {
+		img, ok := defaultImageForCloner[c.Cloner]
+		if ok {
+			c.ImageName = img
+		}
 	}
 
 	// Try to get existing sandbox.
