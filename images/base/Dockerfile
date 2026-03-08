@@ -8,6 +8,7 @@ RUN apk add --no-cache \
   curl \
   fzf \
   git \
+  delta \
   iproute2 \
   ipset \
   iptables \
