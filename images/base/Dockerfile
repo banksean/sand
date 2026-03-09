@@ -23,6 +23,7 @@ RUN apk add --no-cache \
   procps \
   ripgrep \
   sudo \
+  tmux \
   unzip \
   vim \
   zsh
