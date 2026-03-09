@@ -12,8 +12,7 @@ import (
 
 type ShellCmd struct {
 	ShellFlags
-	EnvFile string `short:"e" default:".env" placholder:"<file-path>" help:"path to env file to use when creating a new shell"`
-	SandboxName string `arg:"" completion-predictor:"sandbox-name" optional:"" help:"name of the sandbox"`
+	SandboxNameFlag
 }
 
 func (c *ShellCmd) Run(cctx *CLIContext) error {

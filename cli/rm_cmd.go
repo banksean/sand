@@ -7,7 +7,7 @@ import (
 )
 
 type RmCmd struct {
-	SandboxSelectionFlags
+	MultiSandboxNameFlags
 }
 
 func (c *RmCmd) Run(cctx *CLIContext) error {

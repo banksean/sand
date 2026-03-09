@@ -7,7 +7,7 @@ import (
 )
 
 type StopCmd struct {
-	SandboxSelectionFlags
+	MultiSandboxNameFlags
 }
 
 func (c *StopCmd) Run(cctx *CLIContext) error {

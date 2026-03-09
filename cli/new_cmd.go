@@ -20,9 +20,9 @@ import (
 type NewCmd struct {
 	SandboxCreationFlags
 	ShellFlags
-	Cloner string `short:"c" default:"default" placeholder:"<claude|default|opencode>" help:"name of workspace cloner to use"`
-	Branch bool   `short:"b" help:"create a new git branch inside the sandbox _container_ (not on your host workdir)"`
-	SandboxName string `arg:"" optional:"" help:"name of the sandbox to create, or re-attach to"`
+	Cloner      string `short:"c" default:"default" placeholder:"<claude|default|opencode>" help:"name of workspace cloner to use"`
+	Branch      bool   `short:"b" help:"create a new git branch inside the sandbox _container_ (not on your host workdir)"`
+	SandboxName string `arg:"" optional:"" help:"name of the sandbox to create"`
 }
 
 var defaultImageForCloner = map[string]string{
