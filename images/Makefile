@@ -1,37 +1,39 @@
 REGISTRY := ghcr.io/banksean/sand
+BUILD_CMD := container build -t
+PUSH_CMD := container image push
 
 .PHONY: all base claude codex default opencode push push-base push-claude push-codex push-default push-opencode
 
 all: base claude codex default opencode
 
 base:
-	container build -t $(REGISTRY)/base:latest base/
+	$(BUILD_CMD) $(REGISTRY)/base:latest base/
 
 claude: base
-	container build -t $(REGISTRY)/claude:latest claude/
+	$(BUILD_CMD) $(REGISTRY)/claude:latest claude/
 
 codex: base
-	container build -t $(REGISTRY)/codex:latest codex/
+	$(BUILD_CMD) $(REGISTRY)/codex:latest codex/
 
 default: base
-	container build -t $(REGISTRY)/default:latest default/
+	$(BUILD_CMD) $(REGISTRY)/default:latest default/
 
 opencode:
-	container build -t $(REGISTRY)/opencode:latest opencode/
+	$(BUILD_CMD) $(REGISTRY)/opencode:latest opencode/
 
 push: push-base push-claude push-codex push-default push-opencode
 
 push-base:
-	container push $(REGISTRY)/base:latest
+	$(PUSH_CMD) $(REGISTRY)/base:latest
 
 push-claude:
-	container push $(REGISTRY)/claude:latest
+	$(PUSH_CMD) $(REGISTRY)/claude:latest
 
 push-codex:
-	container push $(REGISTRY)/codex:latest
+	$(PUSH_CMD) $(REGISTRY)/codex:latest
 
 push-default:
-	container push $(REGISTRY)/default:latest
+	$(PUSH_CMD) $(REGISTRY)/default:latest
 
 push-opencode:
-	container push $(REGISTRY)/opencode:latest
+	$(PUSH_CMD) $(REGISTRY)/opencode:latest
