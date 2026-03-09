@@ -18,7 +18,7 @@ func (c *RmCmd) Run(cctx *CLIContext) error {
 
 	ids := []string{}
 	if !c.All {
-		ids = append(ids, c.ID)
+		ids = append(ids, c.SandboxName)
 	} else {
 		bxs, err := mc.ListSandboxes(ctx)
 		if err != nil {

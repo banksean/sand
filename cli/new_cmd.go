@@ -22,7 +22,7 @@ type NewCmd struct {
 	ShellFlags
 	Cloner string `short:"c" default:"default" placeholder:"<claude|default|opencode>" help:"name of workspace cloner to use"`
 	Branch bool   `short:"b" help:"create a new git branch inside the sandbox _container_ (not on your host workdir)"`
-	ID     string `arg:"" optional:"" help:"ID of the sandbox to create, or re-attach to"`
+	SandboxName string `arg:"" optional:"" help:"name of the sandbox to create, or re-attach to"`
 }
 
 var defaultImageForCloner = map[string]string{
@@ -52,10 +52,10 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 	}
 
 	// Generate a new ID if one was not provided
-	if c.ID == "" {
+	if c.SandboxName == "" {
 		seed := time.Now().UTC().UnixNano()
 		nameGenerator := namegenerator.NewNameGenerator(seed)
-		c.ID = nameGenerator.Generate()
+		c.SandboxName = nameGenerator.Generate()
 	}
 
 	if c.EnvFile != "" && !filepath.IsAbs(c.EnvFile) {
@@ -71,12 +71,12 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 
 	// Try to get existing sandbox.
 	// TODO: Consider returning an error here, rather than trying to "do the right thing" despite what the user asked for.
-	sbox, err := mc.GetSandbox(ctx, c.ID)
+	sbox, err := mc.GetSandbox(ctx, c.SandboxName)
 	if sbox == nil || err != nil {
 		// Sandbox doesn't exist, create it via daemon
-		slog.InfoContext(ctx, "Creating new sandbox via daemon", "id", c.ID)
+		slog.InfoContext(ctx, "Creating new sandbox via daemon", "id", c.SandboxName)
 		sbox, err = mc.CreateSandbox(ctx, mux.CreateSandboxOpts{
-			ID:           c.ID,
+			ID:           c.SandboxName,
 			CloneFromDir: c.CloneFromDir,
 			ImageName:    c.ImageName,
 			EnvFile:      c.EnvFile,

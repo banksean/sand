@@ -14,7 +14,7 @@ import (
 // TODO: make 'sand vsc' work from inside the container as well, so that it tells the outie to run `code --remote=` etc on the host
 
 type VscCmd struct {
-	ID string `arg:"" completion-predictor:"sandbox-name" help:"ID of the sandbox to vsc remote to"`
+	SandboxNameFlag
 }
 
 func (c *VscCmd) Run(cctx *CLIContext) error {
@@ -23,16 +23,16 @@ func (c *VscCmd) Run(cctx *CLIContext) error {
 
 	slog.InfoContext(ctx, "VscCmd", "run", *c)
 
-	sbox, err := mc.GetSandbox(ctx, c.ID)
+	sbox, err := mc.GetSandbox(ctx, c.SandboxName)
 	if err != nil {
-		slog.ErrorContext(ctx, "GetSandbox", "error", err, "id", c.ID)
-		return fmt.Errorf("could not find sandbox with ID %s: %w", c.ID, err)
+		slog.ErrorContext(ctx, "GetSandbox", "error", err, "id", c.SandboxName)
+		return fmt.Errorf("could not find sandbox with ID %s: %w", c.SandboxName, err)
 	}
 
 	ctr := sbox.Container
 
 	if ctr == nil || ctr.Status != "running" {
-		return fmt.Errorf("cannot connect to sandbox %q becacuse it is not currently running", c.ID)
+		return fmt.Errorf("cannot connect to sandbox %q becacuse it is not currently running", c.SandboxName)
 	}
 
 	hostname := types.GetContainerHostname(ctr)

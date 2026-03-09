@@ -13,21 +13,21 @@ import (
 type ShellCmd struct {
 	ShellFlags
 	EnvFile string `short:"e" default:".env" placholder:"<file-path>" help:"path to env file to use when creating a new shell"`
-	ID      string `arg:"" completion-predictor:"sandbox-name" optional:"" help:"ID of the sandbox to create, or re-attach to"`
+	SandboxName string `arg:"" completion-predictor:"sandbox-name" optional:"" help:"name of the sandbox"`
 }
 
 func (c *ShellCmd) Run(cctx *CLIContext) error {
 	ctx := cctx.Context
 	mc := cctx.MuxClient
 
-	sbox, err := mc.GetSandbox(ctx, c.ID)
+	sbox, err := mc.GetSandbox(ctx, c.SandboxName)
 	if err != nil {
-		slog.ErrorContext(ctx, "GetSandbox", "error", err, "id", c.ID)
-		return fmt.Errorf("error while trying to find sandbox with ID %s: %w", c.ID, err)
+		slog.ErrorContext(ctx, "GetSandbox", "error", err, "id", c.SandboxName)
+		return fmt.Errorf("error while trying to find sandbox with ID %s: %w", c.SandboxName, err)
 	}
 
 	if sbox == nil {
-		return fmt.Errorf("could not find sandbox with ID %s", c.ID)
+		return fmt.Errorf("could not find sandbox with ID %s", c.SandboxName)
 	}
 
 	hostname := types.GetContainerHostname(sbox.Container)

@@ -19,17 +19,17 @@ type GitCmd struct {
 }
 
 type StatusCmd struct {
-	SandboxID string `arg:"" completion-predictor:"sandbox-name" help:"ID of the sandbox to get status from"`
+	SandboxNameFlag
 }
 
 type LogCmd struct {
-	SandboxID string `arg:"" completion-predictor:"sandbox-name" help:"ID of the sandbox to get log from"`
+	SandboxNameFlag
 }
 
 type DiffCmd struct {
+	SandboxNameFlag
 	Branch             string `short:"b" default:"" placeholder:"<branch name>" help:"remote branch to diff against (default: active git branch name in cwd)"`
 	IncludeUncommitted bool   `short:"u" default:"false" help:"include uncommitted changes from sandbox working tree"`
-	SandboxID          string `arg:"" completion-predictor:"sandbox-name" help:"ID of the sandbox to diff against"`
 }
 
 func (c *DiffCmd) Run(cctx *CLIContext) error {
@@ -40,10 +40,10 @@ func (c *DiffCmd) Run(cctx *CLIContext) error {
 		return err
 	}
 
-	sbox, err := mc.GetSandbox(ctx, c.SandboxID)
+	sbox, err := mc.GetSandbox(ctx, c.SandboxName)
 	if err != nil {
-		slog.ErrorContext(ctx, "GetSandbox", "error", err, "id", c.SandboxID)
-		return fmt.Errorf("could not find sandbox with ID %s: %w", c.SandboxID, err)
+		slog.ErrorContext(ctx, "GetSandbox", "error", err, "id", c.SandboxName)
+		return fmt.Errorf("could not find sandbox with ID %s: %w", c.SandboxName, err)
 	}
 
 	// Get current working directory
@@ -53,7 +53,7 @@ func (c *DiffCmd) Run(cctx *CLIContext) error {
 	}
 
 	// Construct the remote name for the sandbox clone
-	remoteName := cloning.ClonedWorkDirGitRemotePrefix + c.SandboxID
+	remoteName := cloning.ClonedWorkDirGitRemotePrefix + c.SandboxName
 
 	// First, fetch from the sandbox remote
 	gitFetch := exec.CommandContext(ctx, "git", "fetch", remoteName)
@@ -117,7 +117,7 @@ func (c *DiffCmd) Run(cctx *CLIContext) error {
 
 	// Print information about the sandbox
 	slog.InfoContext(ctx, "DiffCmd completed",
-		"sandbox_id", c.SandboxID,
+		"sandbox_id", c.SandboxName,
 		"sandbox_workdir", sbox.SandboxWorkDir,
 		"host_origin_dir", sbox.HostOriginDir,
 		"cwd", cwd,
@@ -197,14 +197,14 @@ func (c *StatusCmd) Run(cctx *CLIContext) error {
 		return err
 	}
 
-	sbox, err := mc.GetSandbox(ctx, c.SandboxID)
+	sbox, err := mc.GetSandbox(ctx, c.SandboxName)
 	if err != nil {
-		slog.ErrorContext(ctx, "GetSandbox", "error", err, "id", c.SandboxID)
-		return fmt.Errorf("could not find sandbox with ID %s: %w", c.SandboxID, err)
+		slog.ErrorContext(ctx, "GetSandbox", "error", err, "id", c.SandboxName)
+		return fmt.Errorf("could not find sandbox with ID %s: %w", c.SandboxName, err)
 	}
 
 	// Construct the remote name for the sandbox clone
-	remoteName := cloning.ClonedWorkDirGitRemotePrefix + c.SandboxID
+	remoteName := cloning.ClonedWorkDirGitRemotePrefix + c.SandboxName
 
 	// Get current working directory
 	cwd, err := os.Getwd()
@@ -235,7 +235,7 @@ func (c *StatusCmd) Run(cctx *CLIContext) error {
 
 	// Print information about the sandbox
 	slog.InfoContext(ctx, "StatusCmd completed",
-		"sandbox_id", c.SandboxID,
+		"sandbox_id", c.SandboxName,
 		"sandbox_workdir", sbox.SandboxWorkDir,
 		"host_origin_dir", sbox.HostOriginDir,
 	)
@@ -251,14 +251,14 @@ func (c *LogCmd) Run(cctx *CLIContext) error {
 		return err
 	}
 
-	sbox, err := mc.GetSandbox(ctx, c.SandboxID)
+	sbox, err := mc.GetSandbox(ctx, c.SandboxName)
 	if err != nil {
-		slog.ErrorContext(ctx, "GetSandbox", "error", err, "id", c.SandboxID)
-		return fmt.Errorf("could not find sandbox with ID %s: %w", c.SandboxID, err)
+		slog.ErrorContext(ctx, "GetSandbox", "error", err, "id", c.SandboxName)
+		return fmt.Errorf("could not find sandbox with ID %s: %w", c.SandboxName, err)
 	}
 
 	// Construct the remote name for the sandbox clone
-	remoteName := cloning.ClonedWorkDirGitRemotePrefix + c.SandboxID
+	remoteName := cloning.ClonedWorkDirGitRemotePrefix + c.SandboxName
 
 	// Get current working directory
 	cwd, err := os.Getwd()
@@ -289,7 +289,7 @@ func (c *LogCmd) Run(cctx *CLIContext) error {
 
 	// Print information about the sandbox
 	slog.InfoContext(ctx, "LogCmd completed",
-		"sandbox_id", c.SandboxID,
+		"sandbox_id", c.SandboxName,
 		"sandbox_workdir", sbox.SandboxWorkDir,
 		"host_origin_dir", sbox.HostOriginDir,
 	)

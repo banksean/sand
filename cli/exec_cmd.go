@@ -13,7 +13,7 @@ import (
 
 type ExecCmd struct {
 	SandboxCreationFlags
-	ID  string   `arg:"" completion-predictor:"sandbox-name" help:"ID of the sandbox to create, or re-attach to"`
+	SandboxNameFlag
 	Arg          []string `arg:"" passthrough:"" help:"command args to exec in the container"`
 }
 
@@ -31,20 +31,20 @@ func (c *ExecCmd) Run(cctx *CLIContext) error {
 	}
 
 	// Generate ID if not provided
-	if c.ID == "" {
+	if c.SandboxName == "" {
 		seed := time.Now().UTC().UnixNano()
 		nameGenerator := namegenerator.NewNameGenerator(seed)
 
-		c.ID = nameGenerator.Generate()
+		c.SandboxName = nameGenerator.Generate()
 	}
 
 	// Try to get existing sandbox
-	sbox, err := mc.GetSandbox(ctx, c.ID)
+	sbox, err := mc.GetSandbox(ctx, c.SandboxName)
 	if err != nil {
 		// Sandbox doesn't exist, create it via daemon
-		slog.InfoContext(ctx, "Creating new sandbox via daemon", "id", c.ID)
+		slog.InfoContext(ctx, "Creating new sandbox via daemon", "id", c.SandboxName)
 		sbox, err = mc.CreateSandbox(ctx, mux.CreateSandboxOpts{
-			ID:           c.ID,
+			ID:           c.SandboxName,
 			CloneFromDir: c.CloneFromDir,
 			ImageName:    c.ImageName,
 			EnvFile:      c.EnvFile,

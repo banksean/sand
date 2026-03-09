@@ -36,8 +36,13 @@ type SandboxCreationFlags struct {
 	Rm           bool   `help:"remove the sandbox after the command terminates"`
 }
 
-// SandboxSelectionFlags are shared by commands that operate on a sandbox by ID or on all sandboxes.
+// SandboxNameFlag is shared by commands that require a single sandbox name argument.
+type SandboxNameFlag struct {
+	SandboxName string `arg:"" completion-predictor:"sandbox-name" help:"name of the sandbox"`
+}
+
+// SandboxSelectionFlags are shared by commands that operate on a sandbox by name or on all sandboxes.
 type SandboxSelectionFlags struct {
-	ID  string `arg:"" completion-predictor:"sandbox-name" optional:"" help:"ID of the sandbox"`
-	All bool   `short:"a" help:"all sandboxes"`
+	SandboxName string `arg:"" completion-predictor:"sandbox-name" optional:"" help:"name of the sandbox"`
+	All         bool   `short:"a" help:"all sandboxes"`
 }
