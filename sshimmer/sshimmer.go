@@ -194,16 +194,18 @@ func (s *LocalSSHimmer) getOrCreateKeyPair(idPath string) (ssh.PublicKey, []byte
 	}
 
 	privateKeyPEM := encodePrivateKeyToPEM(privateKey)
-
-	err = s.writeKeyToFile(privateKeyPEM, idPath)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error writing private key to file %w", err)
-	}
 	pubKeyBytes := ssh.MarshalAuthorizedKey(sshPublicKey)
 
-	err = s.writeKeyToFile([]byte(pubKeyBytes), idPath+".pub")
-	if err != nil {
+	// Write .pub first, then the private key. The private key path is used as
+	// the sentinel in Stat() above, so it must appear last. This ensures any
+	// concurrent caller that observes the private key file will also find the
+	// public key file. Both writes use SafeWriteFile (temp-file + rename) so
+	// each file is written atomically.
+	if err = s.fs.SafeWriteFile(idPath+".pub", []byte(pubKeyBytes), 0o600); err != nil {
 		return nil, nil, fmt.Errorf("error writing public key to file %w", err)
+	}
+	if err = s.fs.SafeWriteFile(idPath, privateKeyPEM, 0o600); err != nil {
+		return nil, nil, fmt.Errorf("error writing private key to file %w", err)
 	}
 	return sshPublicKey, privateKeyPEM, nil
 }
@@ -341,13 +343,16 @@ func (s *LocalSSHimmer) getOrCreateCA(path string) (ssh.Signer, ssh.PublicKey, e
 	}
 	// Then write the converted public key.
 	caPubKeyBytes := ssh.MarshalAuthorizedKey(caPublicKey)
-	if err := s.writeKeyToFile(caPubKeyBytes, path+".pub"); err != nil {
+	// Write .pub first, then the private key (the sentinel for Stat above),
+	// both atomically via SafeWriteFile so a concurrent caller always sees
+	// both files or neither.
+	if err := s.fs.SafeWriteFile(path+".pub", caPubKeyBytes, 0o600); err != nil {
 		return nil, nil, fmt.Errorf("writing CA public key to file: %w", err)
 	}
 
 	// Write the CA private key
 	caPrivKeyPEM := encodePrivateKeyToPEM(pri)
-	if err := s.writeKeyToFile(caPrivKeyPEM, path); err != nil {
+	if err := s.fs.SafeWriteFile(path, caPrivKeyPEM, 0o600); err != nil {
 		return nil, nil, fmt.Errorf("writing CA private key to file: %w", err)
 	}
 
