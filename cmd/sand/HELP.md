@@ -7,7 +7,7 @@ Requires apple container CLI: https://github.com/apple/container/releases/tag/0.
 ## Global Flags
 
 - `-h, --help` - Show context-sensitive help.
-- `--log-file` _`<log-file-path>`_ - location of log file (leave empty for a random tmp/ path) (default: `/tmp/sand/log`)
+- `--log-file` _`<log-file-path>`_ - location of log file (leave empty for a random tmp/ path) (default: `/tmp/sand/outie/log`)
 - `--log-level` _`<debug|info|warn|error>`_ - the logging level (debug, info, warn, error) (default: `info`)
 - `--app-base-dir` _`<app-base-dir>`_ - root dir to store sandbox clones of working directories. Leave unset to use '~/Library/Application Support/Sand'
 
@@ -34,18 +34,19 @@ create a new sandbox and shell into its container
 **Usage:**
 
 ```
-sand new [flags] [ID]
+sand new [flags] [SANDBOX-NAME]
 ```
 
 **Flags:**
 
 - `-i, --image-name` _`<container-image-name>`_ - name of container image to use (default: `ghcr.io/banksean/sand/default:latest`)
+- `-d, --clone-from-dir` _`<project-dir>`_ - directory to clone into the sandbox. Defaults to current working directory, if unset.
+- `-e, --env-file` _`".env"`_ - path to env file to use when creating a new shell (default: `.env`)
+- `--rm` - remove the sandbox after the command terminates
 - `-s, --shell` _`<shell-command>`_ - shell command to exec in the container (default: `/bin/zsh`)
-- `--cloner` _`<claude|default|opencode>`_ - name of workspace cloner to use (default: `default`)
-- `-c, --clone-from-dir` _`<project-dir>`_ - directory to clone into the sandbox. Defaults to current working directory, if unset.
-- `-e, --env-file` _`STRING`_ - path to env file to use when creating a new shell
+- `-c, --cloner` _`<claude|default|opencode>`_ - name of workspace cloner to use (default: `default`)
 - `-b, --branch` - create a new git branch inside the sandbox _container_ (not on your host workdir)
-- `--rm` - remove the sandbox after the shell terminates
+- `-p, --prompt` _`<prompt>`_ - start the agent with this prompt in non-interactive (one-shot) mode and return immediately
 
 ## `sand shell`
 
@@ -54,13 +55,12 @@ shell into a sandbox container (and start the container, if necessary)
 **Usage:**
 
 ```
-sand shell [flags] [ID]
+sand shell [flags] <SANDBOX-NAME>
 ```
 
 **Flags:**
 
 - `-s, --shell` _`<shell-command>`_ - shell command to exec in the container (default: `/bin/zsh`)
-- `-e, --env-file` _`STRING`_ - path to env file to use when creating a new shell
 
 ## `sand exec`
 
@@ -69,15 +69,15 @@ execute a single command in a sanbox
 **Usage:**
 
 ```
-sand exec [flags] <ID> <ARG>...
+sand exec [flags] <SANDBOX-NAME> <ARG>...
 ```
 
 **Flags:**
 
 - `-i, --image-name` _`<container-image-name>`_ - name of container image to use (default: `ghcr.io/banksean/sand/default:latest`)
-- `-c, --clone-from-dir` _`<project-dir>`_ - directory to clone into the sandbox. Defaults to current working directory, if unset.
-- `-e, --env-file` _`STRING`_ - path to env file to use when creating a new shell
-- `--rm` - remove the sandbox after the shell terminates
+- `-d, --clone-from-dir` _`<project-dir>`_ - directory to clone into the sandbox. Defaults to current working directory, if unset.
+- `-e, --env-file` _`".env"`_ - path to env file to use when creating a new shell (default: `.env`)
+- `--rm` - remove the sandbox after the command terminates
 
 ## `sand ls`
 
@@ -96,12 +96,12 @@ remove sandbox container and its clone directory
 **Usage:**
 
 ```
-sand rm [flags] [ID]
+sand rm [flags] [SANDBOX-NAME]
 ```
 
 **Flags:**
 
-- `-a, --all` - remove all sandboxes
+- `-a, --all` - all sandboxes
 
 ## `sand stop`
 
@@ -110,12 +110,12 @@ stop sandbox container
 **Usage:**
 
 ```
-sand stop [flags] [ID]
+sand stop [flags] [SANDBOX-NAME]
 ```
 
 **Flags:**
 
-- `-a, --all` - stop all sandboxes
+- `-a, --all` - all sandboxes
 
 ## `sand git`
 
@@ -134,7 +134,7 @@ diff current working directory with sandbox clone
 **Usage:**
 
 ```
-sand git diff [flags] <SANDBOX-ID>
+sand git diff [flags] <SANDBOX-NAME>
 ```
 
 **Flags:**
@@ -149,7 +149,7 @@ show git status of sandbox working tree
 **Usage:**
 
 ```
-sand git status <SANDBOX-ID>
+sand git status <SANDBOX-NAME>
 ```
 
 ### `sand git log`
@@ -159,7 +159,7 @@ show git log of sandbox working tree
 **Usage:**
 
 ```
-sand git log <SANDBOX-ID>
+sand git log <SANDBOX-NAME>
 ```
 
 ## `sand doc`
@@ -189,6 +189,6 @@ launch a vscode remote window connected to the sandbox's container
 **Usage:**
 
 ```
-sand vsc <ID>
+sand vsc <SANDBOX-NAME>
 ```
 
