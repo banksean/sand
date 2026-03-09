@@ -318,7 +318,7 @@ func TestBoxer_Sync(t *testing.T) {
 
 		boxer := newTestBoxer(t, mockContainer, mockImage)
 
-		box1 := &box.Box{
+		box1 := &sandtypes.Box{
 			ID:             "sandbox-1",
 			ContainerID:    "container-1",
 			SandboxWorkDir: t.TempDir(),
@@ -328,7 +328,7 @@ func TestBoxer_Sync(t *testing.T) {
 			t.Fatalf("SaveSandbox() error = %v", err)
 		}
 
-		box2 := &box.Box{
+		box2 := &sandtypes.Box{
 			ID:             "sandbox-2",
 			ContainerID:    "container-2",
 			SandboxWorkDir: t.TempDir(),
@@ -358,7 +358,7 @@ func TestBoxer_Sync(t *testing.T) {
 
 		boxer := newTestBoxer(t, mockContainer, mockImage)
 
-		box := &box.Box{
+		box := &sandtypes.Box{
 			ID:             "sandbox-1",
 			ContainerID:    "bad-container",
 			SandboxWorkDir: "/nonexistent/path",
@@ -415,7 +415,7 @@ func TestBoxer_Cleanup_EndToEnd(t *testing.T) {
 		boxer.fileOps = mockFile
 
 		sandboxDir := filepath.Join(boxer.appRoot, "clones", "test-sandbox")
-		box := &box.Box{
+		box := &sandtypes.Box{
 			ID:             "test-sandbox",
 			ContainerID:    "test-container",
 			HostOriginDir:  "/host/origin",
@@ -485,7 +485,7 @@ func TestBoxer_Cleanup_EndToEnd(t *testing.T) {
 		boxer := newTestBoxer(t, mockContainer, mockImage)
 		boxer.fileOps = mockFile
 
-		box := &box.Box{
+		box := &sandtypes.Box{
 			ID:             "test-sandbox",
 			ContainerID:    "test-container",
 			HostOriginDir:  "/host/origin",
@@ -519,7 +519,7 @@ func TestBoxer_Cleanup_EndToEnd(t *testing.T) {
 		boxer := newTestBoxer(t, mockContainer, mockImage)
 		boxer.gitOps = mockGit
 
-		box := &box.Box{
+		box := &sandtypes.Box{
 			ID:             "test-sandbox",
 			ContainerID:    "test-container",
 			HostOriginDir:  "/host/origin",
@@ -549,7 +549,7 @@ func TestBoxer_Cleanup_EndToEnd(t *testing.T) {
 		boxer := newTestBoxer(t, mockContainer, mockImage)
 		boxer.fileOps = mockFile
 
-		box := &box.Box{
+		box := &sandtypes.Box{
 			ID:             "test-sandbox",
 			ContainerID:    "test-container",
 			HostOriginDir:  "/host/origin",
@@ -575,7 +575,7 @@ func TestBoxer_AttachSandbox(t *testing.T) {
 		mockImage := &mockImageOps{}
 		boxer := newTestBoxer(t, mockContainer, mockImage)
 
-		originalBox := &box.Box{
+		originalBox := &sandtypes.Box{
 			ID:             "existing-sandbox",
 			ContainerID:    "existing-container",
 			HostOriginDir:  "/host/origin",
@@ -757,7 +757,7 @@ func TestBoxer_StopContainer(t *testing.T) {
 		mockImage := &mockImageOps{}
 		boxer := newTestBoxer(t, mockContainer, mockImage)
 
-		box := &box.Box{
+		box := &sandtypes.Box{
 			ID:          "test-sandbox",
 			ContainerID: "test-container",
 		}
@@ -777,7 +777,7 @@ func TestBoxer_StopContainer(t *testing.T) {
 		mockImage := &mockImageOps{}
 		boxer := newTestBoxer(t, mockContainer, mockImage)
 
-		box := &box.Box{
+		box := &sandtypes.Box{
 			ID:          "test-sandbox",
 			ContainerID: "",
 		}
@@ -802,7 +802,7 @@ func TestBoxer_StopContainer(t *testing.T) {
 		mockImage := &mockImageOps{}
 		boxer := newTestBoxer(t, mockContainer, mockImage)
 
-		box := &box.Box{
+		box := &sandtypes.Box{
 			ID:          "test-sandbox",
 			ContainerID: "test-container",
 		}

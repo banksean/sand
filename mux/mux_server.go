@@ -16,8 +16,8 @@ import (
 	"time"
 
 	"github.com/banksean/sand/applecontainer/types"
-	"github.com/banksean/sand/box"
 	"github.com/banksean/sand/mux/internal/boxer"
+	"github.com/banksean/sand/sandtypes"
 	"github.com/banksean/sand/version"
 )
 
@@ -477,7 +477,7 @@ type CreateSandboxOpts struct {
 }
 
 // createSandbox creates a new sandbox and starts its container.
-func (m *Mux) createSandbox(ctx context.Context, opts CreateSandboxOpts) (*box.Box, error) {
+func (m *Mux) createSandbox(ctx context.Context, opts CreateSandboxOpts) (*sandtypes.Box, error) {
 	agentType := opts.Cloner
 	if agentType == "" {
 		agentType = "default"

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/banksean/sand/box"
+	"github.com/banksean/sand/sandtypes"
 )
 
 func TestSaveSandbox(t *testing.T) {
@@ -25,7 +25,7 @@ func TestSaveSandbox(t *testing.T) {
 	defer sb.Close()
 
 	// Create a test sandbox
-	testSandbox := &box.Box{
+	testSandbox := &sandtypes.Box{
 		ID:             "test-id",
 		ContainerID:    "container-123",
 		HostOriginDir:  "/tmp/host-origin",
@@ -116,7 +116,7 @@ func TestLoadSandbox(t *testing.T) {
 	}
 
 	// Create a test sandbox struct
-	testSandbox := &box.Box{
+	testSandbox := &sandtypes.Box{
 		ID:             testID,
 		ContainerID:    "container-456",
 		HostOriginDir:  "/tmp/host-load",
@@ -214,7 +214,7 @@ func TestListSandboxes(t *testing.T) {
 		sandboxDir := filepath.Join(tmpDir, "test-"+string(rune('0'+i)))
 		os.MkdirAll(sandboxDir, 0o755)
 
-		testBox := &box.Box{
+		testBox := &sandtypes.Box{
 			ID:             "test-" + string(rune('0'+i)),
 			ContainerID:    "container-" + string(rune('0'+i)),
 			HostOriginDir:  "/tmp/host",
@@ -254,7 +254,7 @@ func TestUpdateContainerID(t *testing.T) {
 	sandboxDir := filepath.Join(tmpDir, "test-update")
 	os.MkdirAll(sandboxDir, 0o755)
 
-	testBox := &box.Box{
+	testBox := &sandtypes.Box{
 		ID:             "test-update",
 		ContainerID:    "original-container",
 		HostOriginDir:  "/tmp/host",
@@ -307,7 +307,7 @@ func TestGetSandboxesByImage(t *testing.T) {
 			imageName = "image-b"
 		}
 
-		testBox := &box.Box{
+		testBox := &sandtypes.Box{
 			ID:             "test-" + string(rune('0'+i)),
 			ContainerID:    "container-" + string(rune('0'+i)),
 			HostOriginDir:  "/tmp/host",

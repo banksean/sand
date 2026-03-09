@@ -13,7 +13,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/banksean/sand/box"
+	"github.com/banksean/sand/sandtypes"
 	"github.com/banksean/sand/version"
 )
 
@@ -124,16 +124,16 @@ func (m *MuxClient) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-func (m *MuxClient) ListSandboxes(ctx context.Context) ([]box.Box, error) {
-	var boxes []box.Box
+func (m *MuxClient) ListSandboxes(ctx context.Context) ([]sandtypes.Box, error) {
+	var boxes []sandtypes.Box
 	if err := m.doRequest(ctx, http.MethodGet, "/list", nil, &boxes); err != nil {
 		return nil, err
 	}
 	return boxes, nil
 }
 
-func (m *MuxClient) GetSandbox(ctx context.Context, id string) (*box.Box, error) {
-	var box box.Box
+func (m *MuxClient) GetSandbox(ctx context.Context, id string) (*sandtypes.Box, error) {
+	var box sandtypes.Box
 	if err := m.doRequest(ctx, http.MethodPost, "/get", map[string]string{"id": id}, &box); err != nil {
 		if strings.Contains(err.Error(), "404") {
 			return nil, fmt.Errorf("id not found: %q", id)
@@ -155,8 +155,8 @@ func (m *MuxClient) VSC(ctx context.Context, id string) error {
 	return m.doRequest(ctx, http.MethodPost, "/vsc", map[string]string{"id": id}, nil)
 }
 
-func (m *MuxClient) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*box.Box, error) {
-	var box box.Box
+func (m *MuxClient) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*sandtypes.Box, error) {
+	var box sandtypes.Box
 	if err := m.doRequest(ctx, http.MethodPost, "/create", opts, &box); err != nil {
 		return nil, err
 	}
@@ -164,12 +164,12 @@ func (m *MuxClient) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (
 }
 
 // ListSandboxes returns all sandboxes.
-func (m *Mux) ListSandboxes(ctx context.Context) ([]box.Box, error) {
+func (m *Mux) ListSandboxes(ctx context.Context) ([]sandtypes.Box, error) {
 	return m.boxer.List(ctx)
 }
 
 // GetSandbox retrieves a sandbox by ID.
-func (m *Mux) GetSandbox(ctx context.Context, id string) (*box.Box, error) {
+func (m *Mux) GetSandbox(ctx context.Context, id string) (*sandtypes.Box, error) {
 	return m.boxer.Get(ctx, id)
 }
 
