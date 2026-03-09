@@ -22,6 +22,7 @@ type NewCmd struct {
 	ShellFlags
 	Cloner      string `short:"c" default:"default" placeholder:"<claude|default|opencode>" help:"name of workspace cloner to use"`
 	Branch      bool   `short:"b" help:"create a new git branch inside the sandbox _container_ (not on your host workdir)"`
+	Prompt      string `short:"p" placeholder:"<prompt>" help:"start the agent with this prompt in non-interactive (one-shot) mode and return immediately"`
 	SandboxName string `arg:"" optional:"" help:"name of the sandbox to create"`
 }
 
@@ -60,6 +61,11 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 
 	if c.EnvFile != "" && !filepath.IsAbs(c.EnvFile) {
 		c.EnvFile = filepath.Join(c.CloneFromDir, c.EnvFile)
+	}
+
+	// When a prompt is given, default to the claude cloner for workspace preparation.
+	if c.Prompt != "" && c.Cloner == "default" {
+		c.Cloner = "claude"
 	}
 
 	if c.ImageName == "" && c.Cloner != "" {
@@ -114,6 +120,27 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 		if err != nil {
 			slog.ErrorContext(ctx, "sbox.new git checkout", "error", err, "out", out)
 		}
+	}
+
+	if c.Prompt != "" {
+		// One-shot mode: start the agent inside the container in the background and return
+		// immediately.  The prompt is passed via an env var to avoid shell quoting issues.
+		containerSvc := box.NewAppleContainerOps()
+		_, err := containerSvc.Exec(ctx,
+			&options.ExecContainer{
+				ProcessOptions: options.ProcessOptions{
+					WorkDir: "/app",
+					EnvFile: sbox.EnvFile,
+					Env:     map[string]string{"SAND_ONESHOT_PROMPT": c.Prompt},
+				},
+			}, sbox.ContainerID, "/bin/sh", os.Environ(),
+			"-c", `nohup claude --print "$SAND_ONESHOT_PROMPT" > /tmp/claude-oneshot.log 2>&1 &`)
+		if err != nil {
+			slog.ErrorContext(ctx, "NewCmd: start agent oneshot", "error", err)
+			return fmt.Errorf("failed to start agent in sandbox %s: %w", sbox.ID, err)
+		}
+		fmt.Printf("Agent started in sandbox %s\n", sbox.ID)
+		return nil
 	}
 
 	updateSSHConfFunc, err := sshimmer.CheckSSHReachability(ctx, hostname)
