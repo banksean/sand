@@ -135,7 +135,7 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 				},
 			}, sbox.ContainerID, "/bin/sh", os.Environ(),
 			os.Stdin, os.Stdout, os.Stderr,
-			"-c", `claude --print --permission-mode=auto "$SAND_ONESHOT_PROMPT"`)
+			"-c", `claude --permission-mode=auto --print "$SAND_ONESHOT_PROMPT"`)
 		if err != nil {
 			slog.ErrorContext(ctx, "NewCmd: start agent oneshot", "error", err)
 			return fmt.Errorf("failed to start agent in sandbox %s: %w", sbox.ID, err)
