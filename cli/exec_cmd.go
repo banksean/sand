@@ -12,10 +12,9 @@ import (
 )
 
 type ExecCmd struct {
-	ImageName    string   `short:"i" default:"ghcr.io/banksean/sand/default:latest" placeholder:"<container-image-name>" help:"name of container image to use"`
+	SandboxCreationFlags
 	CloneFromDir string   `short:"c" placeholder:"<project-dir>" help:"directory to clone into the sandbox. Defaults to current working directory, if unset."`
 	EnvFile      string   `short:"e" placholder:"<file-path>" help:"path to env file to use when creating a new shell"`
-	Rm           bool     `help:"remove the sandbox after the shell terminates"`
 	ID           string   `arg:"" completion-predictor:"sandbox-name" help:"ID of the sandbox to create, or re-attach to"`
 	Arg          []string `arg:"" passthrough:"" help:"command args to exec in the container"`
 }

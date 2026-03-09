@@ -7,8 +7,7 @@ import (
 )
 
 type StopCmd struct {
-	ID  string `arg:"" completion-predictor:"sandbox-name" optional:"" help:"ID of the sandbox to stop"`
-	All bool   `short:"a" help:"stop all sandboxes"`
+	SandboxSelectionFlags
 }
 
 func (c *StopCmd) Run(cctx *CLIContext) error {

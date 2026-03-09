@@ -7,8 +7,7 @@ import (
 )
 
 type RmCmd struct {
-	ID  string `arg:"" completion-predictor:"sandbox-name" optional:"" help:"ID of the sandbox to remove"`
-	All bool   `short:"a" help:"remove all sandboxes"`
+	SandboxSelectionFlags
 }
 
 func (c *RmCmd) Run(cctx *CLIContext) error {

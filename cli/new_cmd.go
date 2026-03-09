@@ -18,13 +18,12 @@ import (
 )
 
 type NewCmd struct {
-	ImageName    string `short:"i" default:"ghcr.io/banksean/sand/default:latest" placeholder:"<container-image-name>" help:"name of container image to use"`
-	Shell        string `short:"s" default:"/bin/zsh" placeholder:"<shell-command>" help:"shell command to exec in the container"`
+	SandboxCreationFlags
+	ShellFlags
 	Cloner       string `short:"c" default:"default" placeholder:"<claude|default|opencode>" help:"name of workspace cloner to use"`
 	CloneFromDir string `short:"d" placeholder:"<project-dir>" help:"directory to clone into the sandbox. Defaults to current working directory, if unset."`
 	EnvFile      string `short:"e" default:".env" placholder:"<file-path>" help:"path to env file to use when creating a new shell"`
 	Branch       bool   `short:"b" help:"create a new git branch inside the sandbox _container_ (not on your host workdir)"`
-	Rm           bool   `help:"remove the sandbox after the shell terminates"`
 	ID           string `arg:"" optional:"" help:"ID of the sandbox to create, or re-attach to"`
 }
 
