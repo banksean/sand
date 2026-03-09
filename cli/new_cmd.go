@@ -123,10 +123,10 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 	}
 
 	if c.Prompt != "" {
-		// One-shot mode: start the agent inside the container in the background and return
-		// immediately.  The prompt is passed via an env var to avoid shell quoting issues.
+		// One-shot mode: run the agent inside the container, streaming output to stdio.
+		// The prompt is passed via an env var to avoid shell quoting issues.
 		containerSvc := box.NewAppleContainerOps()
-		_, err := containerSvc.Exec(ctx,
+		wait, err := containerSvc.ExecStream(ctx,
 			&options.ExecContainer{
 				ProcessOptions: options.ProcessOptions{
 					WorkDir: "/app",
@@ -134,12 +134,15 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 					Env:     map[string]string{"SAND_ONESHOT_PROMPT": c.Prompt},
 				},
 			}, sbox.ContainerID, "/bin/sh", os.Environ(),
-			"-c", `nohup claude --print "$SAND_ONESHOT_PROMPT" > /tmp/claude-oneshot.log 2>&1 &`)
+			os.Stdin, os.Stdout, os.Stderr,
+			"-c", `claude --print --permission-mode=auto "$SAND_ONESHOT_PROMPT"`)
 		if err != nil {
 			slog.ErrorContext(ctx, "NewCmd: start agent oneshot", "error", err)
 			return fmt.Errorf("failed to start agent in sandbox %s: %w", sbox.ID, err)
 		}
-		fmt.Printf("Agent started in sandbox %s\n", sbox.ID)
+		if err := wait(); err != nil {
+			slog.ErrorContext(ctx, "NewCmd: agent oneshot wait", "error", err)
+		}
 		return nil
 	}
 

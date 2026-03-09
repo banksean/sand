@@ -14,7 +14,7 @@ type MockContainerOps struct {
 	StopFunc       func(ctx context.Context, opts *options.StopContainer, containerID string) (string, error)
 	DeleteFunc     func(ctx context.Context, opts *options.DeleteContainer, containerID string) (string, error)
 	ExecFunc       func(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, args ...string) (string, error)
-	ExecStreamFunc func(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, stdin io.Reader, stdout, stderr io.Writer) (func() error, error)
+	ExecStreamFunc func(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, stdin io.Reader, stdout, stderr io.Writer, cmdArgs ...string) (func() error, error)
 	InspectFunc    func(ctx context.Context, containerID string) ([]types.Container, error)
 }
 
@@ -53,9 +53,9 @@ func (m *MockContainerOps) Exec(ctx context.Context, opts *options.ExecContainer
 	return "exec output", nil
 }
 
-func (m *MockContainerOps) ExecStream(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, stdin io.Reader, stdout, stderr io.Writer) (func() error, error) {
+func (m *MockContainerOps) ExecStream(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, stdin io.Reader, stdout, stderr io.Writer, cmdArgs ...string) (func() error, error) {
 	if m.ExecStreamFunc != nil {
-		return m.ExecStreamFunc(ctx, opts, containerID, cmd, env, stdin, stdout, stderr)
+		return m.ExecStreamFunc(ctx, opts, containerID, cmd, env, stdin, stdout, stderr, cmdArgs...)
 	}
 	return func() error { return nil }, nil
 }

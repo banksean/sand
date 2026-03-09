@@ -15,7 +15,7 @@ type ContainerOps interface {
 	Stop(ctx context.Context, opts *options.StopContainer, containerID string) (string, error)
 	Delete(ctx context.Context, opts *options.DeleteContainer, containerID string) (string, error)
 	Exec(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, args ...string) (string, error)
-	ExecStream(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, stdin io.Reader, stdout, stderr io.Writer) (func() error, error)
+	ExecStream(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, stdin io.Reader, stdout, stderr io.Writer, cmdArgs ...string) (func() error, error)
 	Inspect(ctx context.Context, containerID string) ([]types.Container, error)
 }
 
@@ -50,8 +50,8 @@ func (a *appleContainerOps) Exec(ctx context.Context, opts *options.ExecContaine
 	return ac.Containers.Exec(ctx, opts, containerID, cmd, env, args...)
 }
 
-func (a *appleContainerOps) ExecStream(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, stdin io.Reader, stdout, stderr io.Writer) (func() error, error) {
-	return ac.Containers.ExecStream(ctx, opts, containerID, cmd, env, stdin, stdout, stderr)
+func (a *appleContainerOps) ExecStream(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, stdin io.Reader, stdout, stderr io.Writer, cmdArgs ...string) (func() error, error) {
+	return ac.Containers.ExecStream(ctx, opts, containerID, cmd, env, stdin, stdout, stderr, cmdArgs...)
 }
 
 func (a *appleContainerOps) Inspect(ctx context.Context, containerID string) ([]types.Container, error) {
