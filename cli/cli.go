@@ -30,8 +30,10 @@ type ShellFlags struct {
 
 // SandboxCreationFlags are shared by commands that create a sandbox.
 type SandboxCreationFlags struct {
-	ImageName string `short:"i" default:"ghcr.io/banksean/sand/default:latest" placeholder:"<container-image-name>" help:"name of container image to use"`
-	Rm        bool   `help:"remove the sandbox after the command terminates"`
+	ImageName    string `short:"i" default:"ghcr.io/banksean/sand/default:latest" placeholder:"<container-image-name>" help:"name of container image to use"`
+	CloneFromDir string `short:"d" placeholder:"<project-dir>" help:"directory to clone into the sandbox. Defaults to current working directory, if unset."`
+	EnvFile      string `short:"e" default:".env" placholder:"<file-path>" help:"path to env file to use when creating a new shell"`
+	Rm           bool   `help:"remove the sandbox after the command terminates"`
 }
 
 // SandboxSelectionFlags are shared by commands that operate on a sandbox by ID or on all sandboxes.

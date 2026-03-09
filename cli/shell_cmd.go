@@ -12,7 +12,7 @@ import (
 
 type ShellCmd struct {
 	ShellFlags
-	EnvFile string `short:"e" placholder:"<file-path>" help:"path to env file to use when creating a new shell"`
+	EnvFile string `short:"e" default:".env" placholder:"<file-path>" help:"path to env file to use when creating a new shell"`
 	ID      string `arg:"" completion-predictor:"sandbox-name" optional:"" help:"ID of the sandbox to create, or re-attach to"`
 }
 
