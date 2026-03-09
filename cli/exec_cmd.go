@@ -14,7 +14,7 @@ import (
 type ExecCmd struct {
 	SandboxCreationFlags
 	SandboxNameFlag
-	Arg          []string `arg:"" passthrough:"" help:"command args to exec in the container"`
+	Arg []string `arg:"" passthrough:"" help:"command args to exec in the container"`
 }
 
 func (c *ExecCmd) Run(cctx *CLIContext) error {
