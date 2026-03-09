@@ -8,8 +8,7 @@ import (
 	"os"
 )
 
-type VscCmd struct {
-}
+type VscCmd struct{}
 
 func (c *VscCmd) Run(cctx *CLIContext) error {
 	ctx := cctx.Context

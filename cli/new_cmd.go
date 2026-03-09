@@ -28,13 +28,11 @@ type NewCmd struct {
 	ID           string `arg:"" optional:"" help:"ID of the sandbox to create, or re-attach to"`
 }
 
-var (
-	defaultImageForCloner = map[string]string{
-		"claude":   "ghcr.io/banksean/sand/default:latest",
-		"opencode": "ghcr.io/banksean/sand/opencode:latest",
-		"codex":    "ghcr.io/banksean/sand/codex:latest",
-	}
-)
+var defaultImageForCloner = map[string]string{
+	"claude":   "ghcr.io/banksean/sand/default:latest",
+	"opencode": "ghcr.io/banksean/sand/opencode:latest",
+	"codex":    "ghcr.io/banksean/sand/codex:latest",
+}
 
 func (c *NewCmd) Run(cctx *CLIContext) error {
 	ctx := cctx.Context
