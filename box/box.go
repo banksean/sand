@@ -7,10 +7,6 @@ import (
 	"github.com/banksean/sand/sshimmer"
 )
 
-const (
-	DefaultImageName = "ghcr.io/banksean/sand/default:latest"
-)
-
 // Box is a "sandbox" - it represents the connection between
 // - a local filesystem clone of a local dev workspace directory
 // - a local container instance (whose state is managed by a separate container service)

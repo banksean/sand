@@ -23,6 +23,10 @@ type CLIContext struct {
 	MuxClient  *mux.MuxClient
 }
 
+const (
+	DefaultImageName = "ghcr.io/banksean/sand/default:latest"
+)
+
 // ShellFlags are shared by commands that exec a shell inside a container.
 type ShellFlags struct {
 	Shell string `short:"s" default:"/bin/zsh" placeholder:"<shell-command>" help:"shell command to exec in the container"`

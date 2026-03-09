@@ -57,7 +57,7 @@ func (c *ExecCmd) Run(cctx *CLIContext) error {
 	}
 
 	if sbox.ImageName == "" {
-		sbox.ImageName = box.DefaultImageName
+		sbox.ImageName = DefaultImageName
 	}
 
 	// At this point the sandbox and container exist and are running (created by daemon)
