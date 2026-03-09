@@ -116,7 +116,15 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 
 	if c.Branch {
 		// Create and check out a git branch inside the container, named after the sandbox id
-		out, err := sbox.Exec(ctx, "git", "checkout", "-b", sbox.ID)
+		containerSvc := box.NewAppleContainerOps()
+		out, err := containerSvc.Exec(ctx,
+			&options.ExecContainer{
+				ProcessOptions: options.ProcessOptions{
+					WorkDir: "/app",
+					EnvFile: sbox.EnvFile,
+				},
+			}, sbox.ContainerID, "/bin/sh", os.Environ(),
+			"git", "checkout", "-b", sbox.ID)
 		if err != nil {
 			slog.ErrorContext(ctx, "sbox.new git checkout", "error", err, "out", out)
 		}

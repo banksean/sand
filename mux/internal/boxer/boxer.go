@@ -108,10 +108,20 @@ func (sb *Boxer) Sync(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		if err := box.Sync(ctx); err != nil {
+		if err := sb.SyncBox(ctx, box); err != nil {
 			slog.ErrorContext(ctx, "Boxer.Sync box.Sync", "error", err)
 		}
 	}
+	return nil
+}
+
+func (b *Boxer) SyncBox(ctx context.Context, sb *box.Box) error {
+	fi, err := os.Stat(sb.SandboxWorkDir)
+	if err != nil || !fi.IsDir() {
+		slog.ErrorContext(ctx, "Boxer.Sync SandboxWorkDir stat", "sandbox", sb.ID, "workdir", sb.SandboxWorkDir, "fi", fi, "error", err)
+		sb.SandboxWorkDirError = "NO CLONE DIR"
+	}
+
 	return nil
 }
 

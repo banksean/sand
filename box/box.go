@@ -1,12 +1,6 @@
 package box
 
 import (
-	"context"
-	"fmt"
-	"io"
-	"log/slog"
-	"os"
-
 	"github.com/banksean/sand/applecontainer/types"
 	"github.com/banksean/sand/cloning"
 	"github.com/banksean/sand/sandtypes"
@@ -56,31 +50,6 @@ type Box struct {
 	ContainerHooks []sandtypes.ContainerStartupHook `json:"-"`
 	Container      *types.Container
 	Keys           *sshimmer.Keys
-}
-
-// Sync checks to see if the SandboxWorkDir exists, an d sets SandboxWorkDirError if not.
-// TODO: Move this method to something in mux/internal/boxer/...
-func (sb *Box) Sync(ctx context.Context) error {
-	fi, err := os.Stat(sb.SandboxWorkDir)
-	if err != nil || !fi.IsDir() {
-		slog.ErrorContext(ctx, "Boxer.Sync SandboxWorkDir stat", "sandbox", sb.ID, "workdir", sb.SandboxWorkDir, "fi", fi, "error", err)
-		sb.SandboxWorkDirError = "NO CLONE DIR"
-	}
-
-	return nil
-}
-
-// Shell executes a command in the container. The container must be in state "running".
-// TODO: Remove this method.
-func (sb *Box) Shell(ctx context.Context, env map[string]string, shellCmd string, stdin io.Reader, stdout, stderr io.Writer) error {
-	slog.InfoContext(ctx, "Sandbox.Shell", "sandbox", sb.ID, "shellCmd", shellCmd)
-	return fmt.Errorf("Don't call Box.Shell. Use e.g. applecontainer.NewContainerService().ExecStream(...) on the host OS")
-}
-
-// Exec executes a command in the container. The container must be in state "running".
-// TODO: Remove this method.
-func (sb *Box) Exec(ctx context.Context, shellCmd string, args ...string) (string, error) {
-	return "", fmt.Errorf("Don't call Box.Exec. Use e.g. applecontainer.NewContainerService().Exec(...) on the host OS.  ")
 }
 
 func (sb *Box) EffectiveMounts() []sandtypes.MountSpec {

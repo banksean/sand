@@ -44,8 +44,6 @@ type Innie struct {
 	Completion kongcompletion.Completion `cmd:"" help:"Outputs shell code for initialising tab completions"`
 
 	New     cli.NewCmd     `cmd:"" help:"create a new sandbox and shell into its container"`
-	Shell   cli.ShellCmd   `cmd:"" help:"shell into a sandbox container (and start the container, if necessary)"`
-	Exec    cli.ExecCmd    `cmd:"" help:"execute a single command in a sanbox"`
 	Ls      cli.LsCmd      `cmd:"" help:"list sandboxes"`
 	Rm      cli.RmCmd      `cmd:"" help:"remove sandbox container and its clone directory"`
 	Stop    cli.StopCmd    `cmd:"" help:"stop sandbox container"`

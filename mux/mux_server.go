@@ -305,7 +305,11 @@ func (m *Mux) handleGet(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, fmt.Errorf("got a nil sandbox for ID %s", args.ID), http.StatusInternalServerError)
 		return
 	}
-	sbox.Sync(r.Context())
+
+	if err := m.boxer.SyncBox(r.Context(), sbox); err != nil {
+		slog.ErrorContext(r.Context(), "Mux.handleGet boxer.SyncBox", "error", err)
+		writeJSONError(w, fmt.Errorf("failed to sync sandbox for ID %s", args.ID), http.StatusInternalServerError)
+	}
 
 	if sbox == nil {
 		http.Error(w, "Not found", http.StatusNotFound)

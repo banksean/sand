@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/banksean/sand/applecontainer/options"
 	"github.com/banksean/sand/box"
 	"github.com/banksean/sand/mux"
 	"github.com/goombaio/namegenerator"
@@ -67,9 +68,17 @@ func (c *ExecCmd) Run(cctx *CLIContext) error {
 	if len(c.Arg) > 1 {
 		args = c.Arg[1:]
 	}
-	out, err := sbox.Exec(ctx, c.Arg[0], args...)
+	containerSvc := box.NewAppleContainerOps()
+	out, err := containerSvc.Exec(ctx,
+		&options.ExecContainer{
+			ProcessOptions: options.ProcessOptions{
+				WorkDir: "/app",
+				EnvFile: sbox.EnvFile,
+			},
+		}, sbox.ContainerID, "/bin/sh", os.Environ(),
+		append([]string{c.Arg[0]}, args...)...)
 	if err != nil {
-		slog.ErrorContext(ctx, "sbox.exec", "error", err)
+		slog.ErrorContext(ctx, "sbox.exec", "error", err, "out", out)
 	}
 
 	if c.Rm {
