@@ -6,19 +6,22 @@ ENV TZ="$TZ"
 RUN apk add --no-cache \
   bash \
   curl \
+  delta \
   fzf \
   git \
-  delta \
   iproute2 \
   ipset \
   iptables \
   jq \
   less \
+  libgcc \
+  libstdc++ \
   man-db \
   nano \
   openssh-client \
   openssh-server \
   procps \
+  ripgrep \
   sudo \
   unzip \
   vim \
