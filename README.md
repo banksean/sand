@@ -9,12 +9,12 @@ go install github.com/banksean/sand/cmd/...
 ```
 
 ## Usage
-```
+```sh
 sand new -c opencode
 ```
 
 Or use with claude, other agents:
-```
+```sh
 sand new -c claude
 ```
 
@@ -48,7 +48,7 @@ Fast and easy: One way to achieve speed is by doing less, so the specific compar
   - hardware isolation via Apple Silicon
   - low memory overhead, fast start times
   - based on [Kata](https://katacontainers.io/)
-  - supported in MacOS 26 and up
+  - supported in macOS 15 (Sonoma) and up
 - Filesystem:
     - Base container image: Minimal, with some dynamic provisioning based on which agent you're using
     - Agent workspaces: `/app` is mounted from the APFS CoW clone, must be same APFS disk as the original project dir
@@ -87,17 +87,19 @@ See [doc/GIT_REMOTES.md](doc/GIT_REMOTES.md) for a more detailed explanation of 
 
 ```sh
 $ sand --help # a much more complete list of commands and flags
-% sand ls # lists your current sandboxes
-% sand git status your-sandbox-name # prints the results of running "git status" in the sandbox's working directory
-% sand git diff your-sandbox-name # compares your working directory to the sandbox's clone of your working directory
-% sand vsc your-sandbox-name # launches a vscode window, connected "remotely" to your-sandbox-name
-% sand shell your-sandbox-name # open a new shell into the your-sandbox-name's container
-% sand stop your-sanbox-name # stops the sandbox container, but does *not* delete its filesystem
-% sand rm your-sandbox-name # stops and removes the container, and *does* remove the sandbox's filesystem.
+$ sand ls # lists your current sandboxes
+$ sand git status your-sandbox-name # prints the results of running "git status" in the sandbox's working directory
+$ sand git diff your-sandbox-name # compares your working directory to the sandbox's clone of your working directory
+$ sand vsc your-sandbox-name # launches a vscode window, connected "remotely" to your-sandbox-name
+$ sand shell your-sandbox-name # open a new shell into the your-sandbox-name's container
+$ sand stop your-sandbox-name # stops the sandbox container, but does *not* delete its filesystem
+$ sand rm your-sandbox-name # stops and removes the container, and *does* remove the sandbox's filesystem.
 ```
 
-For more information about `sand`'s subcommands and other options, 
+For more information about `sand`'s subcommands and other options, see [cmd/sand/HELP.md](./cmd/sand/HELP.md).
 
 ## Requirements
 - Only works on Apple hardware (of course).
+- Apple Silicon Mac (M1/M2/M3/M4)
+- macOS 15 (Sonoma) or later
 - Install [`apple/container`](https://github.com/apple/container) first, since these helper functions just shell out to it. 
