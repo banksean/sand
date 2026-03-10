@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 	"text/tabwriter"
+
+	"github.com/banksean/sand/sandtypes"
 )
 
 type LsCmd struct{}
@@ -25,7 +27,7 @@ func (c *LsCmd) Run(cctx *CLIContext) error {
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "SANDBOX NAME\tSTATUS\tORIGIN DIR\tORIGIN BRANCH\tIMAGE NAME")
+	fmt.Fprintln(w, "SANDBOX NAME\tSTATUS\tFROM DIR\tFROM GIT\tCURRENT GIT\tIMAGE NAME")
 	for _, sbox := range list {
 		ctr := sbox.Container
 		status := []string{"dormant"}
@@ -44,12 +46,29 @@ func (c *LsCmd) Run(cctx *CLIContext) error {
 			hostOriginDir = strings.Replace(hostOriginDir, userHomeDir, "~", 1)
 		}
 		imgName := strings.TrimPrefix(sbox.ImageName, "ghcr.io/banksean/sand/")
-		originalBranch := ""
-		if sbox.OriginalGitDetails != nil {
-			originalBranch = sbox.OriginalGitDetails.Branch
-		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", sbox.ID, strings.Join(status, ", "), hostOriginDir, originalBranch, imgName)
+
+		originalBranch := gitSummary(sbox.OriginalGitDetails)
+		currentBranch := gitSummary(sbox.CurrentGitDetails)
+
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n", sbox.ID, strings.Join(status, ", "), hostOriginDir, originalBranch, currentBranch, imgName)
 	}
 	w.Flush()
 	return nil
+}
+
+func gitSummary(details *sandtypes.GitDetails) string {
+	if details == nil {
+		return ""
+	}
+	commit := "        "
+	if len(details.Commit) > 8 {
+		commit = details.Commit[:8] + " "
+	}
+	ret := commit + details.Branch
+	if details.IsDirty {
+		ret = "*" + ret
+	} else {
+		ret = " " + ret
+	}
+	return ret
 }

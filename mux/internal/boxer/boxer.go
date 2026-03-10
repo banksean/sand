@@ -276,6 +276,7 @@ func (sb *Boxer) List(ctx context.Context) ([]sandtypes.Box, error) {
 			box.SandboxContainerError = containerGetErrorMsg
 		}
 		box.Container = ctr
+		box.CurrentGitDetails = sb.getCurrentGitDetails(ctx, box)
 		boxes[i] = *box
 	}
 	return boxes, nil
@@ -297,6 +298,8 @@ func (sb *Boxer) Get(ctx context.Context, id string) (*sandtypes.Box, error) {
 		box.SandboxContainerError = containerGetErrorMsg
 	}
 	box.Container = ctr
+	box.CurrentGitDetails = sb.getCurrentGitDetails(ctx, box)
+
 	slog.InfoContext(ctx, "Boxer.Get", "ret", box)
 	return box, nil
 }
@@ -330,6 +333,16 @@ func (sb *Boxer) Cleanup(ctx context.Context, sbox *sandtypes.Box) error {
 	return nil
 }
 
+func (sb *Boxer) getCurrentGitDetails(ctx context.Context, box *sandtypes.Box) *sandtypes.GitDetails {
+	currentGit := &sandtypes.GitDetails{}
+	appDir := filepath.Join(box.SandboxWorkDir, "app")
+	currentGit.Branch = sb.gitOps.Branch(ctx, appDir)
+	currentGit.Commit = sb.gitOps.Commit(ctx, appDir)
+	currentGit.IsDirty = sb.gitOps.IsDirty(ctx, appDir)
+
+	return currentGit
+}
+
 // Helper functions for converting between Box and db.Sandbox
 
 func (sb *Boxer) sandboxFromDB(s *db.Sandbox) *sandtypes.Box {
@@ -337,6 +350,7 @@ func (sb *Boxer) sandboxFromDB(s *db.Sandbox) *sandtypes.Box {
 	if agentType == "" {
 		agentType = "default" // Fallback for old sandboxes
 	}
+
 	return &sandtypes.Box{
 		ID:             s.ID,
 		AgentType:      agentType,
@@ -624,7 +638,6 @@ func (sb *Boxer) loadSandbox(ctx context.Context, id string) (*sandtypes.Box, er
 	}
 
 	box := sb.sandboxFromDB(&sandbox)
-
 	return box, nil
 }
 

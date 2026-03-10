@@ -43,6 +43,7 @@ type Box struct {
 	// ContainerHooks run after the container has started to perform any bootstrap logic.
 	ContainerHooks     []ContainerStartupHook `json:"-"`
 	OriginalGitDetails *GitDetails
+	CurrentGitDetails  *GitDetails
 	Container          *types.Container
 	Keys               *sshimmer.Keys
 }
