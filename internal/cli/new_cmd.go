@@ -23,7 +23,7 @@ import (
 type NewCmd struct {
 	SandboxCreationFlags
 	ShellFlags
-	Agent       string `short:"a" default:"default" placeholder:"<claude|default|opencode>" help:"name of coding agent to use"`
+	Agent       string `short:"a" placeholder:"<claude|codex|opencode>" help:"name of coding agent to use"`
 	Branch      bool   `short:"b" help:"create a new git branch inside the sandbox _container_ (not on your host workdir)"`
 	Prompt      string `short:"p" placeholder:"<prompt>" help:"start the agent with this prompt in non-interactive (one-shot) mode and return immediately"`
 	Username    string `help:"name of default user to create (defaults to $USER)"`
@@ -177,6 +177,8 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 	hostname := types.GetContainerHostname(ctr)
 	env := map[string]string{
 		"HOSTNAME": hostname,
+		"LANG":     os.Getenv("LANG"),
+		"TERM":     os.Getenv("TERM"),
 	}
 
 	slog.InfoContext(ctx, "main: sbox.new starting")
@@ -272,10 +274,22 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 	var args []string
 	switch c.Agent {
 	case "claude":
-		args = []string{"-c", "claude --permission-mode=bypassPermissions"}
+		if c.Tmux {
+			args = []string{"new-session", "-A", "-s", "claude-" + sbox.ID, "claude --permission-mode=bypassPermissions"}
+		} else {
+			args = []string{"-c", "claude --permission-mode=bypassPermissions"}
+		}
 	case "opencode":
 		args = []string{"-c", "opencode --port 80 --hostname " + strings.TrimSuffix(ctrs[0].Networks[0].Hostname, ".")}
 	}
+	if c.Tmux {
+		c.Shell = "/usr/bin/tmux"
+		if c.Agent == "" {
+			args = []string{"new-session", "-A", "-s", sbox.ID}
+		}
+	}
+
+	cmdEnv := os.Environ()
 
 	wait, err := containerSvc.ExecStream(ctx,
 		&options.ExecContainer{
@@ -288,7 +302,7 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 				User:        c.Username,
 				UID:         c.Uid,
 			},
-		}, sbox.ContainerID, c.Shell, os.Environ(), os.Stdin, os.Stdout, os.Stderr, args...)
+		}, sbox.ContainerID, c.Shell, cmdEnv, os.Stdin, os.Stdout, os.Stderr, args...)
 	if err != nil {
 		slog.ErrorContext(ctx, "shell: containerService.ExecStream", "sandbox", sbox.ID, "error", err)
 		return fmt.Errorf("failed to execute shell command for sandbox %s: %w", sbox.ID, err)

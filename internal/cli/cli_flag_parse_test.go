@@ -148,8 +148,8 @@ func TestNewCmdDefaults(t *testing.T) {
 	if cli.New.EnvFile != ".env" {
 		t.Errorf("expected default EnvFile .env, got %q", cli.New.EnvFile)
 	}
-	if cli.New.Agent != "default" {
-		t.Errorf("expected default Cloner 'default', got %q", cli.New.Agent)
+	if cli.New.Agent != "" {
+		t.Errorf("expected default Agent '', got %q", cli.New.Agent)
 	}
 	if cli.New.Branch {
 		t.Error("expected Branch=false by default")

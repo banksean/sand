@@ -30,6 +30,7 @@ const (
 // ShellFlags are shared by commands that exec a shell inside a container.
 type ShellFlags struct {
 	Shell string `short:"s" default:"/bin/zsh" placeholder:"<shell-command>" help:"shell command to exec in the container"`
+	Tmux  bool   `short:"t" help:"create or reconnect to a container-side tmux session"`
 }
 
 // SandboxCreationFlags are shared by commands that create a sandbox.

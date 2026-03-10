@@ -8,12 +8,12 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"os/signal"
 	"strings"
 	"syscall"
 
 	"github.com/banksean/sand/internal/applecontainer/options"
 	"github.com/banksean/sand/internal/applecontainer/types"
-	"github.com/creack/pty"
 	"golang.org/x/term"
 )
 
@@ -172,39 +172,48 @@ func (c *ContainerSvc) ExecStream(ctx context.Context, opts *options.ExecContain
 	cmd := exec.CommandContext(ctx, "container", append([]string{"exec"}, args...)...)
 	slog.InfoContext(ctx, "ContainerSvc.ExecStream", "cmd", strings.Join(cmd.Args, " "))
 	cmd.Env = env
-	checkTerminal := false
-	stdinFile, ok := stdin.(*os.File)
-	if !checkTerminal || (ok && term.IsTerminal(int(stdinFile.Fd()))) {
-		slog.InfoContext(ctx, "ContainerSvc.ExecStream: normal terminal passthrough")
-
-		cmd.Stdin = stdin
-		cmd.Stdout = stdout
-		cmd.Stderr = stderr
-		if err := cmd.Start(); err != nil {
-			return nil, err
-		}
-	} else {
-		slog.InfoContext(ctx, "ContainerSvc.ExecStream: using pseudo-terminal")
-
-		ptmx, err := pty.Start(cmd)
+	slog.InfoContext(ctx, "ContainerSvc.ExecStream: normal terminal passthrough")
+	// If stdin is a real terminal, put it in raw mode before handing off.
+	// container exec --tty needs the real terminal to be raw so its own
+	// PTY proxying doesn't get double-processed by the terminal driver.
+	var savedState *term.State
+	if stdinFile, ok := stdin.(*os.File); ok && term.IsTerminal(int(stdinFile.Fd())) {
+		var err error
+		savedState, err = term.MakeRaw(int(stdinFile.Fd()))
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("making terminal raw: %w", err)
 		}
-		defer ptmx.Close()
-
-		// Copy data between stdin/stdout and the pty
-		go io.Copy(ptmx, stdin)
-		go io.Copy(stdout, ptmx)
-		// Writing stderr and stdout to the same place is probably a bad idea,
-		// but we don't have anywhere else to send it at the moment.
-		go io.Copy(stderr, ptmx)
 	}
 
+	cmd.Stdin = stdin
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
+	if err := cmd.Start(); err != nil {
+		if savedState != nil {
+			term.Restore(int(stdin.(*os.File).Fd()), savedState)
+		}
+		return nil, err
+	}
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGWINCH, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		for sig := range sigCh {
+			slog.InfoContext(ctx, "ContainerSvc.ExecStream signal handler", "signal", sig)
+			switch sig {
+			case syscall.SIGWINCH:
+				syscall.Kill(-cmd.Process.Pid, syscall.SIGWINCH)
+			case syscall.SIGINT, syscall.SIGTERM:
+				if savedState != nil {
+					term.Restore(int(stdin.(*os.File).Fd()), savedState)
+				}
+			}
+		}
+	}()
+
 	return func() error {
-		slog.InfoContext(ctx, "ContainerSvc.ExecStream wait")
 		err := cmd.Wait()
-		if err != nil {
-			slog.ErrorContext(ctx, "ContainerSvc.ExecStream wait", "error", err)
+		if savedState != nil {
+			term.Restore(int(stdin.(*os.File).Fd()), savedState)
 		}
 		return err
 	}, nil

@@ -33,6 +33,8 @@ func (c *ShellCmd) Run(cctx *CLIContext) error {
 	hostname := types.GetContainerHostname(sbox.Container)
 	env := map[string]string{
 		"HOSTNAME": hostname,
+		"LANG":     os.Getenv("LANG"),
+		"TERM":     os.Getenv("TERM"),
 	}
 
 	slog.InfoContext(ctx, "main: sbox.shell starting")
@@ -52,6 +54,13 @@ func (c *ShellCmd) Run(cctx *CLIContext) error {
 			return fmt.Errorf("could not start container for %s: %w", sbox.ID, err)
 		}
 	}
+	var cmdArgs []string
+	if c.Tmux {
+		c.Shell = "/usr/bin/tmux"
+		cmdArgs = append(cmdArgs, "attach-session")
+	}
+
+	cmdEnv := os.Environ()
 	if sbox.Username == "" {
 		userInfo, err := user.Current()
 		if err != nil {
@@ -71,7 +80,7 @@ func (c *ShellCmd) Run(cctx *CLIContext) error {
 				User:        sbox.Username,
 				UID:         sbox.Uid,
 			},
-		}, sbox.ContainerID, c.Shell, os.Environ(), os.Stdin, os.Stdout, os.Stderr)
+		}, sbox.ContainerID, c.Shell, cmdEnv, os.Stdin, os.Stdout, os.Stderr, cmdArgs...)
 	if err != nil {
 		slog.ErrorContext(ctx, "shell: containerService.ExecStream", "sandbox", sbox.ID, "error", err)
 		return fmt.Errorf("failed to execute shell command for sandbox %s: %w", sbox.ID, err)
