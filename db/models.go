@@ -9,14 +9,18 @@ import (
 )
 
 type Sandbox struct {
-	ID             string         `json:"id"`
-	ContainerID    sql.NullString `json:"container_id"`
-	HostOriginDir  string         `json:"host_origin_dir"`
-	SandboxWorkDir string         `json:"sandbox_work_dir"`
-	ImageName      string         `json:"image_name"`
-	DnsDomain      sql.NullString `json:"dns_domain"`
-	EnvFile        sql.NullString `json:"env_file"`
-	CreatedAt      sql.NullTime   `json:"created_at"`
-	UpdatedAt      sql.NullTime   `json:"updated_at"`
-	AgentType      sql.NullString `json:"agent_type"`
+	ID                 string         `json:"id"`
+	ContainerID        sql.NullString `json:"container_id"`
+	HostOriginDir      string         `json:"host_origin_dir"`
+	SandboxWorkDir     string         `json:"sandbox_work_dir"`
+	ImageName          string         `json:"image_name"`
+	DnsDomain          sql.NullString `json:"dns_domain"`
+	EnvFile            sql.NullString `json:"env_file"`
+	CreatedAt          sql.NullTime   `json:"created_at"`
+	UpdatedAt          sql.NullTime   `json:"updated_at"`
+	AgentType          sql.NullString `json:"agent_type"`
+	OriginalGitOrigin  sql.NullString `json:"original_git_origin"`
+	OriginalGitBranch  sql.NullString `json:"original_git_branch"`
+	OriginalGitCommit  sql.NullString `json:"original_git_commit"`
+	OriginalGitIsDirty bool           `json:"original_git_is_dirty"`
 }
