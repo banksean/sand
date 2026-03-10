@@ -185,6 +185,20 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 	// This will only work on the *host* OS, since it makes calls to apple's container service.
 	// TODO: Sort out how "new" and "shell" should work when invoked inside a container.
 	containerSvc := hostops.NewAppleContainerOps()
+	ctrs, err := containerSvc.Inspect(ctx, sbox.ContainerID)
+	if err != nil {
+		return fmt.Errorf("could not inspect container for sandbox %s: %w", sbox.ContainerID, err)
+	}
+	if len(ctrs) == 0 {
+		return fmt.Errorf("no container for sandbox %s", sbox.ContainerID)
+	}
+	var args []string
+	switch c.Cloner {
+	case "claude":
+		args = []string{"-c", "claude --permission-mode=auto"}
+	case "opencode":
+		args = []string{"-c", "opencode --port 80 --hostname " + strings.TrimSuffix(ctrs[0].Networks[0].Hostname, ".")}
+	}
 	wait, err := containerSvc.ExecStream(ctx,
 		&options.ExecContainer{
 			ProcessOptions: options.ProcessOptions{
@@ -194,7 +208,7 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 				Env:         env,
 				EnvFile:     sbox.EnvFile,
 			},
-		}, sbox.ContainerID, c.Shell, os.Environ(), os.Stdin, os.Stdout, os.Stderr)
+		}, sbox.ContainerID, c.Shell, os.Environ(), os.Stdin, os.Stdout, os.Stderr, args...)
 	if err != nil {
 		slog.ErrorContext(ctx, "shell: containerService.ExecStream", "sandbox", sbox.ID, "error", err)
 		return fmt.Errorf("failed to execute shell command for sandbox %s: %w", sbox.ID, err)
