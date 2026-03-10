@@ -1,0 +1,246 @@
+package cli
+
+import (
+	"testing"
+
+	"github.com/alecthomas/kong"
+)
+
+// kongParse is a helper that creates a Kong parser for the given struct
+// and parses the given args, returning the parse context or failing the test.
+func kongParse(t *testing.T, target any, args []string) *kong.Context {
+	t.Helper()
+	k := kong.Must(target)
+	ctx, err := k.Parse(args)
+	if err != nil {
+		t.Fatalf("kong.Parse(%v) error: %v", args, err)
+	}
+	return ctx
+}
+
+func TestShellFlagsDefaults(t *testing.T) {
+	var cli struct {
+		Shell ShellFlags `embed:""`
+	}
+	kongParse(t, &cli, []string{})
+	if cli.Shell.Shell != "/bin/zsh" {
+		t.Errorf("expected default shell /bin/zsh, got %q", cli.Shell.Shell)
+	}
+}
+
+func TestShellFlagsShortFlag(t *testing.T) {
+	var cli struct {
+		Shell ShellFlags `embed:""`
+	}
+	kongParse(t, &cli, []string{"-s", "/bin/bash"})
+	if cli.Shell.Shell != "/bin/bash" {
+		t.Errorf("expected /bin/bash, got %q", cli.Shell.Shell)
+	}
+}
+
+func TestSandboxCreationFlagsDefaults(t *testing.T) {
+	var cli struct {
+		SandboxCreationFlags `embed:""`
+	}
+	kongParse(t, &cli, []string{})
+	if cli.EnvFile != ".env" {
+		t.Errorf("expected default EnvFile .env, got %q", cli.EnvFile)
+	}
+	if cli.ImageName != "" {
+		t.Errorf("expected empty ImageName, got %q", cli.ImageName)
+	}
+	if cli.CloneFromDir != "" {
+		t.Errorf("expected empty CloneFromDir, got %q", cli.CloneFromDir)
+	}
+	if cli.Rm {
+		t.Error("expected Rm=false by default")
+	}
+}
+
+func TestSandboxCreationFlagsShortFlags(t *testing.T) {
+	var cli struct {
+		SandboxCreationFlags `embed:""`
+	}
+	kongParse(t, &cli, []string{
+		"-i", "myimage:latest",
+		"-d", "/some/dir",
+		"-e", "prod.env",
+		"--rm",
+	})
+	if cli.ImageName != "myimage:latest" {
+		t.Errorf("expected ImageName myimage:latest, got %q", cli.ImageName)
+	}
+	if cli.CloneFromDir != "/some/dir" {
+		t.Errorf("expected CloneFromDir /some/dir, got %q", cli.CloneFromDir)
+	}
+	if cli.EnvFile != "prod.env" {
+		t.Errorf("expected EnvFile prod.env, got %q", cli.EnvFile)
+	}
+	if !cli.Rm {
+		t.Error("expected Rm=true")
+	}
+}
+
+func TestSandboxNameFlagArg(t *testing.T) {
+	var cli struct {
+		SandboxNameFlag `embed:""`
+	}
+	kongParse(t, &cli, []string{"my-sandbox"})
+	if cli.SandboxName != "my-sandbox" {
+		t.Errorf("expected SandboxName my-sandbox, got %q", cli.SandboxName)
+	}
+}
+
+func TestMultiSandboxNameFlagsName(t *testing.T) {
+	var cli struct {
+		MultiSandboxNameFlags `embed:""`
+	}
+	kongParse(t, &cli, []string{"my-sandbox"})
+	if cli.SandboxName != "my-sandbox" {
+		t.Errorf("expected SandboxName my-sandbox, got %q", cli.SandboxName)
+	}
+	if cli.All {
+		t.Error("expected All=false")
+	}
+}
+
+func TestMultiSandboxNameFlagsAll(t *testing.T) {
+	var cli struct {
+		MultiSandboxNameFlags `embed:""`
+	}
+	kongParse(t, &cli, []string{"--all"})
+	if !cli.All {
+		t.Error("expected All=true")
+	}
+}
+
+func TestMultiSandboxNameFlagsAllShort(t *testing.T) {
+	var cli struct {
+		MultiSandboxNameFlags `embed:""`
+	}
+	kongParse(t, &cli, []string{"-a"})
+	if !cli.All {
+		t.Error("expected All=true with -a short flag")
+	}
+}
+
+func TestMultiSandboxNameFlagsNoArgs(t *testing.T) {
+	var cli struct {
+		MultiSandboxNameFlags `embed:""`
+	}
+	kongParse(t, &cli, []string{})
+	if cli.SandboxName != "" {
+		t.Errorf("expected empty SandboxName, got %q", cli.SandboxName)
+	}
+	if cli.All {
+		t.Error("expected All=false")
+	}
+}
+
+func TestNewCmdDefaults(t *testing.T) {
+	var cli struct {
+		New NewCmd `cmd:""`
+	}
+	kongParse(t, &cli, []string{"new"})
+	if cli.New.Shell != "/bin/zsh" {
+		t.Errorf("expected default shell /bin/zsh, got %q", cli.New.Shell)
+	}
+	if cli.New.EnvFile != ".env" {
+		t.Errorf("expected default EnvFile .env, got %q", cli.New.EnvFile)
+	}
+	if cli.New.Cloner != "default" {
+		t.Errorf("expected default Cloner 'default', got %q", cli.New.Cloner)
+	}
+	if cli.New.Branch {
+		t.Error("expected Branch=false by default")
+	}
+	if cli.New.Prompt != "" {
+		t.Errorf("expected empty Prompt, got %q", cli.New.Prompt)
+	}
+}
+
+func TestNewCmdWithSandboxName(t *testing.T) {
+	var cli struct {
+		New NewCmd `cmd:""`
+	}
+	kongParse(t, &cli, []string{"new", "my-box"})
+	if cli.New.SandboxName != "my-box" {
+		t.Errorf("expected SandboxName my-box, got %q", cli.New.SandboxName)
+	}
+}
+
+func TestNewCmdFlags(t *testing.T) {
+	var cli struct {
+		New NewCmd `cmd:""`
+	}
+	kongParse(t, &cli, []string{
+		"new",
+		"-i", "myimage:v2",
+		"-c", "claude",
+		"-b",
+		"-p", "fix the bug",
+		"-s", "/bin/sh",
+		"sandbox-42",
+	})
+	if cli.New.ImageName != "myimage:v2" {
+		t.Errorf("expected ImageName myimage:v2, got %q", cli.New.ImageName)
+	}
+	if cli.New.Cloner != "claude" {
+		t.Errorf("expected Cloner claude, got %q", cli.New.Cloner)
+	}
+	if !cli.New.Branch {
+		t.Error("expected Branch=true")
+	}
+	if cli.New.Prompt != "fix the bug" {
+		t.Errorf("expected Prompt 'fix the bug', got %q", cli.New.Prompt)
+	}
+	if cli.New.Shell != "/bin/sh" {
+		t.Errorf("expected Shell /bin/sh, got %q", cli.New.Shell)
+	}
+	if cli.New.SandboxName != "sandbox-42" {
+		t.Errorf("expected SandboxName sandbox-42, got %q", cli.New.SandboxName)
+	}
+}
+
+func TestStopCmdSandboxName(t *testing.T) {
+	var cli struct {
+		Stop StopCmd `cmd:""`
+	}
+	kongParse(t, &cli, []string{"stop", "my-box"})
+	if cli.Stop.SandboxName != "my-box" {
+		t.Errorf("expected SandboxName my-box, got %q", cli.Stop.SandboxName)
+	}
+	if cli.Stop.All {
+		t.Error("expected All=false")
+	}
+}
+
+func TestStopCmdAll(t *testing.T) {
+	var cli struct {
+		Stop StopCmd `cmd:""`
+	}
+	kongParse(t, &cli, []string{"stop", "-a"})
+	if !cli.Stop.All {
+		t.Error("expected All=true")
+	}
+}
+
+func TestRmCmdSandboxName(t *testing.T) {
+	var cli struct {
+		Rm RmCmd `cmd:""`
+	}
+	kongParse(t, &cli, []string{"rm", "target-box"})
+	if cli.Rm.SandboxName != "target-box" {
+		t.Errorf("expected SandboxName target-box, got %q", cli.Rm.SandboxName)
+	}
+}
+
+func TestRmCmdAll(t *testing.T) {
+	var cli struct {
+		Rm RmCmd `cmd:""`
+	}
+	kongParse(t, &cli, []string{"rm", "--all"})
+	if !cli.Rm.All {
+		t.Error("expected All=true")
+	}
+}
