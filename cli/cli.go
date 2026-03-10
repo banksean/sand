@@ -20,7 +20,7 @@ type CLIContext struct {
 	LogLevel   string
 	CloneRoot  string
 	Context    context.Context
-	MuxClient  *mux.MuxClient
+	MuxClient  mux.MuxClient
 }
 
 const (

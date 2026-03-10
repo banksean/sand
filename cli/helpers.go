@@ -8,7 +8,7 @@ import (
 )
 
 type sandboxNamePredictor struct {
-	mc *mux.MuxClient
+	mc mux.MuxClient
 }
 
 // Predict implements [complete.Predictor].
@@ -24,6 +24,6 @@ func (s *sandboxNamePredictor) Predict(args complete.Args) []string {
 	return ret
 }
 
-func NewSandboxNamePredictor(mc *mux.MuxClient) complete.Predictor {
+func NewSandboxNamePredictor(mc mux.MuxClient) complete.Predictor {
 	return &sandboxNamePredictor{mc: mc}
 }

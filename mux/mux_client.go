@@ -17,21 +17,35 @@ import (
 	"github.com/banksean/sand/version"
 )
 
-// MuxClient invokes methods on the sandd process via IPC, whether the client is running on the same MacOS
-// instance as sandd, or if it is running inside a linux container.
-type MuxClient struct {
+// MuxClient is the interface for invoking methods on the sandd process via IPC, whether the
+// client is running on the same MacOS instance as sandd, or inside a linux container.
+type MuxClient interface {
+	Ping(ctx context.Context) error
+	Version(ctx context.Context) (version.Info, error)
+	Shutdown(ctx context.Context) error
+	ListSandboxes(ctx context.Context) ([]sandtypes.Box, error)
+	GetSandbox(ctx context.Context, id string) (*sandtypes.Box, error)
+	RemoveSandbox(ctx context.Context, id string) error
+	StopSandbox(ctx context.Context, id string) error
+	VSC(ctx context.Context, id string) error
+	CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*sandtypes.Box, error)
+}
+
+// defaultClient is the concrete implementation of MuxClient that communicates
+// with the sandd daemon over HTTP (unix socket or TCP).
+type defaultClient struct {
 	base       string
 	httpClient *http.Client
 }
 
-func NewHTTPClient(ctx context.Context, containerHostPort string) (*MuxClient, error) {
-	return &MuxClient{
+func NewHTTPClient(ctx context.Context, containerHostPort string) (MuxClient, error) {
+	return &defaultClient{
 		base:       "http://" + internalContainerHost + ":" + containerHostPort,
 		httpClient: http.DefaultClient,
 	}, nil
 }
 
-func NewUnixSocketClient(ctx context.Context, appBaseDir string) (*MuxClient, error) {
+func NewUnixSocketClient(ctx context.Context, appBaseDir string) (MuxClient, error) {
 	httpClient := &http.Client{
 		Timeout: 30 * time.Second,
 		Transport: &http.Transport{
@@ -40,39 +54,39 @@ func NewUnixSocketClient(ctx context.Context, appBaseDir string) (*MuxClient, er
 			},
 		},
 	}
-	return &MuxClient{
+	return &defaultClient{
 		base:       "http://unix",
 		httpClient: httpClient,
 	}, nil
 }
 
-func (m *MuxClient) doRequest(ctx context.Context, method, path string, body any, result any) error {
+func (m *defaultClient) doRequest(ctx context.Context, method, path string, body any, result any) error {
 	var req *http.Request
 	var err error
-	slog.InfoContext(ctx, "MuxClient.doRequest", "method", method, "path", path)
+	slog.InfoContext(ctx, "defaultClient.doRequest", "method", method, "path", path)
 	if body != nil {
 		reqBody, err := json.Marshal(body)
 		if err != nil {
-			slog.ErrorContext(ctx, "MuxClient.doRequest", "error", err)
+			slog.ErrorContext(ctx, "defaultClient.doRequest", "error", err)
 			return err
 		}
 		req, err = http.NewRequestWithContext(ctx, method, m.base+path, strings.NewReader(string(reqBody)))
 		if err != nil {
-			slog.ErrorContext(ctx, "MuxClient.doRequest", "error", err)
+			slog.ErrorContext(ctx, "defaultClient.doRequest", "error", err)
 			return err
 		}
 		req.Header.Set("Content-Type", "application/json")
 	} else {
 		req, err = http.NewRequestWithContext(ctx, method, m.base+path, nil)
 		if err != nil {
-			slog.ErrorContext(ctx, "MuxClient.doRequest", "error", err)
+			slog.ErrorContext(ctx, "defaultClient.doRequest", "error", err)
 			return err
 		}
 	}
 
 	resp, err := m.httpClient.Do(req)
 	if err != nil {
-		slog.ErrorContext(ctx, "MuxClient.doRequest", "error", err)
+		slog.ErrorContext(ctx, "defaultClient.doRequest", "error", err)
 		return fmt.Errorf("daemon not running: %w", err)
 	}
 	defer resp.Body.Close()
@@ -84,11 +98,11 @@ func (m *MuxClient) doRequest(ctx context.Context, method, path string, body any
 		if json.NewDecoder(resp.Body).Decode(&errResp) == nil && errResp.Error != "" {
 			return fmt.Errorf("%s", errResp.Error)
 		}
-		slog.ErrorContext(ctx, "MuxClient.doRequest", "errorResp", errResp)
+		slog.ErrorContext(ctx, "defaultClient.doRequest", "errorResp", errResp)
 
 		return fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
-	slog.InfoContext(ctx, "MuxClient.doRequest", "method", method, "path", path, "resp.StatusCode", resp.StatusCode)
+	slog.InfoContext(ctx, "defaultClient.doRequest", "method", method, "path", path, "resp.StatusCode", resp.StatusCode)
 
 	if result != nil {
 		if err := json.NewDecoder(resp.Body).Decode(result); err != nil {
@@ -99,7 +113,7 @@ func (m *MuxClient) doRequest(ctx context.Context, method, path string, body any
 	return nil
 }
 
-func (m *MuxClient) Ping(ctx context.Context) error {
+func (m *defaultClient) Ping(ctx context.Context) error {
 	var resp map[string]string
 	if err := m.doRequest(ctx, http.MethodGet, "/ping", nil, &resp); err != nil {
 		return err
@@ -107,7 +121,7 @@ func (m *MuxClient) Ping(ctx context.Context) error {
 	return nil
 }
 
-func (m *MuxClient) Version(ctx context.Context) (version.Info, error) {
+func (m *defaultClient) Version(ctx context.Context) (version.Info, error) {
 	var info version.Info
 	if err := m.doRequest(ctx, http.MethodGet, "/version", nil, &info); err != nil {
 		return version.Info{}, err
@@ -115,7 +129,7 @@ func (m *MuxClient) Version(ctx context.Context) (version.Info, error) {
 	return info, nil
 }
 
-func (m *MuxClient) Shutdown(ctx context.Context) error {
+func (m *defaultClient) Shutdown(ctx context.Context) error {
 	var resp map[string]string
 	if err := m.doRequest(ctx, http.MethodPost, "/shutdown", nil, &resp); err != nil {
 		return err
@@ -124,7 +138,7 @@ func (m *MuxClient) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-func (m *MuxClient) ListSandboxes(ctx context.Context) ([]sandtypes.Box, error) {
+func (m *defaultClient) ListSandboxes(ctx context.Context) ([]sandtypes.Box, error) {
 	var boxes []sandtypes.Box
 	if err := m.doRequest(ctx, http.MethodGet, "/list", nil, &boxes); err != nil {
 		return nil, err
@@ -132,7 +146,7 @@ func (m *MuxClient) ListSandboxes(ctx context.Context) ([]sandtypes.Box, error) 
 	return boxes, nil
 }
 
-func (m *MuxClient) GetSandbox(ctx context.Context, id string) (*sandtypes.Box, error) {
+func (m *defaultClient) GetSandbox(ctx context.Context, id string) (*sandtypes.Box, error) {
 	var box sandtypes.Box
 	if err := m.doRequest(ctx, http.MethodPost, "/get", map[string]string{"id": id}, &box); err != nil {
 		if strings.Contains(err.Error(), "404") {
@@ -143,19 +157,19 @@ func (m *MuxClient) GetSandbox(ctx context.Context, id string) (*sandtypes.Box, 
 	return &box, nil
 }
 
-func (m *MuxClient) RemoveSandbox(ctx context.Context, id string) error {
+func (m *defaultClient) RemoveSandbox(ctx context.Context, id string) error {
 	return m.doRequest(ctx, http.MethodPost, "/remove", map[string]string{"id": id}, nil)
 }
 
-func (m *MuxClient) StopSandbox(ctx context.Context, id string) error {
+func (m *defaultClient) StopSandbox(ctx context.Context, id string) error {
 	return m.doRequest(ctx, http.MethodPost, "/stop", map[string]string{"id": id}, nil)
 }
 
-func (m *MuxClient) VSC(ctx context.Context, id string) error {
+func (m *defaultClient) VSC(ctx context.Context, id string) error {
 	return m.doRequest(ctx, http.MethodPost, "/vsc", map[string]string{"id": id}, nil)
 }
 
-func (m *MuxClient) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*sandtypes.Box, error) {
+func (m *defaultClient) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*sandtypes.Box, error) {
 	var box sandtypes.Box
 	if err := m.doRequest(ctx, http.MethodPost, "/create", opts, &box); err != nil {
 		return nil, err

@@ -47,7 +47,7 @@ func TestMuxHTTPPing(t *testing.T) {
 
 	// Test ping via HTTP
 	var resp map[string]string
-	if err := client.doRequest(ctx, "GET", "/ping", nil, &resp); err != nil {
+	if err := client.(*defaultClient).doRequest(ctx, "GET", "/ping", nil, &resp); err != nil {
 		t.Fatalf("Ping request failed: %v", err)
 	}
 
