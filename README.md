@@ -1,23 +1,77 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/banksean/sand.svg)](https://pkg.go.dev/github.com/banksean/sand) 
 [![Main Commit Queue](https://github.com/banksean/sand/actions/workflows/queue-main.yml/badge.svg)](https://github.com/banksean/sand/actions/workflows/queue-main.yml)
 
-If you don't write code on a Mac, and you don't deploy it to Linux, you can stop reading this now.
-
 # TL;DR
 
+## Installation
 ```sh
-% go install github.com/banksean/sand/cmd/sand
-% sand new your-new-sandbox-name
+go install github.com/banksean/sand/cmd/...
 ```
 
-You are now root, in a Linux container, with your CWD set to a copy-on-write clone of the directory you were at when you ran `sand` on your MacOS host. 
+## Usage
+```
+sand new -c opencode
+```
+
+Or use with claude, other agents:
+```
+sand new -c claude
+```
+
+Under the hood, the `sand new` command:
+- creates a copy-on-write clone your current working directory (traversing up to git root, if necessary)
+- creates a local linux container with that cloned working directory mounted at `/app` 
+- configures the container with keys for bidirectional ssh authentication
+- makes the container visible to your host OS via DNS
+- ssh's you into that container
+- runs your coding agent's CLI (if you specified an agent)
+
+# Design
+
+Aside from the basic requirements for any sandboxing tool in general, I've chosen a few more specific constraints for `sand`.
+
+## Chosen Constraints
+
+- Local: Works entirely on your workstation (no remote hosting dependency)
+- Agnostic: use whatever coding agent you want to (including no agent at all)
+- Fast, easy: Make using sandboxes as easy and lightweight as using tmux sessions or git branches
+
+The design goals imply some obvious trade-offs. Most obvious is that by running locally on your workstation, it is limited by your workstation's hardware resources. However, this choice also makes it easy to create new sandboxes very quickly, and does not require you to trust a third party with your files.
+
+By being agent-agnostic, `sand` doesn't take advantage of agent-specific features that it could if it were more tightly coupled to them. On the other hand, this agnosticism makes it possible to treat sandbox lifecycles separately from agent session lifecycles. This trade-off also makes it possible to use sandboxes for manual coding tasks, without any agent whatsoever.
+
+Fast and easy: One way to achieve speed is by doing less, so the specific comparisons to git and tmux are intentional here. The trade-off is that you can use `git` and `tmux` with `sand`'s resources, but `sand` will only do so much to simplify sandbox-related `git` and `tmux` tasks if you aren't already familiar with those tools. Also similarly to git, you should be able to create a new sandbox from an existing sandbox as easily as you can create a git branch from an existing git branch.
+
+## Implementation Choices
+
+- Isolation Model: Apple Containers
+  - hardware isolation via Apple Silicon
+  - low memory overhead, fast start times
+  - based on [Kata](https://katacontainers.io/)
+  - supported in MacOS 26 and up
+- Filesystem:
+    - Base container image: Minimal, with some dynamic provisioning based on which agent you're using
+    - Agent workspaces: `/app` is mounted from the APFS CoW clone, must be same APFS disk as the original project dir
+    - Host filesystem access: limited to the CoW clone directory. (Apple Containerization uses virtiofs to bridge the macOS-to-VM boundary, and then uses a bind mount inside the Linux micro-VM to present that path to the container.)
+- Execution interface: 
+  - A CLI with a fast exec path, and a session path for interactive use
+  - A daemon on the host OS handles sandbox lifecycle management, with the CLI just thin wrapper that makes IPC calls to the daemon
+  - The container environment *also* has a `sand` CLI, which uses container-to-host networking to make IPCs to that same daemon
+
+Implementation decisions I'm still investigating:
+- Lifecycle & Pooling Strategy: Currently `sand` will just spawn containers on demand, with no pooling. It does not monitor container activity or utilization etc. You can stop and start sandbox containers manually, but `sand` does not try to do any of that automatically yet.
+- Network Topology: Per-container isolated network vs. shared host network vs. a managed bridge, vs ... something else perhaps? A lot of this aspect is constrained by what MacOS and Apple Containers will support.
+
+# Usage Notes
+
+See [cmd/sand/HELP.md](./cmd/sand/HELP.md) for a full CLI reference.
 
 ## You work with a sandboxed clone of `./`
-The sandbox starts out with a clone of your MacOS current directory, mounted as `/app` inside the container. 
+The sandbox starts out with a clone of your current directory from MacOS, mounted as `/app` inside the container. 
 
-This operation actually uses much less disk space than a full copy of the original directory, because `sand` clones it using copy-on-write (via APFS's `clonefile(2)` call). Additional disk space is only required when you make changes to the cloned files.
+This cloning operation actually uses much less disk space than a full copy of the original directory, because `sand` clones it using copy-on-write (via APFS's `clonefile(2)` call). Additional disk space is only consumed by the sandbox when the cloned files are modified.
 
-The original files on your MacOS host filesystem are not affected by changes made to the clones of those files inside the sandbox.
+Note: The original files on your MacOS host filesystem are not affected by changes made to the clones of those files inside the sandbox.  You can `rm -rf /` in the sandbox container and it won't affect your original working directory at all.
 
 ## Getting changes out of the sandbox
 
@@ -42,7 +96,7 @@ $ sand --help # a much more complete list of commands and flags
 % sand rm your-sandbox-name # stops and removes the container, and *does* remove the sandbox's filesystem.
 ```
 
-For more information about `sand`'s subcommands and other options, see [cmd/sand/HELP.md](./cmd/sand/HELP.md)
+For more information about `sand`'s subcommands and other options, 
 
 ## Requirements
 - Only works on Apple hardware (of course).
