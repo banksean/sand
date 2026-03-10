@@ -514,3 +514,25 @@ func (m *Mux) createSandbox(ctx context.Context, opts CreateSandboxOpts) (*sandt
 	sbox.Container = ctr
 	return sbox, nil
 }
+
+// ListSandboxes returns all sandboxes.
+func (m *Mux) ListSandboxes(ctx context.Context) ([]sandtypes.Box, error) {
+	return m.boxer.List(ctx)
+}
+
+// GetSandbox retrieves a sandbox by ID.
+func (m *Mux) GetSandbox(ctx context.Context, id string) (*sandtypes.Box, error) {
+	return m.boxer.Get(ctx, id)
+}
+
+// RemoveSandbox removes a single sandbox.
+func (m *Mux) RemoveSandbox(ctx context.Context, id string) error {
+	sbox, err := m.boxer.Get(ctx, id)
+	if err != nil {
+		return err
+	}
+	if sbox == nil {
+		return fmt.Errorf("sandbox not found: %s", id)
+	}
+	return m.boxer.Cleanup(ctx, sbox)
+}

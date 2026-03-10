@@ -163,28 +163,6 @@ func (m *MuxClient) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (
 	return &box, nil
 }
 
-// ListSandboxes returns all sandboxes.
-func (m *Mux) ListSandboxes(ctx context.Context) ([]sandtypes.Box, error) {
-	return m.boxer.List(ctx)
-}
-
-// GetSandbox retrieves a sandbox by ID.
-func (m *Mux) GetSandbox(ctx context.Context, id string) (*sandtypes.Box, error) {
-	return m.boxer.Get(ctx, id)
-}
-
-// RemoveSandbox removes a single sandbox.
-func (m *Mux) RemoveSandbox(ctx context.Context, id string) error {
-	sbox, err := m.boxer.Get(ctx, id)
-	if err != nil {
-		return err
-	}
-	if sbox == nil {
-		return fmt.Errorf("sandbox not found: %s", id)
-	}
-	return m.boxer.Cleanup(ctx, sbox)
-}
-
 // EnsureDaemon attempts to verify that the sandd daemon is running, and if not,
 // starting a new instance of it.
 //
