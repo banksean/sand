@@ -172,7 +172,7 @@ func (m *mockFileOps) WriteFile(path string, data []byte, perm os.FileMode) erro
 func newTestBoxer(t *testing.T, containerOps hostops.ContainerOps, imageOps hostops.ImageOps) *Boxer {
 	t.Helper()
 	tmpDir := path.Join(t.TempDir(), "Application Support", "Sand")
-	boxer, err := NewBoxer(tmpDir, nil)
+	boxer, err := NewBoxer(tmpDir, "test", nil)
 	if err != nil {
 		t.Fatalf("Failed to create test Boxer: %v", err)
 	}

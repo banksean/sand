@@ -132,7 +132,7 @@ func main() {
 
 	app.initSlog()
 
-	if err := cli.VerifyPrerequisites(ctx, cli.MacOS, cli.MacOSVersion, cli.ContainerCommand); err != nil {
+	if err := cli.VerifyPrerequisites(ctx, cli.MacOS, cli.MacOSVersion, cli.ContainerCommand, cli.ContainerSystemDNSDomain); err != nil {
 		fmt.Fprintf(os.Stderr, "Prerequisite check(s) failed: %s\r\n", err)
 		os.Exit(1)
 	}

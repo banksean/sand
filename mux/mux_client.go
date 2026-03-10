@@ -210,6 +210,7 @@ func EnsureDaemon(ctx context.Context, appBaseDir string) error {
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	cmd.Stdin = nil
+	cmd.Dir = appBaseDir
 
 	// Detach from parent process
 	cmd.SysProcAttr = &syscall.SysProcAttr{

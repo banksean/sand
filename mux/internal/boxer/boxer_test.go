@@ -18,7 +18,7 @@ func TestSaveSandbox(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// Create a Boxer
-	sb, err := NewBoxer(tmpDir, nil)
+	sb, err := NewBoxer(tmpDir, "test", nil)
 	if err != nil {
 		t.Fatalf("Failed to create Boxer: %v", err)
 	}
@@ -102,7 +102,7 @@ func TestLoadSandbox(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// Create a Boxer
-	sb, err := NewBoxer(tmpDir, nil)
+	sb, err := NewBoxer(tmpDir, "test", nil)
 	if err != nil {
 		t.Fatalf("Failed to create Boxer: %v", err)
 	}
@@ -171,7 +171,7 @@ func TestLoadSandboxNotFound(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// Create a Boxer
-	sb, err := NewBoxer(tmpDir, nil)
+	sb, err := NewBoxer(tmpDir, "test", nil)
 	if err != nil {
 		t.Fatalf("Failed to create Boxer: %v", err)
 	}
@@ -192,7 +192,7 @@ func TestListSandboxes(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	sb, err := NewBoxer(tmpDir, nil)
+	sb, err := NewBoxer(tmpDir, "test", nil)
 	if err != nil {
 		t.Fatalf("Failed to create Boxer: %v", err)
 	}
@@ -244,7 +244,7 @@ func TestUpdateContainerID(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	sb, err := NewBoxer(tmpDir, nil)
+	sb, err := NewBoxer(tmpDir, "test", nil)
 	if err != nil {
 		t.Fatalf("Failed to create Boxer: %v", err)
 	}
@@ -289,7 +289,7 @@ func TestGetSandboxesByImage(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	sb, err := NewBoxer(tmpDir, nil)
+	sb, err := NewBoxer(tmpDir, "test", nil)
 	if err != nil {
 		t.Fatalf("Failed to create Boxer: %v", err)
 	}

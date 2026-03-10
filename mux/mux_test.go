@@ -19,7 +19,7 @@ func TestMuxHTTPPing(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// Create and start mux
-	mux := NewMuxServer(tmpDir, "")
+	mux := NewMuxServer(tmpDir, "test", "")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -75,7 +75,7 @@ func TestMuxHTTPList(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// Create and start mux
-	mux := NewMuxServer(tmpDir, "")
+	mux := NewMuxServer(tmpDir, "test", "")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -125,7 +125,7 @@ func TestMuxHTTPVersion(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// Create and start mux
-	mux := NewMuxServer(tmpDir, "")
+	mux := NewMuxServer(tmpDir, "test", "")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -174,7 +174,7 @@ func TestMuxPingNotRunning(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	sber, err := boxer.NewBoxer(tmpDir, nil)
+	sber, err := boxer.NewBoxer(tmpDir, "test", nil)
 	if err != nil {
 		t.Fatalf("Failed to create Boxer: %v", err)
 	}

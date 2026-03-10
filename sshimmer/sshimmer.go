@@ -20,10 +20,6 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-/**
-TODO: sort out all the .pub-cert vs -cert.pub shit. ssh expects one but no the other when deriving the cert filename from the private key filename.
-*/
-
 // Keys is the set of ssh keys and certificates to be installed on a newly created sandbox container.
 type Keys struct {
 	HostKey     []byte // host private key
@@ -64,12 +60,12 @@ type LocalSSHimmer struct {
 // It adds a single Include line, once, automatically the first time you use sand.
 // Everything else (host CA, user CA and user identity keys) is maintained by updating files in
 // ~/.config/sand.
-func NewLocalSSHimmer(ctx context.Context) (*LocalSSHimmer, error) {
-	return newLocalSSHimmerWithDeps(ctx, &RealFileSystem{}, &RealKeyGenerator{})
+func NewLocalSSHimmer(ctx context.Context, localDomain string) (*LocalSSHimmer, error) {
+	return newLocalSSHimmerWithDeps(ctx, localDomain, &RealFileSystem{}, &RealKeyGenerator{})
 }
 
 // newLocalSSHimmerWithDeps creates a new LocalSSHimmer with the specified dependencies
-func newLocalSSHimmerWithDeps(ctx context.Context, fs FileSystem, kg KeyGenerator) (*LocalSSHimmer, error) {
+func newLocalSSHimmerWithDeps(ctx context.Context, localDomain string, fs FileSystem, kg KeyGenerator) (*LocalSSHimmer, error) {
 	base := filepath.Join(os.Getenv("HOME"), ".config", "sand")
 	if _, err := fs.Stat(base); err != nil {
 		if err := fs.MkdirAll(base, 0o777); err != nil {
@@ -78,7 +74,7 @@ func newLocalSSHimmerWithDeps(ctx context.Context, fs FileSystem, kg KeyGenerato
 	}
 
 	s := &LocalSSHimmer{
-		localDomain:      "test", // TODO: pass this in.
+		localDomain:      localDomain,
 		knownHostsPath:   filepath.Join(base, "known_hosts"),
 		userIdentityPath: filepath.Join(base, "user_key"),
 
@@ -112,7 +108,7 @@ func newLocalSSHimmerWithDeps(ctx context.Context, fs FileSystem, kg KeyGenerato
 	s.userCertificate = userCert.Marshal()
 	userCertBytes := ssh.MarshalAuthorizedKey(userCert)
 	s.writeKeyToFile(userCertBytes, s.userIdentityPath+"-cert.pub")
-	if err := writeSandSSHConfig(s.fs); err != nil {
+	if err := writeSandSSHConfig(s.localDomain, s.fs); err != nil {
 		return nil, fmt.Errorf("writeSandSSHConfig: %w", err)
 	}
 	// Load or create the host CA
@@ -432,12 +428,12 @@ func CheckForIncludeWithFS(ctx context.Context, fs FileSystem) (func() error, er
 	return nil, nil
 }
 
-func writeSandSSHConfig(fs FileSystem) error {
+func writeSandSSHConfig(localDomain string, fs FileSystem) error {
 	identityPath := filepath.Join(os.Getenv("HOME"), ".config", "sand", "user_key")
 	sandSSHConfigPath := filepath.Join(os.Getenv("HOME"), ".config", "sand", "ssh_config")
 	knownHostsPath := filepath.Join(os.Getenv("HOME"), ".config", "sand", "known_hosts")
 
-	hostPattern, err := ssh_config.NewPattern("*.test")
+	hostPattern, err := ssh_config.NewPattern("*." + localDomain)
 	if err != nil {
 		return err
 	}
@@ -463,7 +459,7 @@ func writeSandSSHConfig(fs FileSystem) error {
 					},
 					&ssh_config.KV{
 						Key:   "CanonicalDomains",
-						Value: "test",
+						Value: localDomain,
 					},
 				},
 			},

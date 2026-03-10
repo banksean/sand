@@ -12,6 +12,7 @@ import (
 	"syscall"
 
 	"github.com/alecthomas/kong"
+	"github.com/banksean/sand/applecontainer"
 	"github.com/banksean/sand/mux"
 )
 
@@ -45,7 +46,12 @@ type DaemonCmd struct {
 // Run handles all daemon command variants
 func (c *DaemonCmd) Run(cctx *App) error {
 	ctx := cctx.Context
-	server := mux.NewMuxServer(cctx.AppBaseDir, cctx.HTTPPort)
+
+	localDomain, err := applecontainer.System.PropertyGet(ctx, "dns.domain")
+	if err != nil {
+		return fmt.Errorf("unable to get dns.domain from container system: %w", err)
+	}
+	server := mux.NewMuxServer(cctx.AppBaseDir, cctx.HTTPPort, localDomain)
 
 	switch c.Action {
 	case "start":
@@ -219,6 +225,8 @@ func main() {
 	defer stop()
 
 	cli.initSlog()
+	cwd, err := os.Getwd()
+	slog.InfoContext(ctx, "sandd main", "cwd", cwd, "error", err)
 
 	appBaseDir, err := appHomeDir()
 	if err != nil {

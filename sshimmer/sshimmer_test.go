@@ -281,7 +281,7 @@ func setupTestLocalSSHimmer(t *testing.T) (*LocalSSHimmer, *MockFileSystem, *Moc
 	t.Cleanup(func() { os.Setenv("HOME", oldHome) })
 
 	// Create LocalSSHimmer with mocks
-	ssh, err := newLocalSSHimmerWithDeps(t.Context(), mockFS, mockKG)
+	ssh, err := newLocalSSHimmerWithDeps(t.Context(), "test", mockFS, mockKG)
 	if err != nil {
 		t.Fatalf("Failed to create LocalSSHimmer: %v", err)
 	}
@@ -305,7 +305,7 @@ func TestNewLocalSSHimmerCreatesRequiredDirectories(t *testing.T) {
 	mockFS.Files[knownHostsPath] = []byte("")
 
 	// Create sshimmer
-	_, err := newLocalSSHimmerWithDeps(t.Context(), mockFS, mockKG)
+	_, err := newLocalSSHimmerWithDeps(t.Context(), "test", mockFS, mockKG)
 	if err != nil {
 		t.Fatalf("Failed to create LocalSSHimmer: %v", err)
 	}
@@ -438,7 +438,7 @@ func TestLocalSSHimmerWithErrors(t *testing.T) {
 	defer func() { os.Setenv("HOME", oldHome) }()
 
 	// Try to create sshimmer with failing FS
-	_, err := newLocalSSHimmerWithDeps(t.Context(), mockFS, mockKG)
+	_, err := newLocalSSHimmerWithDeps(t.Context(), "test", mockFS, mockKG)
 	if err == nil || !strings.Contains(err.Error(), "mock mkdir error") {
 		t.Errorf("Should have failed with mkdir error, got: %v", err)
 	}
@@ -448,7 +448,7 @@ func TestLocalSSHimmerWithErrors(t *testing.T) {
 	mockKG = NewMockKeyGenerator(nil, nil, nil, nil)
 	mockKG.FailOn["GenerateKeyPair"] = fmt.Errorf("mock key generation error")
 
-	_, err = newLocalSSHimmerWithDeps(t.Context(), mockFS, mockKG)
+	_, err = newLocalSSHimmerWithDeps(t.Context(), "test", mockFS, mockKG)
 	if err == nil || !strings.Contains(err.Error(), "key generation error") {
 		t.Errorf("Should have failed with key generation error, got: %v", err)
 	}

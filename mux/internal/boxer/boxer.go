@@ -45,7 +45,7 @@ type Boxer struct {
 	agentRegistry    *cloning.AgentRegistry
 }
 
-func NewBoxer(appRoot string, terminalWriter io.Writer) (*Boxer, error) {
+func NewBoxer(appRoot, localDomain string, terminalWriter io.Writer) (*Boxer, error) {
 	fileOps := hostops.NewDefaultFileOps()
 	if err := fileOps.MkdirAll(appRoot, 0o750); err != nil {
 		return nil, err
@@ -57,7 +57,7 @@ func NewBoxer(appRoot string, terminalWriter io.Writer) (*Boxer, error) {
 	}
 
 	ctx := context.Background()
-	sshim, err := sshimmer.NewLocalSSHimmer(ctx)
+	sshim, err := sshimmer.NewLocalSSHimmer(ctx, localDomain)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create LocalSSHimmer: %w", err)
 	}

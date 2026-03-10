@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/banksean/sand/applecontainer"
-	"github.com/banksean/sand/applecontainer/types"
 )
 
 const (
@@ -98,22 +97,14 @@ var (
 			ID:          ContainerSystemDNSDomain,
 			Description: "Container system has dns.domain property set",
 			Run: func(ctx context.Context) error {
-				systemProps, err := applecontainer.System.PropertyList(ctx)
+				domain, err := applecontainer.System.PropertyGet(ctx, "dns.domain")
 				if err != nil {
 					return fmt.Errorf("could not get container system properties: %w", err)
 				}
-				if len(systemProps) == 0 {
-					return fmt.Errorf("no container system properties")
+				if domain == "" {
+					return fmt.Errorf("container system property dns.domain is not set")
 				}
 
-				propMap := map[string]types.SystemProperty{}
-				for _, p := range systemProps {
-					propMap[p.ID] = p
-				}
-
-				if p, ok := propMap["dns.domain"]; !ok || p.Value == nil {
-					return fmt.Errorf("missing system property 'dns.domain'")
-				}
 				return nil
 			},
 		},

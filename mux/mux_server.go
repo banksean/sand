@@ -31,6 +31,7 @@ type Mux struct {
 	AppBaseDir    string
 	SocketPath    string
 	LocalHTTPPort string
+	LocalDomain   string
 
 	hostMCP *HostMCP
 	boxer   *boxer.Boxer
@@ -41,7 +42,7 @@ type Mux struct {
 	httpSrv  http.Server
 }
 
-func NewMuxServer(appBaseDir, httpPort string) *Mux {
+func NewMuxServer(appBaseDir, httpPort, localDomain string) *Mux {
 	return &Mux{
 		AppBaseDir:    appBaseDir,
 		SocketPath:    filepath.Join(appBaseDir, defaultSocketFile),
@@ -83,7 +84,7 @@ func (m *Mux) startDaemonServer(ctx context.Context) error {
 
 	m.listener = listener
 	m.shutdown = make(chan any)
-	sber, err := boxer.NewBoxer(m.AppBaseDir, os.Stderr)
+	sber, err := boxer.NewBoxer(m.AppBaseDir, m.LocalDomain, os.Stderr)
 	if err != nil {
 		return err
 	}

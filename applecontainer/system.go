@@ -106,6 +106,28 @@ func (s *SystemSvc) PropertyList(ctx context.Context) ([]types.SystemProperty, e
 	return ret, nil
 }
 
+// PropertySet sets a container system property value.
+func (s *SystemSvc) PropertySet(ctx context.Context, id, value string) error {
+	cmd := exec.CommandContext(ctx, "container", "system", "property", "set", id, value)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		slog.ErrorContext(ctx, "SystemSvc.PropertySet", "output", string(output), "error", err)
+		return err
+	}
+	return nil
+}
+
+// PropertyGet gets a container system property value.
+func (s *SystemSvc) PropertyGet(ctx context.Context, id string) (string, error) {
+	cmd := exec.CommandContext(ctx, "container", "system", "property", "get", id)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		slog.ErrorContext(ctx, "SystemSvc.PropertyGet", "output", string(output), "error", err)
+		return "", err
+	}
+	return string(output), nil
+}
+
 // Logs returns an io.ReadCloser for streaming log output and a wait func that blocks on the command's completion, or an error.
 func (s *SystemSvc) Logs(ctx context.Context, opts *options.SystemLogs) (io.ReadCloser, func() error, error) {
 	args := options.ToArgs(opts)
