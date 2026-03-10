@@ -97,6 +97,7 @@ const description = `The "innie" side of the "sand" command, communicates with t
 
 func main() {
 	var app Innie
+	slog.SetLogLoggerLevel(slog.LevelError)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

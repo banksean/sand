@@ -101,6 +101,7 @@ func appHomeDir() (string, error) {
 
 func main() {
 	var app Outie
+	slog.SetLogLoggerLevel(slog.LevelError)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
