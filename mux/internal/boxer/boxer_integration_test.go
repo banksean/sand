@@ -40,6 +40,10 @@ type mockGitOps struct {
 	removeRemoteFunc func(ctx context.Context, dir, name string) error
 	fetchFunc        func(ctx context.Context, dir, remote string) error
 	topLevelFunc     func(ctx context.Context, dir string) string
+	remoteURLFunc    func(ctx context.Context, dir, name string) string
+	branchFunc       func(ctx context.Context, dir string) string
+	commitFunc       func(ctx context.Context, dir string) string
+	isDirtyFunc      func(ctx context.Context, dir string) bool
 }
 
 func (m *mockGitOps) AddRemote(ctx context.Context, dir, name, url string) error {
@@ -68,6 +72,34 @@ func (m *mockGitOps) TopLevel(ctx context.Context, dir string) string {
 		return m.topLevelFunc(ctx, dir)
 	}
 	return ""
+}
+
+func (m *mockGitOps) RemoteURL(ctx context.Context, dir, name string) string {
+	if m.remoteURLFunc != nil {
+		return m.remoteURLFunc(ctx, dir, name)
+	}
+	return ""
+}
+
+func (m *mockGitOps) Branch(ctx context.Context, dir string) string {
+	if m.branchFunc != nil {
+		return m.branchFunc(ctx, dir)
+	}
+	return ""
+}
+
+func (m *mockGitOps) Commit(ctx context.Context, dir string) string {
+	if m.commitFunc != nil {
+		return m.commitFunc(ctx, dir)
+	}
+	return ""
+}
+
+func (m *mockGitOps) IsDirty(ctx context.Context, dir string) bool {
+	if m.isDirtyFunc != nil {
+		return m.isDirtyFunc(ctx, dir)
+	}
+	return false
 }
 
 type mockFileOps struct {
