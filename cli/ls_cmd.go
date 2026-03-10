@@ -6,8 +6,6 @@ import (
 	"os"
 	"strings"
 	"text/tabwriter"
-
-	"github.com/banksean/sand/applecontainer/types"
 )
 
 type LsCmd struct{}
@@ -27,14 +25,12 @@ func (c *LsCmd) Run(cctx *CLIContext) error {
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "SANDBOX ID\tSTATUS\tCONTAINER ID\tHOSTNAME\tORIGIN DIR\tIMAGE NAME\t")
+	fmt.Fprintln(w, "SANDBOX NAME\tSTATUS\tORIGIN DIR\tORIGIN BRANCH\tIMAGE NAME")
 	for _, sbox := range list {
 		ctr := sbox.Container
 		status := []string{"dormant"}
-		hostname := ""
 		if ctr != nil {
 			status[0] = ctr.Status
-			hostname = types.GetContainerHostname(ctr)
 		}
 		if sbox.SandboxContainerError != "" {
 			status = append(status, sbox.SandboxContainerError)
@@ -48,7 +44,11 @@ func (c *LsCmd) Run(cctx *CLIContext) error {
 			hostOriginDir = strings.Replace(hostOriginDir, userHomeDir, "~", 1)
 		}
 		imgName := strings.TrimPrefix(sbox.ImageName, "ghcr.io/banksean/sand/")
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t\n", sbox.ID, strings.Join(status, ", "), sbox.ContainerID, hostname, hostOriginDir, imgName)
+		originalBranch := ""
+		if sbox.OriginalGitDetails != nil {
+			originalBranch = sbox.OriginalGitDetails.Branch
+		}
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", sbox.ID, strings.Join(status, ", "), hostOriginDir, originalBranch, imgName)
 	}
 	w.Flush()
 	return nil

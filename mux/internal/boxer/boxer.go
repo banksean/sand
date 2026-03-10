@@ -169,11 +169,18 @@ func (sb *Boxer) NewSandbox(ctx context.Context, agentType, id, hostWorkDir, ima
 	// hostWorkDir may not be the same as the git root - should we save both here instead of
 	// only saving the gitTopLevel?
 	gitTopLevel := sb.gitOps.TopLevel(ctx, hostWorkDir)
+	var gitRemote, gitBranch, gitCommit string
+	var gitIsDirty bool
 	slog.InfoContext(ctx, "NewSandbox", "gitTopLevel", gitTopLevel, "hostWorkDir", hostWorkDir)
 	if gitTopLevel != "" {
 		// Clone from git top level instead
 		hostWorkDir = gitTopLevel
+		gitRemote = sb.gitOps.RemoteURL(ctx, hostWorkDir, "origin")
+		gitBranch = sb.gitOps.Branch(ctx, hostWorkDir)
+		gitCommit = sb.gitOps.Commit(ctx, hostWorkDir)
+		gitIsDirty = sb.gitOps.IsDirty(ctx, hostWorkDir)
 	}
+
 	ret := &sandtypes.Box{
 		ID:             id,
 		AgentType:      agentType,
@@ -184,6 +191,12 @@ func (sb *Boxer) NewSandbox(ctx context.Context, agentType, id, hostWorkDir, ima
 		Mounts:         append(mounts, sshKeysMountSpec),
 		ContainerHooks: hooks,
 		Keys:           keys,
+		OriginalGitDetails: &sandtypes.GitDetails{
+			RemoteOrigin: gitRemote,
+			Branch:       gitBranch,
+			Commit:       gitCommit,
+			IsDirty:      gitIsDirty,
+		},
 	}
 
 	if err := sb.SaveSandbox(ctx, ret); err != nil {
@@ -330,6 +343,12 @@ func (sb *Boxer) sandboxFromDB(s *db.Sandbox) *sandtypes.Box {
 		ImageName:      s.ImageName,
 		DNSDomain:      fromNullString(s.DnsDomain),
 		EnvFile:        fromNullString(s.EnvFile),
+		OriginalGitDetails: &sandtypes.GitDetails{
+			RemoteOrigin: fromNullString(s.OriginalGitOrigin),
+			Branch:       fromNullString(s.OriginalGitBranch),
+			Commit:       fromNullString(s.OriginalGitCommit),
+			IsDirty:      s.OriginalGitIsDirty,
+		},
 	}
 }
 
@@ -538,7 +557,7 @@ func (sb *Boxer) pullImage(ctx context.Context, imageName string) error {
 func (sb *Boxer) SaveSandbox(ctx context.Context, sbox *sandtypes.Box) error {
 	slog.InfoContext(ctx, "Boxer.SaveSandbox", "id", sbox.ID)
 
-	err := sb.queries.UpsertSandbox(ctx, db.UpsertSandboxParams{
+	upsertParams := db.UpsertSandboxParams{
 		ID:             sbox.ID,
 		ContainerID:    toNullString(sbox.ContainerID),
 		HostOriginDir:  sbox.HostOriginDir,
@@ -547,7 +566,14 @@ func (sb *Boxer) SaveSandbox(ctx context.Context, sbox *sandtypes.Box) error {
 		DnsDomain:      toNullString(sbox.DNSDomain),
 		EnvFile:        toNullString(sbox.EnvFile),
 		AgentType:      toNullString(sbox.AgentType),
-	})
+	}
+	if sbox.OriginalGitDetails != nil {
+		upsertParams.OriginalGitOrigin = toNullString(sbox.OriginalGitDetails.RemoteOrigin)
+		upsertParams.OriginalGitBranch = toNullString(sbox.OriginalGitDetails.Branch)
+		upsertParams.OriginalGitCommit = toNullString(sbox.OriginalGitDetails.Commit)
+		upsertParams.OriginalGitIsDirty = sbox.OriginalGitDetails.IsDirty
+	}
+	err := sb.queries.UpsertSandbox(ctx, upsertParams)
 	if err != nil {
 		return fmt.Errorf("failed to save sandbox: %w", err)
 	}

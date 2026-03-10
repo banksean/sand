@@ -155,8 +155,10 @@ func (q *Queries) UpdateContainerID(ctx context.Context, arg UpdateContainerIDPa
 const upsertSandbox = `-- name: UpsertSandbox :exec
 INSERT INTO sandboxes (
     id, container_id, host_origin_dir, sandbox_work_dir,
-    image_name, dns_domain, env_file, agent_type
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    image_name, dns_domain, env_file, agent_type,
+    original_git_origin, original_git_branch, original_git_commit, 
+    original_git_is_dirty
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(id) DO UPDATE SET
     container_id = excluded.container_id,
     host_origin_dir = excluded.host_origin_dir,
@@ -165,18 +167,26 @@ ON CONFLICT(id) DO UPDATE SET
     dns_domain = excluded.dns_domain,
     env_file = excluded.env_file,
     agent_type = excluded.agent_type,
-    updated_at = CURRENT_TIMESTAMP
+    updated_at = CURRENT_TIMESTAMP,
+    original_git_origin = excluded.original_git_origin,
+    original_git_branch = excluded.original_git_branch,
+    original_git_commit = excluded.original_git_commit,
+    original_git_is_dirty = excluded.original_git_is_dirty
 `
 
 type UpsertSandboxParams struct {
-	ID             string         `json:"id"`
-	ContainerID    sql.NullString `json:"container_id"`
-	HostOriginDir  string         `json:"host_origin_dir"`
-	SandboxWorkDir string         `json:"sandbox_work_dir"`
-	ImageName      string         `json:"image_name"`
-	DnsDomain      sql.NullString `json:"dns_domain"`
-	EnvFile        sql.NullString `json:"env_file"`
-	AgentType      sql.NullString `json:"agent_type"`
+	ID                 string         `json:"id"`
+	ContainerID        sql.NullString `json:"container_id"`
+	HostOriginDir      string         `json:"host_origin_dir"`
+	SandboxWorkDir     string         `json:"sandbox_work_dir"`
+	ImageName          string         `json:"image_name"`
+	DnsDomain          sql.NullString `json:"dns_domain"`
+	EnvFile            sql.NullString `json:"env_file"`
+	AgentType          sql.NullString `json:"agent_type"`
+	OriginalGitOrigin  sql.NullString `json:"original_git_origin"`
+	OriginalGitBranch  sql.NullString `json:"original_git_branch"`
+	OriginalGitCommit  sql.NullString `json:"original_git_commit"`
+	OriginalGitIsDirty bool           `json:"original_git_is_dirty"`
 }
 
 func (q *Queries) UpsertSandbox(ctx context.Context, arg UpsertSandboxParams) error {
@@ -189,6 +199,10 @@ func (q *Queries) UpsertSandbox(ctx context.Context, arg UpsertSandboxParams) er
 		arg.DnsDomain,
 		arg.EnvFile,
 		arg.AgentType,
+		arg.OriginalGitOrigin,
+		arg.OriginalGitBranch,
+		arg.OriginalGitCommit,
+		arg.OriginalGitIsDirty,
 	)
 	return err
 }

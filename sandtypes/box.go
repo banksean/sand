@@ -41,7 +41,15 @@ type Box struct {
 	SandboxWorkDirError   string
 	SandboxContainerError string
 	// ContainerHooks run after the container has started to perform any bootstrap logic.
-	ContainerHooks []ContainerStartupHook `json:"-"`
-	Container      *types.Container
-	Keys           *sshimmer.Keys
+	ContainerHooks     []ContainerStartupHook `json:"-"`
+	OriginalGitDetails *GitDetails
+	Container          *types.Container
+	Keys               *sshimmer.Keys
+}
+
+type GitDetails struct {
+	RemoteOrigin string
+	Branch       string
+	Commit       string
+	IsDirty      bool
 }

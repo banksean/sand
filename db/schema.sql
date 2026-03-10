@@ -8,7 +8,11 @@ CREATE TABLE IF NOT EXISTS sandboxes (
     env_file TEXT,
     agent_type TEXT DEFAULT 'default',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    original_git_origin TEXT,
+    original_git_branch TEXT,
+    original_git_commit TEXT,
+    original_git_is_dirty BOOLEAN NOT NULL DEFAULT 0,
 );
 
 CREATE INDEX IF NOT EXISTS idx_container_id ON sandboxes(container_id);
