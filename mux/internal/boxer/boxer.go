@@ -467,7 +467,7 @@ func (sber *Boxer) StartContainer(ctx context.Context, sb *sandtypes.Box) error 
 	agentConfig := cloning.GetGlobalRegistry().Get(sb.AgentType)
 	hooks := agentConfig.Configuration.GetStartupHooks(artifacts)
 
-	slog.InfoContext(ctx, "Box.StartContainer", "box", *sb, "ContainerHooks", len(hooks))
+	slog.InfoContext(ctx, "Boxer.StartContainer", "box", *sb, "ContainerHooks", len(hooks))
 	if err := sber.startContainerProcess(ctx, sb.ContainerID); err != nil {
 		return err
 	}
@@ -476,20 +476,20 @@ func (sber *Boxer) StartContainer(ctx context.Context, sb *sandtypes.Box) error 
 }
 
 func (sb *Boxer) startContainerProcess(ctx context.Context, containerID string) error {
-	slog.InfoContext(ctx, "Box.startContainerProcess", "containerID", containerID)
+	slog.InfoContext(ctx, "Boxer.startContainerProcess", "containerID", containerID)
 	output, err := sb.ContainerService.Start(ctx, nil, containerID)
 	if err != nil {
 		slog.ErrorContext(ctx, "startContainerProcess", "containerID", containerID, "error", err, "output", output)
 		return fmt.Errorf("failed to start container for sandbox %s: %w", containerID, err)
 	}
-	slog.InfoContext(ctx, "Box.startContainerProcess succeeded", "sandbox", containerID, "output", output)
+	slog.InfoContext(ctx, "Boxer.startContainerProcess succeeded", "sandbox", containerID, "output", output)
 	return nil
 }
 
 func (sber *Boxer) executeHooks(ctx context.Context, sb *sandtypes.Box, hooks []sandtypes.ContainerStartupHook) error {
 	var hookErrs []error
 	for _, hook := range hooks {
-		slog.InfoContext(ctx, "Box.executeHooks running hook", "hook", hook.Name())
+		slog.InfoContext(ctx, "Boxer.executeHooks running hook", "hook", hook.Name())
 		// Need something that can call GetContaner and Exec on sb, since sb can no longer do those things.
 		ctr, err := sber.GetContainer(ctx, sb.ContainerID)
 		if err != nil {
@@ -511,7 +511,7 @@ func (sber *Boxer) executeHooks(ctx context.Context, sb *sandtypes.Box, hooks []
 			}
 			return output, nil
 		}); err != nil {
-			slog.ErrorContext(ctx, "Box.executeHooks hook error", "hook", hook.Name(), "error", err)
+			slog.ErrorContext(ctx, "Boxer.executeHooks hook error", "hook", hook.Name(), "error", err)
 			hookErrs = append(hookErrs, fmt.Errorf("%s: %w", hook.Name(), err))
 		}
 	}
