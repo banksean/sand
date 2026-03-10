@@ -27,9 +27,10 @@ type NewCmd struct {
 }
 
 var defaultImageForCloner = map[string]string{
-	"claude":   "ghcr.io/banksean/sand/default:latest",
-	"opencode": "ghcr.io/banksean/sand/opencode:latest",
+	"claude":   "ghcr.io/banksean/sand/claude:latest",
 	"codex":    "ghcr.io/banksean/sand/codex:latest",
+	"default":  "ghcr.io/banksean/sand/default:latest",
+	"opencode": "ghcr.io/banksean/sand/opencode:latest",
 }
 
 func (c *NewCmd) Run(cctx *CLIContext) error {
@@ -68,10 +69,16 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 		c.Cloner = "claude"
 	}
 
-	if c.ImageName == "" && c.Cloner != "" {
-		img, ok := defaultImageForCloner[c.Cloner]
-		if ok {
-			c.ImageName = img
+	if c.ImageName == "" {
+		if c.Cloner != "" {
+			img, ok := defaultImageForCloner[c.Cloner]
+			if ok {
+				c.ImageName = img
+			} else {
+				c.ImageName = DefaultImageName
+			}
+		} else {
+			c.ImageName = DefaultImageName
 		}
 	}
 

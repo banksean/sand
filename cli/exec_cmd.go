@@ -39,6 +39,10 @@ func (c *ExecCmd) Run(cctx *CLIContext) error {
 		c.SandboxName = nameGenerator.Generate()
 	}
 
+	if c.ImageName == "" {
+		c.ImageName = DefaultImageName
+	}
+
 	// Try to get existing sandbox
 	sbox, err := mc.GetSandbox(ctx, c.SandboxName)
 	if err != nil {
