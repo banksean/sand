@@ -133,6 +133,9 @@ func (sb *Boxer) NewSandbox(ctx context.Context, agentType, id, hostWorkDir, ima
 
 	// Get agent configuration from registry
 	agentConfig := sb.agentRegistry.Get(agentType)
+	if _, err := os.Stat(envFile); err != nil {
+		envFile = ""
+	}
 
 	// Prepare workspace
 	artifacts, err := agentConfig.Preparation.Prepare(ctx, cloning.CloneRequest{
