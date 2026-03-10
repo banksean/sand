@@ -3,20 +3,39 @@
 
 # TL;DR
 
-## Installation
+Installation:
 ```sh
 go install github.com/banksean/sand/cmd/...
 ```
 
-## Usage
+Manual usage:
 ```sh
-sand new -c opencode
+> sand new my-sandbox
+container hostname: my-sandbox
+⚡ ⌨️  # shell prompt, go crazy, rm -rf whatever
 ```
 
-Or use with claude, other agents:
+Use with a coding agent, like claude or opencode:
 ```sh
-sand new -c claude
+> sand new -c claude
+container hostname: shy-snow
+
+ ▐▛███▜▌   Claude Code v2.1.71
+▝▜█████▛▘  Sonnet 4.6 · API Usage Billing
+  ▘▘ ▝▝    /app
+
+──────────────────────────────────────────────────── ▪▪▪ ─
+❯  
 ```
+
+And in another shell window from your host MacOS, use `sand ls` to list the sandboxes:
+```sh
+> sand ls
+SANDBOX NAME  STATUS   FROM DIR     FROM GIT          CURRENT GIT       IMAGE NAME
+shy-snow      running  ~/code/sand  *2be518ca readme  *2be518ca readme  claude:latest
+my-sandbox    running  ~/code/sand  *2be518ca readme  *2be518ca readme  default:latest
+```
+## Details
 
 Under the hood, the `sand new` command:
 - creates a copy-on-write clone your current working directory (traversing up to git root, if necessary)
@@ -44,7 +63,7 @@ Fast and easy: One way to achieve speed is by doing less, so the specific compar
 
 ## Implementation Choices
 
-- Isolation Model: Apple Containers
+- Isolation Model: [Apple Containerization](https://github.com/apple/containerization)
   - hardware isolation via Apple Silicon
   - low memory overhead, fast start times
   - based on [Kata](https://katacontainers.io/)
