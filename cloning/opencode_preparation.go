@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/banksean/sand/sandtypes"
+	"github.com/banksean/sand/hostops"
 )
 
 const opencodeJSON = `
@@ -37,11 +37,11 @@ const opencodeJSON = `
 // It clones OpenCode authentication, storage, logs, and configuration.
 type OpenCodeWorkspacePreparation struct {
 	base      *BaseWorkspacePreparation
-	messenger sandtypes.UserMessenger
+	messenger hostops.UserMessenger
 }
 
 // NewOpenCodeWorkspacePreparation creates a new OpenCode workspace preparation instance.
-func NewOpenCodeWorkspacePreparation(cloneRoot string, messenger sandtypes.UserMessenger, gitOps sandtypes.GitOps, fileOps sandtypes.FileOps) *OpenCodeWorkspacePreparation {
+func NewOpenCodeWorkspacePreparation(cloneRoot string, messenger hostops.UserMessenger, gitOps hostops.GitOps, fileOps hostops.FileOps) *OpenCodeWorkspacePreparation {
 	return &OpenCodeWorkspacePreparation{
 		base:      NewBaseWorkspacePreparation(cloneRoot, messenger, gitOps, fileOps),
 		messenger: messenger,

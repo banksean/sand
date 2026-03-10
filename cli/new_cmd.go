@@ -11,7 +11,7 @@ import (
 
 	"github.com/banksean/sand/applecontainer/options"
 	"github.com/banksean/sand/applecontainer/types"
-	"github.com/banksean/sand/box"
+	"github.com/banksean/sand/hostops"
 	"github.com/banksean/sand/mux"
 	"github.com/banksean/sand/sshimmer"
 	"github.com/goombaio/namegenerator"
@@ -116,7 +116,7 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 
 	if c.Branch {
 		// Create and check out a git branch inside the container, named after the sandbox id
-		containerSvc := box.NewAppleContainerOps()
+		containerSvc := hostops.NewAppleContainerOps()
 		out, err := containerSvc.Exec(ctx,
 			&options.ExecContainer{
 				ProcessOptions: options.ProcessOptions{
@@ -133,7 +133,7 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 	if c.Prompt != "" {
 		// One-shot mode: run the agent inside the container, streaming output to stdio.
 		// The prompt is passed via an env var to avoid shell quoting issues.
-		containerSvc := box.NewAppleContainerOps()
+		containerSvc := hostops.NewAppleContainerOps()
 		wait, err := containerSvc.ExecStream(ctx,
 			&options.ExecContainer{
 				ProcessOptions: options.ProcessOptions{
@@ -177,7 +177,7 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 
 	// This will only work on the *host* OS, since it makes calls to apple's container service.
 	// TODO: Sort out how "new" and "shell" should work when invoked inside a container.
-	containerSvc := box.NewAppleContainerOps()
+	containerSvc := hostops.NewAppleContainerOps()
 	wait, err := containerSvc.ExecStream(ctx,
 		&options.ExecContainer{
 			ProcessOptions: options.ProcessOptions{

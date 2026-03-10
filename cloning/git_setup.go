@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/banksean/sand/sandtypes"
+	"github.com/banksean/sand/hostops"
 )
 
 const (
@@ -18,11 +18,11 @@ const (
 // GitSetup handles git-specific operations for workspace cloning.
 // It sets up bidirectional git remotes between the host workspace and the sandbox clone.
 type GitSetup struct {
-	gitOps sandtypes.GitOps
+	gitOps hostops.GitOps
 }
 
 // NewGitSetup creates a new GitSetup instance.
-func NewGitSetup(gitOps sandtypes.GitOps) *GitSetup {
+func NewGitSetup(gitOps hostops.GitOps) *GitSetup {
 	return &GitSetup{gitOps: gitOps}
 }
 

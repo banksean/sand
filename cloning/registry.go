@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/banksean/sand/sandtypes"
+	"github.com/banksean/sand/hostops"
 )
 
 var (
@@ -14,7 +14,7 @@ var (
 
 // InitializeGlobalRegistry creates and populates the global agent registry.
 // This should be called once at application startup.
-func InitializeGlobalRegistry(appRoot string, messenger sandtypes.UserMessenger, gitOps sandtypes.GitOps, fileOps sandtypes.FileOps) *AgentRegistry {
+func InitializeGlobalRegistry(appRoot string, messenger hostops.UserMessenger, gitOps hostops.GitOps, fileOps hostops.FileOps) *AgentRegistry {
 	globalRegistryOnce.Do(func() {
 		globalRegistry = NewAgentRegistry()
 

@@ -11,18 +11,18 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/banksean/sand/sandtypes"
+	"github.com/banksean/sand/hostops"
 )
 
 // ClaudeWorkspacePreparation extends base preparation with Claude-specific files.
 // It clones the ~/.claude directory and filters .claude.json for the current project.
 type ClaudeWorkspacePreparation struct {
 	base      *BaseWorkspacePreparation
-	messenger sandtypes.UserMessenger
+	messenger hostops.UserMessenger
 }
 
 // NewClaudeWorkspacePreparation creates a new Claude workspace preparation instance.
-func NewClaudeWorkspacePreparation(cloneRoot string, messenger sandtypes.UserMessenger, gitOps sandtypes.GitOps, fileOps sandtypes.FileOps) *ClaudeWorkspacePreparation {
+func NewClaudeWorkspacePreparation(cloneRoot string, messenger hostops.UserMessenger, gitOps hostops.GitOps, fileOps hostops.FileOps) *ClaudeWorkspacePreparation {
 	return &ClaudeWorkspacePreparation{
 		base:      NewBaseWorkspacePreparation(cloneRoot, messenger, gitOps, fileOps),
 		messenger: messenger,

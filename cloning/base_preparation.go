@@ -8,20 +8,20 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/banksean/sand/sandtypes"
+	"github.com/banksean/sand/hostops"
 )
 
 // BaseWorkspacePreparation implements the default workspace preparation behavior.
 // It clones the host workspace directory, sets up dotfiles, and configures git remotes.
 type BaseWorkspacePreparation struct {
 	cloneRoot string
-	messenger sandtypes.UserMessenger
+	messenger hostops.UserMessenger
 	gitSetup  *GitSetup
-	fileOps   sandtypes.FileOps
+	fileOps   hostops.FileOps
 }
 
 // NewBaseWorkspacePreparation creates a new base workspace preparation instance.
-func NewBaseWorkspacePreparation(cloneRoot string, messenger sandtypes.UserMessenger, gitOps sandtypes.GitOps, fileOps sandtypes.FileOps) *BaseWorkspacePreparation {
+func NewBaseWorkspacePreparation(cloneRoot string, messenger hostops.UserMessenger, gitOps hostops.GitOps, fileOps hostops.FileOps) *BaseWorkspacePreparation {
 	return &BaseWorkspacePreparation{
 		cloneRoot: cloneRoot,
 		messenger: messenger,

@@ -7,7 +7,7 @@ import (
 
 	"github.com/banksean/sand/applecontainer/options"
 	"github.com/banksean/sand/applecontainer/types"
-	"github.com/banksean/sand/box"
+	"github.com/banksean/sand/hostops"
 )
 
 type ShellCmd struct {
@@ -38,7 +38,7 @@ func (c *ShellCmd) Run(cctx *CLIContext) error {
 	slog.InfoContext(ctx, "main: sbox.shell starting")
 	// This will only work on the *host* OS, since it makes calls to apple's container service.
 	// TODO: Sort out how "new" and "shell" should work when invoked inside a container.
-	containerSvc := box.NewAppleContainerOps()
+	containerSvc := hostops.NewAppleContainerOps()
 	wait, err := containerSvc.ExecStream(ctx,
 		&options.ExecContainer{
 			ProcessOptions: options.ProcessOptions{

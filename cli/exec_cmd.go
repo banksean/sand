@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/banksean/sand/applecontainer/options"
-	"github.com/banksean/sand/box"
+	"github.com/banksean/sand/hostops"
 	"github.com/banksean/sand/mux"
 	"github.com/goombaio/namegenerator"
 )
@@ -68,7 +68,7 @@ func (c *ExecCmd) Run(cctx *CLIContext) error {
 	if len(c.Arg) > 1 {
 		args = c.Arg[1:]
 	}
-	containerSvc := box.NewAppleContainerOps()
+	containerSvc := hostops.NewAppleContainerOps()
 	out, err := containerSvc.Exec(ctx,
 		&options.ExecContainer{
 			ProcessOptions: options.ProcessOptions{

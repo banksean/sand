@@ -17,9 +17,9 @@ import (
 
 	"github.com/banksean/sand/applecontainer/options"
 	"github.com/banksean/sand/applecontainer/types"
-	"github.com/banksean/sand/box"
 	"github.com/banksean/sand/cloning"
 	"github.com/banksean/sand/db"
+	"github.com/banksean/sand/hostops"
 	"github.com/banksean/sand/sandtypes"
 	"github.com/banksean/sand/sshimmer"
 	_ "github.com/golang-migrate/migrate/v4/database/sqlite"
@@ -34,19 +34,19 @@ const (
 // Boxer manages the lifecycle of sandboxes.
 type Boxer struct {
 	appRoot          string
-	messenger        box.UserMessenger
+	messenger        hostops.UserMessenger
 	sqlDB            *sql.DB
 	queries          *db.Queries
-	ContainerService box.ContainerOps
-	imageService     box.ImageOps
-	gitOps           box.GitOps
-	fileOps          box.FileOps
+	ContainerService hostops.ContainerOps
+	imageService     hostops.ImageOps
+	gitOps           hostops.GitOps
+	fileOps          hostops.FileOps
 	sshim            *sshimmer.LocalSSHimmer
 	agentRegistry    *cloning.AgentRegistry
 }
 
 func NewBoxer(appRoot string, terminalWriter io.Writer) (*Boxer, error) {
-	fileOps := box.NewDefaultFileOps()
+	fileOps := hostops.NewDefaultFileOps()
 	if err := fileOps.MkdirAll(appRoot, 0o750); err != nil {
 		return nil, err
 	}
@@ -62,17 +62,17 @@ func NewBoxer(appRoot string, terminalWriter io.Writer) (*Boxer, error) {
 		return nil, fmt.Errorf("failed to create LocalSSHimmer: %w", err)
 	}
 
-	messenger := box.NewTerminalMessenger(terminalWriter)
-	agentRegistry := cloning.InitializeGlobalRegistry(appRoot, messenger, box.NewDefaultGitOps(), fileOps)
+	messenger := hostops.NewTerminalMessenger(terminalWriter)
+	agentRegistry := cloning.InitializeGlobalRegistry(appRoot, messenger, hostops.NewDefaultGitOps(), fileOps)
 
 	sb := &Boxer{
 		appRoot:          appRoot,
-		messenger:        box.NewTerminalMessenger(terminalWriter),
+		messenger:        hostops.NewTerminalMessenger(terminalWriter),
 		sqlDB:            sqlDB,
 		queries:          db.New(sqlDB),
-		ContainerService: box.NewAppleContainerOps(),
-		imageService:     box.NewAppleImageOps(),
-		gitOps:           box.NewDefaultGitOps(),
+		ContainerService: hostops.NewAppleContainerOps(),
+		imageService:     hostops.NewAppleImageOps(),
+		gitOps:           hostops.NewDefaultGitOps(),
 		fileOps:          fileOps,
 		sshim:            sshim,
 		agentRegistry:    agentRegistry,
@@ -599,7 +599,7 @@ func (sb *Boxer) loadSandbox(ctx context.Context, id string) (*sandtypes.Box, er
 	return box, nil
 }
 
-func writeKeyToFile(fileOps box.FileOps, keyBytes []byte, filename string) error {
+func writeKeyToFile(fileOps hostops.FileOps, keyBytes []byte, filename string) error {
 	err := fileOps.WriteFile(filename, keyBytes, 0o600)
 	return err
 }
@@ -624,7 +624,7 @@ func encodePrivateKeyToPEM(privateKey ed25519.PrivateKey) []byte {
 }
 
 // TODO: Remove this
-func createKeyPairIfMissing(fileOps box.FileOps, idPath string) (ssh.PublicKey, error) {
+func createKeyPairIfMissing(fileOps hostops.FileOps, idPath string) (ssh.PublicKey, error) {
 	if _, err := fileOps.Stat(idPath); err == nil {
 		return nil, nil
 	}
