@@ -120,6 +120,11 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 
 	slog.InfoContext(ctx, "main: sbox.new starting")
 
+	fmt.Printf("Connecting you to %q. CPUs: %d, Mem: %dMB, dns: %s\n", sbox.ID,
+		sbox.Container.Configuration.Resources.CPUs,
+		sbox.Container.Configuration.Resources.MemoryInBytes>>20,
+		hostname)
+
 	if c.Branch {
 		// Create and check out a git branch inside the container, named after the sandbox id
 		containerSvc := hostops.NewAppleContainerOps()
