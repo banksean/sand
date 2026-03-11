@@ -145,6 +145,15 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 		// One-shot mode: run the agent inside the container, streaming output to stdio.
 		// The prompt is passed via an env var to avoid shell quoting issues.
 		containerSvc := hostops.NewAppleContainerOps()
+		agentOneShotCmd := ""
+		switch c.Cloner {
+		case "claude":
+			agentOneShotCmd = `claude --permission-mode=auto --print "$SAND_ONESHOT_PROMPT"`
+		case "opencode":
+			agentOneShotCmd = `opencode run "$SAND_ONESHOT_PROMPT"`
+		default:
+			return fmt.Errorf("one-shot prompt mode not supported for %q", c.Cloner)
+		}
 		wait, err := containerSvc.ExecStream(ctx,
 			&options.ExecContainer{
 				ProcessOptions: options.ProcessOptions{
@@ -154,7 +163,7 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 				},
 			}, sbox.ContainerID, "/bin/sh", os.Environ(),
 			os.Stdin, os.Stdout, os.Stderr,
-			"-c", `claude --permission-mode=auto --print "$SAND_ONESHOT_PROMPT"`)
+			"-c", agentOneShotCmd)
 		if err != nil {
 			slog.ErrorContext(ctx, "NewCmd: start agent oneshot", "error", err)
 			return fmt.Errorf("failed to start agent in sandbox %s: %w", sbox.ID, err)
