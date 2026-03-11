@@ -94,6 +94,9 @@ func (p *BaseWorkspacePreparation) cloneWorkDir(ctx context.Context, id, hostWor
 func (p *BaseWorkspacePreparation) cloneDotfiles(ctx context.Context, id string, pathRegistry PathRegistry) error {
 	p.messenger.Message(ctx, "Cloning dotfiles...")
 
+	// TODO: get this list from somewhere less hard-coded.
+	// There are plenty of reasons one might not want to clone their dotfiles directly,
+	// and instead use some written specifically for interactive sandbox shells.
 	dotfiles := []string{
 		".gitconfig",
 		".p10k.zsh",

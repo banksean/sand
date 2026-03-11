@@ -195,8 +195,18 @@ func (s *SystemProperty) BoolValue() (bool, bool) {
 }
 
 func GetContainerHostname(ctr *Container) string {
+	hostname := ctr.Configuration.ID
 	for _, n := range ctr.Networks {
-		return strings.TrimSuffix(n.Hostname, ".")
+		if n.Network == "default" {
+			hostname = n.Hostname
+		}
 	}
-	return ctr.Configuration.ID
+	for _, n := range ctr.Configuration.Networks {
+		if n.Network == "default" {
+			if h, ok := n.Options["hostname"]; ok {
+				hostname = h
+			}
+		}
+	}
+	return strings.TrimSuffix(hostname, ".")
 }

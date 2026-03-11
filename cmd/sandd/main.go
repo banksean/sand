@@ -51,6 +51,7 @@ func (c *DaemonCmd) Run(cctx *App) error {
 	if err != nil {
 		return fmt.Errorf("unable to get dns.domain from container system: %w", err)
 	}
+	slog.InfoContext(ctx, "DaemonCmd.Run", "localDomain", localDomain)
 	server := mux.NewMuxServer(cctx.AppBaseDir, cctx.HTTPPort, localDomain)
 
 	switch c.Action {

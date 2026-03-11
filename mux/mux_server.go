@@ -47,6 +47,7 @@ func NewMuxServer(appBaseDir, httpPort, localDomain string) *Mux {
 		AppBaseDir:    appBaseDir,
 		SocketPath:    filepath.Join(appBaseDir, defaultSocketFile),
 		LocalHTTPPort: httpPort,
+		LocalDomain:   localDomain,
 		hostMCP: &HostMCP{
 			ChromeDevToolsPort: 9222,
 			ChromeUserDataDir:  "/tmp/chrome-profile-stable",

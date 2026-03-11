@@ -33,7 +33,6 @@ func (c *ShellCmd) Run(cctx *CLIContext) error {
 	env := map[string]string{
 		"HOSTNAME": hostname,
 	}
-	fmt.Printf("container hostname: %s\n", hostname)
 
 	slog.InfoContext(ctx, "main: sbox.shell starting")
 	// This will only work on the *host* OS, since it makes calls to apple's container service.

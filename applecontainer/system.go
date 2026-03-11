@@ -125,7 +125,7 @@ func (s *SystemSvc) PropertyGet(ctx context.Context, id string) (string, error) 
 		slog.ErrorContext(ctx, "SystemSvc.PropertyGet", "output", string(output), "error", err)
 		return "", err
 	}
-	return string(output), nil
+	return strings.TrimSpace(string(output)), nil
 }
 
 // Logs returns an io.ReadCloser for streaming log output and a wait func that blocks on the command's completion, or an error.
