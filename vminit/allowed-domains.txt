@@ -1,0 +1,13 @@
+# Allowed egress domains for sandbox
+# This is a dummy placeholder list just for testing.
+api.github.com
+github.com
+www.github.com
+registry.npmjs.org
+www.gitlab.com
+api.openai.com
+api.anthropic.com
+amazonaws.com
+stackoverflow.com
+google.com
+www.google.com

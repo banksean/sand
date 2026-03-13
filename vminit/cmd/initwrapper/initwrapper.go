@@ -3,23 +3,35 @@
 package main
 
 import (
-	"log"
+	"fmt"
 	"os"
+	"os/exec"
 	"syscall"
 )
 
 func main() {
-	// Write a message to kernel log
 	kmsg, err := os.OpenFile("/dev/kmsg", os.O_WRONLY, 0)
 	if err == nil {
 		kmsg.WriteString("<6>sand-init: === SAND INIT IMAGE RUNNING ===\n")
-		kmsg.Close()
+		defer kmsg.Close()
 	}
 
-	if os.Getenv("SKIP_EXEC") == "" {
-		// Execute the real vminitd
-		syscall.Exec("/sbin/vminitd.real", os.Args, os.Environ())
+	cmd := exec.Command("/sbin/dns-allowlist-proxy")
+
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Setsid: true,
 	}
-	log.Println("skipping exec, staying alive for inspection")
-	select {} // block so we can inspect /sys/fs/bpf/ etc
+
+	kmsg.WriteString("<6>starting dns proxy sidecar...")
+
+	if err := cmd.Start(); err != nil {
+		kmsg.WriteString(fmt.Sprintf("<6>failed to start dns proxy sidecar: %v", err))
+	} else {
+		kmsg.WriteString(fmt.Sprintf("<6>sand-init: dns proxy pid is %d\n", cmd.Process.Pid))
+	}
+
+	kmsg.WriteString("<6>shelling out to /sbin/vminitd.real...")
+	syscall.Exec("/sbin/vminitd.real", os.Args, os.Environ())
 }
