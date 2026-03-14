@@ -1,33 +1,47 @@
 # Custom vm init image for eBPF
 
-This only partially works, so it's not baked into the rest of `sand` yet.
+This only partially works, so it's not integrated into the rest of `sand` yet.
 
-Its purpose is to set up ePBF during the vm init phase, so that `sand` can set up DNS allowlists and block agents from accessing other domains at the OS kernel level.
+Its purpose is to apply DNS allowlisting *at the kernel level*, via ePBF.
+To make this work, we have to change our vm's init process:
+- create and apply the eBPF configuration
+- spawn a local DNS proxy process (in the VM's namespace, not the container's) at 127.0.0.1:53
+- configure the container settings to use that nameserver address in its resolv.conf 
 
-This image is meant to be used with `apple/container`'s  `--init-image` flag like so:
+You can try this image out using `apple/container`'s `--init-image` and `--dns` flags like so:
 
 ```sh
-container run -i -t --name my-container --init-image ghcr.io/banksean/sand/custom-init:latest ghcr.io/banksean/sand/base:latest
+container run -i -t \
+  --name my-container \
+  --init-image ghcr.io/banksean/sand/custom-init:latest \
+  --dns 127.0.0.1 \ # the dns proxy created by cmd/initwrapper
+  ghcr.io/banksean/sand/base:latest
 ```
 
-It wraps Apple's default [`vminitd`](https://github.com/apple/containerization/tree/main/vminitd) image with its own [`cmd/initwrapper`](cmd/initwrapper/) process. `initwrapper` starts a separate DNS proxy sidecar process before Exec'ing out to Apple's `vminitd` process, where it continues as it would without this custom init image.
+When you get a shell prompt, try looking up some domain names that are either in the allowlist or not to see the difference:
 
-The DNS proxy sidecar is implemented in [`cmd/dnsproxy`](cmd/dnsproxy/). It performs a lot of unnatural, ugly acts in order to mount /sys/fs/bpf and writer /etc/resolv.conf etc at the appropriate times during the vm init sequence.
-
-This code barely works when it works at all. In particular, the pre-resolved domain queries rarely cover all the addresses. E.g. pinging an allowlisted domain from inside a guest container will often resolve to an IP address that wasn't in the pre-resolved set for that domain. So it fails in the overly-restrictive direction.
-
-You can get an idea of what the pre-resolved queries cover by running this command from your host OS after your container starts up:
 ```sh
-> container logs --boot my-container
-...
-2026/03/12 23:52:30 network ready, pre-resolving domains...
-2026/03/12 23:52:30 pre-resolved api.github.com -> 140.82.116.6
-2026/03/12 23:52:30 pre-resolved github.com -> 140.82.116.3
-2026/03/12 23:52:30 pre-resolved www.github.com -> 140.82.116.3
-2026/03/12 23:52:30 pre-resolved registry.npmjs.org -> 104.16.10.34
-2026/03/12 23:52:30 pre-resolved registry.npmjs.org -> 104.16.4.34
-2026/03/12 23:52:30 pre-resolved registry.npmjs.org -> 104.16.3.34
-2026/03/12 23:52:30 pre-resolved registry.npmjs.org -> 104.16.7.34
+/workspace # nslookup api.github.com
+Server:         127.0.0.1:53
+Address:        127.0.0.1:53
+
+Non-authoritative answer:
+
+Non-authoritative answer:
+Name:   api.github.com
+Address: 140.82.116.6
+
+/workspace # nslookup reddit.com
+Server:         127.0.0.1:53
+Address:        127.0.0.1:53
+
+** server can't find reddit.com: REFUSED
+
+** server can't find reddit.com: REFUSED
 ```
 
-I'm considering scrapping this approach and forking apple's vminit, so that we don't have to use a sidecar at all. That's a whole other can of worms though.
+The `custom-init` image wraps Apple's default [`vminitd`](https://github.com/apple/containerization/tree/main/vminitd) image with its own [`cmd/initwrapper`](cmd/initwrapper/) process. `initwrapper` starts a separate DNS proxy sidecar process before Exec'ing out to Apple's `vminitd` process, where it continues as it would without this custom init image.
+
+The DNS proxy sidecar is implemented in [`cmd/dnsproxy`](cmd/dnsproxy/). 
+
+The domain [allowlist](./allowed-domains.txt) is still baked into the `custom-init` image, so it's not yet very useful beyond demonstration purposes.  Ideally, one could specify this list via `sand` configuration settings without having to rebuild the `custom-init` image.

@@ -4,13 +4,12 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/binary"
 	"flag"
 	"fmt"
-	"log"
 	"net"
 	"os"
+	"sync"
 	"syscall"
 	"time"
 
@@ -23,6 +22,20 @@ import (
 
 const bpfTarget = "/sys/fs/bpf"
 
+func retry(attempts int, sleep time.Duration, f func() error) (err error) {
+	for i := 0; i < attempts; i++ {
+		if i > 0 {
+			time.Sleep(sleep)
+			sleep *= 2 // Exponential backoff
+		}
+		err = f()
+		if err == nil {
+			return nil
+		}
+	}
+	return fmt.Errorf("after %d attempts, last error: %s", attempts, err)
+}
+
 func allowIP(m *ebpf.Map, addr string) {
 	ip := net.ParseIP(addr).To4()
 	if ip == nil {
@@ -31,7 +44,7 @@ func allowIP(m *ebpf.Map, addr string) {
 	key := binary.LittleEndian.Uint32(ip)
 	val := uint8(1)
 	if err := m.Put(key, val); err != nil {
-		log.Printf("map put %s: %v", addr, err)
+		log("map put %s: %v", addr, err)
 	}
 }
 
@@ -47,7 +60,8 @@ func isAllowedDomain(allowed []string, name string) bool {
 func loadDomains(path string) []string {
 	f, err := os.Open(path)
 	if err != nil {
-		log.Fatalf("open domains: %v", err)
+		log("open domains error: %v", err)
+		return nil
 	}
 	defer f.Close()
 	var domains []string
@@ -67,63 +81,44 @@ func preResolveDomains(domains []string, upstream string, m *ebpf.Map) {
 		msg.SetQuestion(dns.Fqdn(domain), dns.TypeA)
 		resp, _, err := c.Exchange(msg, upstream)
 		if err != nil {
-			log.Printf("warn: resolve %s: %v", domain, err)
+			log("warn: resolve %s: %v", domain, err)
 			continue
 		}
 		for _, ans := range resp.Answer {
 			if a, ok := ans.(*dns.A); ok {
 				allowIP(m, a.A.String())
-				log.Printf("pre-resolved %s -> %s", domain, a.A)
+				log("pre-resolved %s -> %s", domain, a.A)
 			}
 		}
 	}
 }
 
-func waitForLoopback() {
-	for {
+func waitForLoopback() error {
+	return retry(100, time.Millisecond, func() error {
 		iface, err := net.InterfaceByName("lo")
 		if err == nil {
 			addrs, err := iface.Addrs()
-			if err == nil && len(addrs) > 0 {
-				// try actually binding to confirm it's up
+
+			if err == nil && len(addrs) > 0 { // try actually binding to confirm it's up
 				l, err := net.ListenPacket("udp", "127.0.0.1:0")
 				if err == nil {
 					l.Close()
-					return
+					return nil
 				}
+				return err
 			}
 		}
-		time.Sleep(10 * time.Millisecond)
-	}
+		return err
+	})
 }
 
-func waitForNetwork() {
-	for {
-		c, err := net.Dial("udp", "1.1.1.1:53")
-		if err == nil {
-			c.Close()
-			return
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-}
-
-func maintainResolvConf() {
-	// TODO: replace the "namesever" line only, and keep the rest of whatever else is in /etc/resolv.conf
-
-	want := []byte("nameserver 127.0.0.1\ndomain test\n")
-	for {
-		current, _ := os.ReadFile("/etc/resolv.conf")
-		if !bytes.Equal(current, want) {
-			err := os.WriteFile("/etc/resolv.conf", want, 0644)
-			if err == nil && false {
-				log.Println("(re)wrote /etc/resolv.conf")
-			} else if false {
-				log.Printf("error trying to (re)write /etc/resolv.conf: %v", err)
-			}
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
+func waitForNetwork(upstream string) error {
+	return retry(100, time.Millisecond, func() error {
+		c := new(dns.Client)
+		msg := new(dns.Msg).SetQuestion(".", dns.TypeNS)
+		_, _, err := c.Exchange(msg, upstream)
+		return err
+	})
 }
 
 func mountBPFFS() error {
@@ -134,27 +129,24 @@ func mountBPFFS() error {
 	// bpfs and makes it writeable.
 	// TODO: look into just forking vminitd rather than trying to
 	// do all this stuff in a sidecar.
-	tries := 100
-	for {
-		if err := os.MkdirAll(bpfTarget, 0755); err != nil {
-			tries--
-			if tries == 0 {
-				return fmt.Errorf("mkdir bpffs: %w", err)
-			}
-			time.Sleep(10 * time.Millisecond)
-			continue
-		}
-		break
+	err := retry(100, time.Millisecond, func() error {
+		return os.MkdirAll(bpfTarget, 0755)
+	})
+
+	if err != nil {
+		return err
 	}
 
-	if err := syscall.Mount("bpffs", bpfTarget, "bpf", 0, ""); err != nil {
-		if err == syscall.EBUSY {
-			// already mounted, that's fine
-			return nil
+	return retry(100, time.Millisecond, func() error {
+		if err := syscall.Mount("bpffs", bpfTarget, "bpf", 0, ""); err != nil {
+			if err == syscall.EBUSY {
+				// already mounted, that's fine
+				return nil
+			}
+			return err
 		}
-		return fmt.Errorf("mount bpffs: %w", err)
-	}
-	return nil
+		return nil
+	})
 }
 
 // attachTCEgress attaches prog to the egress hook of ifname using the clsact
@@ -163,7 +155,7 @@ func mountBPFFS() error {
 // Returns a cleanup func — call it if you want to detach (you probably don't,
 // since the filter should outlive the exec into vminitd.real, but it's useful
 // for error paths).
-func attachTCEgress(kmsg *os.File, ifname string, prog *ebpf.Program) (func(), error) {
+func attachTCEgress(ifname string, prog *ebpf.Program) (func(), error) {
 	iface, err := net.InterfaceByName(ifname)
 	if err != nil {
 		return nil, fmt.Errorf("interface %q: %w", ifname, err)
@@ -177,17 +169,17 @@ func attachTCEgress(kmsg *os.File, ifname string, prog *ebpf.Program) (func(), e
 	})
 
 	if err == nil {
-		kmsg.WriteString("<6>attachTCEgress: AttachTCX worked, pinning...\n")
+		//log("attachTCEgress: AttachTCX worked, pinning...")
 		// Pin the link so it survives exec
 		if err := l.Pin(bpfTarget + "/egress_link"); err != nil {
-			kmsg.WriteString(fmt.Sprintf("<6>pin tcx link failed, falling back to attachTCEgressNetlink: %v\n", err))
+			log("pin tcx link failed, falling back to attachTCEgressNetlink: %v", err)
 			return attachTCEgressNetlink(iface.Index, prog)
 		}
-		kmsg.WriteString("<6>attachTCEgress: pin worked\n")
+		//log("attachTCEgress: pin worked")
 		return func() { l.Close() }, nil
 	}
 
-	kmsg.WriteString("<6>attachTCEgress: AttachTCX failed, falling back to attachTCEgressNetlink\n")
+	log("attachTCEgress: AttachTCX failed, falling back to attachTCEgressNetlink")
 	// Fall back to classic netlink TC (works on older Kata kernels).
 	return attachTCEgressNetlink(iface.Index, prog)
 }
@@ -229,40 +221,72 @@ func attachTCEgressNetlink(ifindex int, prog *ebpf.Program) (func(), error) {
 	return cleanup, nil
 }
 
-func main() {
-	domainsFile := flag.String("domains-file", "/etc/sandbox/allowed-domains.txt", "")
-	listen := flag.String("listen", "127.0.0.1:53", "")
-	upstream := flag.String("upstream", "1.1.1.1:53", "")
+var (
+	logWriterMu sync.Mutex
+	logWriter   *os.File
+)
 
-	// Write a message to kernel log
-	kmsg, err := os.OpenFile("/dev/kmsg", os.O_WRONLY, 0)
-	if err == nil {
-		kmsg.WriteString("<6>sand-dns-proxy: === starting dns proxy ===\n")
-		defer kmsg.Close()
+func log(s string, args ...any) {
+	if logWriter == nil {
+		return
 	}
+	logWriterMu.Lock()
+	defer logWriterMu.Unlock()
+	logWriter.WriteString(fmt.Sprintf("<6>%s\n", fmt.Sprintf(s, args...)))
+}
 
-	kmsg.WriteString("<6>mounting bpffs...\n")
+func makeHandler(domains []string, upstream string, m *ebpf.Map) func(dns.ResponseWriter, *dns.Msg) {
+	return func(w dns.ResponseWriter, r *dns.Msg) {
+		// Filter out any domains that are not allowlisted, so the
+		// upstream query doesn't even ask for them.
+		var allowedQuestions []dns.Question
+		for _, q := range r.Question {
+			if isAllowedDomain(domains, q.Name) {
+				allowedQuestions = append(allowedQuestions, q)
+				log("dns.Client Question allowed domain: %s=%s", q.Name, q.String())
+			} else {
+				log("dns.Client Question blocked domain: %s=%s", q.Name, q.String())
+			}
+		}
+		if len(allowedQuestions) == 0 && len(r.Question) > 0 {
+			resp := new(dns.Msg).SetReply(r).SetRcode(r, dns.RcodeRefused)
+			w.WriteMsg(resp)
+			return
+		}
+		r.Question = allowedQuestions
+
+		c := new(dns.Client)
+		resp, _, err := c.Exchange(r, upstream)
+
+		if err != nil {
+			if logWriter != nil {
+				log("dns.Client Exchange error: %v", err)
+			}
+			dns.HandleFailed(w, r)
+			return
+		}
+
+		for _, ans := range resp.Answer {
+			if a, ok := ans.(*dns.A); ok {
+				allowIP(m, a.A.String())
+			}
+		}
+		w.WriteMsg(resp)
+	}
+}
+
+func setupBPF() (*ebpf.Map, func(), error) {
 	if err := mountBPFFS(); err != nil {
-		kmsg.WriteString(fmt.Sprintf("<6>mountBPFFS: %v\n", err))
-		return
+		return nil, nil, fmt.Errorf("mountBPFFS: %w", err)
 	}
-	kmsg.WriteString("<6>bpffs mounted ok\n")
 
-	// verify
-	entries, err := os.ReadDir(bpfTarget)
-	if err != nil {
-		kmsg.WriteString(fmt.Sprintf("<6>readdir %s: %v\n", bpfTarget, err))
-		return
+	if _, err := os.ReadDir(bpfTarget); err != nil {
+		return nil, nil, fmt.Errorf("readdir %s: %w", bpfTarget, err)
 	}
-	kmsg.WriteString(fmt.Sprintf("<6>%s contents: %v\n", bpfTarget, entries))
 
-	kmsg.WriteString("<6>loading bpf spec...\n")
-
-	// Load and attach TC filter
 	spec, err := ebpf.LoadCollectionSpec("/sbin/egress_filter.o")
 	if err != nil {
-		kmsg.WriteString(fmt.Sprintf("<6>load bpf spec: %v\n", err))
-		return
+		return nil, nil, fmt.Errorf("load bpf spec: %w", err)
 	}
 
 	var objs struct {
@@ -277,73 +301,70 @@ func main() {
 			LogLevel: ebpf.LogLevelInstruction, // helpful for verifier errors
 		},
 	}); err != nil {
-		kmsg.WriteString(fmt.Sprintf("<6>load bpf objs: %v\n", err))
-		return
+		return nil, nil, fmt.Errorf("load bpf objs: %w", err)
 	}
-
-	kmsg.WriteString("<6>pinning allowed_ips...\n")
 
 	if err := objs.AllowedIPs.Pin(bpfTarget + "/allowed_ips"); err != nil {
-		kmsg.WriteString(fmt.Sprintf("<6>pin map: %v\n", err))
-		return
+		objs.AllowedIPs.Close()
+		return nil, nil, fmt.Errorf("pin map: %w", err)
 	}
 
-	kmsg.WriteString("<6>attaching egress filter to eth0...\n")
-
-	_, err = attachTCEgress(kmsg, "eth0", objs.EgressFilter)
+	cleanup, err := attachTCEgress("eth0", objs.EgressFilter)
 	if err != nil {
-		kmsg.WriteString(fmt.Sprintf("<6>attaching egress to eth0: %v\n", err))
-		return
+		objs.AllowedIPs.Close()
+		return nil, nil, fmt.Errorf("attaching egress to eth0: %w", err)
+	}
+	objs.EgressFilter.Close()
+
+	return objs.AllowedIPs, cleanup, nil
+}
+
+func main() {
+	domainsFile := flag.String("domains-file", "/etc/sandbox/allowed-domains.txt", "")
+	listen := flag.String("listen", "127.0.0.1:53", "")
+	upstream := flag.String("upstream", "1.1.1.1:53", "")
+	logTo := flag.String("log", "/dev/kmsg", "")
+	flag.Parse()
+	logWriter = os.Stderr
+	// Log to kernel log during start-up.
+	if *logTo != "" {
+		w, err := os.OpenFile(*logTo, os.O_WRONLY, 0)
+		if err == nil {
+			logWriter = w
+			defer logWriter.Close()
+		}
 	}
 
-	m := objs.AllowedIPs
+	log("sand-dns-proxy: === starting dns proxy ===")
 
-	log.Println("waiting for loopback...")
-	waitForLoopback()
-	log.Println("loopback ready")
+	m, cleanup, err := setupBPF()
+	if err != nil {
+		log("setupBPF: %v", err)
+		return
+	}
+	defer cleanup()
 
-	log.Println("waiting for network...")
-	waitForNetwork()
-	log.Println("network ready, pre-resolving domains...")
+	if err := waitForLoopback(); err != nil {
+		log("waitForLoopback failed: %v", err)
+		return
+	} else {
+		log("loopback ready")
+	}
+
+	if err := waitForNetwork(*upstream); err != nil {
+		log("waitForNetwork failed: %v", err)
+		return
+	} else {
+		log("network ready, pre-resolving domains...")
+	}
 
 	// Pre-resolve domains from file and populate map
 	domains := loadDomains(*domainsFile)
 	preResolveDomains(domains, *upstream, m)
 
 	// Intercept DNS and dynamically update map on each response
-	dns.HandleFunc(".", func(w dns.ResponseWriter, r *dns.Msg) {
-		kmsg, err := os.OpenFile("/dev/kmsg", os.O_WRONLY, 0)
-		if err == nil {
-			defer kmsg.Close()
-		}
-		c := new(dns.Client)
-		resp, _, err := c.Exchange(r, *upstream)
-		if err != nil {
-			if kmsg != nil {
-				kmsg.WriteString(fmt.Sprintf("<6>dns.Client Exchange error: %v", err))
-			}
-			dns.HandleFailed(w, r)
-			return
-		}
-
-		for _, ans := range resp.Answer {
-			if a, ok := ans.(*dns.A); ok {
-				if isAllowedDomain(domains, a.Hdr.Name) {
-					if kmsg != nil {
-						kmsg.WriteString(fmt.Sprintf("<6>dns.Client allowed domain: %s=%s", a.Hdr.Name, a.A.String()))
-					}
-					allowIP(m, a.A.String())
-				} else {
-					if kmsg != nil {
-						kmsg.WriteString(fmt.Sprintf("<6>dns.Client NOT allowed domain: %s=%s", a.Hdr.Name, a.A.String()))
-					}
-				}
-			}
-		}
-		w.WriteMsg(resp)
-	})
+	dns.HandleFunc(".", makeHandler(domains, *upstream, m))
 
 	server := &dns.Server{Addr: *listen, Net: "udp"}
-	go maintainResolvConf()
-	log.Fatal(server.ListenAndServe())
+	log("dnsproxy returned %v", server.ListenAndServe())
 }

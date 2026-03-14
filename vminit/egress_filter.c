@@ -10,6 +10,10 @@
 
 #define IPPROTO_UDP 17
 
+// Apple's Kata kernel isn't compiled with the right options to support 
+// newer BTF-defined maps, so we use this older bpf_map_def as a
+// workaround. TODO: get a kernel that *is* compiled with the
+// right options so we don't have to resort to this.
 struct bpf_map_def {
     unsigned int type;
     unsigned int key_size;
@@ -34,7 +38,7 @@ int egress_filter(struct __sk_buff *skb) {
     if ((void *)(eth + 1) > data_end)
         return TC_ACT_OK;
 
-    // Only filter IPv4
+    // Only filter IPv4 (TODO: IPv6)
     if (eth->h_proto != bpf_htons(ETH_P_IP))
         return TC_ACT_OK;
 
@@ -45,12 +49,27 @@ int egress_filter(struct __sk_buff *skb) {
     // Allow loopback and RFC1918 (intra-sandbox traffic)
     __u32 dst = ip->daddr;
     __u8 b1 = dst & 0xff;
+    __u8 b2 = (dst >> 8) & 0xff;
     if (b1 == 127) return TC_ACT_OK;       // loopback
     if (b1 == 10)  return TC_ACT_OK;       // 10.x.x.x
-    // 192.168.x.x
-    if (b1 == 192 && ((dst >> 8) & 0xff) == 168) return TC_ACT_OK;
+    if (b1 == 172 && b2 >= 16 && b2 <= 31) return TC_ACT_OK;  // 172.16.0.0/12
+    if (b1 == 192 && b2 == 168) return TC_ACT_OK;             // 192.168.x.x
 
-    // Allow DNS (port 53) — handled by our proxy, which enforces policy
+    // Allow DNS only to local proxy (127.0.0.1:53). If we *don't* implement this
+    // restriction, we leave open a path to exfiltration via "DNS tunneling": stuffing
+    // exfil data into query/name fields and sending it to the IP of a controlled
+    // nameserver as though it were regular DNS traffic.
+    // TODO: Fix this and un-comment it. It currently won't accept any traffic
+    // from the container when un-commented.
+    // if (ip->protocol == IPPROTO_UDP) {
+    //     struct udphdr *udp = (void *)(ip + 1);
+    //     __u32 loopback = bpf_htonl(0x7f000001);
+    //     if ((void *)(udp + 1) <= data_end &&
+    //         udp->dest == bpf_htons(53) &&
+    //         dst == loopback)
+    //         return TC_ACT_OK;
+    // }
+
     if (ip->protocol == IPPROTO_UDP) {
         struct udphdr *udp = (void *)(ip + 1);
         if ((void *)(udp + 1) <= data_end && udp->dest == bpf_htons(53))
