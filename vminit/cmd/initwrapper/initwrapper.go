@@ -16,8 +16,7 @@ func main() {
 		defer kmsg.Close()
 	}
 
-	cmd := exec.Command("/sbin/dns-allowlist-proxy")
-
+	cmd := exec.Command("/sbin/dnsproxy")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.SysProcAttr = &syscall.SysProcAttr{

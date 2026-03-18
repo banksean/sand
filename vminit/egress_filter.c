@@ -10,24 +10,12 @@
 
 #define IPPROTO_UDP 17
 
-// Apple's Kata kernel isn't compiled with the right options to support 
-// newer BTF-defined maps, so we use this older bpf_map_def as a
-// workaround. TODO: get a kernel that *is* compiled with the
-// right options so we don't have to resort to this.
-struct bpf_map_def {
-    unsigned int type;
-    unsigned int key_size;
-    unsigned int value_size;
-    unsigned int max_entries;
-    unsigned int map_flags;
-};
-
-struct bpf_map_def SEC("maps") allowed_ips = {
-    .type        = BPF_MAP_TYPE_HASH,
-    .key_size    = sizeof(__u32),
-    .value_size  = sizeof(__u8),
-    .max_entries = 1024,
-};
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(max_entries, 1024);
+    __type(key, __u32);
+    __type(value, __u8);
+} allowed_ips SEC(".maps");
 
 SEC("tc")
 int egress_filter(struct __sk_buff *skb) {

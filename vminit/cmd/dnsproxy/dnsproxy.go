@@ -1,5 +1,7 @@
 //go:build linux
 
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -target bpf EgressFilter ../../egress_filter.c -- -D__TARGET_ARCH_arm64
+
 package main
 
 import (
@@ -16,8 +18,6 @@ import (
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 	"github.com/miekg/dns"
-	"github.com/vishvananda/netlink"
-	"golang.org/x/sys/unix"
 )
 
 const bpfTarget = "/sys/fs/bpf"
@@ -149,76 +149,29 @@ func mountBPFFS() error {
 	})
 }
 
-// attachTCEgress attaches prog to the egress hook of ifname using the clsact
-// qdisc. Tries TCX (kernel 6.6+) first; falls back to classic netlink TC.
-//
-// Returns a cleanup func — call it if you want to detach (you probably don't,
-// since the filter should outlive the exec into vminitd.real, but it's useful
-// for error paths).
+// attachTCEgress attaches prog to the egress hook of ifname using TCX (kernel >= 6.6).
+// Pins the bpf_link so it survives exec into vminitd.real.
 func attachTCEgress(ifname string, prog *ebpf.Program) (func(), error) {
 	iface, err := net.InterfaceByName(ifname)
 	if err != nil {
 		return nil, fmt.Errorf("interface %q: %w", ifname, err)
 	}
 
-	// Try TCX first (kernel >= 6.6, bpf_link based).
 	l, err := link.AttachTCX(link.TCXOptions{
 		Interface: iface.Index,
 		Program:   prog,
 		Attach:    ebpf.AttachTCXEgress,
 	})
-
-	if err == nil {
-		//log("attachTCEgress: AttachTCX worked, pinning...")
-		// Pin the link so it survives exec
-		if err := l.Pin(bpfTarget + "/egress_link"); err != nil {
-			log("pin tcx link failed, falling back to attachTCEgressNetlink: %v", err)
-			return attachTCEgressNetlink(iface.Index, prog)
-		}
-		//log("attachTCEgress: pin worked")
-		return func() { l.Close() }, nil
+	if err != nil {
+		return nil, fmt.Errorf("attach tcx: %w", err)
 	}
 
-	log("attachTCEgress: AttachTCX failed, falling back to attachTCEgressNetlink")
-	// Fall back to classic netlink TC (works on older Kata kernels).
-	return attachTCEgressNetlink(iface.Index, prog)
-}
-
-func attachTCEgressNetlink(ifindex int, prog *ebpf.Program) (func(), error) {
-	// Add clsact qdisc — idempotent if already present.
-	qdisc := &netlink.GenericQdisc{
-		QdiscAttrs: netlink.QdiscAttrs{
-			LinkIndex: ifindex,
-			Handle:    netlink.MakeHandle(0xffff, 0),
-			Parent:    netlink.HANDLE_CLSACT,
-		},
-		QdiscType: "clsact",
-	}
-	if err := netlink.QdiscReplace(qdisc); err != nil {
-		return nil, fmt.Errorf("qdisc replace: %w", err)
+	if err := l.Pin(bpfTarget + "/egress_link"); err != nil {
+		l.Close()
+		return nil, fmt.Errorf("pin tcx link: %w", err)
 	}
 
-	filter := &netlink.BpfFilter{
-		FilterAttrs: netlink.FilterAttrs{
-			LinkIndex: ifindex,
-			Parent:    netlink.HANDLE_MIN_EGRESS,
-			Handle:    1,
-			Protocol:  unix.ETH_P_ALL,
-			Priority:  1,
-		},
-		Fd:           prog.FD(),
-		Name:         "egress_filter",
-		DirectAction: true,
-	}
-	if err := netlink.FilterReplace(filter); err != nil {
-		return nil, fmt.Errorf("filter replace: %w", err)
-	}
-
-	cleanup := func() {
-		netlink.FilterDel(filter)
-		netlink.QdiscDel(qdisc)
-	}
-	return cleanup, nil
+	return func() { l.Close() }, nil
 }
 
 var (
@@ -284,39 +237,28 @@ func setupBPF() (*ebpf.Map, func(), error) {
 		return nil, nil, fmt.Errorf("readdir %s: %w", bpfTarget, err)
 	}
 
-	spec, err := ebpf.LoadCollectionSpec("/sbin/egress_filter.o")
-	if err != nil {
-		return nil, nil, fmt.Errorf("load bpf spec: %w", err)
-	}
-
-	var objs struct {
-		EgressFilter *ebpf.Program `ebpf:"egress_filter"`
-		AllowedIPs   *ebpf.Map     `ebpf:"allowed_ips"`
-	}
-	if err := spec.LoadAndAssign(&objs, &ebpf.CollectionOptions{
-		Maps: ebpf.MapOptions{
-			PinPath: "", // we pin manually
-		},
+	var objs EgressFilterObjects
+	if err := LoadEgressFilterObjects(&objs, &ebpf.CollectionOptions{
 		Programs: ebpf.ProgramOptions{
-			LogLevel: ebpf.LogLevelInstruction, // helpful for verifier errors
+			LogLevel: ebpf.LogLevelInstruction,
 		},
 	}); err != nil {
 		return nil, nil, fmt.Errorf("load bpf objs: %w", err)
 	}
 
-	if err := objs.AllowedIPs.Pin(bpfTarget + "/allowed_ips"); err != nil {
-		objs.AllowedIPs.Close()
+	if err := objs.AllowedIps.Pin(bpfTarget + "/allowed_ips"); err != nil {
+		objs.Close()
 		return nil, nil, fmt.Errorf("pin map: %w", err)
 	}
 
 	cleanup, err := attachTCEgress("eth0", objs.EgressFilter)
 	if err != nil {
-		objs.AllowedIPs.Close()
+		objs.Close()
 		return nil, nil, fmt.Errorf("attaching egress to eth0: %w", err)
 	}
 	objs.EgressFilter.Close()
 
-	return objs.AllowedIPs, cleanup, nil
+	return objs.AllowedIps, cleanup, nil
 }
 
 func main() {
