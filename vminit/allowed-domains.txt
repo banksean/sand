@@ -1,6 +1,5 @@
 # Allowed egress domains for sandbox
 # This is a dummy placeholder list just for testing.
-host.container.internal
 api.github.com
 github.com
 www.github.com
