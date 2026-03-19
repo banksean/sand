@@ -4,7 +4,7 @@ Note: This only partially works at the moment, so it's not integrated into the r
 
 This directory contains code to build a custom init image that enables *kernel-level* egress filtering using eBPF and a DNS proxy.
 
-Also note that this is for an *init* image, only to be used with the `--init-image` flag as show below. This type of image is distinct from container images like the ones you would typically specify using positional arguments when invoking apple's `container` commands in most use cases.
+Also note that this is for an *init* image, only to be used with the `--init-image` flag as shown below. This type of image is distinct from container images like the ones you would typically specify using positional arguments when invoking apple's `container` commands in most use cases.
 
 ## Usage
 
@@ -57,7 +57,7 @@ The domain [allowlist](./allowed-domains.txt) is still baked into the `custom-in
 
 ## Custom kernel build instructions
 
-The default kernel build that Apple's containerization framework uses does not include the BTF metadata required to mount BPFFS (`/sys/fs/bpf`), which `cmd/dnsporxy` needs to exist when it starts up, in order to load the egress filter code into the kernel.
+The default kernel build that Apple's containerization framework uses does not include the BTF metadata required to mount BPFFS (`/sys/fs/bpf`), which `cmd/dnsproxy` needs to exist when it starts up, in order to load the egress filter code into the kernel.
 
 So I forked the apple/containerization repo (https://github.com/banksean/containerization) and modified its linux kernel build flags so that BPFFS *is* available. With these flags you can build a BPFFS-enabled vmlinux binary like so:  
 
