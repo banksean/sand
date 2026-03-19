@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS sandboxes (
     original_git_branch TEXT,
     original_git_commit TEXT,
     original_git_is_dirty BOOLEAN NOT NULL DEFAULT 0,
+    allowed_domains TEXT,
 );
 
 CREATE INDEX IF NOT EXISTS idx_container_id ON sandboxes(container_id);

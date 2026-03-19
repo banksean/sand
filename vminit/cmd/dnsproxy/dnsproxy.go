@@ -7,10 +7,14 @@ package main
 import (
 	"bufio"
 	"encoding/binary"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
+	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -259,11 +263,64 @@ func setupBPF() (*ebpf.Map, func(), error) {
 	return objs.AllowedIps, cleanup, nil
 }
 
+// defaultGateway returns the default gateway IP by reading /proc/net/route.
+func defaultGateway() (string, error) {
+	f, err := os.Open("/proc/net/route")
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	sc := bufio.NewScanner(f)
+	sc.Scan() // skip header line
+	for sc.Scan() {
+		fields := strings.Fields(sc.Text())
+		if len(fields) < 3 {
+			continue
+		}
+		if fields[1] != "00000000" { // destination 0.0.0.0 = default route
+			continue
+		}
+		gw, err := strconv.ParseUint(fields[2], 16, 32)
+		if err != nil {
+			continue
+		}
+		ip := make(net.IP, 4)
+		binary.LittleEndian.PutUint32(ip, uint32(gw))
+		return ip.String(), nil
+	}
+	return "", fmt.Errorf("no default gateway found in /proc/net/route")
+}
+
+// fetchDomainsFromSandd contacts the sandd HTTP server on the host to retrieve
+// the allowed-domains list for this sandbox. Sandd identifies the sandbox by
+// the source IP of the request, so no name parameter is needed.
+func fetchDomainsFromSandd(gateway, port string) ([]string, error) {
+	log("fetchDomainsFromSandd: gateway=%s", gateway)
+	url := fmt.Sprintf("http://%s:%s/sandbox-config", gateway, port)
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+	var result struct {
+		Domains []string `json:"domains"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+	return result.Domains, nil
+}
+
 func main() {
 	domainsFile := flag.String("domains-file", "/etc/sandbox/allowed-domains.txt", "")
 	listen := flag.String("listen", "127.0.0.1:53", "")
 	upstream := flag.String("upstream", "1.1.1.1:53", "")
 	logTo := flag.String("log", "/dev/kmsg", "")
+	sanddPort := flag.String("sandd-port", "4242", "port that sandd listens on (for fetching allowed-domains at startup)")
 	flag.Parse()
 	logWriter = os.Stderr
 	// Log to kernel log during start-up.
@@ -298,8 +355,25 @@ func main() {
 		log("network ready, pre-resolving domains...")
 	}
 
-	// Pre-resolve domains from file and populate map
-	domains := loadDomains(*domainsFile)
+	// Try to fetch per-sandbox allowed-domains from sandd on the host.
+	// The eBPF filter allows all RFC1918 traffic, so the host gateway is
+	// always reachable without pre-allowlisting.
+	var domains []string
+	gw, err := defaultGateway()
+	if err != nil {
+		log("warn: defaultGateway: %v; falling back to domains file", err)
+	} else {
+		fetched, err := fetchDomainsFromSandd(gw, *sanddPort)
+		if err != nil {
+			log("warn: fetchDomainsFromSandd: %v; falling back to domains file", err)
+		} else if len(fetched) > 0 {
+			log("fetched %d allowed domains from sandd", len(fetched))
+			domains = fetched
+		}
+	}
+	if domains == nil {
+		domains = loadDomains(*domainsFile)
+	}
 	preResolveDomains(domains, *upstream, m)
 
 	// Intercept DNS and dynamically update map on each response

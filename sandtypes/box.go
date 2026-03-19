@@ -30,6 +30,9 @@ type Box struct {
 	DNSDomain string
 	// EnvFile is the host filesystem path to the env file to use when executing commands in the container
 	EnvFile string
+	// AllowedDomains is the list of domains the sandbox container is permitted to contact.
+	// When non-empty, this overrides the default allowlist baked into the init image.
+	AllowedDomains []string
 	// Mounts defines bind mounts that should be attached when creating the container.
 	Mounts []MountSpec
 	// SandboxWorkDirError and SandboxContainerError are the most recently updated error states of the sandbox

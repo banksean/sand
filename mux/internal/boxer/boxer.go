@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/banksean/sand/applecontainer/options"
@@ -128,7 +129,7 @@ func (b *Boxer) SyncBox(ctx context.Context, sb *sandtypes.Box) error {
 // NewSandbox creates a new sandbox based on a clone of hostWorkDir.
 // TODO: clone envFile, if it exists, into the sandbox clone so every command exec'd in that sandbox container
 // uses the same env file, even if the original .env file has changed on the host machine.
-func (sb *Boxer) NewSandbox(ctx context.Context, agentType, id, hostWorkDir, imageName, envFile string) (*sandtypes.Box, error) {
+func (sb *Boxer) NewSandbox(ctx context.Context, agentType, id, hostWorkDir, imageName, envFile string, allowedDomains []string) (*sandtypes.Box, error) {
 	slog.InfoContext(ctx, "Boxer.NewSandbox", "hostWorkDir", hostWorkDir, "id", id, "agentType", agentType)
 
 	// Get agent configuration from registry
@@ -191,6 +192,7 @@ func (sb *Boxer) NewSandbox(ctx context.Context, agentType, id, hostWorkDir, ima
 		SandboxWorkDir: artifacts.SandboxWorkDir,
 		ImageName:      imageName,
 		EnvFile:        envFile,
+		AllowedDomains: allowedDomains,
 		Mounts:         append(mounts, sshKeysMountSpec),
 		ContainerHooks: hooks,
 		Keys:           keys,
@@ -360,6 +362,7 @@ func (sb *Boxer) sandboxFromDB(s *db.Sandbox) *sandtypes.Box {
 		ImageName:      s.ImageName,
 		DNSDomain:      fromNullString(s.DnsDomain),
 		EnvFile:        fromNullString(s.EnvFile),
+		AllowedDomains: domainsFromNullString(s.AllowedDomains),
 		OriginalGitDetails: &sandtypes.GitDetails{
 			RemoteOrigin: fromNullString(s.OriginalGitOrigin),
 			Branch:       fromNullString(s.OriginalGitBranch),
@@ -378,6 +381,26 @@ func fromNullString(ns sql.NullString) string {
 		return ns.String
 	}
 	return ""
+}
+
+func domainsToNullString(domains []string) sql.NullString {
+	if len(domains) == 0 {
+		return sql.NullString{}
+	}
+	return sql.NullString{String: strings.Join(domains, "\n"), Valid: true}
+}
+
+func domainsFromNullString(ns sql.NullString) []string {
+	if !ns.Valid || ns.String == "" {
+		return nil
+	}
+	var domains []string
+	for _, d := range strings.Split(ns.String, "\n") {
+		if d != "" {
+			domains = append(domains, d)
+		}
+	}
+	return domains
 }
 
 func (sb *Boxer) getContainer(ctx context.Context, containerID string) (interface{}, error) {
@@ -428,6 +451,19 @@ func (sber *Boxer) CreateContainer(ctx context.Context, sb *sandtypes.Box) error
 		mountOpts = append(mountOpts, m.String())
 	}
 
+	mgmtOpts := options.ManagementOptions{
+		// TODO: Try to name the container after the sandbox, and handle collisions
+		// if the name is already in use (e.g. append random chars to sb.ID).
+		Name:      sb.ID,
+		SSH:       true,
+		DNSDomain: sb.DNSDomain,
+		Remove:    false,
+		Mount:     mountOpts,
+	}
+	if len(sb.AllowedDomains) > 0 {
+		mgmtOpts.InitImage = "ghcr.io/banksean/sand/custom-init:latest"
+		mgmtOpts.DNS = "127.0.0.1"
+	}
 	containerID, err := sber.ContainerService.Create(ctx,
 		&options.CreateContainer{
 			ProcessOptions: options.ProcessOptions{
@@ -435,15 +471,7 @@ func (sber *Boxer) CreateContainer(ctx context.Context, sb *sandtypes.Box) error
 				TTY:         true,
 				EnvFile:     sb.EnvFile,
 			},
-			ManagementOptions: options.ManagementOptions{
-				// TODO: Try to name the container after the sandbox, and handle collisions
-				// if the name is already in use (e.g. append random chars to sb.ID).
-				Name:      sb.ID,
-				SSH:       true,
-				DNSDomain: sb.DNSDomain,
-				Remove:    false,
-				Mount:     mountOpts,
-			},
+			ManagementOptions: mgmtOpts,
 		},
 		sb.ImageName, nil)
 	if err != nil {
@@ -583,6 +611,7 @@ func (sb *Boxer) SaveSandbox(ctx context.Context, sbox *sandtypes.Box) error {
 		DnsDomain:      toNullString(sbox.DNSDomain),
 		EnvFile:        toNullString(sbox.EnvFile),
 		AgentType:      toNullString(sbox.AgentType),
+		AllowedDomains: domainsToNullString(sbox.AllowedDomains),
 	}
 	if sbox.OriginalGitDetails != nil {
 		upsertParams.OriginalGitOrigin = toNullString(sbox.OriginalGitDetails.RemoteOrigin)

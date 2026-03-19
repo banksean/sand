@@ -8,10 +8,12 @@ import (
 
 type Container struct {
 	Networks []struct {
-		Hostname string `json:"hostname"`
-		Network  string `json:"network"`
-		Address  string `json:"address"`
-		Gateway  string `json:"gateway"`
+		Hostname    string `json:"hostname"`
+		Network     string `json:"network"`
+		IPv4Address string `json:"ipv4Address"`
+		IPv4Gateway string `json:"ipv4Gateway"`
+		IPv6Address string `json:"ipv6Address"`
+		IPv6Gateway string `json:"ipv6Gateway"`
 	} `json:"networks"`
 	Status        string          `json:"status"`
 	Configuration ContainerConfig `json:"configuration"`

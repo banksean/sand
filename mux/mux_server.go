@@ -22,9 +22,8 @@ import (
 )
 
 const (
-	defaultSocketFile     = "sandmux.sock"
-	defaultLockFile       = "sandmux.lock"
-	internalContainerHost = "host.container.internal"
+	defaultSocketFile = "sandmux.sock"
+	defaultLockFile   = "sandmux.lock"
 )
 
 type Mux struct {
@@ -208,6 +207,12 @@ func (m *Mux) serveTCPSocket(ctx context.Context) {
 	mux.HandleFunc("/stop", slogHandler(ctx, m.handleStop))
 	mux.HandleFunc("/create", slogHandler(ctx, m.handleCreate))
 	mux.HandleFunc("/vsc", slogHandler(ctx, m.handleVSC))
+	mux.HandleFunc("/sandbox-config", slogHandler(ctx, m.handleSandboxConfig))
+	mux.HandleFunc("/", slogHandler(ctx, func(w http.ResponseWriter, r *http.Request) {
+		http.NotFound(w, r) // Respond with a 404 Not Found status
+		// Alternatively, serve a custom response:
+		// fmt.Fprintf(w, "404 - Unknown route")
+	}))
 
 	server := &http.Server{
 		Handler: mux,
@@ -438,6 +443,56 @@ func (m *Mux) handleVSC(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// handleSandboxConfig is called by the dnsproxy sidecar running in the VM to fetch
+// the allowed-domains list for a given sandbox at startup time.
+// We identify the sandbox by the source IP of the request rather than a name parameter,
+// because the VM's hostname is baked into the init image and does not match the sandbox ID.
+func (m *Mux) handleSandboxConfig(w http.ResponseWriter, r *http.Request) {
+	slog.InfoContext(r.Context(), "handleSandboxConfig")
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	callerIP, _, err := net.SplitHostPort(r.RemoteAddr)
+	slog.InfoContext(r.Context(), "handleSandboxConfig", "callerIP", callerIP, "error", err)
+	if err != nil {
+		writeJSONError(w, fmt.Errorf("bad remote addr %q: %w", r.RemoteAddr, err), http.StatusBadRequest)
+		return
+	}
+
+	boxes, err := m.boxer.List(r.Context())
+	slog.InfoContext(r.Context(), "handleSandboxConfig", "boxes", boxes, "error", err)
+	if err != nil {
+		writeJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	for _, box := range boxes {
+		if box.Container == nil {
+			continue
+		}
+		ctr, err := m.boxer.ContainerService.Inspect(r.Context(), box.ContainerID)
+		if err != nil {
+			slog.ErrorContext(r.Context(), "inspect container", "error", err)
+			continue
+		}
+		for _, n := range ctr[0].Networks {
+			// Address may be CIDR notation ("192.168.65.2/24") or a plain IP.
+			ip := strings.SplitN(n.IPv4Address, "/", 2)[0]
+			slog.InfoContext(r.Context(), "handleSandboxConfig checking box network", "n", n, "ip", ip, "callerIP", callerIP)
+			if ip == callerIP {
+				slog.InfoContext(r.Context(), "handleSandboxConfig matched", "sandbox", box.ID, "callerIP", callerIP)
+				writeJSON(w, map[string]any{"domains": box.AllowedDomains})
+				return
+			}
+		}
+	}
+	slog.InfoContext(r.Context(), "handleSandboxConfig NOT FOUND", "callerIP", callerIP)
+
+	writeJSONError(w, fmt.Errorf("no sandbox found for caller IP %s", callerIP), http.StatusNotFound)
+}
+
 func acquireLock(lockFile string) (*os.File, error) {
 	file, err := os.OpenFile(lockFile, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
@@ -471,11 +526,12 @@ func (m *Mux) StopSandbox(ctx context.Context, id string) error {
 }
 
 type CreateSandboxOpts struct {
-	ID           string `json:"id,omitempty"`
-	CloneFromDir string `json:"cloneFromDir,omitempty"`
-	ImageName    string `json:"imageName,omitempty"`
-	EnvFile      string `json:"envFile,omitempty"`
-	Cloner       string `json:"cloner,omitempty"`
+	ID             string   `json:"id,omitempty"`
+	CloneFromDir   string   `json:"cloneFromDir,omitempty"`
+	ImageName      string   `json:"imageName,omitempty"`
+	EnvFile        string   `json:"envFile,omitempty"`
+	Cloner         string   `json:"cloner,omitempty"`
+	AllowedDomains []string `json:"allowedDomains,omitempty"`
 }
 
 // createSandbox creates a new sandbox and starts its container.
@@ -486,7 +542,7 @@ func (m *Mux) createSandbox(ctx context.Context, opts CreateSandboxOpts) (*sandt
 	}
 	slog.InfoContext(ctx, "CreateSandbox", "agentType", agentType)
 
-	sbox, err := m.boxer.NewSandbox(ctx, agentType, opts.ID, opts.CloneFromDir, opts.ImageName, opts.EnvFile)
+	sbox, err := m.boxer.NewSandbox(ctx, agentType, opts.ID, opts.CloneFromDir, opts.ImageName, opts.EnvFile, opts.AllowedDomains)
 	if err != nil {
 		return nil, err
 	}

@@ -1,14 +1,18 @@
 package mux
 
 import (
+	"bufio"
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
+	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -38,7 +42,38 @@ type defaultClient struct {
 	httpClient *http.Client
 }
 
+func defaultGateway() (string, error) {
+	f, err := os.Open("/proc/net/route")
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	sc := bufio.NewScanner(f)
+	sc.Scan() // skip header line
+	for sc.Scan() {
+		fields := strings.Fields(sc.Text())
+		if len(fields) < 3 {
+			continue
+		}
+		if fields[1] != "00000000" { // destination 0.0.0.0 = default route
+			continue
+		}
+		gw, err := strconv.ParseUint(fields[2], 16, 32)
+		if err != nil {
+			continue
+		}
+		ip := make(net.IP, 4)
+		binary.LittleEndian.PutUint32(ip, uint32(gw))
+		return ip.String(), nil
+	}
+	return "", fmt.Errorf("no default gateway found in /proc/net/route")
+}
+
 func NewHTTPClient(ctx context.Context, containerHostPort string) (MuxClient, error) {
+	internalContainerHost, err := defaultGateway()
+	if err != nil {
+		return nil, fmt.Errorf("error getting default gateway: %w", err)
+	}
 	return &defaultClient{
 		base:       "http://" + internalContainerHost + ":" + containerHostPort,
 		httpClient: http.DefaultClient,

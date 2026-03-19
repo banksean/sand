@@ -82,6 +82,15 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 		}
 	}
 
+	var allowedDomains []string
+	if c.AllowedDomainsFile != "" {
+		domains, err := loadDomainsFile(c.AllowedDomainsFile)
+		if err != nil {
+			return fmt.Errorf("reading allowed-domains-file: %w", err)
+		}
+		allowedDomains = domains
+	}
+
 	// Try to get existing sandbox.
 	// TODO: Consider returning an error here, rather than trying to "do the right thing" despite what the user asked for.
 	sbox, err := mc.GetSandbox(ctx, c.SandboxName)
@@ -89,11 +98,12 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 		// Sandbox doesn't exist, create it via daemon
 		slog.InfoContext(ctx, "Creating new sandbox via daemon", "id", c.SandboxName)
 		sbox, err = mc.CreateSandbox(ctx, mux.CreateSandboxOpts{
-			ID:           c.SandboxName,
-			CloneFromDir: c.CloneFromDir,
-			ImageName:    c.ImageName,
-			EnvFile:      c.EnvFile,
-			Cloner:       c.Cloner,
+			ID:             c.SandboxName,
+			CloneFromDir:   c.CloneFromDir,
+			ImageName:      c.ImageName,
+			EnvFile:        c.EnvFile,
+			Cloner:         c.Cloner,
+			AllowedDomains: allowedDomains,
 		})
 		if err != nil {
 			slog.ErrorContext(ctx, "CreateSandbox", "error", err)
@@ -238,4 +248,20 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 		slog.InfoContext(ctx, "Cleanup complete. Exiting.")
 	}
 	return nil
+}
+
+func loadDomainsFile(path string) ([]string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	var domains []string
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		if d := sc.Text(); d != "" && d[0] != '#' {
+			domains = append(domains, d)
+		}
+	}
+	return domains, sc.Err()
 }

@@ -121,6 +121,8 @@ type ManagementOptions struct {
 	Detach bool `flag:"--detach"`
 	// DNS is the DNS nameserver IP address
 	DNS string `flag:"--dns"`
+	// InitImage is the OCI image to use as the VM init process (replaces vminitd)
+	InitImage string `flag:"--init-image"`
 	// DNSDomain is the default DNS domain
 	DNSDomain string `flag:"--dns-domain"`
 	// DNSOption specifies DNS options
