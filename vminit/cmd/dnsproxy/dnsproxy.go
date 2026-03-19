@@ -130,9 +130,8 @@ func mountBPFFS() error {
 	// TODO: look into just forking vminitd rather than trying to
 	// do all this stuff in a sidecar.
 	err := retry(100, time.Millisecond, func() error {
-		return os.MkdirAll(bpfTarget, 0755)
+		return os.MkdirAll(bpfTarget, 0o755)
 	})
-
 	if err != nil {
 		return err
 	}
@@ -210,7 +209,6 @@ func makeHandler(domains []string, upstream string, m *ebpf.Map) func(dns.Respon
 
 		c := new(dns.Client)
 		resp, _, err := c.Exchange(r, upstream)
-
 		if err != nil {
 			if logWriter != nil {
 				log("dns.Client Exchange error: %v", err)
