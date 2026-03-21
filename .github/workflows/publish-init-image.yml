@@ -1,3 +1,5 @@
+name: Build and Publish Sandbox Images
+
 on:
   push:
     branches:
