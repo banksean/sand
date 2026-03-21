@@ -14,7 +14,7 @@ type LsCmd struct{}
 
 func (c *LsCmd) Run(cctx *CLIContext) error {
 	ctx := cctx.Context
-	mc := cctx.MuxClient
+	mc := cctx.Daemon
 
 	list, err := mc.ListSandboxes(ctx)
 	if err != nil {

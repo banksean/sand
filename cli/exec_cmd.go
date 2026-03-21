@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/banksean/sand/applecontainer/options"
+	"github.com/banksean/sand/daemon"
 	"github.com/banksean/sand/hostops"
-	"github.com/banksean/sand/mux"
 	"github.com/goombaio/namegenerator"
 )
 
@@ -20,7 +20,7 @@ type ExecCmd struct {
 
 func (c *ExecCmd) Run(cctx *CLIContext) error {
 	ctx := cctx.Context
-	mc := cctx.MuxClient
+	mc := cctx.Daemon
 
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -48,7 +48,7 @@ func (c *ExecCmd) Run(cctx *CLIContext) error {
 	if err != nil {
 		// Sandbox doesn't exist, create it via daemon
 		slog.InfoContext(ctx, "Creating new sandbox via daemon", "id", c.SandboxName)
-		sbox, err = mc.CreateSandbox(ctx, mux.CreateSandboxOpts{
+		sbox, err = mc.CreateSandbox(ctx, daemon.CreateSandboxOpts{
 			ID:           c.SandboxName,
 			CloneFromDir: c.CloneFromDir,
 			ImageName:    c.ImageName,

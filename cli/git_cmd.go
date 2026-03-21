@@ -34,7 +34,7 @@ type DiffCmd struct {
 
 func (c *DiffCmd) Run(cctx *CLIContext) error {
 	ctx := cctx.Context
-	mc := cctx.MuxClient
+	mc := cctx.Daemon
 
 	if err := VerifyPrerequisites(ctx, GitDir, GitRemoteIsSSH); err != nil {
 		return err
@@ -191,7 +191,7 @@ func (c *DiffCmd) cleanupTempCommit(ctx context.Context, sandboxWorkDir string) 
 
 func (c *StatusCmd) Run(cctx *CLIContext) error {
 	ctx := cctx.Context
-	mc := cctx.MuxClient
+	mc := cctx.Daemon
 
 	if err := VerifyPrerequisites(ctx, GitDir, GitRemoteIsSSH); err != nil {
 		return err
@@ -245,7 +245,7 @@ func (c *StatusCmd) Run(cctx *CLIContext) error {
 
 func (c *LogCmd) Run(cctx *CLIContext) error {
 	ctx := cctx.Context
-	mc := cctx.MuxClient
+	mc := cctx.Daemon
 
 	if err := VerifyPrerequisites(ctx, GitDir, GitRemoteIsSSH); err != nil {
 		return err

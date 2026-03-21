@@ -1,4 +1,4 @@
-package mux
+package daemon
 
 import (
 	"context"
@@ -16,17 +16,17 @@ import (
 	"time"
 
 	"github.com/banksean/sand/applecontainer/types"
-	"github.com/banksean/sand/mux/internal/boxer"
+	"github.com/banksean/sand/daemon/internal/boxer"
 	"github.com/banksean/sand/sandtypes"
 	"github.com/banksean/sand/version"
 )
 
 const (
-	defaultSocketFile = "sandmux.sock"
-	defaultLockFile   = "sandmux.lock"
+	defaultSocketFile = "sandd.sock"
+	defaultLockFile   = "sandd.lock"
 )
 
-type Mux struct {
+type Daemon struct {
 	AppBaseDir    string
 	SocketPath    string
 	LocalHTTPPort string
@@ -41,8 +41,8 @@ type Mux struct {
 	httpSrv  http.Server
 }
 
-func NewMuxServer(appBaseDir, httpPort, localDomain string) *Mux {
-	return &Mux{
+func NewDaemon(appBaseDir, httpPort, localDomain string) *Daemon {
+	return &Daemon{
 		AppBaseDir:    appBaseDir,
 		SocketPath:    filepath.Join(appBaseDir, defaultSocketFile),
 		LocalHTTPPort: httpPort,
@@ -54,37 +54,37 @@ func NewMuxServer(appBaseDir, httpPort, localDomain string) *Mux {
 	}
 }
 
-// ServeUnixSocket serves the unix domain socket that sandmux clients (the host-side CLI, e.g.) connect to.
-func (m *Mux) ServeUnixSocket(ctx context.Context) error {
-	lockFilePath := filepath.Join(m.AppBaseDir, defaultLockFile)
-	slog.InfoContext(ctx, "Mux.ServeUnix", "mux", m, "pid", os.Getpid(), "lockFilePath", lockFilePath)
+// ServeUnixSocket serves the unix domain socket that sandd clients (the host-side CLI, e.g.) connect to.
+func (d *Daemon) ServeUnixSocket(ctx context.Context) error {
+	lockFilePath := filepath.Join(d.AppBaseDir, defaultLockFile)
+	slog.InfoContext(ctx, "Daemon.ServeUnix", "mux", d, "pid", os.Getpid(), "lockFilePath", lockFilePath)
 	lockFile, err := acquireLock(lockFilePath)
 	if err != nil {
 		return err
 	}
-	m.lockFile = lockFile
+	d.lockFile = lockFile
 
-	if err := m.startDaemonServer(ctx); err != nil {
-		slog.ErrorContext(ctx, "Mux.Serve startDaemonServer", "error", err)
+	if err := d.startDaemonServer(ctx); err != nil {
+		slog.ErrorContext(ctx, "Daemon.Serve startDaemonServer", "error", err)
 		return err
 	}
 
 	return nil
 }
 
-func (m *Mux) startDaemonServer(ctx context.Context) error {
-	slog.InfoContext(ctx, "Mux.startDaemonServer", "socketPath", m.SocketPath)
+func (d *Daemon) startDaemonServer(ctx context.Context) error {
+	slog.InfoContext(ctx, "Daemon.startDaemonServer", "socketPath", d.SocketPath)
 	// Remove old socket if it exists
-	os.Remove(m.SocketPath)
+	os.Remove(d.SocketPath)
 
-	listener, err := net.Listen("unix", m.SocketPath)
+	listener, err := net.Listen("unix", d.SocketPath)
 	if err != nil {
 		return err
 	}
 
-	m.listener = listener
-	m.shutdown = make(chan any)
-	sber, err := boxer.NewBoxer(m.AppBaseDir, m.LocalDomain, os.Stderr)
+	d.listener = listener
+	d.shutdown = make(chan any)
+	sber, err := boxer.NewBoxer(d.AppBaseDir, d.LocalDomain, os.Stderr)
 	if err != nil {
 		return err
 	}
@@ -92,93 +92,93 @@ func (m *Mux) startDaemonServer(ctx context.Context) error {
 		return fmt.Errorf("failed to sync Boxer db with current environment state: %v\n", err)
 	}
 
-	m.boxer = sber
+	d.boxer = sber
 	// Handle cleanup on shutdown
-	go m.waitForShutdown(ctx)
+	go d.waitForShutdown(ctx)
 
 	// Start unix domain socket HTTP server
-	go m.serveUnixSocket(ctx)
+	go d.serveUnixSocket(ctx)
 
 	// Start net HTTP server
-	go m.serveTCPSocket(ctx)
+	go d.serveTCPSocket(ctx)
 
 	go func() {
-		if err := m.hostMCP.StartHostServices(ctx); err != nil {
+		if err := d.hostMCP.StartHostServices(ctx); err != nil {
 			slog.ErrorContext(ctx, "startDaemonServer MCP.StartMCPDeps", "error", err)
 		}
 	}()
 	// Wait for shutdown signal
-	<-m.shutdown
+	<-d.shutdown
 
 	return nil
 }
 
-func (m *Mux) waitForShutdown(ctx context.Context) {
+func (d *Daemon) waitForShutdown(ctx context.Context) {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	select {
 	case <-ctx.Done(): // TODO: is this really necessary here?
 	case <-sigChan:
-		m.Shutdown(ctx)
-	case <-m.shutdown:
+		d.Shutdown(ctx)
+	case <-d.shutdown:
 		// Shutdown already initiated
 	}
 }
 
-func (m *Mux) Shutdown(ctx context.Context) {
-	lockFilePath := filepath.Join(m.AppBaseDir, defaultLockFile)
+func (d *Daemon) Shutdown(ctx context.Context) {
+	lockFilePath := filepath.Join(d.AppBaseDir, defaultLockFile)
 
-	slog.InfoContext(ctx, "Mux.Shutdown", "pid", os.Getpid())
+	slog.InfoContext(ctx, "Daemon.Shutdown", "pid", os.Getpid())
 	// Close listener (stops accepting new connections)
-	if m.listener != nil {
-		m.listener.Close()
+	if d.listener != nil {
+		d.listener.Close()
 	}
 
-	if m.hostMCP != nil {
-		if err := m.hostMCP.Cleanup(ctx); err != nil {
-			slog.ErrorContext(ctx, "Mux.Shutdown: MCP.Cleanup", "error", err)
+	if d.hostMCP != nil {
+		if err := d.hostMCP.Cleanup(ctx); err != nil {
+			slog.ErrorContext(ctx, "Daemon.Shutdown: MCP.Cleanup", "error", err)
 		}
 	}
 
 	// Remove socket file. This mail fail in many cases since closing the listener appears
 	// to remove the file automatically on MacOS. Therefore we ignore the err return value.
-	os.Remove(m.SocketPath)
+	os.Remove(d.SocketPath)
 
 	// Release and remove lock file
-	if m.lockFile != nil {
-		syscall.Flock(int(m.lockFile.Fd()), syscall.LOCK_UN)
-		m.lockFile.Close()
+	if d.lockFile != nil {
+		syscall.Flock(int(d.lockFile.Fd()), syscall.LOCK_UN)
+		d.lockFile.Close()
 		if err := os.Remove(lockFilePath); err != nil {
-			slog.ErrorContext(ctx, "Mux.Shutdown removing lockfile", "error", err, "LockFilePath", lockFilePath)
+			slog.ErrorContext(ctx, "Daemon.Shutdown removing lockfile", "error", err, "LockFilePath", lockFilePath)
 		}
 	}
 
 	// Signal shutdown complete
-	close(m.shutdown)
+	close(d.shutdown)
 }
 
-func (m *Mux) serveUnixSocket(ctx context.Context) {
+func (d *Daemon) serveUnixSocket(ctx context.Context) {
 	mux := http.NewServeMux()
 
 	// Register handlers
-	mux.HandleFunc("/shutdown", m.handleShutdown)
-	mux.HandleFunc("/ping", m.handlePing)
-	mux.HandleFunc("/version", m.handleVersion)
-	mux.HandleFunc("/list", m.handleList)
-	mux.HandleFunc("/get", m.handleGet)
-	mux.HandleFunc("/remove", m.handleRemove)
-	mux.HandleFunc("/stop", m.handleStop)
-	mux.HandleFunc("/create", m.handleCreate)
+	mux.HandleFunc("/shutdown", d.handleShutdown)
+	mux.HandleFunc("/ping", d.handlePing)
+	mux.HandleFunc("/version", d.handleVersion)
+	mux.HandleFunc("/list", d.handleList)
+	mux.HandleFunc("/get", d.handleGet)
+	mux.HandleFunc("/remove", d.handleRemove)
+	mux.HandleFunc("/stop", d.handleStop)
+	mux.HandleFunc("/create", d.handleCreate)
 
 	server := &http.Server{
 		Handler: mux,
 	}
-	slog.InfoContext(ctx, "Mux.serveUnixSocketHTTP starting up")
+	slog.InfoContext(ctx, "Daemon.serveUnixSocketHTTP starting up")
 
-	err := server.Serve(m.listener)
+	err := server.Serve(d.listener)
 	if err != nil {
-		slog.ErrorContext(ctx, "Mux.serveUnixSocketHTTP", "error", err)
+		slog.ErrorContext(ctx, "Daemon.serveUnixSocketHTTP", "error", err)
 	}
 }
 
@@ -194,20 +194,20 @@ func slogHandler(ctx context.Context, h http.HandlerFunc) http.HandlerFunc {
 // make sure that we know which sandbox container is making the call.
 // As-is, sandboxes make requests to mutate eachother, as can anything else that
 // has access to port 4242 on the host OS.
-func (m *Mux) serveTCPSocket(ctx context.Context) {
+func (d *Daemon) serveTCPSocket(ctx context.Context) {
 	mux := http.NewServeMux()
 
 	// Register handlers
-	mux.HandleFunc("/shutdown", slogHandler(ctx, m.handleShutdown))
-	mux.HandleFunc("/ping", slogHandler(ctx, m.handlePing))
-	mux.HandleFunc("/version", slogHandler(ctx, m.handleVersion))
-	mux.HandleFunc("/list", slogHandler(ctx, m.handleList))
-	mux.HandleFunc("/get", slogHandler(ctx, m.handleGet))
-	mux.HandleFunc("/remove", slogHandler(ctx, m.handleRemove))
-	mux.HandleFunc("/stop", slogHandler(ctx, m.handleStop))
-	mux.HandleFunc("/create", slogHandler(ctx, m.handleCreate))
-	mux.HandleFunc("/vsc", slogHandler(ctx, m.handleVSC))
-	mux.HandleFunc("/sandbox-config", slogHandler(ctx, m.handleSandboxConfig))
+	mux.HandleFunc("/shutdown", slogHandler(ctx, d.handleShutdown))
+	mux.HandleFunc("/ping", slogHandler(ctx, d.handlePing))
+	mux.HandleFunc("/version", slogHandler(ctx, d.handleVersion))
+	mux.HandleFunc("/list", slogHandler(ctx, d.handleList))
+	mux.HandleFunc("/get", slogHandler(ctx, d.handleGet))
+	mux.HandleFunc("/remove", slogHandler(ctx, d.handleRemove))
+	mux.HandleFunc("/stop", slogHandler(ctx, d.handleStop))
+	mux.HandleFunc("/create", slogHandler(ctx, d.handleCreate))
+	mux.HandleFunc("/vsc", slogHandler(ctx, d.handleVSC))
+	mux.HandleFunc("/sandbox-config", slogHandler(ctx, d.handleSandboxConfig))
 	mux.HandleFunc("/", slogHandler(ctx, func(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r) // Respond with a 404 Not Found status
 		// Alternatively, serve a custom response:
@@ -216,13 +216,13 @@ func (m *Mux) serveTCPSocket(ctx context.Context) {
 
 	server := &http.Server{
 		Handler: mux,
-		Addr:    ":" + m.LocalHTTPPort,
+		Addr:    ":" + d.LocalHTTPPort,
 	}
 
-	slog.InfoContext(ctx, "Mux.serveHTTP starting up")
+	slog.InfoContext(ctx, "Daemon.serveHTTP starting up")
 	err := server.ListenAndServe()
 	if err != nil {
-		slog.ErrorContext(ctx, "Mux.serveHTTP", "error", err)
+		slog.ErrorContext(ctx, "Daemon.serveHTTP", "error", err)
 	}
 }
 
@@ -239,7 +239,7 @@ func writeJSON(w http.ResponseWriter, data any) {
 }
 
 // HTTP handlers
-func (m *Mux) handleShutdown(w http.ResponseWriter, r *http.Request) {
+func (d *Daemon) handleShutdown(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -250,11 +250,11 @@ func (m *Mux) handleShutdown(w http.ResponseWriter, r *http.Request) {
 	// Shutdown daemon after response is sent
 	go func() {
 		time.Sleep(100 * time.Millisecond)
-		m.Shutdown(r.Context())
+		d.Shutdown(r.Context())
 	}()
 }
 
-func (m *Mux) handlePing(w http.ResponseWriter, r *http.Request) {
+func (d *Daemon) handlePing(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -262,7 +262,7 @@ func (m *Mux) handlePing(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]string{"status": "pong"})
 }
 
-func (m *Mux) handleVersion(w http.ResponseWriter, r *http.Request) {
+func (d *Daemon) handleVersion(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -270,13 +270,13 @@ func (m *Mux) handleVersion(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, version.Get())
 }
 
-func (m *Mux) handleList(w http.ResponseWriter, r *http.Request) {
+func (d *Daemon) handleList(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	boxes, err := m.ListSandboxes(r.Context())
+	boxes, err := d.ListSandboxes(r.Context())
 	if err != nil {
 		writeJSONError(w, err, http.StatusInternalServerError)
 		return
@@ -284,7 +284,7 @@ func (m *Mux) handleList(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, boxes)
 }
 
-func (m *Mux) handleGet(w http.ResponseWriter, r *http.Request) {
+func (d *Daemon) handleGet(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -303,7 +303,7 @@ func (m *Mux) handleGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sbox, err := m.GetSandbox(r.Context(), args.ID)
+	sbox, err := d.GetSandbox(r.Context(), args.ID)
 	if err != nil {
 		writeJSONError(w, fmt.Errorf("couldn't get sandbox ID %s", args.ID), http.StatusInternalServerError)
 		return
@@ -313,8 +313,8 @@ func (m *Mux) handleGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := m.boxer.SyncBox(r.Context(), sbox); err != nil {
-		slog.ErrorContext(r.Context(), "Mux.handleGet boxer.SyncBox", "error", err)
+	if err := d.boxer.SyncBox(r.Context(), sbox); err != nil {
+		slog.ErrorContext(r.Context(), "Daemon.handleGet boxer.SyncBox", "error", err)
 		writeJSONError(w, fmt.Errorf("failed to sync sandbox for ID %s", args.ID), http.StatusInternalServerError)
 	}
 
@@ -323,7 +323,7 @@ func (m *Mux) handleGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctr, err := m.boxer.GetContainer(r.Context(), sbox.ContainerID)
+	ctr, err := d.boxer.GetContainer(r.Context(), sbox.ContainerID)
 	if err != nil {
 		http.Error(w, "couldn't get container", http.StatusInternalServerError)
 		return
@@ -332,7 +332,7 @@ func (m *Mux) handleGet(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, sbox)
 }
 
-func (m *Mux) handleRemove(w http.ResponseWriter, r *http.Request) {
+func (d *Daemon) handleRemove(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -351,14 +351,14 @@ func (m *Mux) handleRemove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := m.RemoveSandbox(r.Context(), args.ID); err != nil {
+	if err := d.RemoveSandbox(r.Context(), args.ID); err != nil {
 		writeJSONError(w, err, http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, map[string]string{"status": "ok"})
 }
 
-func (m *Mux) handleStop(w http.ResponseWriter, r *http.Request) {
+func (d *Daemon) handleStop(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -377,14 +377,14 @@ func (m *Mux) handleStop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := m.StopSandbox(r.Context(), args.ID); err != nil {
+	if err := d.StopSandbox(r.Context(), args.ID); err != nil {
 		writeJSONError(w, err, http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, map[string]string{"status": "ok"})
 }
 
-func (m *Mux) handleCreate(w http.ResponseWriter, r *http.Request) {
+func (d *Daemon) handleCreate(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -396,7 +396,7 @@ func (m *Mux) handleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sbox, err := m.createSandbox(r.Context(), opts)
+	sbox, err := d.createSandbox(r.Context(), opts)
 	if err != nil {
 		writeJSONError(w, err, http.StatusInternalServerError)
 		return
@@ -404,7 +404,7 @@ func (m *Mux) handleCreate(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, sbox)
 }
 
-func (m *Mux) handleVSC(w http.ResponseWriter, r *http.Request) {
+func (d *Daemon) handleVSC(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var c struct {
@@ -419,7 +419,7 @@ func (m *Mux) handleVSC(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, fmt.Errorf("missing id"), http.StatusBadRequest)
 		return
 	}
-	sbox, err := m.GetSandbox(ctx, c.ID)
+	sbox, err := d.GetSandbox(ctx, c.ID)
 	if err != nil {
 		slog.ErrorContext(ctx, "GetSandbox", "error", err, "id", c.ID)
 		writeJSONError(w, err, http.StatusInternalServerError)
@@ -447,7 +447,7 @@ func (m *Mux) handleVSC(w http.ResponseWriter, r *http.Request) {
 // the allowed-domains list for a given sandbox at startup time.
 // We identify the sandbox by the source IP of the request rather than a name parameter,
 // because the VM's hostname is baked into the init image and does not match the sandbox ID.
-func (m *Mux) handleSandboxConfig(w http.ResponseWriter, r *http.Request) {
+func (d *Daemon) handleSandboxConfig(w http.ResponseWriter, r *http.Request) {
 	slog.InfoContext(r.Context(), "handleSandboxConfig")
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -461,7 +461,7 @@ func (m *Mux) handleSandboxConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	boxes, err := m.boxer.List(r.Context())
+	boxes, err := d.boxer.List(r.Context())
 	slog.InfoContext(r.Context(), "handleSandboxConfig", "boxes", boxes, "error", err)
 	if err != nil {
 		writeJSONError(w, err, http.StatusInternalServerError)
@@ -472,7 +472,7 @@ func (m *Mux) handleSandboxConfig(w http.ResponseWriter, r *http.Request) {
 		if box.Container == nil {
 			continue
 		}
-		ctr, err := m.boxer.ContainerService.Inspect(r.Context(), box.ContainerID)
+		ctr, err := d.boxer.ContainerService.Inspect(r.Context(), box.ContainerID)
 		if err != nil {
 			slog.ErrorContext(r.Context(), "inspect container", "error", err)
 			continue
@@ -514,15 +514,15 @@ func acquireLock(lockFile string) (*os.File, error) {
 }
 
 // StopSandbox stops a single sandbox container.
-func (m *Mux) StopSandbox(ctx context.Context, id string) error {
-	sbox, err := m.boxer.Get(ctx, id)
+func (d *Daemon) StopSandbox(ctx context.Context, id string) error {
+	sbox, err := d.boxer.Get(ctx, id)
 	if err != nil {
 		return err
 	}
 	if sbox == nil {
 		return fmt.Errorf("sandbox not found: %s", id)
 	}
-	return m.boxer.StopContainer(ctx, sbox)
+	return d.boxer.StopContainer(ctx, sbox)
 }
 
 type CreateSandboxOpts struct {
@@ -535,36 +535,36 @@ type CreateSandboxOpts struct {
 }
 
 // createSandbox creates a new sandbox and starts its container.
-func (m *Mux) createSandbox(ctx context.Context, opts CreateSandboxOpts) (*sandtypes.Box, error) {
+func (d *Daemon) createSandbox(ctx context.Context, opts CreateSandboxOpts) (*sandtypes.Box, error) {
 	agentType := opts.Cloner
 	if agentType == "" {
 		agentType = "default"
 	}
 	slog.InfoContext(ctx, "CreateSandbox", "agentType", agentType)
 
-	sbox, err := m.boxer.NewSandbox(ctx, agentType, opts.ID, opts.CloneFromDir, opts.ImageName, opts.EnvFile, opts.AllowedDomains)
+	sbox, err := d.boxer.NewSandbox(ctx, agentType, opts.ID, opts.CloneFromDir, opts.ImageName, opts.EnvFile, opts.AllowedDomains)
 	if err != nil {
 		return nil, err
 	}
 
-	ctr, err := m.boxer.GetContainer(ctx, sbox.ContainerID)
+	ctr, err := d.boxer.GetContainer(ctx, sbox.ContainerID)
 
 	if ctr == nil {
-		err := m.boxer.CreateContainer(ctx, sbox)
+		err := d.boxer.CreateContainer(ctx, sbox)
 		if err != nil {
 			return nil, err
 		}
-		if err := m.boxer.UpdateContainerID(ctx, sbox, sbox.ContainerID); err != nil {
+		if err := d.boxer.UpdateContainerID(ctx, sbox, sbox.ContainerID); err != nil {
 			return nil, err
 		}
-		ctr, err = m.boxer.GetContainer(ctx, sbox.ContainerID)
+		ctr, err = d.boxer.GetContainer(ctx, sbox.ContainerID)
 		if err != nil || ctr == nil {
 			return nil, fmt.Errorf("failed to get container after creation")
 		}
 	}
 
 	if ctr.Status != "running" {
-		err := m.boxer.StartContainer(ctx, sbox)
+		err := d.boxer.StartContainer(ctx, sbox)
 		if err != nil {
 			return nil, err
 		}
@@ -574,23 +574,23 @@ func (m *Mux) createSandbox(ctx context.Context, opts CreateSandboxOpts) (*sandt
 }
 
 // ListSandboxes returns all sandboxes.
-func (m *Mux) ListSandboxes(ctx context.Context) ([]sandtypes.Box, error) {
-	return m.boxer.List(ctx)
+func (d *Daemon) ListSandboxes(ctx context.Context) ([]sandtypes.Box, error) {
+	return d.boxer.List(ctx)
 }
 
 // GetSandbox retrieves a sandbox by ID.
-func (m *Mux) GetSandbox(ctx context.Context, id string) (*sandtypes.Box, error) {
-	return m.boxer.Get(ctx, id)
+func (d *Daemon) GetSandbox(ctx context.Context, id string) (*sandtypes.Box, error) {
+	return d.boxer.Get(ctx, id)
 }
 
 // RemoveSandbox removes a single sandbox.
-func (m *Mux) RemoveSandbox(ctx context.Context, id string) error {
-	sbox, err := m.boxer.Get(ctx, id)
+func (d *Daemon) RemoveSandbox(ctx context.Context, id string) error {
+	sbox, err := d.boxer.Get(ctx, id)
 	if err != nil {
 		return err
 	}
 	if sbox == nil {
 		return fmt.Errorf("sandbox not found: %s", id)
 	}
-	return m.boxer.Cleanup(ctx, sbox)
+	return d.boxer.Cleanup(ctx, sbox)
 }

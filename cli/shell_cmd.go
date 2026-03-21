@@ -17,7 +17,7 @@ type ShellCmd struct {
 
 func (c *ShellCmd) Run(cctx *CLIContext) error {
 	ctx := cctx.Context
-	mc := cctx.MuxClient
+	mc := cctx.Daemon
 
 	sbox, err := mc.GetSandbox(ctx, c.SandboxName)
 	if err != nil {

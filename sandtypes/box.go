@@ -9,7 +9,7 @@ import (
 // - a local filesystem clone of a local dev workspace directory
 // - a local container instance (whose state is managed by a separate container service)
 //
-// At startup, the sand.Mux server will synchronize its internal database with the current
+// At startup, the sand/daemon#Daemon server will synchronize its internal database with the current
 // observed state of the local filesystem clone root and the local container service.
 //
 // TODO: Move this struct to package sandtypes, but make sure all the instances of it are treated as dumb structs first.

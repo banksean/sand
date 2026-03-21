@@ -12,7 +12,7 @@ type StopCmd struct {
 
 func (c *StopCmd) Run(cctx *CLIContext) error {
 	ctx := cctx.Context
-	mc := cctx.MuxClient
+	mc := cctx.Daemon
 
 	ids := []string{}
 	if !c.All {

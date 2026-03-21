@@ -3,12 +3,12 @@ package cli
 import (
 	"context"
 
-	"github.com/banksean/sand/mux"
+	"github.com/banksean/sand/daemon"
 	"github.com/posener/complete"
 )
 
 type sandboxNamePredictor struct {
-	mc mux.MuxClient
+	mc daemon.Client
 }
 
 // Predict implements [complete.Predictor].
@@ -24,6 +24,6 @@ func (s *sandboxNamePredictor) Predict(args complete.Args) []string {
 	return ret
 }
 
-func NewSandboxNamePredictor(mc mux.MuxClient) complete.Predictor {
+func NewSandboxNamePredictor(mc daemon.Client) complete.Predictor {
 	return &sandboxNamePredictor{mc: mc}
 }

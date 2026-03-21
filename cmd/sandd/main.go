@@ -13,7 +13,7 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/banksean/sand/applecontainer"
-	"github.com/banksean/sand/mux"
+	"github.com/banksean/sand/daemon"
 )
 
 // `sandd start` runs a long-lived process that manages sandboxes' lifecycles.
@@ -22,8 +22,8 @@ import (
 // to do all of the actual work of managing sandboxes.
 //
 // At startup, it will:
-// - acquire a lock file at $AppBaseDir/sandmux.lock
-// - open a unix domain socket at $AppBaseDir/sandmux.sock to accept IPC from the sand cli on the host OS
+// - acquire a lock file at $AppBaseDir/sandd.lock
+// - open a unix domain socket at $AppBaseDir/sandd.sock to accept IPC from the sand cli on the host OS
 // - start an http server listening at :4242 to accept IPC from the sand cli running inside containers
 
 type App struct {
@@ -52,7 +52,7 @@ func (c *DaemonCmd) Run(cctx *App) error {
 		return fmt.Errorf("unable to get dns.domain from container system: %w", err)
 	}
 	slog.InfoContext(ctx, "DaemonCmd.Run", "localDomain", localDomain)
-	server := mux.NewMuxServer(cctx.AppBaseDir, cctx.HTTPPort, localDomain)
+	server := daemon.NewDaemon(cctx.AppBaseDir, cctx.HTTPPort, localDomain)
 
 	switch c.Action {
 	case "start":
@@ -69,8 +69,8 @@ func (c *DaemonCmd) Run(cctx *App) error {
 	}
 }
 
-func (c *DaemonCmd) version(ctx context.Context, server *mux.Mux) error {
-	mc, err := mux.NewUnixSocketClient(ctx, c.AppBaseDir)
+func (c *DaemonCmd) version(ctx context.Context, server *daemon.Daemon) error {
+	mc, err := daemon.NewUnixSocketClient(ctx, c.AppBaseDir)
 	if err != nil {
 		fmt.Println("Daemon is not running")
 		return nil
@@ -104,8 +104,8 @@ func (c *DaemonCmd) version(ctx context.Context, server *mux.Mux) error {
 	return nil
 }
 
-func (c *DaemonCmd) checkStatus(ctx context.Context, server *mux.Mux) error {
-	mc, err := mux.NewUnixSocketClient(ctx, c.AppBaseDir)
+func (c *DaemonCmd) checkStatus(ctx context.Context, server *daemon.Daemon) error {
+	mc, err := daemon.NewUnixSocketClient(ctx, c.AppBaseDir)
 	if err != nil {
 		fmt.Println("Daemon is not running")
 		return nil
@@ -120,9 +120,9 @@ func (c *DaemonCmd) checkStatus(ctx context.Context, server *mux.Mux) error {
 	return nil
 }
 
-func (c *DaemonCmd) startDaemon(ctx context.Context, server *mux.Mux) error {
+func (c *DaemonCmd) startDaemon(ctx context.Context, server *daemon.Daemon) error {
 	// Check if daemon is already running
-	mc, err := mux.NewUnixSocketClient(ctx, c.AppBaseDir)
+	mc, err := daemon.NewUnixSocketClient(ctx, c.AppBaseDir)
 	if err == nil {
 		if err := mc.Ping(ctx); err == nil {
 			fmt.Println("Daemon is already running")
@@ -134,8 +134,8 @@ func (c *DaemonCmd) startDaemon(ctx context.Context, server *mux.Mux) error {
 	return server.ServeUnixSocket(ctx)
 }
 
-func (c *DaemonCmd) stopDaemon(ctx context.Context, server *mux.Mux) error {
-	mc, err := mux.NewUnixSocketClient(ctx, c.AppBaseDir)
+func (c *DaemonCmd) stopDaemon(ctx context.Context, server *daemon.Daemon) error {
+	mc, err := daemon.NewUnixSocketClient(ctx, c.AppBaseDir)
 	if err != nil {
 		fmt.Println("Daemon is not running")
 		return nil

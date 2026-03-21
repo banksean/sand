@@ -12,7 +12,7 @@ type VscCmd struct{}
 
 func (c *VscCmd) Run(cctx *CLIContext) error {
 	ctx := cctx.Context
-	mc := cctx.MuxClient
+	mc := cctx.Daemon
 
 	slog.InfoContext(ctx, "VscCmd", "run", *c)
 	hostname, err := os.Hostname()

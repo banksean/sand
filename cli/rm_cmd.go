@@ -12,7 +12,7 @@ type RmCmd struct {
 
 func (c *RmCmd) Run(cctx *CLIContext) error {
 	ctx := cctx.Context
-	mc := cctx.MuxClient
+	mc := cctx.Daemon
 
 	slog.InfoContext(ctx, "RmCmd", "run", *c)
 

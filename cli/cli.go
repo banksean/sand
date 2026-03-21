@@ -3,7 +3,7 @@
 // to provide automatic documentation, default flag values and so on.
 //
 // In general, code in this package should not depend on any sand/mux details besides the
-// sand/mux/MuxClient type. That type handles the transport details for communicating with
+// sand/daemon#Client type. That type handles the transport details for communicating with
 // the sandd daemon, whether by unix domain socket (when running on the host OS) or by TCP
 // socket (when running inside a container).
 package cli
@@ -11,7 +11,7 @@ package cli
 import (
 	"context"
 
-	"github.com/banksean/sand/mux"
+	"github.com/banksean/sand/daemon"
 )
 
 type CLIContext struct {
@@ -20,7 +20,7 @@ type CLIContext struct {
 	LogLevel   string
 	CloneRoot  string
 	Context    context.Context
-	MuxClient  mux.MuxClient
+	Daemon     daemon.Client
 }
 
 const (

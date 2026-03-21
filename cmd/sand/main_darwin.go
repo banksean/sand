@@ -13,7 +13,7 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/banksean/sand/cli"
-	"github.com/banksean/sand/mux"
+	"github.com/banksean/sand/daemon"
 	kongcompletion "github.com/jotaen/kong-completion"
 )
 
@@ -117,9 +117,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	predictorMC, err := mux.NewUnixSocketClient(ctx, appBaseDir)
+	predictorMC, err := daemon.NewUnixSocketClient(ctx, appBaseDir)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to create sandmux client, error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Failed to create sandd client, error: %v\n", err)
 		os.Exit(1)
 	}
 	namePredictor := cli.NewSandboxNamePredictor(predictorMC)
@@ -139,7 +139,7 @@ func main() {
 
 	slog.Info("main", "appBaseDir", appBaseDir)
 
-	if err := mux.EnsureDaemon(ctx, appBaseDir); err != nil {
+	if err := daemon.EnsureDaemon(ctx, appBaseDir); err != nil {
 		fmt.Fprintf(os.Stderr, "daemon not running, and failed to start it. error: %v\n", err)
 		os.Exit(1)
 	}
@@ -148,13 +148,13 @@ func main() {
 		app.AppBaseDir = appBaseDir
 	}
 
-	mc, err := mux.NewUnixSocketClient(ctx, appBaseDir)
+	mc, err := daemon.NewUnixSocketClient(ctx, appBaseDir)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to create sandmux client, error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Failed to create sandd client, error: %v\n", err)
 		os.Exit(1)
 	}
 	err = kongCtx.Run(&cli.CLIContext{
-		MuxClient:  mc,
+		Daemon:     mc,
 		Context:    ctx,
 		AppBaseDir: appBaseDir,
 		LogFile:    app.LogFile,

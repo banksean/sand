@@ -1,4 +1,4 @@
-package mux
+package daemon
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/banksean/sand/mux/internal/boxer"
+	"github.com/banksean/sand/daemon/internal/boxer"
 )
 
 func TestMuxHTTPPing(t *testing.T) {
@@ -19,7 +19,7 @@ func TestMuxHTTPPing(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// Create and start mux
-	mux := NewMuxServer(tmpDir, "test", "")
+	mux := NewDaemon(tmpDir, "test", "")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -75,7 +75,7 @@ func TestMuxHTTPList(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// Create and start mux
-	mux := NewMuxServer(tmpDir, "test", "")
+	mux := NewDaemon(tmpDir, "test", "")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -125,7 +125,7 @@ func TestMuxHTTPVersion(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// Create and start mux
-	mux := NewMuxServer(tmpDir, "test", "")
+	mux := NewDaemon(tmpDir, "test", "")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 

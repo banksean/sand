@@ -1,4 +1,4 @@
-package mux
+package daemon
 
 import (
 	"bufio"
@@ -21,9 +21,9 @@ import (
 	"github.com/banksean/sand/version"
 )
 
-// MuxClient is the interface for invoking methods on the sandd process via IPC, whether the
+// Client is the interface for invoking methods on the sandd process via IPC, whether the
 // client is running on the same MacOS instance as sandd, or inside a linux container.
-type MuxClient interface {
+type Client interface {
 	Ping(ctx context.Context) error
 	Version(ctx context.Context) (version.Info, error)
 	Shutdown(ctx context.Context) error
@@ -69,7 +69,7 @@ func defaultGateway() (string, error) {
 	return "", fmt.Errorf("no default gateway found in /proc/net/route")
 }
 
-func NewHTTPClient(ctx context.Context, containerHostPort string) (MuxClient, error) {
+func NewHTTPClient(ctx context.Context, containerHostPort string) (Client, error) {
 	internalContainerHost, err := defaultGateway()
 	if err != nil {
 		return nil, fmt.Errorf("error getting default gateway: %w", err)
@@ -80,7 +80,7 @@ func NewHTTPClient(ctx context.Context, containerHostPort string) (MuxClient, er
 	}, nil
 }
 
-func NewUnixSocketClient(ctx context.Context, appBaseDir string) (MuxClient, error) {
+func NewUnixSocketClient(ctx context.Context, appBaseDir string) (Client, error) {
 	httpClient := &http.Client{
 		Timeout: 30 * time.Second,
 		Transport: &http.Transport{

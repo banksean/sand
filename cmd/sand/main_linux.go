@@ -13,7 +13,7 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/banksean/sand/cli"
-	"github.com/banksean/sand/mux"
+	"github.com/banksean/sand/daemon"
 	kongcompletion "github.com/jotaen/kong-completion"
 )
 
@@ -110,9 +110,9 @@ func main() {
 	appBaseDir := "/outie" // connect to the sandd process running on the host via socket.
 
 	kongApp := kong.Must(&app)
-	predictorMC, err := mux.NewHTTPClient(ctx, "4242")
+	predictorMC, err := daemon.NewHTTPClient(ctx, "4242")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to create sandmux client, error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Failed to create sandd client, error: %v\n", err)
 		os.Exit(1)
 	}
 	namePredictor := cli.NewSandboxNamePredictor(predictorMC)
@@ -130,13 +130,13 @@ func main() {
 		app.AppBaseDir = appBaseDir
 	}
 
-	mc, err := mux.NewHTTPClient(ctx, app.HTTPPort)
+	mc, err := daemon.NewHTTPClient(ctx, app.HTTPPort)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to create sandmux client, error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Failed to create sandd client, error: %v\n", err)
 		os.Exit(1)
 	}
 	err = kongCtx.Run(&cli.CLIContext{
-		MuxClient:  mc,
+		Daemon:     mc,
 		Context:    ctx,
 		AppBaseDir: appBaseDir,
 		LogFile:    app.LogFile,

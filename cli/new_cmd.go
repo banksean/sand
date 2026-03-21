@@ -11,8 +11,8 @@ import (
 
 	"github.com/banksean/sand/applecontainer/options"
 	"github.com/banksean/sand/applecontainer/types"
+	"github.com/banksean/sand/daemon"
 	"github.com/banksean/sand/hostops"
-	"github.com/banksean/sand/mux"
 	"github.com/banksean/sand/sshimmer"
 	"github.com/goombaio/namegenerator"
 )
@@ -35,7 +35,7 @@ var defaultImageForCloner = map[string]string{
 
 func (c *NewCmd) Run(cctx *CLIContext) error {
 	ctx := cctx.Context
-	mc := cctx.MuxClient
+	mc := cctx.Daemon
 
 	slog.InfoContext(ctx, "NewCmd.Run")
 
@@ -97,7 +97,7 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 	if sbox == nil || err != nil {
 		// Sandbox doesn't exist, create it via daemon
 		slog.InfoContext(ctx, "Creating new sandbox via daemon", "id", c.SandboxName)
-		sbox, err = mc.CreateSandbox(ctx, mux.CreateSandboxOpts{
+		sbox, err = mc.CreateSandbox(ctx, daemon.CreateSandboxOpts{
 			ID:             c.SandboxName,
 			CloneFromDir:   c.CloneFromDir,
 			ImageName:      c.ImageName,
