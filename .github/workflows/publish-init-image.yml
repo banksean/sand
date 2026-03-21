@@ -1,4 +1,4 @@
-name: Build and Publish Sandbox Images
+name: Build and Publish Custom Init Image
 
 on:
   push:
