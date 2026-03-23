@@ -23,16 +23,17 @@ type Outie struct {
 	AppBaseDir string                    `default:"" placeholder:"<app-base-dir>" help:"root dir to store sandbox clones of working directories. Leave unset to use '~/Library/Application Support/Sand'"`
 	Completion kongcompletion.Completion `cmd:"" help:"Outputs shell code for initialising tab completions"`
 
-	New     cli.NewCmd     `cmd:"" help:"create a new sandbox and shell into its container"`
-	Shell   cli.ShellCmd   `cmd:"" help:"shell into a sandbox container (and start the container, if necessary)"`
-	Exec    cli.ExecCmd    `cmd:"" help:"execute a single command in a sanbox"`
-	Ls      cli.LsCmd      `cmd:"" help:"list sandboxes"`
-	Rm      cli.RmCmd      `cmd:"" help:"remove sandbox container and its clone directory"`
-	Stop    cli.StopCmd    `cmd:"" help:"stop sandbox container"`
-	Git     cli.GitCmd     `cmd:"" help:"git operations with sandboxes"`
-	Doc     DocCmd         `cmd:"" help:"print complete command help formatted as markdown"`
-	Version cli.VersionCmd `cmd:"" help:"print version infomation about this command"`
-	Vsc     cli.VscCmd     `cmd:"" help:"launch a vscode remote window connected to the sandbox's container"`
+	New           cli.NewCmd           `cmd:"" help:"create a new sandbox and shell into its container"`
+	Shell         cli.ShellCmd         `cmd:"" help:"shell into a sandbox container (and start the container, if necessary)"`
+	Exec          cli.ExecCmd          `cmd:"" help:"execute a single command in a sanbox"`
+	Ls            cli.LsCmd            `cmd:"" help:"list sandboxes"`
+	Rm            cli.RmCmd            `cmd:"" help:"remove sandbox container and its clone directory"`
+	Stop          cli.StopCmd          `cmd:"" help:"stop sandbox container"`
+	Git           cli.GitCmd           `cmd:"" help:"git operations with sandboxes"`
+	Doc           DocCmd               `cmd:"" help:"print complete command help formatted as markdown"`
+	Version       cli.VersionCmd       `cmd:"" help:"print version infomation about this command"`
+	Vsc           cli.VscCmd           `cmd:"" help:"launch a vscode remote window connected to the sandbox's container"`
+	InstallKernel cli.InstallKernelCmd `cmd:"" help:"install the BPFFS-enabled kernel build"`
 }
 
 func (c *Outie) initSlog() {
