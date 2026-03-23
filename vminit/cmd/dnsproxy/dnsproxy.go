@@ -341,6 +341,16 @@ func main() {
 	}
 	defer cleanup()
 
+	upstreamIP, _, err := net.SplitHostPort(*upstream)
+	if err == nil {
+		// Have to allow the upstream resolver's IP address, otherwise nothing at all
+		// will resolve.
+		allowIP(m, upstreamIP)
+	} else {
+		log("couldn't parse upstream into host:port: %q", upstream)
+		return
+	}
+
 	if err := waitForLoopback(); err != nil {
 		log("waitForLoopback failed: %v", err)
 		return

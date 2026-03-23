@@ -47,20 +47,12 @@ int egress_filter(struct __sk_buff *skb) {
     // restriction, we leave open a path to exfiltration via "DNS tunneling": stuffing
     // exfil data into query/name fields and sending it to the IP of a controlled
     // nameserver as though it were regular DNS traffic.
-    // TODO: Fix this and un-comment it. It currently won't accept any traffic
-    // from the container when un-commented.
-    // if (ip->protocol == IPPROTO_UDP) {
-    //     struct udphdr *udp = (void *)(ip + 1);
-    //     __u32 loopback = bpf_htonl(0x7f000001);
-    //     if ((void *)(udp + 1) <= data_end &&
-    //         udp->dest == bpf_htons(53) &&
-    //         dst == loopback)
-    //         return TC_ACT_OK;
-    // }
-
     if (ip->protocol == IPPROTO_UDP) {
         struct udphdr *udp = (void *)(ip + 1);
-        if ((void *)(udp + 1) <= data_end && udp->dest == bpf_htons(53))
+        __u32 loopback = bpf_htonl(0x7f000001);
+        if ((void *)(udp + 1) <= data_end &&
+            udp->dest == bpf_htons(53) &&
+            dst == loopback)
             return TC_ACT_OK;
     }
 
@@ -68,6 +60,12 @@ int egress_filter(struct __sk_buff *skb) {
     __u8 *allowed = bpf_map_lookup_elem(&allowed_ips, &dst);
     if (allowed)
         return TC_ACT_OK;
+
+    // TODO: return explicit ICMP port-unreachable/host-unreachable instead of letting
+    // denied requests time out. IIUC, doing so is tricky to implement here without
+    // either iptables (requires a large redesign of this whole setup), or
+    // doing a lot of work to craft and inject a new packet (cloning/rewriting MAC
+    // and IP headers, ICMP stuff and probably fixing checksums, etc).
 
     // Default deny
     return TC_ACT_SHOT;
