@@ -77,6 +77,20 @@ func (p *BaseWorkspacePreparation) cloneWorkDir(ctx context.Context, id, hostWor
 	hostCloneDir := pathRegistry.WorkDir()
 	slog.InfoContext(ctx, "BaseWorkspacePreparation.cloneWorkDir", "hostCloneDir", hostCloneDir)
 
+	workDirVol, err := p.fileOps.Volume(hostWorkDir)
+	if err != nil {
+		return fmt.Errorf("failed to get volume info for work dir %s: %v", hostWorkDir, err)
+	}
+
+	cloneDirVol, err := p.fileOps.Volume(p.cloneRoot)
+	if err != nil {
+		return fmt.Errorf("failed to get volume info for clone root dir %s: %v", p.cloneRoot, err)
+	}
+
+	if workDirVol.DeviceID != cloneDirVol.DeviceID {
+		return fmt.Errorf("can't clone dirs across volumes: workdir volume %s vs clone dir volume %s", workDirVol.MountPoint, cloneDirVol.MountPoint)
+	}
+
 	if err := p.fileOps.Copy(ctx, hostWorkDir, hostCloneDir); err != nil {
 		return fmt.Errorf("failed to copy workdir %s to %s for sandbox %s: %w", hostWorkDir, hostCloneDir, id, err)
 	}

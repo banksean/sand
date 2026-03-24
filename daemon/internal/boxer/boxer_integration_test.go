@@ -111,6 +111,7 @@ type mockFileOps struct {
 	createFunc    func(path string) (*os.File, error)
 	removeAllFunc func(path string) error
 	writeFileFunc func(path string, data []byte, perm os.FileMode) error
+	volumeFunc    func(path string) (*hostops.VolumeInfo, error)
 }
 
 func (m *mockFileOps) MkdirAll(path string, perm os.FileMode) error {
@@ -167,6 +168,13 @@ func (m *mockFileOps) WriteFile(path string, data []byte, perm os.FileMode) erro
 		return m.writeFileFunc(path, data, perm)
 	}
 	return nil
+}
+
+func (m *mockFileOps) Volume(path string) (*hostops.VolumeInfo, error) {
+	if m.volumeFunc != nil {
+		return m.volumeFunc(path)
+	}
+	return nil, nil
 }
 
 func newTestBoxer(t *testing.T, containerOps hostops.ContainerOps, imageOps hostops.ImageOps) *Boxer {

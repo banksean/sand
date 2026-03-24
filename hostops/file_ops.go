@@ -18,13 +18,10 @@ type FileOps interface {
 	Create(path string) (*os.File, error)
 	RemoveAll(path string) error
 	WriteFile(path string, data []byte, perm os.FileMode) error
+	Volume(path string) (*VolumeInfo, error)
 }
 
 type defaultFileOps struct{}
-
-func NewDefaultFileOps() FileOps {
-	return &defaultFileOps{}
-}
 
 func (f *defaultFileOps) MkdirAll(path string, perm os.FileMode) error {
 	return os.MkdirAll(path, perm)
@@ -39,6 +36,13 @@ func (f *defaultFileOps) Copy(ctx context.Context, src, dst string) error {
 		return fmt.Errorf("copy failed: %w (output: %s)", err, output)
 	}
 	return nil
+}
+
+type VolumeInfo struct {
+	Path       string // The original path checked
+	MountPoint string // Where the volume is mounted (e.g., /Volumes/Backup)
+	DeviceID   int32  // The unique integer ID for this volume
+	DeviceName string // The BSD node (e.g., /dev/disk4s2)
 }
 
 func (f *defaultFileOps) Stat(path string) (os.FileInfo, error) {
