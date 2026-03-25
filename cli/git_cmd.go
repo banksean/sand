@@ -37,7 +37,7 @@ func (c *DiffCmd) Run(cctx *CLIContext) error {
 	ctx := cctx.Context
 	mc := cctx.Daemon
 
-	if err := runtimedeps.Verify(ctx, runtimedeps.GitDir, runtimedeps.GitRemoteIsSSH); err != nil {
+	if err := runtimedeps.Verify(ctx, cctx.AppBaseDir, runtimedeps.GitDir, runtimedeps.GitRemoteIsSSH); err != nil {
 		return err
 	}
 
@@ -194,7 +194,7 @@ func (c *StatusCmd) Run(cctx *CLIContext) error {
 	ctx := cctx.Context
 	mc := cctx.Daemon
 
-	if err := runtimedeps.Verify(ctx, runtimedeps.GitDir, runtimedeps.GitRemoteIsSSH); err != nil {
+	if err := runtimedeps.Verify(ctx, cctx.AppBaseDir, runtimedeps.GitDir, runtimedeps.GitRemoteIsSSH); err != nil {
 		return err
 	}
 
@@ -248,7 +248,7 @@ func (c *LogCmd) Run(cctx *CLIContext) error {
 	ctx := cctx.Context
 	mc := cctx.Daemon
 
-	if err := runtimedeps.Verify(ctx, runtimedeps.GitDir, runtimedeps.GitRemoteIsSSH); err != nil {
+	if err := runtimedeps.Verify(ctx, cctx.AppBaseDir, runtimedeps.GitDir, runtimedeps.GitRemoteIsSSH); err != nil {
 		return err
 	}
 

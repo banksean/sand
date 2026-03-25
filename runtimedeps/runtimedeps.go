@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -18,25 +20,28 @@ const (
 	MinimumMacOSVersion        = 26
 	CustomKernelReleaseVersion = "v0.0.1"
 	CustomKernelHash           = "fce4baecf9f814d0dc17e55c185f25b49bd462b61c81fb8520e306990b0c65c1"
+	CustomInitImage            = "ghcr.io/banksean/sand/custom-init:latest"
 )
 
 type diagnosticCheck struct {
 	ID          PrerequID
 	Description string
-	Run         func(context.Context) error
+	Run         func(context.Context, string) error
 	// TODO: Severity, AffectedFeatures, Remedy
 }
 
 type PrerequID string
 
 const (
-	GitRemoteIsSSH           = "git-ssh-checkout"
-	GitDir                   = "git-dir"
-	ContainerSystemDNSDomain = "container-dns-domain-set"
-	ContainerSystemDNSName   = "container-dns-name"
-	ContainerCommand         = "container-runtime"
-	MacOSVersion             = "macos-version"
-	MacOS                    = "macos"
+	GitRemoteIsSSH           PrerequID = "git-ssh-checkout"
+	GitDir                   PrerequID = "git-dir"
+	ContainerSystemDNSDomain PrerequID = "container-dns-domain-set"
+	ContainerSystemDNSName   PrerequID = "container-dns-name"
+	ContainerCommand         PrerequID = "container-runtime"
+	MacOSVersion             PrerequID = "macos-version"
+	MacOS                    PrerequID = "macos"
+	CustomInitImagePulled    PrerequID = "custom-init-image-pulled"
+	CustomKernelInstalled    PrerequID = "custom-kernel-installed"
 )
 
 var (
@@ -44,7 +49,7 @@ var (
 		{
 			ID:          MacOS,
 			Description: "Running on MacOS",
-			Run: func(ctx context.Context) error {
+			Run: func(ctx context.Context, appBaseDir string) error {
 				if runtime.GOOS != "darwin" {
 					return fmt.Errorf("this program requires macOS %d or greater, but detected OS: %s", MinimumMacOSVersion, runtime.GOOS)
 				}
@@ -54,7 +59,7 @@ var (
 		{
 			ID:          MacOSVersion,
 			Description: fmt.Sprintf("Running MacOS version %d or greater", MinimumMacOSVersion),
-			Run: func(ctx context.Context) error {
+			Run: func(ctx context.Context, appBaseDir string) error {
 				majorVersion, err := getMacOSMajorVersion(ctx)
 				if err != nil {
 					return fmt.Errorf("failed to get macOS version: %w", err)
@@ -68,7 +73,7 @@ var (
 		{
 			ID:          ContainerCommand,
 			Description: fmt.Sprintf("Have https://github.com/apple/container runtime installed at version %s", AppleContainerVersion),
-			Run: func(ctx context.Context) error {
+			Run: func(ctx context.Context, appBaseDir string) error {
 				version, err := applecontainer.System.Version(ctx)
 				if err != nil {
 					return fmt.Errorf("could not locate Apple's `container` command from the releases published at https://github.com/apple/container/releases/tag/%s", AppleContainerVersion)
@@ -83,7 +88,7 @@ var (
 		{
 			ID:          ContainerSystemDNSName,
 			Description: "Container system has at least one dns name configured",
-			Run: func(ctx context.Context) error {
+			Run: func(ctx context.Context, appBaseDir string) error {
 				domains, err := applecontainer.System.DNSList(ctx)
 				if err != nil {
 					return fmt.Errorf("could not get container system dns domain list: %w", err)
@@ -98,7 +103,7 @@ var (
 		{
 			ID:          ContainerSystemDNSDomain,
 			Description: "Container system has dns.domain property set",
-			Run: func(ctx context.Context) error {
+			Run: func(ctx context.Context, appBaseDir string) error {
 				domain, err := applecontainer.System.PropertyGet(ctx, "dns.domain")
 				if err != nil {
 					return fmt.Errorf("could not get container system properties: %w", err)
@@ -113,7 +118,7 @@ var (
 		{
 			ID:          GitDir,
 			Description: "should be invoked from a git directory",
-			Run: func(ctx context.Context) error {
+			Run: func(ctx context.Context, appBaseDir string) error {
 				gitCmd := exec.Command("git", "rev-parse", "--show-toplevel")
 				out, err := gitCmd.Output()
 				if err != nil {
@@ -125,7 +130,7 @@ var (
 		{
 			ID:          GitRemoteIsSSH,
 			Description: "git checkout should be authenticated to origin with ssh",
-			Run: func(ctx context.Context) error {
+			Run: func(ctx context.Context, appBaseDir string) error {
 				gitCmd := exec.Command("git", "remote", "get-url", "origin")
 				out, err := gitCmd.Output()
 				if err != nil {
@@ -140,6 +145,30 @@ var (
 				return nil
 			},
 		},
+		{
+			ID:          CustomInitImagePulled,
+			Description: "custom init image must be pulled and available in local registry. run `sand install-ebpf-support` to install it",
+			Run: func(ctx context.Context, appBaseDir string) error {
+				inspectCmd := exec.Command("container", "image", "inspect", CustomInitImage)
+				_, err := inspectCmd.Output()
+				if err != nil {
+					return err
+				}
+				return nil
+			},
+		},
+		{
+			ID:          CustomKernelInstalled,
+			Description: "custom kernel binary must be installed. run `sand install-ebpf-support` to install it",
+			Run: func(ctx context.Context, appBaseDir string) error {
+				kernelFile := filepath.Join(appBaseDir, "kernel", CustomKernelReleaseVersion, "vmlinux")
+				_, err := os.Stat(kernelFile)
+				if err != nil {
+					return err
+				}
+				return nil
+			},
+		},
 	}
 	diagnosticCheckMap = map[PrerequID]diagnosticCheck{}
 )
@@ -150,7 +179,7 @@ func init() {
 	}
 }
 
-func Verify(ctx context.Context, checkIDs ...PrerequID) error {
+func Verify(ctx context.Context, appBaseDir string, checkIDs ...PrerequID) error {
 	failures := map[PrerequID]string{}
 	for _, checkID := range checkIDs {
 		check, ok := diagnosticCheckMap[checkID]
@@ -158,7 +187,7 @@ func Verify(ctx context.Context, checkIDs ...PrerequID) error {
 			failures[checkID] = "unrecognized prerequisite check ID"
 			continue
 		}
-		if err := check.Run(ctx); err != nil {
+		if err := check.Run(ctx, appBaseDir); err != nil {
 			failures[check.ID] = fmt.Sprintf("%s: %s", check.Description, err.Error())
 			slog.ErrorContext(ctx, "diagnosticCheck failed", "name", check.Description, "error", err)
 		} else {

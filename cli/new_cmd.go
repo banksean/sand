@@ -40,7 +40,7 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 
 	slog.InfoContext(ctx, "NewCmd.Run")
 
-	if err := runtimedeps.Verify(ctx, runtimedeps.GitDir); err != nil {
+	if err := runtimedeps.Verify(ctx, cctx.AppBaseDir, runtimedeps.GitDir); err != nil {
 		return err
 	}
 
@@ -85,6 +85,10 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 
 	var allowedDomains []string
 	if c.AllowedDomainsFile != "" {
+		if err := runtimedeps.Verify(ctx, cctx.AppBaseDir, runtimedeps.CustomInitImagePulled, runtimedeps.CustomKernelInstalled); err != nil {
+			return err
+		}
+
 		domains, err := loadDomainsFile(c.AllowedDomainsFile)
 		if err != nil {
 			return fmt.Errorf("reading allowed-domains-file: %w", err)

@@ -6,15 +6,17 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/banksean/sand/runtimedeps"
+	"golang.org/x/sync/errgroup"
 )
 
-// InstallKernelCmd downloads a linux kernel binary that has been
+// InstallEBPFSupportCmd downloads a linux kernel binary that has been
 // built with flags to enable BPFFS, which enables kernel-level packet
 // filtering for sand's sandbox containers.
-type InstallKernelCmd struct{}
+type InstallEBPFSupportCmd struct{}
 
 func downloadFile(filepath string, url string) error {
 	resp, err := http.Get(url)
@@ -64,7 +66,7 @@ func hashFileSHA256(filePath string) (string, error) {
 	return hashString, err
 }
 
-func (c *InstallKernelCmd) Run(cctx *CLIContext) error {
+func (c *InstallEBPFSupportCmd) downloadKernel(cctx *CLIContext) error {
 	kernelDir := filepath.Join(cctx.AppBaseDir, "kernel", runtimedeps.CustomKernelReleaseVersion)
 	if err := os.MkdirAll(kernelDir, 0o750); err != nil {
 		return fmt.Errorf("unable to create directory %s: %w", kernelDir, err)
@@ -88,4 +90,18 @@ func (c *InstallKernelCmd) Run(cctx *CLIContext) error {
 	}
 
 	return nil
+}
+
+func (c *InstallEBPFSupportCmd) pullInitImage(cctx *CLIContext) error {
+	pullCmd := exec.CommandContext(cctx.Context, "container", "image", "pull", runtimedeps.CustomInitImage)
+	_, err := pullCmd.Output()
+	return err
+}
+
+func (c *InstallEBPFSupportCmd) Run(cctx *CLIContext) error {
+	g := errgroup.Group{}
+	g.Go(func() error { return c.downloadKernel(cctx) })
+	g.Go(func() error { return c.pullInitImage(cctx) })
+
+	return g.Wait()
 }

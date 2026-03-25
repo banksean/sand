@@ -462,7 +462,7 @@ func (sber *Boxer) CreateContainer(ctx context.Context, sb *sandtypes.Box) error
 		Mount:     mountOpts,
 	}
 	if len(sb.AllowedDomains) > 0 {
-		mgmtOpts.InitImage = "ghcr.io/banksean/sand/custom-init:latest"
+		mgmtOpts.InitImage = runtimedeps.CustomInitImage
 		mgmtOpts.DNS = "127.0.0.1"
 		mgmtOpts.Kernel = filepath.Join(sber.appRoot, "kernel", runtimedeps.CustomKernelReleaseVersion, "vmlinux")
 	}
