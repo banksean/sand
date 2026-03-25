@@ -1,3 +1,0 @@
-#!/bin/sh
-
-/usr/local/bin/sketch --unsafe --addr $HOSTNAME:80 --ska-band-addr= --session-id=$HOSTNAME "$@"
