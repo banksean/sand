@@ -50,21 +50,13 @@ RUN mkdir -p /root/.ssh && \
 
 ADD sshd_config /etc/ssh/sshd_config
 
-# Install Go toolchain so that we can build and install the sand cli "innie" version for the container.
-ARG GO_VERSION=1.25.1
+# Install innie (container-side sand cli binary)
+ARG SAND_CLI_VERSION=v0.0.2
 RUN ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') && \
-  wget "https://go.dev/dl/go${GO_VERSION}.linux-${ARCH}.tar.gz" && \
-  tar -C /usr/local -xzf "go${GO_VERSION}.linux-${ARCH}.tar.gz" && \
-  rm "go${GO_VERSION}.linux-${ARCH}.tar.gz"
-
-ENV PATH=$PATH:/usr/local/go/bin
-ENV GOPATH=/root/go
-ENV PATH=$PATH:/root/go/bin
-RUN go env -w GOTOOLCHAIN=auto
-RUN git clone https://github.com/banksean/sand.git /tmp/sand && \
-  cd /tmp/sand && \
-  go build -o ./innie ./cmd/sand/... && \
-  mv ./innie /usr/local/bin/sand
+  wget "https://github.com/banksean/sand/releases/download/${SAND_CLI_VERSION}/innie_linux_${ARCH}.tar.gz" && \
+  tar -C /usr/local -xzf "innie_linux_${ARCH}.tar.gz" && \
+  mv /usr/local/innie /usr/local/sand && \
+  rm "innie_linux_${ARCH}.tar.gz"
 
 ARG ZSH_IN_DOCKER_VERSION=1.2.1
 RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/v${ZSH_IN_DOCKER_VERSION}/zsh-in-docker.sh)" -- \
