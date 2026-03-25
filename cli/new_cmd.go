@@ -2,9 +2,11 @@ package cli
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -81,6 +83,12 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 		} else {
 			c.ImageName = DefaultImageName
 		}
+	}
+
+	// Check to make sure c.ImageName is already pulled and available first, so we
+	// don't block creating the new container on downloading the image for it.
+	if err := verifyImageIsPulled(cctx.Context, c.ImageName); err != nil {
+		return fmt.Errorf("missing container image: run `container image pull %s`", c.ImageName)
 	}
 
 	var allowedDomains []string
@@ -251,6 +259,15 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 			slog.ErrorContext(ctx, "RemoveSandbox", "error", err)
 		}
 		slog.InfoContext(ctx, "Cleanup complete. Exiting.")
+	}
+	return nil
+}
+
+func verifyImageIsPulled(ctx context.Context, image string) error {
+	inspectCmd := exec.Command("container", "image", "inspect", image)
+	_, err := inspectCmd.Output()
+	if err != nil {
+		return err
 	}
 	return nil
 }
