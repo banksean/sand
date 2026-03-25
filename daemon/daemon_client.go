@@ -122,7 +122,7 @@ func (m *defaultClient) doRequest(ctx context.Context, method, path string, body
 	resp, err := m.httpClient.Do(req)
 	if err != nil {
 		slog.ErrorContext(ctx, "defaultClient.doRequest", "error", err)
-		return fmt.Errorf("daemon not running: %w", err)
+		return fmt.Errorf("couldn't complete request to daemon: %w", err)
 	}
 	defer resp.Body.Close()
 
