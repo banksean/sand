@@ -21,6 +21,7 @@ import (
 	"github.com/banksean/sand/cloning"
 	"github.com/banksean/sand/db"
 	"github.com/banksean/sand/hostops"
+	"github.com/banksean/sand/runtimedeps"
 	"github.com/banksean/sand/sandtypes"
 	"github.com/banksean/sand/sshimmer"
 	_ "github.com/golang-migrate/migrate/v4/database/sqlite"
@@ -463,6 +464,7 @@ func (sber *Boxer) CreateContainer(ctx context.Context, sb *sandtypes.Box) error
 	if len(sb.AllowedDomains) > 0 {
 		mgmtOpts.InitImage = "ghcr.io/banksean/sand/custom-init:latest"
 		mgmtOpts.DNS = "127.0.0.1"
+		mgmtOpts.Kernel = filepath.Join(sber.appRoot, "kernel", runtimedeps.CustomKernelReleaseVersion, "vmlinux")
 	}
 	containerID, err := sber.ContainerService.Create(ctx,
 		&options.CreateContainer{
