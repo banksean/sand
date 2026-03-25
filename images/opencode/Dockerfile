@@ -54,8 +54,8 @@ ADD sshd_config /etc/ssh/sshd_config
 ARG SAND_CLI_VERSION=v0.0.2
 RUN ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') && \
   wget "https://github.com/banksean/sand/releases/download/${SAND_CLI_VERSION}/innie_linux_${ARCH}.tar.gz" && \
-  tar -C /usr/local -xzf "innie_linux_${ARCH}.tar.gz" && \
-  mv /usr/local/innie /usr/local/sand && \
+  tar -C /usr/local/bin -xzf "innie_linux_${ARCH}.tar.gz" && \
+  mv /usr/local/bin/innie /usr/local/bin/sand && \
   rm "innie_linux_${ARCH}.tar.gz"
 
 ARG ZSH_IN_DOCKER_VERSION=1.2.1
