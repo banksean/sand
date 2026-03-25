@@ -1,0 +1,63 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  # Host-side CLI (macOS only)
+  - id: sand
+    binary: sand
+    main: ./cmd/sand
+    goos:
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -X 'github.com/banksean/sand/version.GitRepo={{ .Env.RELEASE_GIT_REPO }}'
+      - -X 'github.com/banksean/sand/version.GitBranch={{ .Tag }}'
+      - -X 'github.com/banksean/sand/version.GitCommit={{ .FullCommit }}'
+      - -X 'github.com/banksean/sand/version.BuildTime={{ .Date }}'
+
+  # Container-side CLI (Linux only) — built from the same cmd/sand package
+  # using the linux build tag, producing the "innie" binary
+  - id: innie
+    binary: innie
+    main: ./cmd/sand
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -X 'github.com/banksean/sand/version.GitRepo={{ .Env.RELEASE_GIT_REPO }}'
+      - -X 'github.com/banksean/sand/version.GitBranch={{ .Tag }}'
+      - -X 'github.com/banksean/sand/version.GitCommit={{ .FullCommit }}'
+      - -X 'github.com/banksean/sand/version.BuildTime={{ .Date }}'
+
+  # Daemon process (macOS only)
+  - id: sandd
+    binary: sandd
+    main: ./cmd/sandd
+    goos:
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -X 'github.com/banksean/sand/version.GitRepo={{ .Env.RELEASE_GIT_REPO }}'
+      - -X 'github.com/banksean/sand/version.GitBranch={{ .Tag }}'
+      - -X 'github.com/banksean/sand/version.GitCommit={{ .FullCommit }}'
+      - -X 'github.com/banksean/sand/version.BuildTime={{ .Date }}'
+
+archives:
+  - formats: [tar.gz]
+    name_template: "{{ .Binary }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: "checksums.txt"
+
+release:
+  draft: false
+  replace_existing_draft: true
