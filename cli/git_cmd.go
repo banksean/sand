@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/banksean/sand/cloning"
+	"github.com/banksean/sand/runtimedeps"
 )
 
 type GitCmd struct {
@@ -36,7 +37,7 @@ func (c *DiffCmd) Run(cctx *CLIContext) error {
 	ctx := cctx.Context
 	mc := cctx.Daemon
 
-	if err := VerifyPrerequisites(ctx, GitDir, GitRemoteIsSSH); err != nil {
+	if err := runtimedeps.Verify(ctx, runtimedeps.GitDir, runtimedeps.GitRemoteIsSSH); err != nil {
 		return err
 	}
 
@@ -193,7 +194,7 @@ func (c *StatusCmd) Run(cctx *CLIContext) error {
 	ctx := cctx.Context
 	mc := cctx.Daemon
 
-	if err := VerifyPrerequisites(ctx, GitDir, GitRemoteIsSSH); err != nil {
+	if err := runtimedeps.Verify(ctx, runtimedeps.GitDir, runtimedeps.GitRemoteIsSSH); err != nil {
 		return err
 	}
 
@@ -247,7 +248,7 @@ func (c *LogCmd) Run(cctx *CLIContext) error {
 	ctx := cctx.Context
 	mc := cctx.Daemon
 
-	if err := VerifyPrerequisites(ctx, GitDir, GitRemoteIsSSH); err != nil {
+	if err := runtimedeps.Verify(ctx, runtimedeps.GitDir, runtimedeps.GitRemoteIsSSH); err != nil {
 		return err
 	}
 

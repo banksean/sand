@@ -14,6 +14,7 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/banksean/sand/cli"
 	"github.com/banksean/sand/daemon"
+	"github.com/banksean/sand/runtimedeps"
 	kongcompletion "github.com/jotaen/kong-completion"
 )
 
@@ -80,7 +81,7 @@ func (c *Outie) initSlog() {
 
 const description = `Manage lightweight linux container sandboxes on MacOS.
 
-Requires apple container CLI: https://github.com/apple/container/releases/tag/` + cli.AppleContainerVersion
+Requires apple container CLI: https://github.com/apple/container/releases/tag/` + runtimedeps.AppleContainerVersion
 
 func appHomeDir() (string, error) {
 	homeDir, err := os.UserHomeDir()
@@ -133,7 +134,11 @@ func main() {
 
 	app.initSlog()
 
-	if err := cli.VerifyPrerequisites(ctx, cli.MacOS, cli.MacOSVersion, cli.ContainerCommand, cli.ContainerSystemDNSDomain); err != nil {
+	if err := runtimedeps.Verify(ctx,
+		runtimedeps.MacOS,
+		runtimedeps.MacOSVersion,
+		runtimedeps.ContainerCommand,
+		runtimedeps.ContainerSystemDNSDomain); err != nil {
 		fmt.Fprintf(os.Stderr, "Prerequisite check(s) failed: %s\r\n", err)
 		os.Exit(1)
 	}

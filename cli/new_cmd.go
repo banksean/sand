@@ -13,6 +13,7 @@ import (
 	"github.com/banksean/sand/applecontainer/types"
 	"github.com/banksean/sand/daemon"
 	"github.com/banksean/sand/hostops"
+	"github.com/banksean/sand/runtimedeps"
 	"github.com/banksean/sand/sshimmer"
 	"github.com/goombaio/namegenerator"
 )
@@ -39,7 +40,7 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 
 	slog.InfoContext(ctx, "NewCmd.Run")
 
-	if err := VerifyPrerequisites(ctx, GitDir); err != nil {
+	if err := runtimedeps.Verify(ctx, runtimedeps.GitDir); err != nil {
 		return err
 	}
 
