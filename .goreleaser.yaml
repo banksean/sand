@@ -52,7 +52,17 @@ builds:
       - -X 'github.com/banksean/sand/version.BuildTime={{ .Date }}'
 
 archives:
-  - formats: [tar.gz]
+  - id: sand
+    ids: [sand]
+    formats: [tar.gz]
+    name_template: "{{ .Binary }}_{{ .Os }}_{{ .Arch }}"
+  - id: innie
+    ids: [innie]
+    formats: [tar.gz]
+    name_template: "{{ .Binary }}_{{ .Os }}_{{ .Arch }}"
+  - id: sandd
+    ids: [sandd]
+    formats: [tar.gz]
     name_template: "{{ .Binary }}_{{ .Os }}_{{ .Arch }}"
 
 checksum:
