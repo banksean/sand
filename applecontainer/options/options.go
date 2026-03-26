@@ -270,15 +270,13 @@ func ToArgs[T any](s *T) []string {
 			}
 			continue
 		} else if fieldKind == reflect.Map {
-			mapVals := []string{}
 			m := v.Interface().(map[string]string)
-			keyIter := maps.Keys(m)
-			keys := slices.Sorted(keyIter)
+			keys := slices.Sorted(maps.Keys(m))
 			for _, k := range keys {
-				v := m[k]
-				mapVals = append(mapVals, fmt.Sprintf("%v=%v", k, v))
+				ret = append(ret, flagName)
+				ret = append(ret, fmt.Sprintf("%v=%v", k, m[k]))
 			}
-			flagValue = strings.Join(mapVals, ",")
+			continue
 		} else if fieldKind != reflect.Bool {
 			flagValue = fmt.Sprintf("%v", fv.Interface())
 		}

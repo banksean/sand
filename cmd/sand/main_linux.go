@@ -17,19 +17,9 @@ import (
 	kongcompletion "github.com/jotaen/kong-completion"
 )
 
-// The host OS must already have dns entry in the apple container system, created like so:
-// `sudo container system dns create host.container.internal --localhost 203.0.113.113`
-//
-// TODO: Evaluate SSH local port forwarding (make `sand exec` use `ssh -L 4242:4242 ...`) to
-// replace the above "container system dns create ..." approach. SSH would require less apple container
-// service futzing, but is probably more prone to losing connections as ssh port forward is known
-// to do. It also wouldn't have to use a host name from innie - just localhost:4242.
-
-// type Innie is the container-side cli to work with sand.  It shares a lot of the same subcommands
-// with the host-side sand command, but they work slightly differently when invoked in a container.
-// Notably, the innie connects to the sandd process running on the host via HTTP+JSON over TCP,
-// rather than via unix domain socket.
-
+// Innie is the container-side cli to work with the sandd instance running on the host.
+// It shares a lot of the same subcommands with the host-side sand command, but they
+// work slightly differently when invoked from inside a container.
 // TODO:
 // - sort out how `sand new` should work when you run it from inside a sandbox container. There are multiple ways to do this. Some options:
 //.  - A: should it create a clone from the innie's sandbox's original parent, or
@@ -40,7 +30,6 @@ type Innie struct {
 	LogFile    string                    `default:"/tmp/sand/innie/log" placeholder:"<log-file-path>" help:"location of log file (leave empty for a random tmp/ path)"`
 	LogLevel   string                    `default:"info" placeholder:"<debug|info|warn|error>" help:"the logging level (debug, info, warn, error)"`
 	AppBaseDir string                    `default:"" placeholder:"<app-base-dir>" help:"root dir to store sandbox clones of working directories. Leave unset to use '~/Library/Application Support/Sand'"`
-	HTTPPort   string                    `default:"4242" placeholder:"<local port>" help:"container host http port to connect to, for commands running inside containers"`
 	Completion kongcompletion.Completion `cmd:"" help:"Outputs shell code for initialising tab completions"`
 
 	New     cli.NewCmd     `cmd:"" help:"create a new sandbox and shell into its container"`
@@ -106,11 +95,12 @@ func main() {
 	// we also kill any subprocesses that were started with ctx.
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	httpPort := os.Getenv("SANDD_PORT")
 
 	appBaseDir := "/outie" // connect to the sandd process running on the host via socket.
 
 	kongApp := kong.Must(&app)
-	predictorMC, err := daemon.NewHTTPClient(ctx, "4242")
+	predictorMC, err := daemon.NewHTTPClient(ctx, httpPort)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create sandd client, error: %v\n", err)
 		os.Exit(1)
@@ -130,7 +120,7 @@ func main() {
 		app.AppBaseDir = appBaseDir
 	}
 
-	mc, err := daemon.NewHTTPClient(ctx, app.HTTPPort)
+	mc, err := daemon.NewHTTPClient(ctx, httpPort)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create sandd client, error: %v\n", err)
 		os.Exit(1)

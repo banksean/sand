@@ -27,26 +27,26 @@ const (
 )
 
 type Daemon struct {
-	AppBaseDir    string
-	SocketPath    string
-	LocalHTTPPort string
-	LocalDomain   string
+	AppBaseDir  string
+	SocketPath  string
+	LocalDomain string
 
 	hostMCP *HostMCP
 	boxer   *boxer.Boxer
 
-	listener net.Listener
+	unixListener net.Listener
+	tcpListener  net.Listener
+
 	lockFile *os.File
 	shutdown chan any
 	httpSrv  http.Server
 }
 
-func NewDaemon(appBaseDir, httpPort, localDomain string) *Daemon {
+func NewDaemon(appBaseDir, localDomain string) *Daemon {
 	return &Daemon{
-		AppBaseDir:    appBaseDir,
-		SocketPath:    filepath.Join(appBaseDir, defaultSocketFile),
-		LocalHTTPPort: httpPort,
-		LocalDomain:   localDomain,
+		AppBaseDir:  appBaseDir,
+		SocketPath:  filepath.Join(appBaseDir, defaultSocketFile),
+		LocalDomain: localDomain,
 		hostMCP: &HostMCP{
 			ChromeDevToolsPort: 9222,
 			ChromeUserDataDir:  "/tmp/chrome-profile-stable",
@@ -77,12 +77,18 @@ func (d *Daemon) startDaemonServer(ctx context.Context) error {
 	// Remove old socket if it exists
 	os.Remove(d.SocketPath)
 
-	listener, err := net.Listen("unix", d.SocketPath)
+	unixListener, err := net.Listen("unix", d.SocketPath)
 	if err != nil {
 		return err
 	}
+	d.unixListener = unixListener
 
-	d.listener = listener
+	tcpListener, err := net.Listen("tcp", ":0")
+	if err != nil {
+		return err
+	}
+	d.tcpListener = tcpListener
+
 	d.shutdown = make(chan any)
 	sber, err := boxer.NewBoxer(d.AppBaseDir, d.LocalDomain, os.Stderr)
 	if err != nil {
@@ -131,8 +137,8 @@ func (d *Daemon) Shutdown(ctx context.Context) {
 
 	slog.InfoContext(ctx, "Daemon.Shutdown", "pid", os.Getpid())
 	// Close listener (stops accepting new connections)
-	if d.listener != nil {
-		d.listener.Close()
+	if d.unixListener != nil {
+		d.unixListener.Close()
 	}
 
 	if d.hostMCP != nil {
@@ -170,13 +176,14 @@ func (d *Daemon) serveUnixSocket(ctx context.Context) {
 	mux.HandleFunc("/remove", d.handleRemove)
 	mux.HandleFunc("/stop", d.handleStop)
 	mux.HandleFunc("/create", d.handleCreate)
+	mux.HandleFunc("/tcpport", d.handleGetTCPPort)
 
 	server := &http.Server{
 		Handler: mux,
 	}
 	slog.InfoContext(ctx, "Daemon.serveUnixSocketHTTP starting up")
 
-	err := server.Serve(d.listener)
+	err := server.Serve(d.unixListener)
 	if err != nil {
 		slog.ErrorContext(ctx, "Daemon.serveUnixSocketHTTP", "error", err)
 	}
@@ -209,20 +216,18 @@ func (d *Daemon) serveTCPSocket(ctx context.Context) {
 	mux.HandleFunc("/vsc", slogHandler(ctx, d.handleVSC))
 	mux.HandleFunc("/sandbox-config", slogHandler(ctx, d.handleSandboxConfig))
 	mux.HandleFunc("/", slogHandler(ctx, func(w http.ResponseWriter, r *http.Request) {
-		http.NotFound(w, r) // Respond with a 404 Not Found status
-		// Alternatively, serve a custom response:
-		// fmt.Fprintf(w, "404 - Unknown route")
+		http.NotFound(w, r)
 	}))
 
 	server := &http.Server{
 		Handler: mux,
-		Addr:    ":" + d.LocalHTTPPort,
+		//		Addr:    ":" + d.tcpListener.Addr().String(),
 	}
 
-	slog.InfoContext(ctx, "Daemon.serveHTTP starting up")
-	err := server.ListenAndServe()
+	slog.InfoContext(ctx, "Daemon.serveTCPSocket starting up", "address", d.tcpListener.Addr().String())
+	err := server.Serve(d.tcpListener)
 	if err != nil {
-		slog.ErrorContext(ctx, "Daemon.serveHTTP", "error", err)
+		slog.ErrorContext(ctx, "Daemon.serveTCPSocket", "error", err)
 	}
 }
 
@@ -282,6 +287,20 @@ func (d *Daemon) handleList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, boxes)
+}
+
+func (d *Daemon) handleGetTCPPort(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	addr := d.tcpListener.Addr().String()
+	_, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		slog.ErrorContext(r.Context(), "Daemon.handleGetTCPPort", "error", err)
+		return
+	}
+	writeJSON(w, map[string]string{"port": port})
 }
 
 func (d *Daemon) handleGet(w http.ResponseWriter, r *http.Request) {

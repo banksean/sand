@@ -30,8 +30,16 @@ func (c *ShellCmd) Run(cctx *CLIContext) error {
 	}
 
 	hostname := types.GetContainerHostname(sbox.Container)
+	sandTCPPort, err := cctx.Daemon.GetTCPPort(ctx)
+	if err != nil {
+		return err
+	}
+	// TODO: get sanddHTTPPort from the daemon process, somehow.
+	// We could add a new method to the daemon.Client interface, just for
+	// this purpose.
 	env := map[string]string{
-		"HOSTNAME": hostname,
+		"HOSTNAME":   hostname,
+		"SANDD_PORT": sandTCPPort,
 	}
 
 	slog.InfoContext(ctx, "main: sbox.shell starting")

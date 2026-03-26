@@ -28,18 +28,17 @@ import (
 
 type App struct {
 	AppBaseDir string
-	HTTPPort   string
-	LogFile    string
-	LogLevel   string
-	CloneRoot  string
-	Context    context.Context
+	//HTTPPort   string
+	LogFile   string
+	LogLevel  string
+	CloneRoot string
+	Context   context.Context
 }
 
 type DaemonCmd struct {
 	LogFile    string `default:"/tmp/sand/daemon/log" placeholder:"<log-file-path>" help:"location of log file"`
 	LogLevel   string `default:"info" placeholder:"<debug|info|warn|error>" help:"the logging level (debug, info, warn, error)"`
 	AppBaseDir string `default:"" placeholder:"<app-base-dir>" help:"root dir to store sandbox clones of working directories. Leave unset to use '~/Library/Application Support/Sand'"`
-	HTTPPort   string `default:"4242" placeholder:"<local port>" help:"local http port to listen on, for commands running inside containers"`
 	Action     string `arg:"" optional:"" default:"status" enum:"start,stop,status,version" help:"Action to perform: start, stop, or status (default). Shows daemon status if omitted."`
 }
 
@@ -52,7 +51,7 @@ func (c *DaemonCmd) Run(cctx *App) error {
 		return fmt.Errorf("unable to get dns.domain from container system: %w", err)
 	}
 	slog.InfoContext(ctx, "DaemonCmd.Run", "localDomain", localDomain)
-	server := daemon.NewDaemon(cctx.AppBaseDir, cctx.HTTPPort, localDomain)
+	server := daemon.NewDaemon(cctx.AppBaseDir, localDomain)
 
 	switch c.Action {
 	case "start":
@@ -242,7 +241,6 @@ func main() {
 
 	err = kongCtx.Run(&App{
 		Context:    ctx,
-		HTTPPort:   cli.HTTPPort,
 		AppBaseDir: appBaseDir,
 		LogFile:    cli.LogFile,
 		LogLevel:   cli.LogLevel,

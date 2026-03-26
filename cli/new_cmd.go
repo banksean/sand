@@ -135,10 +135,14 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 	if ctr == nil {
 		return fmt.Errorf("sandbox's container field is nil")
 	}
-
+	sandTCPPort, err := cctx.Daemon.GetTCPPort(ctx)
+	if err != nil {
+		return err
+	}
 	hostname := types.GetContainerHostname(ctr)
 	env := map[string]string{
-		"HOSTNAME": hostname,
+		"HOSTNAME":   hostname,
+		"SANDD_PORT": sandTCPPort,
 	}
 
 	slog.InfoContext(ctx, "main: sbox.new starting")

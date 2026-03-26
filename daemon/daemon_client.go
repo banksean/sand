@@ -25,6 +25,7 @@ import (
 // client is running on the same MacOS instance as sandd, or inside a linux container.
 type Client interface {
 	Ping(ctx context.Context) error
+	GetTCPPort(ctx context.Context) (string, error)
 	Version(ctx context.Context) (version.Info, error)
 	Shutdown(ctx context.Context) error
 	ListSandboxes(ctx context.Context) ([]sandtypes.Box, error)
@@ -74,6 +75,7 @@ func NewHTTPClient(ctx context.Context, containerHostPort string) (Client, error
 	if err != nil {
 		return nil, fmt.Errorf("error getting default gateway: %w", err)
 	}
+	slog.InfoContext(ctx, "NewHTTPClient", "base", "http://"+internalContainerHost+":"+containerHostPort)
 	return &defaultClient{
 		base:       "http://" + internalContainerHost + ":" + containerHostPort,
 		httpClient: http.DefaultClient,
@@ -146,6 +148,14 @@ func (m *defaultClient) doRequest(ctx context.Context, method, path string, body
 	}
 
 	return nil
+}
+
+func (m *defaultClient) GetTCPPort(ctx context.Context) (string, error) {
+	var resp map[string]string
+	if err := m.doRequest(ctx, http.MethodGet, "/tcpport", nil, &resp); err != nil {
+		return "", err
+	}
+	return resp["port"], nil
 }
 
 func (m *defaultClient) Ping(ctx context.Context) error {
