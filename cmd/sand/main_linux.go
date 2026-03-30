@@ -95,12 +95,15 @@ func main() {
 	// we also kill any subprocesses that were started with ctx.
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	httpPort := os.Getenv("SANDD_PORT")
 
-	appBaseDir := "/outie" // connect to the sandd process running on the host via socket.
+	// connect to the sandd process running on the host via unix domain socket.
+	// The sand.sock file in this directory should have been created by sandd
+	// and attached to this container via --volume flag.
+	appBaseDir := "/run/host-services"
 
 	kongApp := kong.Must(&app)
-	predictorMC, err := daemon.NewHTTPClient(ctx, httpPort)
+
+	predictorMC, err := daemon.NewUnixSocketClient(ctx, appBaseDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create sandd client, error: %v\n", err)
 		os.Exit(1)
@@ -120,7 +123,7 @@ func main() {
 		app.AppBaseDir = appBaseDir
 	}
 
-	mc, err := daemon.NewHTTPClient(ctx, httpPort)
+	mc, err := daemon.NewUnixSocketClient(ctx, appBaseDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create sandd client, error: %v\n", err)
 		os.Exit(1)

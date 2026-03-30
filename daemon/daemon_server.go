@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -24,6 +25,7 @@ import (
 const (
 	defaultSocketFile = "sandd.sock"
 	defaultLockFile   = "sandd.lock"
+	containerIDKey    = "containerID"
 )
 
 type Daemon struct {
@@ -34,8 +36,11 @@ type Daemon struct {
 	hostMCP *HostMCP
 	boxer   *boxer.Boxer
 
-	unixListener net.Listener
-	tcpListener  net.Listener
+	outieListener net.Listener
+
+	innieServersMu sync.Mutex
+	// TODO: sync with container lifecycle for cases like restarting sandd with sandboxes running.
+	innieServers map[string]*http.Server
 
 	lockFile *os.File
 	shutdown chan any
@@ -51,6 +56,7 @@ func NewDaemon(appBaseDir, localDomain string) *Daemon {
 			ChromeDevToolsPort: 9222,
 			ChromeUserDataDir:  "/tmp/chrome-profile-stable",
 		},
+		innieServers: map[string]*http.Server{},
 	}
 }
 
@@ -81,13 +87,7 @@ func (d *Daemon) startDaemonServer(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	d.unixListener = unixListener
-
-	tcpListener, err := net.Listen("tcp", ":0")
-	if err != nil {
-		return err
-	}
-	d.tcpListener = tcpListener
+	d.outieListener = unixListener
 
 	d.shutdown = make(chan any)
 	sber, err := boxer.NewBoxer(d.AppBaseDir, d.LocalDomain, os.Stderr)
@@ -103,10 +103,7 @@ func (d *Daemon) startDaemonServer(ctx context.Context) error {
 	go d.waitForShutdown(ctx)
 
 	// Start unix domain socket HTTP server
-	go d.serveUnixSocket(ctx)
-
-	// Start net HTTP server
-	go d.serveTCPSocket(ctx)
+	go d.serveOutieSocket(ctx)
 
 	go func() {
 		if err := d.hostMCP.StartHostServices(ctx); err != nil {
@@ -137,8 +134,8 @@ func (d *Daemon) Shutdown(ctx context.Context) {
 
 	slog.InfoContext(ctx, "Daemon.Shutdown", "pid", os.Getpid())
 	// Close listener (stops accepting new connections)
-	if d.unixListener != nil {
-		d.unixListener.Close()
+	if d.outieListener != nil {
+		d.outieListener.Close()
 	}
 
 	if d.hostMCP != nil {
@@ -164,7 +161,7 @@ func (d *Daemon) Shutdown(ctx context.Context) {
 	close(d.shutdown)
 }
 
-func (d *Daemon) serveUnixSocket(ctx context.Context) {
+func (d *Daemon) serveOutieSocket(ctx context.Context) {
 	mux := http.NewServeMux()
 
 	// Register handlers
@@ -176,58 +173,92 @@ func (d *Daemon) serveUnixSocket(ctx context.Context) {
 	mux.HandleFunc("/remove", d.handleRemove)
 	mux.HandleFunc("/stop", d.handleStop)
 	mux.HandleFunc("/create", d.handleCreate)
-	mux.HandleFunc("/tcpport", d.handleGetTCPPort)
 
 	server := &http.Server{
 		Handler: mux,
 	}
 	slog.InfoContext(ctx, "Daemon.serveUnixSocketHTTP starting up")
 
-	err := server.Serve(d.unixListener)
+	err := server.Serve(d.outieListener)
 	if err != nil {
 		slog.ErrorContext(ctx, "Daemon.serveUnixSocketHTTP", "error", err)
 	}
 }
 
-func slogHandler(ctx context.Context, h http.HandlerFunc) http.HandlerFunc {
+func slogHandler(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		slog.InfoContext(r.Context(), "http request", "url", r.URL.String())
+		h(w, r)
+	}
+}
+
+func fromSandbox(sandboxID string, h http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := context.WithValue(r.Context(), containerIDKey, sandboxID)
+		r = r.WithContext(ctx)
 		slog.InfoContext(ctx, "http request", "url", r.URL.String())
 		h(w, r)
 	}
 }
 
-// TODO: auth these requests and limit access only to known sandbox instances.
-// We're already creating keypairs for ssh, so we can probably use those to
-// make sure that we know which sandbox container is making the call.
-// As-is, sandboxes make requests to mutate eachother, as can anything else that
-// has access to port 4242 on the host OS.
-func (d *Daemon) serveTCPSocket(ctx context.Context) {
+func sandboxIDOf(r *http.Request) (string, error) {
+	ctx := r.Context()
+	ret, ok := ctx.Value(containerIDKey).(string)
+	if ok {
+		return ret, nil
+	}
+	var args struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&args); err != nil {
+		return ret, err
+	}
+
+	return args.ID, nil
+}
+
+func (d *Daemon) stopInnieServer(ctx context.Context, id string) error {
+	d.innieServersMu.Lock()
+	defer d.innieServersMu.Unlock()
+	if srv, ok := d.innieServers[id]; ok {
+		if err := srv.Shutdown(ctx); err != nil {
+			return fmt.Errorf("StopSandbox could not shut down sandbox's http server: %w", err)
+		}
+	}
+	return nil
+}
+
+func (d *Daemon) serveInnieSocket(ctx context.Context, sandboxID string, unixListener net.Listener) {
 	mux := http.NewServeMux()
 
 	// Register handlers
-	mux.HandleFunc("/shutdown", slogHandler(ctx, d.handleShutdown))
-	mux.HandleFunc("/ping", slogHandler(ctx, d.handlePing))
-	mux.HandleFunc("/version", slogHandler(ctx, d.handleVersion))
-	mux.HandleFunc("/list", slogHandler(ctx, d.handleList))
-	mux.HandleFunc("/get", slogHandler(ctx, d.handleGet))
-	mux.HandleFunc("/remove", slogHandler(ctx, d.handleRemove))
-	mux.HandleFunc("/stop", slogHandler(ctx, d.handleStop))
-	mux.HandleFunc("/create", slogHandler(ctx, d.handleCreate))
-	mux.HandleFunc("/vsc", slogHandler(ctx, d.handleVSC))
-	mux.HandleFunc("/sandbox-config", slogHandler(ctx, d.handleSandboxConfig))
-	mux.HandleFunc("/", slogHandler(ctx, func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/shutdown", slogHandler(fromSandbox(sandboxID, d.handleShutdown)))
+	mux.HandleFunc("/ping", slogHandler(fromSandbox(sandboxID, d.handlePing)))
+	mux.HandleFunc("/version", slogHandler(fromSandbox(sandboxID, d.handleVersion)))
+	mux.HandleFunc("/list", slogHandler(fromSandbox(sandboxID, d.handleList)))
+	mux.HandleFunc("/get", slogHandler(fromSandbox(sandboxID, d.handleGet)))
+	mux.HandleFunc("/remove", slogHandler(fromSandbox(sandboxID, d.handleRemove)))
+	mux.HandleFunc("/stop", slogHandler(fromSandbox(sandboxID, d.handleStop)))
+	mux.HandleFunc("/create", slogHandler(fromSandbox(sandboxID, d.handleCreate)))
+	mux.HandleFunc("/vsc", slogHandler(fromSandbox(sandboxID, d.handleVSC)))
+	mux.HandleFunc("/sandbox-config", slogHandler(fromSandbox(sandboxID, d.handleSandboxConfig)))
+	mux.HandleFunc("/", slogHandler(fromSandbox(sandboxID, func(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
-	}))
+	})))
 
 	server := &http.Server{
 		Handler: mux,
-		//		Addr:    ":" + d.tcpListener.Addr().String(),
 	}
+	d.innieServersMu.Lock()
+	d.innieServers[sandboxID] = server
+	d.innieServersMu.Unlock()
 
-	slog.InfoContext(ctx, "Daemon.serveTCPSocket starting up", "address", d.tcpListener.Addr().String())
-	err := server.Serve(d.tcpListener)
+	defer unixListener.Close()
+
+	slog.InfoContext(ctx, "Daemon.serveInnieSocket starting up", "container ID", sandboxID)
+	err := server.Serve(unixListener)
 	if err != nil {
-		slog.ErrorContext(ctx, "Daemon.serveTCPSocket", "error", err)
+		slog.ErrorContext(ctx, "Daemon.serveInnieSocket", "error", err)
 	}
 }
 
@@ -289,52 +320,30 @@ func (d *Daemon) handleList(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, boxes)
 }
 
-func (d *Daemon) handleGetTCPPort(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	addr := d.tcpListener.Addr().String()
-	_, port, err := net.SplitHostPort(addr)
-	if err != nil {
-		slog.ErrorContext(r.Context(), "Daemon.handleGetTCPPort", "error", err)
-		return
-	}
-	writeJSON(w, map[string]string{"port": port})
-}
-
 func (d *Daemon) handleGet(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	var args struct {
-		ID string `json:"id"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&args); err != nil {
+	sandboxID, err := sandboxIDOf(r)
+	if err != nil {
 		writeJSONError(w, err, http.StatusBadRequest)
 		return
 	}
-
-	if args.ID == "" {
-		writeJSONError(w, fmt.Errorf("missing id"), http.StatusBadRequest)
-		return
-	}
-
-	sbox, err := d.GetSandbox(r.Context(), args.ID)
+	sbox, err := d.GetSandbox(r.Context(), sandboxID)
 	if err != nil {
-		writeJSONError(w, fmt.Errorf("couldn't get sandbox ID %s", args.ID), http.StatusInternalServerError)
+		writeJSONError(w, fmt.Errorf("couldn't get sandbox ID %s", sandboxID), http.StatusInternalServerError)
 		return
 	}
 	if sbox == nil {
-		writeJSONError(w, fmt.Errorf("got a nil sandbox for ID %s", args.ID), http.StatusInternalServerError)
+		writeJSONError(w, fmt.Errorf("got a nil sandbox for ID %s", sandboxID), http.StatusInternalServerError)
 		return
 	}
 
 	if err := d.boxer.SyncBox(r.Context(), sbox); err != nil {
 		slog.ErrorContext(r.Context(), "Daemon.handleGet boxer.SyncBox", "error", err)
-		writeJSONError(w, fmt.Errorf("failed to sync sandbox for ID %s", args.ID), http.StatusInternalServerError)
+		writeJSONError(w, fmt.Errorf("failed to sync sandbox for ID %s", sandboxID), http.StatusInternalServerError)
 	}
 
 	if sbox == nil {
@@ -357,20 +366,13 @@ func (d *Daemon) handleRemove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var args struct {
-		ID string `json:"id"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&args); err != nil {
+	sandboxID, err := sandboxIDOf(r)
+	if err != nil {
 		writeJSONError(w, err, http.StatusBadRequest)
 		return
 	}
 
-	if args.ID == "" {
-		writeJSONError(w, fmt.Errorf("missing id"), http.StatusBadRequest)
-		return
-	}
-
-	if err := d.RemoveSandbox(r.Context(), args.ID); err != nil {
+	if err := d.RemoveSandbox(r.Context(), sandboxID); err != nil {
 		writeJSONError(w, err, http.StatusInternalServerError)
 		return
 	}
@@ -383,20 +385,13 @@ func (d *Daemon) handleStop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var args struct {
-		ID string `json:"id"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&args); err != nil {
+	sandboxID, err := sandboxIDOf(r)
+	if err != nil {
 		writeJSONError(w, err, http.StatusBadRequest)
 		return
 	}
 
-	if args.ID == "" {
-		writeJSONError(w, fmt.Errorf("missing id"), http.StatusBadRequest)
-		return
-	}
-
-	if err := d.StopSandbox(r.Context(), args.ID); err != nil {
+	if err := d.StopSandbox(r.Context(), sandboxID); err != nil {
 		writeJSONError(w, err, http.StatusInternalServerError)
 		return
 	}
@@ -426,21 +421,14 @@ func (d *Daemon) handleCreate(w http.ResponseWriter, r *http.Request) {
 func (d *Daemon) handleVSC(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	var c struct {
-		ID string `json:"id"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
+	sandboxID, err := sandboxIDOf(r)
+	if err != nil {
 		writeJSONError(w, err, http.StatusBadRequest)
 		return
 	}
-
-	if c.ID == "" {
-		writeJSONError(w, fmt.Errorf("missing id"), http.StatusBadRequest)
-		return
-	}
-	sbox, err := d.GetSandbox(ctx, c.ID)
+	sbox, err := d.GetSandbox(ctx, sandboxID)
 	if err != nil {
-		slog.ErrorContext(ctx, "GetSandbox", "error", err, "id", c.ID)
+		slog.ErrorContext(ctx, "GetSandbox", "error", err, "id", sandboxID)
 		writeJSONError(w, err, http.StatusInternalServerError)
 		return
 	}
@@ -448,7 +436,7 @@ func (d *Daemon) handleVSC(w http.ResponseWriter, r *http.Request) {
 	ctr := sbox.Container
 
 	if ctr == nil || ctr.Status != "running" {
-		writeJSONError(w, fmt.Errorf("cannot connect to sandbox %q becacuse it is not currently running", c.ID), http.StatusInternalServerError)
+		writeJSONError(w, fmt.Errorf("cannot connect to sandbox %q becacuse it is not currently running", sandboxID), http.StatusInternalServerError)
 		return
 	}
 
@@ -457,7 +445,7 @@ func (d *Daemon) handleVSC(w http.ResponseWriter, r *http.Request) {
 	slog.InfoContext(ctx, "main: running vsc with", "cmd", strings.Join(vscCmd.Args, " "))
 	out, err := vscCmd.CombinedOutput()
 	if err != nil {
-		writeJSONError(w, fmt.Errorf("failed to start vsc for %q: %w", c.ID, err), http.StatusInternalServerError)
+		writeJSONError(w, fmt.Errorf("failed to start vsc for %q: %w", sandboxID, err), http.StatusInternalServerError)
 		slog.ErrorContext(ctx, "VscCmd.Run cmd", "out", out, "error", err)
 	}
 }
@@ -541,6 +529,10 @@ func (d *Daemon) StopSandbox(ctx context.Context, id string) error {
 	if sbox == nil {
 		return fmt.Errorf("sandbox not found: %s", id)
 	}
+	if err := d.stopInnieServer(ctx, id); err != nil {
+		return err
+	}
+
 	return d.boxer.StopContainer(ctx, sbox)
 }
 
@@ -569,7 +561,14 @@ func (d *Daemon) createSandbox(ctx context.Context, opts CreateSandboxOpts) (*sa
 	ctr, err := d.boxer.GetContainer(ctx, sbox.ContainerID)
 
 	if ctr == nil {
-		err := d.boxer.CreateContainer(ctx, sbox)
+		socketPath := filepath.Join(d.AppBaseDir, "containersockets", opts.ID)
+		unixListener, err := net.Listen("unix", socketPath)
+		if err != nil {
+			return nil, fmt.Errorf("createSandbox couldn't open container socket %s: %w", socketPath, err)
+		}
+		go d.serveInnieSocket(ctx, opts.ID, unixListener)
+
+		err = d.boxer.CreateContainer(ctx, sbox)
 		if err != nil {
 			return nil, err
 		}
@@ -611,5 +610,9 @@ func (d *Daemon) RemoveSandbox(ctx context.Context, id string) error {
 	if sbox == nil {
 		return fmt.Errorf("sandbox not found: %s", id)
 	}
+	if err := d.stopInnieServer(ctx, id); err != nil {
+		return err
+	}
+
 	return d.boxer.Cleanup(ctx, sbox)
 }
