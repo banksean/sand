@@ -65,13 +65,14 @@ func TestToFlags(t *testing.T) {
 				},
 				ManagementOptions: ManagementOptions{
 					Remove: true,
-					Volume: []string{"/foo/bar:/gorunac/dev"},
+					Volume: []string{"/foo/bar:/gorunac/dev", "/host/path/sandd.sock:/container/path/sandd.sock"},
 				},
 			},
 			expected: []string{
 				"--interactive",
 				"--remove",
 				"--volume", "/foo/bar:/gorunac/dev",
+				"--volume", "/host/path/sandd.sock:/container/path/sandd.sock",
 			},
 		},
 		"create container": {
@@ -81,11 +82,14 @@ func TestToFlags(t *testing.T) {
 						"type=bind,source=/Users/Library/Application Support/Sand/clones/59edaa35-1cbb-4914-a478-606ae706f324,target=/app",
 						"type=bind,source=/Users/seanmccullough/.claude,target=/home/node/.claude,readonly",
 					},
+					Volume: []string{"/foo/bar:/gorunac/dev", "/host/path/sandd.sock:/container/path/sandd.sock"},
 				},
 			},
 			expected: []string{
 				"--mount", "type=bind,source=/Users/Library/Application Support/Sand/clones/59edaa35-1cbb-4914-a478-606ae706f324,target=/app",
 				"--mount", "type=bind,source=/Users/seanmccullough/.claude,target=/home/node/.claude,readonly",
+				"--volume", "/foo/bar:/gorunac/dev",
+				"--volume", "/host/path/sandd.sock:/container/path/sandd.sock",
 			},
 		},
 	}

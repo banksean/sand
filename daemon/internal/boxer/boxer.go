@@ -453,6 +453,9 @@ func (sber *Boxer) CreateContainer(ctx context.Context, sb *sandtypes.Box) error
 		mountOpts = append(mountOpts, m.String())
 	}
 
+	vols := []string{filepath.Join(sber.appRoot, "containersockets", sb.ID) + ":/run/host-services/sandd.sock"}
+	sb.Volumes = append(sb.Volumes, vols...)
+
 	mgmtOpts := options.ManagementOptions{
 		// TODO: Try to name the container after the sandbox, and handle collisions
 		// if the name is already in use (e.g. append random chars to sb.ID).
@@ -463,11 +466,13 @@ func (sber *Boxer) CreateContainer(ctx context.Context, sb *sandtypes.Box) error
 		Mount:     mountOpts,
 		Volume:    sb.Volumes,
 	}
+
 	if len(sb.AllowedDomains) > 0 {
 		mgmtOpts.InitImage = runtimedeps.CustomInitImage
 		mgmtOpts.DNS = "127.0.0.1"
 		mgmtOpts.Kernel = filepath.Join(sber.appRoot, "kernel", runtimedeps.CustomKernelReleaseVersion, "vmlinux")
 	}
+
 	containerID, err := sber.ContainerService.Create(ctx,
 		&options.CreateContainer{
 			ProcessOptions: options.ProcessOptions{
@@ -482,6 +487,7 @@ func (sber *Boxer) CreateContainer(ctx context.Context, sb *sandtypes.Box) error
 		slog.ErrorContext(ctx, "createContainer", "sandbox", sb.ID, "imageName", sb.ImageName, "error", err, "output", containerID)
 		return fmt.Errorf("failed to create container for sandbox %s: %w", sb.ID, err)
 	}
+
 	sb.ContainerID = containerID
 	return nil
 }
@@ -696,35 +702,4 @@ func encodePrivateKeyToPEM(privateKey ed25519.PrivateKey) []byte {
 
 	// Return PEM encoded bytes
 	return pem.EncodeToMemory(pkBytes)
-}
-
-// TODO: Remove this
-func createKeyPairIfMissing(fileOps hostops.FileOps, idPath string) (ssh.PublicKey, error) {
-	if _, err := fileOps.Stat(idPath); err == nil {
-		return nil, nil
-	}
-
-	publicKey, privateKey, err := genHostKeyPair()
-	if err != nil {
-		return nil, fmt.Errorf("error generating key pair: %w", err)
-	}
-
-	sshPublicKey, err := ssh.NewPublicKey(publicKey)
-	if err != nil {
-		return nil, fmt.Errorf("error converting to SSH public key: %w", err)
-	}
-
-	privateKeyPEM := encodePrivateKeyToPEM(privateKey)
-
-	err = writeKeyToFile(fileOps, privateKeyPEM, idPath)
-	if err != nil {
-		return nil, fmt.Errorf("error writing private key to file %w", err)
-	}
-	pubKeyBytes := ssh.MarshalAuthorizedKey(sshPublicKey)
-
-	err = writeKeyToFile(fileOps, []byte(pubKeyBytes), idPath+".pub")
-	if err != nil {
-		return nil, fmt.Errorf("error writing public key to file %w", err)
-	}
-	return sshPublicKey, nil
 }
