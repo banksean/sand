@@ -35,6 +35,8 @@ type Box struct {
 	AllowedDomains []string
 	// Mounts defines bind mounts that should be attached when creating the container.
 	Mounts []MountSpec
+	// Volumes defines volume mounts in host:container format, passed directly to the container runtime.
+	Volumes []string
 	// SandboxWorkDirError and SandboxContainerError are the most recently updated error states of the sandbox
 	// work dir and container instance. In-memory only. Updated once either at
 	// server startup or sandbox creation time, and then updated periodically thereafter.

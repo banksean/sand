@@ -65,7 +65,7 @@ func TestToFlags(t *testing.T) {
 				},
 				ManagementOptions: ManagementOptions{
 					Remove: true,
-					Volume: "/foo/bar:/gorunac/dev",
+					Volume: []string{"/foo/bar:/gorunac/dev"},
 				},
 			},
 			expected: []string{

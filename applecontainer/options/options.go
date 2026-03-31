@@ -158,7 +158,7 @@ type ManagementOptions struct {
 	// TmpFS adds a tmpfs mount to the container at the given path
 	TmpFS string `flag:"--tmpfs"`
 	// Volume bind mounts a volume into the container
-	Volume string `flag:"--volume"`
+	Volume []string `flag:"--volume"`
 	// Virtualization exposes virtualization capabilities to the container (requires host and guest support)
 	Virtualization bool `flag:"--virtualization"`
 }

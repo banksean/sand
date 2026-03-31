@@ -53,6 +53,7 @@ func (c *ExecCmd) Run(cctx *CLIContext) error {
 			CloneFromDir: c.CloneFromDir,
 			ImageName:    c.ImageName,
 			EnvFile:      c.EnvFile,
+			Volumes:      c.Volume,
 		})
 		if err != nil {
 			slog.ErrorContext(ctx, "CreateSandbox", "error", err)
