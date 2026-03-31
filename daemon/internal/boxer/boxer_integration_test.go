@@ -21,6 +21,11 @@ type mockImageOps struct {
 	pullFunc func(ctx context.Context, image string) (func() error, error)
 }
 
+// Inspect implements [hostops.ImageOps].
+func (m *mockImageOps) Inspect(ctx context.Context, name string) ([]*types.ImageManifest, error) {
+	panic("unimplemented")
+}
+
 func (m *mockImageOps) List(ctx context.Context) ([]types.ImageEntry, error) {
 	if m.listFunc != nil {
 		return m.listFunc(ctx)
@@ -187,7 +192,7 @@ func newTestBoxer(t *testing.T, containerOps hostops.ContainerOps, imageOps host
 	t.Cleanup(func() { boxer.Close() })
 
 	boxer.ContainerService = containerOps
-	boxer.imageService = imageOps
+	boxer.ImageService = imageOps
 	boxer.gitOps = &mockGitOps{}
 	boxer.fileOps = &mockFileOps{
 		lstatFunc: func(path string) (os.FileInfo, error) {

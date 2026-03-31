@@ -40,7 +40,7 @@ type Boxer struct {
 	sqlDB            *sql.DB
 	queries          *db.Queries
 	ContainerService hostops.ContainerOps
-	imageService     hostops.ImageOps
+	ImageService     hostops.ImageOps
 	gitOps           hostops.GitOps
 	fileOps          hostops.FileOps
 	sshim            *sshimmer.LocalSSHimmer
@@ -73,7 +73,7 @@ func NewBoxer(appRoot, localDomain string, terminalWriter io.Writer) (*Boxer, er
 		sqlDB:            sqlDB,
 		queries:          db.New(sqlDB),
 		ContainerService: hostops.NewAppleContainerOps(),
-		imageService:     hostops.NewAppleImageOps(),
+		ImageService:     hostops.NewAppleImageOps(),
 		gitOps:           hostops.NewDefaultGitOps(),
 		fileOps:          fileOps,
 		sshim:            sshim,
@@ -471,9 +471,13 @@ func (sber *Boxer) CreateContainer(ctx context.Context, sb *sandtypes.Box) error
 		mgmtOpts.DNS = "127.0.0.1"
 		mgmtOpts.Kernel = filepath.Join(sber.appRoot, "kernel", runtimedeps.CustomKernelReleaseVersion, "vmlinux")
 	}
+	if err := sber.checkImageHasEntrypoint(ctx, sb.ImageName); err != nil {
+		mgmtOpts.Entrypoint = "/bin/sh"
+	}
 
 	containerID, err := sber.ContainerService.Create(ctx,
 		&options.CreateContainer{
+
 			ProcessOptions: options.ProcessOptions{
 				Interactive: true,
 				TTY:         true,
@@ -489,6 +493,24 @@ func (sber *Boxer) CreateContainer(ctx context.Context, sb *sandtypes.Box) error
 
 	sb.ContainerID = containerID
 	return nil
+}
+
+func (sber *Boxer) checkImageHasEntrypoint(ctx context.Context, imageName string) error {
+	if imageName != "" {
+		img, err := sber.ImageService.Inspect(ctx, imageName)
+		if err != nil {
+			return err
+		}
+		if len(img) == 0 {
+			return fmt.Errorf("image not found: %s", imageName)
+		}
+		for _, v := range img[0].Variants {
+			if len(v.Config.Config.Cmd) != 0 {
+				return nil
+			}
+		}
+	}
+	return fmt.Errorf("image %q has no command or entrypoint specified for container process", imageName)
 }
 
 // StartContainer starts a container instance. The container must exist, and it should not be in the "running" state.
@@ -562,7 +584,7 @@ func (sber *Boxer) executeHooks(ctx context.Context, sb *sandtypes.Box, hooks []
 func (sb *Boxer) EnsureImage(ctx context.Context, imageName string) error {
 	slog.InfoContext(ctx, "Boxer.EnsureImage", "imageName", imageName)
 
-	images, err := sb.imageService.List(ctx)
+	images, err := sb.ImageService.List(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to list images: %w", err)
 	}
@@ -585,7 +607,7 @@ func (sb *Boxer) pullImage(ctx context.Context, imageName string) error {
 	sb.messenger.Message(ctx, fmt.Sprintf("This may take a while: pulling container image %s...", imageName))
 	start := time.Now()
 
-	waitFn, err := sb.imageService.Pull(ctx, imageName)
+	waitFn, err := sb.ImageService.Pull(ctx, imageName)
 	defer func() {
 		if waitFn != nil {
 			waitFn()
