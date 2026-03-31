@@ -244,3 +244,37 @@ func TestRmCmdAll(t *testing.T) {
 		t.Error("expected All=true")
 	}
 }
+
+func TestSandboxCreationFlagsVolume(t *testing.T) {
+	var cli struct {
+		SandboxCreationFlags `embed:""`
+	}
+	kongParse(t, &cli, []string{
+		"-v", "/host/path:/container/path",
+	})
+	if len(cli.Volume) != 1 {
+		t.Fatalf("expected 1 volume, got %d", len(cli.Volume))
+	}
+	if cli.Volume[0] != "/host/path:/container/path" {
+		t.Errorf("expected Volume /host/path:/container/path, got %q", cli.Volume[0])
+	}
+}
+
+func TestSandboxCreationFlagsMultipleVolumes(t *testing.T) {
+	var cli struct {
+		SandboxCreationFlags `embed:""`
+	}
+	kongParse(t, &cli, []string{
+		"-v", "/path1:/mount1",
+		"--volume", "/path2:/mount2",
+	})
+	if len(cli.Volume) != 2 {
+		t.Fatalf("expected 2 volumes, got %d", len(cli.Volume))
+	}
+	if cli.Volume[0] != "/path1:/mount1" {
+		t.Errorf("expected first volume /path1:/mount1, got %q", cli.Volume[0])
+	}
+	if cli.Volume[1] != "/path2:/mount2" {
+		t.Errorf("expected second volume /path2:/mount2, got %q", cli.Volume[1])
+	}
+}

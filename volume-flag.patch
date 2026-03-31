@@ -1,0 +1,220 @@
+From 08cb071cd654db1eb15675e468db0da3dc38edf4 Mon Sep 17 00:00:00 2001
+From: erikswedberg <erik@erikswedberg.com>
+Date: Sun, 29 Mar 2026 21:25:55 +0000
+Subject: [PATCH] add --volume flag to sand new and sand exec
+
+---
+ applecontainer/options/options.go             |  2 +-
+ applecontainer/options/options_test.go        |  2 +-
+ cli/cli.go                                    | 11 +++---
+ cli/cli_flag_parse_test.go                    | 34 +++++++++++++++++++
+ cli/exec_cmd.go                               |  1 +
+ cli/new_cmd.go                                |  1 +
+ daemon/daemon_server.go                       |  3 +-
+ daemon/internal/boxer/boxer.go                |  4 ++-
+ .../internal/boxer/boxer_integration_test.go  |  4 +--
+ sandtypes/box.go                              |  2 ++
+ 10 files changed, 53 insertions(+), 11 deletions(-)
+
+diff --git a/applecontainer/options/options.go b/applecontainer/options/options.go
+index ab7ea24..91ae2c5 100644
+--- a/applecontainer/options/options.go
++++ b/applecontainer/options/options.go
+@@ -158,7 +158,7 @@ type ManagementOptions struct {
+ 	// TmpFS adds a tmpfs mount to the container at the given path
+ 	TmpFS string `flag:"--tmpfs"`
+ 	// Volume bind mounts a volume into the container
+-	Volume string `flag:"--volume"`
++	Volume []string `flag:"--volume"`
+ 	// Virtualization exposes virtualization capabilities to the container (requires host and guest support)
+ 	Virtualization bool `flag:"--virtualization"`
+ }
+diff --git a/applecontainer/options/options_test.go b/applecontainer/options/options_test.go
+index e6b3272..a06cce7 100644
+--- a/applecontainer/options/options_test.go
++++ b/applecontainer/options/options_test.go
+@@ -65,7 +65,7 @@ func TestToFlags(t *testing.T) {
+ 				},
+ 				ManagementOptions: ManagementOptions{
+ 					Remove: true,
+-					Volume: "/foo/bar:/gorunac/dev",
++					Volume: []string{"/foo/bar:/gorunac/dev"},
+ 				},
+ 			},
+ 			expected: []string{
+diff --git a/cli/cli.go b/cli/cli.go
+index 447844c..90363e2 100644
+--- a/cli/cli.go
++++ b/cli/cli.go
+@@ -34,11 +34,12 @@ type ShellFlags struct {
+ 
+ // SandboxCreationFlags are shared by commands that create a sandbox.
+ type SandboxCreationFlags struct {
+-	ImageName          string `short:"i" placeholder:"<container-image-name>" help:"name of container image to use"`
+-	CloneFromDir       string `short:"d" placeholder:"<project-dir>" help:"directory to clone into the sandbox. Defaults to current working directory, if unset."`
+-	EnvFile            string `short:"e" default:".env" placholder:"<file-path>" help:"path to env file to use when creating a new shell"`
+-	Rm                 bool   `help:"remove the sandbox after the command terminates"`
+-	AllowedDomainsFile string `placeholder:"<file-path>" help:"path to allowed-domains.txt file for DNS egress filtering (overrides the init image default)"`
++	ImageName          string   `short:"i" placeholder:"<container-image-name>" help:"name of container image to use"`
++	CloneFromDir       string   `short:"d" placeholder:"<project-dir>" help:"directory to clone into the sandbox. Defaults to current working directory, if unset."`
++	EnvFile            string   `short:"e" default:".env" placholder:"<file-path>" help:"path to env file to use when creating a new shell"`
++	Rm                 bool     `help:"remove the sandbox after the command terminates"`
++	AllowedDomainsFile string   `placeholder:"<file-path>" help:"path to allowed-domains.txt file for DNS egress filtering (overrides the init image default)"`
++	Volume             []string `short:"v" placeholder:"<host-path:container-path>" help:"bind mount a volume (can be specified multiple times)"`
+ }
+ 
+ // SandboxNameFlag is shared by commands that require a single sandbox name argument.
+diff --git a/cli/cli_flag_parse_test.go b/cli/cli_flag_parse_test.go
+index 6dc35c4..bf0c05e 100644
+--- a/cli/cli_flag_parse_test.go
++++ b/cli/cli_flag_parse_test.go
+@@ -244,3 +244,37 @@ func TestRmCmdAll(t *testing.T) {
+ 		t.Error("expected All=true")
+ 	}
+ }
++
++func TestSandboxCreationFlagsVolume(t *testing.T) {
++	var cli struct {
++		SandboxCreationFlags `embed:""`
++	}
++	kongParse(t, &cli, []string{
++		"-v", "/host/path:/container/path",
++	})
++	if len(cli.Volume) != 1 {
++		t.Fatalf("expected 1 volume, got %d", len(cli.Volume))
++	}
++	if cli.Volume[0] != "/host/path:/container/path" {
++		t.Errorf("expected Volume /host/path:/container/path, got %q", cli.Volume[0])
++	}
++}
++
++func TestSandboxCreationFlagsMultipleVolumes(t *testing.T) {
++	var cli struct {
++		SandboxCreationFlags `embed:""`
++	}
++	kongParse(t, &cli, []string{
++		"-v", "/path1:/mount1",
++		"--volume", "/path2:/mount2",
++	})
++	if len(cli.Volume) != 2 {
++		t.Fatalf("expected 2 volumes, got %d", len(cli.Volume))
++	}
++	if cli.Volume[0] != "/path1:/mount1" {
++		t.Errorf("expected first volume /path1:/mount1, got %q", cli.Volume[0])
++	}
++	if cli.Volume[1] != "/path2:/mount2" {
++		t.Errorf("expected second volume /path2:/mount2, got %q", cli.Volume[1])
++	}
++}
+diff --git a/cli/exec_cmd.go b/cli/exec_cmd.go
+index 58ec612..b05516a 100644
+--- a/cli/exec_cmd.go
++++ b/cli/exec_cmd.go
+@@ -53,6 +53,7 @@ func (c *ExecCmd) Run(cctx *CLIContext) error {
+ 			CloneFromDir: c.CloneFromDir,
+ 			ImageName:    c.ImageName,
+ 			EnvFile:      c.EnvFile,
++			Volumes:      c.Volume,
+ 		})
+ 		if err != nil {
+ 			slog.ErrorContext(ctx, "CreateSandbox", "error", err)
+diff --git a/cli/new_cmd.go b/cli/new_cmd.go
+index 24778d8..2ce76bf 100644
+--- a/cli/new_cmd.go
++++ b/cli/new_cmd.go
+@@ -117,6 +117,7 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
+ 			EnvFile:        c.EnvFile,
+ 			Cloner:         c.Cloner,
+ 			AllowedDomains: allowedDomains,
++			Volumes:        c.Volume,
+ 		})
+ 		if err != nil {
+ 			slog.ErrorContext(ctx, "CreateSandbox", "error", err)
+diff --git a/daemon/daemon_server.go b/daemon/daemon_server.go
+index ed5817f..0d0715e 100644
+--- a/daemon/daemon_server.go
++++ b/daemon/daemon_server.go
+@@ -551,6 +551,7 @@ type CreateSandboxOpts struct {
+ 	EnvFile        string   `json:"envFile,omitempty"`
+ 	Cloner         string   `json:"cloner,omitempty"`
+ 	AllowedDomains []string `json:"allowedDomains,omitempty"`
++	Volumes        []string `json:"volumes,omitempty"`
+ }
+ 
+ // createSandbox creates a new sandbox and starts its container.
+@@ -561,7 +562,7 @@ func (d *Daemon) createSandbox(ctx context.Context, opts CreateSandboxOpts) (*sa
+ 	}
+ 	slog.InfoContext(ctx, "CreateSandbox", "agentType", agentType)
+ 
+-	sbox, err := d.boxer.NewSandbox(ctx, agentType, opts.ID, opts.CloneFromDir, opts.ImageName, opts.EnvFile, opts.AllowedDomains)
++	sbox, err := d.boxer.NewSandbox(ctx, agentType, opts.ID, opts.CloneFromDir, opts.ImageName, opts.EnvFile, opts.AllowedDomains, opts.Volumes)
+ 	if err != nil {
+ 		return nil, err
+ 	}
+diff --git a/daemon/internal/boxer/boxer.go b/daemon/internal/boxer/boxer.go
+index e753207..8351c1f 100644
+--- a/daemon/internal/boxer/boxer.go
++++ b/daemon/internal/boxer/boxer.go
+@@ -130,7 +130,7 @@ func (b *Boxer) SyncBox(ctx context.Context, sb *sandtypes.Box) error {
+ // NewSandbox creates a new sandbox based on a clone of hostWorkDir.
+ // TODO: clone envFile, if it exists, into the sandbox clone so every command exec'd in that sandbox container
+ // uses the same env file, even if the original .env file has changed on the host machine.
+-func (sb *Boxer) NewSandbox(ctx context.Context, agentType, id, hostWorkDir, imageName, envFile string, allowedDomains []string) (*sandtypes.Box, error) {
++func (sb *Boxer) NewSandbox(ctx context.Context, agentType, id, hostWorkDir, imageName, envFile string, allowedDomains, volumes []string) (*sandtypes.Box, error) {
+ 	slog.InfoContext(ctx, "Boxer.NewSandbox", "hostWorkDir", hostWorkDir, "id", id, "agentType", agentType)
+ 
+ 	// Get agent configuration from registry
+@@ -194,6 +194,7 @@ func (sb *Boxer) NewSandbox(ctx context.Context, agentType, id, hostWorkDir, ima
+ 		ImageName:      imageName,
+ 		EnvFile:        envFile,
+ 		AllowedDomains: allowedDomains,
++		Volumes:        volumes,
+ 		Mounts:         append(mounts, sshKeysMountSpec),
+ 		ContainerHooks: hooks,
+ 		Keys:           keys,
+@@ -460,6 +461,7 @@ func (sber *Boxer) CreateContainer(ctx context.Context, sb *sandtypes.Box) error
+ 		DNSDomain: sb.DNSDomain,
+ 		Remove:    false,
+ 		Mount:     mountOpts,
++		Volume:    sb.Volumes,
+ 	}
+ 	if len(sb.AllowedDomains) > 0 {
+ 		mgmtOpts.InitImage = runtimedeps.CustomInitImage
+diff --git a/daemon/internal/boxer/boxer_integration_test.go b/daemon/internal/boxer/boxer_integration_test.go
+index d5e4bbb..8437207 100644
+--- a/daemon/internal/boxer/boxer_integration_test.go
++++ b/daemon/internal/boxer/boxer_integration_test.go
+@@ -239,7 +239,7 @@ func TestBoxer_NewSandbox_EndToEnd(t *testing.T) {
+ 		})
+ 
+ 		hostWorkDir := t.TempDir()
+-		result, err := boxer.NewSandbox(ctx, "test-agent", "test-sandbox", hostWorkDir, "test-image:latest", "", nil)
++		result, err := boxer.NewSandbox(ctx, "test-agent", "test-sandbox", hostWorkDir, "test-image:latest", "", nil, nil)
+ 		if err != nil {
+ 			t.Fatalf("NewSandbox() error = %v", err)
+ 		}
+@@ -290,7 +290,7 @@ func TestBoxer_NewSandbox_EndToEnd(t *testing.T) {
+ 			Configuration: testConfig,
+ 		})
+ 
+-		_, err := boxer.NewSandbox(ctx, "test-error-agent", "test-sandbox", "/host/work", "test-image", "", nil)
++		_, err := boxer.NewSandbox(ctx, "test-error-agent", "test-sandbox", "/host/work", "test-image", "", nil, nil)
+ 		if err == nil {
+ 			t.Fatal("Expected error from preparation, got nil")
+ 		}
+diff --git a/sandtypes/box.go b/sandtypes/box.go
+index e0859cb..50c129c 100644
+--- a/sandtypes/box.go
++++ b/sandtypes/box.go
+@@ -35,6 +35,8 @@ type Box struct {
+ 	AllowedDomains []string
+ 	// Mounts defines bind mounts that should be attached when creating the container.
+ 	Mounts []MountSpec
++	// Volumes defines volume mounts in host:container format, passed directly to the container runtime.
++	Volumes []string
+ 	// SandboxWorkDirError and SandboxContainerError are the most recently updated error states of the sandbox
+ 	// work dir and container instance. In-memory only. Updated once either at
+ 	// server startup or sandbox creation time, and then updated periodically thereafter.
+-- 
+2.52.0
+

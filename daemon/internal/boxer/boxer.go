@@ -130,7 +130,7 @@ func (b *Boxer) SyncBox(ctx context.Context, sb *sandtypes.Box) error {
 // NewSandbox creates a new sandbox based on a clone of hostWorkDir.
 // TODO: clone envFile, if it exists, into the sandbox clone so every command exec'd in that sandbox container
 // uses the same env file, even if the original .env file has changed on the host machine.
-func (sb *Boxer) NewSandbox(ctx context.Context, agentType, id, hostWorkDir, imageName, envFile string, allowedDomains []string) (*sandtypes.Box, error) {
+func (sb *Boxer) NewSandbox(ctx context.Context, agentType, id, hostWorkDir, imageName, envFile string, allowedDomains, volumes []string) (*sandtypes.Box, error) {
 	slog.InfoContext(ctx, "Boxer.NewSandbox", "hostWorkDir", hostWorkDir, "id", id, "agentType", agentType)
 
 	// Get agent configuration from registry
@@ -194,6 +194,7 @@ func (sb *Boxer) NewSandbox(ctx context.Context, agentType, id, hostWorkDir, ima
 		ImageName:      imageName,
 		EnvFile:        envFile,
 		AllowedDomains: allowedDomains,
+		Volumes:        volumes,
 		Mounts:         append(mounts, sshKeysMountSpec),
 		ContainerHooks: hooks,
 		Keys:           keys,
@@ -452,7 +453,7 @@ func (sber *Boxer) CreateContainer(ctx context.Context, sb *sandtypes.Box) error
 		mountOpts = append(mountOpts, m.String())
 	}
 
-	vols := []string{filepath.Join(sber.appRoot, "containersockets", sb.ID) + ":/run/host-services/sandd.sock"}
+	sb.Volumes = append(sb.Volumes, filepath.Join(sber.appRoot, "containersockets", sb.ID)+":/run/host-services/sandd.sock")
 
 	mgmtOpts := options.ManagementOptions{
 		// TODO: Try to name the container after the sandbox, and handle collisions
@@ -462,7 +463,7 @@ func (sber *Boxer) CreateContainer(ctx context.Context, sb *sandtypes.Box) error
 		DNSDomain: sb.DNSDomain,
 		Remove:    false,
 		Mount:     mountOpts,
-		Volume:    vols,
+		Volume:    sb.Volumes,
 	}
 
 	if len(sb.AllowedDomains) > 0 {
