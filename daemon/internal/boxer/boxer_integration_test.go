@@ -192,7 +192,7 @@ func newTestBoxer(t *testing.T, containerOps hostops.ContainerOps, imageOps host
 	t.Cleanup(func() { boxer.Close() })
 
 	boxer.ContainerService = containerOps
-	boxer.ImageService = imageOps
+	boxer.imageService = imageOps
 	boxer.gitOps = &mockGitOps{}
 	boxer.fileOps = &mockFileOps{
 		lstatFunc: func(path string) (os.FileInfo, error) {

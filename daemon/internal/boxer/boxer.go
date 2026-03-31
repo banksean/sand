@@ -40,7 +40,7 @@ type Boxer struct {
 	sqlDB            *sql.DB
 	queries          *db.Queries
 	ContainerService hostops.ContainerOps
-	ImageService     hostops.ImageOps
+	imageService     hostops.ImageOps
 	gitOps           hostops.GitOps
 	fileOps          hostops.FileOps
 	sshim            *sshimmer.LocalSSHimmer
@@ -73,7 +73,7 @@ func NewBoxer(appRoot, localDomain string, terminalWriter io.Writer) (*Boxer, er
 		sqlDB:            sqlDB,
 		queries:          db.New(sqlDB),
 		ContainerService: hostops.NewAppleContainerOps(),
-		ImageService:     hostops.NewAppleImageOps(),
+		imageService:     hostops.NewAppleImageOps(),
 		gitOps:           hostops.NewDefaultGitOps(),
 		fileOps:          fileOps,
 		sshim:            sshim,
@@ -497,7 +497,7 @@ func (sber *Boxer) CreateContainer(ctx context.Context, sb *sandtypes.Box) error
 
 func (sber *Boxer) checkImageHasEntrypoint(ctx context.Context, imageName string) error {
 	if imageName != "" {
-		img, err := sber.ImageService.Inspect(ctx, imageName)
+		img, err := sber.imageService.Inspect(ctx, imageName)
 		if err != nil {
 			return err
 		}
@@ -584,7 +584,7 @@ func (sber *Boxer) executeHooks(ctx context.Context, sb *sandtypes.Box, hooks []
 func (sb *Boxer) EnsureImage(ctx context.Context, imageName string) error {
 	slog.InfoContext(ctx, "Boxer.EnsureImage", "imageName", imageName)
 
-	images, err := sb.ImageService.List(ctx)
+	images, err := sb.imageService.List(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to list images: %w", err)
 	}
@@ -607,7 +607,7 @@ func (sb *Boxer) pullImage(ctx context.Context, imageName string) error {
 	sb.messenger.Message(ctx, fmt.Sprintf("This may take a while: pulling container image %s...", imageName))
 	start := time.Now()
 
-	waitFn, err := sb.ImageService.Pull(ctx, imageName)
+	waitFn, err := sb.imageService.Pull(ctx, imageName)
 	defer func() {
 		if waitFn != nil {
 			waitFn()
