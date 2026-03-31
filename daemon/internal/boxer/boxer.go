@@ -453,8 +453,7 @@ func (sber *Boxer) CreateContainer(ctx context.Context, sb *sandtypes.Box) error
 		mountOpts = append(mountOpts, m.String())
 	}
 
-	vols := []string{filepath.Join(sber.appRoot, "containersockets", sb.ID) + ":/run/host-services/sandd.sock"}
-	sb.Volumes = append(sb.Volumes, vols...)
+	sb.Volumes = append(sb.Volumes, filepath.Join(sber.appRoot, "containersockets", sb.ID)+":/run/host-services/sandd.sock")
 
 	mgmtOpts := options.ManagementOptions{
 		// TODO: Try to name the container after the sandbox, and handle collisions
