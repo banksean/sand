@@ -32,6 +32,7 @@ type Outie struct {
 	Ls                 cli.LsCmd                 `cmd:"" help:"list sandboxes"`
 	Rm                 cli.RmCmd                 `cmd:"" help:"remove sandbox container and its clone directory"`
 	Stop               cli.StopCmd               `cmd:"" help:"stop sandbox container"`
+	Start              cli.StartCmd              `cmd:"" help:"start sandbox container"`
 	Git                cli.GitCmd                `cmd:"" help:"git operations with sandboxes"`
 	Doc                DocCmd                    `cmd:"" help:"print complete command help formatted as markdown"`
 	Version            cli.VersionCmd            `cmd:"" help:"print version infomation about this command"`

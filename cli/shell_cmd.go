@@ -38,6 +38,20 @@ func (c *ShellCmd) Run(cctx *CLIContext) error {
 	// This will only work on the *host* OS, since it makes calls to apple's container service.
 	// TODO: Sort out how "new" and "shell" should work when invoked inside a container.
 	containerSvc := hostops.NewAppleContainerOps()
+
+	ctrs, err := containerSvc.Inspect(ctx, sbox.ContainerID)
+	if err != nil {
+		slog.ErrorContext(ctx, "containerSvc.Inspect", "containerID", sbox.ContainerID, "error", err)
+		return err
+	}
+
+	// TODO: Make containerSvc.Inspect just return a single value instead of a slice.
+	if ctrs[0].Status != "running" {
+		if err := mc.StartSandbox(ctx, sbox.ID); err != nil {
+			return fmt.Errorf("could not start container for %s: %w", sbox.ID, err)
+		}
+	}
+
 	wait, err := containerSvc.ExecStream(ctx,
 		&options.ExecContainer{
 			ProcessOptions: options.ProcessOptions{

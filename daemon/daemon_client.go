@@ -27,6 +27,7 @@ type Client interface {
 	GetSandbox(ctx context.Context, id string) (*sandtypes.Box, error)
 	RemoveSandbox(ctx context.Context, id string) error
 	StopSandbox(ctx context.Context, id string) error
+	StartSandbox(ctx context.Context, id string) error
 	ExportImage(ctx context.Context, id, imageName string) error
 	VSC(ctx context.Context, id string) error
 	CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*sandtypes.Box, error)
@@ -79,7 +80,7 @@ func (m *defaultClient) doRequest(ctx context.Context, method, path string, body
 
 	resp, err := m.httpClient.Do(req)
 	if err != nil {
-		slog.ErrorContext(ctx, "defaultClient.doRequest", "error", err)
+		slog.ErrorContext(ctx, "defaultClient.doRequest", "req", req, "error", err)
 		return fmt.Errorf("couldn't complete request to daemon: %w", err)
 	}
 	defer resp.Body.Close()
@@ -156,6 +157,10 @@ func (m *defaultClient) RemoveSandbox(ctx context.Context, id string) error {
 
 func (m *defaultClient) StopSandbox(ctx context.Context, id string) error {
 	return m.doRequest(ctx, http.MethodPost, "/stop", map[string]string{"id": id}, nil)
+}
+
+func (m *defaultClient) StartSandbox(ctx context.Context, id string) error {
+	return m.doRequest(ctx, http.MethodPost, "/start", map[string]string{"id": id}, nil)
 }
 
 func (m *defaultClient) VSC(ctx context.Context, id string) error {

@@ -166,15 +166,16 @@ func (d *Daemon) serveOutieSocket(ctx context.Context) {
 	mux := http.NewServeMux()
 
 	// Register handlers
-	mux.HandleFunc("/shutdown", d.handleShutdown)
-	mux.HandleFunc("/ping", d.handlePing)
-	mux.HandleFunc("/version", d.handleVersion)
-	mux.HandleFunc("/list", d.handleList)
-	mux.HandleFunc("/get", d.handleGet)
-	mux.HandleFunc("/remove", d.handleRemove)
-	mux.HandleFunc("/stop", d.handleStop)
-	mux.HandleFunc("/create", d.handleCreate)
-	mux.HandleFunc("/export", d.handleExport)
+	mux.HandleFunc("/shutdown", slogHandler(d.handleShutdown))
+	mux.HandleFunc("/ping", slogHandler(d.handlePing))
+	mux.HandleFunc("/version", slogHandler(d.handleVersion))
+	mux.HandleFunc("/list", slogHandler(d.handleList))
+	mux.HandleFunc("/get", slogHandler(d.handleGet))
+	mux.HandleFunc("/remove", slogHandler(d.handleRemove))
+	mux.HandleFunc("/stop", slogHandler(d.handleStop))
+	mux.HandleFunc("/start", slogHandler(d.handleStart))
+	mux.HandleFunc("/create", slogHandler(d.handleCreate))
+	mux.HandleFunc("/export", slogHandler(d.handleExport))
 
 	server := &http.Server{
 		Handler: mux,
@@ -420,6 +421,25 @@ func (d *Daemon) handleStop(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]string{"status": "ok"})
 }
 
+func (d *Daemon) handleStart(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	sandboxID, err := sandboxIDOf(r)
+	if err != nil {
+		writeJSONError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	if err := d.StartSandbox(r.Context(), sandboxID); err != nil {
+		writeJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string]string{"status": "ok"})
+}
+
 func (d *Daemon) handleCreate(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -556,6 +576,27 @@ func (d *Daemon) StopSandbox(ctx context.Context, id string) error {
 	}
 
 	return d.boxer.StopContainer(ctx, sbox)
+}
+
+// StartSandbox starts a single sandbox container.
+func (d *Daemon) StartSandbox(ctx context.Context, id string) error {
+	sbox, err := d.boxer.Get(ctx, id)
+	if err != nil {
+		return err
+	}
+	if sbox == nil {
+		return fmt.Errorf("sandbox not found: %s", id)
+	}
+	socketPath := filepath.Join(d.AppBaseDir, "containersockets", id)
+	// Don't care about errors, e.g. socketPath already does not exist:
+	os.Remove(socketPath)
+	unixListener, err := net.Listen("unix", socketPath)
+	if err != nil {
+		return fmt.Errorf("createSandbox couldn't open container socket %s: %w", socketPath, err)
+	}
+	go d.serveInnieSocket(ctx, id, unixListener)
+
+	return d.boxer.StartContainer(ctx, sbox)
 }
 
 type CreateSandboxOpts struct {
