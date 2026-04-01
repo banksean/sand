@@ -83,8 +83,13 @@ type DNS struct {
 }
 
 type ContainerNetwork struct {
-	Options map[string]string `json:"options"`
-	Network string            `json:"network"`
+	Options NetowrkOptions `json:"options"`
+	Network string         `json:"network"`
+}
+
+type NetowrkOptions struct {
+	Hostname string `json:"hostname,omitempty"`
+	MTU      int    `json:"mtu,omitempty"`
 }
 
 type Image struct {
@@ -205,8 +210,8 @@ func GetContainerHostname(ctr *Container) string {
 	}
 	for _, n := range ctr.Configuration.Networks {
 		if n.Network == "default" {
-			if h, ok := n.Options["hostname"]; ok {
-				hostname = h
+			if n.Options.Hostname != "" {
+				hostname = n.Options.Hostname
 			}
 		}
 	}

@@ -37,6 +37,8 @@ func (c *StartCmd) Run(cctx *CLIContext) error {
 			sb, err := mc.GetSandbox(ctx, id)
 			if err != nil {
 				slog.ErrorContext(ctx, "GetSandbox", "error", err, "id", id)
+				errChan <- err
+				return
 			}
 			if sb.Container.Status == "running" {
 				fmt.Printf("%s is already running\n", id)

@@ -356,10 +356,12 @@ func (d *Daemon) handleGet(w http.ResponseWriter, r *http.Request) {
 	}
 	sbox, err := d.GetSandbox(r.Context(), sandboxID)
 	if err != nil {
+		slog.ErrorContext(r.Context(), "Daemon.handleGet d.GetSandbox", "error", err)
 		writeJSONError(w, fmt.Errorf("couldn't get sandbox ID %s", sandboxID), http.StatusInternalServerError)
 		return
 	}
 	if sbox == nil {
+		slog.ErrorContext(r.Context(), "Daemon.handleGet d.GetSandbox returned nil", "id", sandboxID)
 		writeJSONError(w, fmt.Errorf("got a nil sandbox for ID %s", sandboxID), http.StatusInternalServerError)
 		return
 	}
@@ -376,6 +378,7 @@ func (d *Daemon) handleGet(w http.ResponseWriter, r *http.Request) {
 
 	ctr, err := d.boxer.GetContainer(r.Context(), sbox.ContainerID)
 	if err != nil {
+		slog.ErrorContext(r.Context(), "Daemon.handleGet boxer.GetContainer", "error", err)
 		http.Error(w, "couldn't get container", http.StatusInternalServerError)
 		return
 	}
