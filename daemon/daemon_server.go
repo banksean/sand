@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/banksean/sand/applecontainer/options"
 	"github.com/banksean/sand/applecontainer/types"
 	"github.com/banksean/sand/daemon/internal/boxer"
 	"github.com/banksean/sand/sandtypes"
@@ -173,6 +174,7 @@ func (d *Daemon) serveOutieSocket(ctx context.Context) {
 	mux.HandleFunc("/remove", d.handleRemove)
 	mux.HandleFunc("/stop", d.handleStop)
 	mux.HandleFunc("/create", d.handleCreate)
+	mux.HandleFunc("/export", d.handleExport)
 
 	server := &http.Server{
 		Handler: mux,
@@ -242,6 +244,8 @@ func (d *Daemon) serveInnieSocket(ctx context.Context, sandboxID string, unixLis
 	mux.HandleFunc("/create", slogHandler(fromSandbox(sandboxID, d.handleCreate)))
 	mux.HandleFunc("/vsc", slogHandler(fromSandbox(sandboxID, d.handleVSC)))
 	mux.HandleFunc("/sandbox-config", slogHandler(fromSandbox(sandboxID, d.handleSandboxConfig)))
+	mux.HandleFunc("/export", slogHandler(fromSandbox(sandboxID, d.handleExport)))
+
 	mux.HandleFunc("/", slogHandler(fromSandbox(sandboxID, func(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 	})))
@@ -288,6 +292,24 @@ func (d *Daemon) handleShutdown(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(100 * time.Millisecond)
 		d.Shutdown(r.Context())
 	}()
+}
+
+func (d *Daemon) handleExport(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	var args struct {
+		ID        string `json:"id"`
+		ImageName string `json:"imageName"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&args); err != nil {
+		writeJSONError(w, err, http.StatusBadRequest)
+		return
+	}
+	ctxID, ok := ctx.Value(containerIDKey).(string)
+	if ok {
+		args.ID = ctxID
+	}
+
+	d.boxer.ContainerService.Export(ctx, &options.ExportContainer{Image: args.ImageName}, args.ID)
 }
 
 func (d *Daemon) handlePing(w http.ResponseWriter, r *http.Request) {

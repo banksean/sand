@@ -27,6 +27,7 @@ type Client interface {
 	GetSandbox(ctx context.Context, id string) (*sandtypes.Box, error)
 	RemoveSandbox(ctx context.Context, id string) error
 	StopSandbox(ctx context.Context, id string) error
+	ExportImage(ctx context.Context, id, imageName string) error
 	VSC(ctx context.Context, id string) error
 	CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*sandtypes.Box, error)
 }
@@ -40,7 +41,6 @@ type defaultClient struct {
 
 func NewUnixSocketClient(ctx context.Context, appBaseDir string) (Client, error) {
 	httpClient := &http.Client{
-		Timeout: 30 * time.Second,
 		Transport: &http.Transport{
 			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 				return net.Dial("unix", filepath.Join(appBaseDir, defaultSocketFile))
@@ -168,6 +168,14 @@ func (m *defaultClient) CreateSandbox(ctx context.Context, opts CreateSandboxOpt
 		return nil, err
 	}
 	return &box, nil
+}
+
+func (m *defaultClient) ExportImage(ctx context.Context, id string, imageName string) error {
+	if err := m.doRequest(ctx, http.MethodPost, "/export", map[string]string{"id": id, "imageName": imageName}, nil); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // EnsureDaemon attempts to verify that the sandd daemon is running, and if not,

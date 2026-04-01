@@ -6,6 +6,7 @@ import (
 
 type ExportCmd struct {
 	SandboxNameFlag
+	ImageName string `short:"i" placeholder:"<container-image-name>" help:"name of container image to export"`
 }
 
 const expectedStatus = "stopped"
@@ -22,5 +23,7 @@ func (c *ExportCmd) Run(cctx *CLIContext) error {
 		return fmt.Errorf("sandbox container %s is in state %q, but this command only works with %q", c.SandboxName, sb.Container.Status, expectedStatus)
 	}
 
-	return nil
+	err = mc.ExportImage(ctx, c.SandboxName, c.ImageName)
+
+	return err
 }

@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"github.com/alecthomas/kong"
 	"github.com/banksean/sand/cli"
@@ -22,6 +23,7 @@ type Outie struct {
 	LogFile    string                    `default:"/tmp/sand/outie/log" placeholder:"<log-file-path>" help:"location of log file (leave empty for a random tmp/ path)"`
 	LogLevel   string                    `default:"info" placeholder:"<debug|info|warn|error>" help:"the logging level (debug, info, warn, error)"`
 	AppBaseDir string                    `default:"" placeholder:"<app-base-dir>" help:"root dir to store sandbox clones of working directories. Leave unset to use '~/Library/Application Support/Sand'"`
+	Timeout    time.Duration             `default:"0s" help:"if set to anything other than 0s, overrides the default timeout for an operation"`
 	Completion kongcompletion.Completion `cmd:"" help:"Outputs shell code for initialising tab completions"`
 
 	New                cli.NewCmd                `cmd:"" help:"create a new sandbox and shell into its container"`
@@ -160,6 +162,10 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create sandd client, error: %v\n", err)
 		os.Exit(1)
+	}
+	if app.Timeout != 0 {
+		ctx, cancel = context.WithTimeout(ctx, app.Timeout)
+		defer cancel()
 	}
 	err = kongCtx.Run(&cli.CLIContext{
 		Daemon:     mc,

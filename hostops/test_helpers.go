@@ -16,6 +16,12 @@ type MockContainerOps struct {
 	ExecFunc       func(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, args ...string) (string, error)
 	ExecStreamFunc func(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, stdin io.Reader, stdout, stderr io.Writer, cmdArgs ...string) (func() error, error)
 	InspectFunc    func(ctx context.Context, containerID string) ([]types.Container, error)
+	ExportFunc     func(ctx context.Context, containerID, image string) (string, error)
+}
+
+// Export implements [ContainerOps].
+func (m *MockContainerOps) Export(ctx context.Context, opts *options.ExportContainer, imageName string) (string, error) {
+	panic("unimplemented")
 }
 
 func (m *MockContainerOps) Create(ctx context.Context, opts *options.CreateContainer, image string, args []string) (string, error) {

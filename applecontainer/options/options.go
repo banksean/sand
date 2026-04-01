@@ -112,6 +112,10 @@ type ExecContainer struct {
 	ProcessOptions
 }
 
+type ExportContainer struct {
+	Image string `flag:"--image"`
+}
+
 type ManagementOptions struct {
 	// Arch sets arch if image can target multiple architectures (default: arm64)
 	Arch string `flag:"--arch"`

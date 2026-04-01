@@ -223,3 +223,17 @@ func (c *ContainerSvc) Kill(ctx context.Context, opts *options.KillContainer, id
 	}
 	return strings.TrimSpace(string(output)), nil
 }
+
+func (c *ContainerSvc) Export(ctx context.Context, opts *options.ExportContainer, id string) (string, error) {
+	args := options.ToArgs(opts)
+	args = append(args, id)
+	cmd := exec.CommandContext(ctx, "container", append([]string{"export"}, args...)...)
+	slog.InfoContext(ctx, "ContainerSvc.Export", "cmd", strings.Join(cmd.Args, " "))
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		slog.ErrorContext(ctx, "ContainerSvc.Export", "error", err, "out", string(out))
+		return string(out), err
+	}
+
+	return string(out), nil
+}
