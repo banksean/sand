@@ -10,6 +10,7 @@ Requires apple container CLI: https://github.com/apple/container/releases/tag/0.
 - `--log-file` _`<log-file-path>`_ - location of log file (leave empty for a random tmp/ path) (default: `/tmp/sand/outie/log`)
 - `--log-level` _`<debug|info|warn|error>`_ - the logging level (debug, info, warn, error) (default: `info`)
 - `--app-base-dir` _`<app-base-dir>`_ - root dir to store sandbox clones of working directories. Leave unset to use '~/Library/Application Support/Sand'
+- `--timeout` _`0s`_ - if set to anything other than 0s, overrides the default timeout for an operation (default: `0s`)
 
 ## Subcommands
 
@@ -39,10 +40,12 @@ sand new [flags] [SANDBOX-NAME]
 
 **Flags:**
 
-- `-i, --image-name` _`<container-image-name>`_ - name of container image to use (default: `ghcr.io/banksean/sand/default:latest`)
+- `-i, --image-name` _`<container-image-name>`_ - name of container image to use
 - `-d, --clone-from-dir` _`<project-dir>`_ - directory to clone into the sandbox. Defaults to current working directory, if unset.
 - `-e, --env-file` _`".env"`_ - path to env file to use when creating a new shell (default: `.env`)
 - `--rm` - remove the sandbox after the command terminates
+- `--allowed-domains-file` _`<file-path>`_ - path to allowed-domains.txt file for DNS egress filtering (overrides the init image default)
+- `-v, --volume` _`<host-path:container-path>,...`_ - bind mount a volume (can be specified multiple times)
 - `-s, --shell` _`<shell-command>`_ - shell command to exec in the container (default: `/bin/zsh`)
 - `-c, --cloner` _`<claude|default|opencode>`_ - name of workspace cloner to use (default: `default`)
 - `-b, --branch` - create a new git branch inside the sandbox _container_ (not on your host workdir)
@@ -74,10 +77,12 @@ sand exec [flags] <SANDBOX-NAME> <ARG>...
 
 **Flags:**
 
-- `-i, --image-name` _`<container-image-name>`_ - name of container image to use (default: `ghcr.io/banksean/sand/default:latest`)
+- `-i, --image-name` _`<container-image-name>`_ - name of container image to use
 - `-d, --clone-from-dir` _`<project-dir>`_ - directory to clone into the sandbox. Defaults to current working directory, if unset.
 - `-e, --env-file` _`".env"`_ - path to env file to use when creating a new shell (default: `.env`)
 - `--rm` - remove the sandbox after the command terminates
+- `--allowed-domains-file` _`<file-path>`_ - path to allowed-domains.txt file for DNS egress filtering (overrides the init image default)
+- `-v, --volume` _`<host-path:container-path>,...`_ - bind mount a volume (can be specified multiple times)
 
 ## `sand ls`
 
@@ -191,4 +196,28 @@ launch a vscode remote window connected to the sandbox's container
 ```
 sand vsc <SANDBOX-NAME>
 ```
+
+## `sand install-ebpf-support`
+
+install the BPFFS-enabled kernel build
+
+**Usage:**
+
+```
+sand install-ebpf-support
+```
+
+## `sand export-image`
+
+export a container image based on a stopped sandbox
+
+**Usage:**
+
+```
+sand export-image [flags] <SANDBOX-NAME>
+```
+
+**Flags:**
+
+- `-i, --image-name` _`<container-image-name>`_ - name of container image to export
 
