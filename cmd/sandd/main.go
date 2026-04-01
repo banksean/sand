@@ -28,7 +28,7 @@ import (
 
 type App struct {
 	AppBaseDir string
-	//HTTPPort   string
+	// HTTPPort   string
 	LogFile   string
 	LogLevel  string
 	CloneRoot string

@@ -477,7 +477,6 @@ func (sber *Boxer) CreateContainer(ctx context.Context, sb *sandtypes.Box) error
 
 	containerID, err := sber.ContainerService.Create(ctx,
 		&options.CreateContainer{
-
 			ProcessOptions: options.ProcessOptions{
 				Interactive: true,
 				TTY:         true,
