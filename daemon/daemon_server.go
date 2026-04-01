@@ -581,6 +581,23 @@ func (d *Daemon) StopSandbox(ctx context.Context, id string) error {
 	return d.boxer.StopContainer(ctx, sbox)
 }
 
+func (d *Daemon) createContainerSocket(ctx context.Context, id string) (net.Listener, error) {
+	socketsDir := filepath.Join(d.AppBaseDir, "containersockets")
+	slog.InfoContext(ctx, "Daemon.createContainerSocket", "socketsDir", socketsDir)
+	if err := os.MkdirAll(socketsDir, 0o777); err != nil {
+		return nil, err
+	}
+	socketPath := filepath.Join(socketsDir, id)
+	slog.InfoContext(ctx, "Daemon.createContainerSocket", "socketPath", socketPath)
+	// Don't care about errors, e.g. socketPath already does not exist:
+	os.Remove(socketPath)
+	unixListener, err := net.Listen("unix", socketPath)
+	if err != nil {
+		return nil, fmt.Errorf("createSandbox couldn't open container socket %s: %w", socketPath, err)
+	}
+	return unixListener, nil
+}
+
 // StartSandbox starts a single sandbox container.
 func (d *Daemon) StartSandbox(ctx context.Context, id string) error {
 	sbox, err := d.boxer.Get(ctx, id)
@@ -590,12 +607,9 @@ func (d *Daemon) StartSandbox(ctx context.Context, id string) error {
 	if sbox == nil {
 		return fmt.Errorf("sandbox not found: %s", id)
 	}
-	socketPath := filepath.Join(d.AppBaseDir, "containersockets", id)
-	// Don't care about errors, e.g. socketPath already does not exist:
-	os.Remove(socketPath)
-	unixListener, err := net.Listen("unix", socketPath)
+	unixListener, err := d.createContainerSocket(ctx, id)
 	if err != nil {
-		return fmt.Errorf("createSandbox couldn't open container socket %s: %w", socketPath, err)
+		return err
 	}
 	go d.serveInnieSocket(ctx, id, unixListener)
 
@@ -628,10 +642,9 @@ func (d *Daemon) createSandbox(ctx context.Context, opts CreateSandboxOpts) (*sa
 	ctr, err := d.boxer.GetContainer(ctx, sbox.ContainerID)
 
 	if ctr == nil {
-		socketPath := filepath.Join(d.AppBaseDir, "containersockets", opts.ID)
-		unixListener, err := net.Listen("unix", socketPath)
+		unixListener, err := d.createContainerSocket(ctx, opts.ID)
 		if err != nil {
-			return nil, fmt.Errorf("createSandbox couldn't open container socket %s: %w", socketPath, err)
+			return nil, err
 		}
 		go d.serveInnieSocket(ctx, opts.ID, unixListener)
 

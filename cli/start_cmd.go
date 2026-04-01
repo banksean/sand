@@ -40,6 +40,9 @@ func (c *StartCmd) Run(cctx *CLIContext) error {
 				errChan <- err
 				return
 			}
+			if sb.Container == nil {
+				fmt.Printf("%s has no container\n", id)
+			}
 			if sb.Container.Status == "running" {
 				fmt.Printf("%s is already running\n", id)
 				return
