@@ -2,15 +2,14 @@ package cli
 
 import (
 	"bufio"
-	"context"
 	"fmt"
 	"log/slog"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/banksean/sand/applecontainer"
 	"github.com/banksean/sand/applecontainer/options"
 	"github.com/banksean/sand/applecontainer/types"
 	"github.com/banksean/sand/daemon"
@@ -84,11 +83,29 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 			c.ImageName = DefaultImageName
 		}
 	}
-
 	// Check to make sure c.ImageName is already pulled and available first, so we
 	// don't block creating the new container on downloading the image for it.
-	if err := verifyImageIsPulled(cctx.Context, c.ImageName); err != nil {
-		return fmt.Errorf("missing container image: run `container image pull %s`", c.ImageName)
+	exists, err := runtimedeps.CheckImageExistsLocally(cctx.Context, c.ImageName)
+	if err != nil {
+		return fmt.Errorf("error checking for container image %s: %w ", c.ImageName, err)
+	}
+	if !exists {
+		fmt.Printf("Pulling image %s...", c.ImageName)
+		applecontainer.Images.Pull(ctx, c.ImageName)
+	}
+	isLatest, err := runtimedeps.CheckImageIsLatest(ctx, c.ImageName)
+	if err != nil {
+		return fmt.Errorf("checking for latest version of %s: %w", c.ImageName, err)
+	}
+	if !isLatest {
+		fmt.Printf("Local image digest doesn't match latest remote digest, pulling %s\n", c.ImageName)
+		wait, err := applecontainer.Images.Pull(ctx, c.ImageName)
+		if err != nil {
+			return fmt.Errorf("pulling %s: %w", c.ImageName, err)
+		}
+		if err := wait(); err != nil {
+			return fmt.Errorf("waiting for pull of %s: %w", c.ImageName, err)
+		}
 	}
 
 	var allowedDomains []string
@@ -259,15 +276,6 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 			slog.ErrorContext(ctx, "RemoveSandbox", "error", err)
 		}
 		slog.InfoContext(ctx, "Cleanup complete. Exiting.")
-	}
-	return nil
-}
-
-func verifyImageIsPulled(ctx context.Context, image string) error {
-	inspectCmd := exec.Command("container", "image", "inspect", image)
-	_, err := inspectCmd.Output()
-	if err != nil {
-		return err
 	}
 	return nil
 }

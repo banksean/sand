@@ -13,6 +13,8 @@ import (
 	"strings"
 
 	"github.com/banksean/sand/applecontainer"
+	"github.com/google/go-containerregistry/pkg/authn"
+	"github.com/google/go-containerregistry/pkg/crane"
 )
 
 const (
@@ -224,4 +226,32 @@ func getMacOSMajorVersion(ctx context.Context) (int, error) {
 	}
 
 	return majorVersion, nil
+}
+
+func CheckImageExistsLocally(ctx context.Context, imageName string) (bool, error) {
+	imgs, err := applecontainer.Images.Inspect(ctx, imageName)
+	if err != nil {
+		return false, err
+	}
+	if len(imgs) == 0 {
+		return false, fmt.Errorf("not found in local registry: %s", imageName)
+	}
+	return true, nil
+}
+
+func CheckImageIsLatest(ctx context.Context, imageName string) (bool, error) {
+	remoteDigest, err := crane.Digest(imageName, crane.WithAuth(authn.Anonymous))
+	if err != nil {
+		return false, err
+	}
+	imgs, err := applecontainer.Images.Inspect(ctx, imageName)
+	if err != nil {
+		return false, err
+	}
+	if len(imgs) == 0 {
+		return false, fmt.Errorf("not found in local registry: %s", imageName)
+	}
+	img := imgs[0]
+	slog.InfoContext(ctx, "checkLocalContainerRegistry", "localDigest", img.Index.Digest, "remoteDigest", remoteDigest)
+	return remoteDigest == img.Index.Digest, nil
 }
