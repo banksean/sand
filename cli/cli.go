@@ -40,6 +40,8 @@ type SandboxCreationFlags struct {
 	Rm                 bool     `help:"remove the sandbox after the command terminates"`
 	AllowedDomainsFile string   `placeholder:"<file-path>" help:"path to allowed-domains.txt file for DNS egress filtering (overrides the init image default)"`
 	Volume             []string `short:"v" placeholder:"<host-path:container-path>" help:"bind mount a volume (can be specified multiple times)"`
+	CPU                int      `help:"number of CPUs to allocate to the container" default:"2"`
+	Memory             int      `help:"how much memory in MiB to allocate to the container" default:"1024"`
 }
 
 // SandboxNameFlag is shared by commands that require a single sandbox name argument.

@@ -624,6 +624,8 @@ type CreateSandboxOpts struct {
 	Cloner         string   `json:"cloner,omitempty"`
 	AllowedDomains []string `json:"allowedDomains,omitempty"`
 	Volumes        []string `json:"volumes,omitempty"`
+	CPUs           int      `json:"cpus"`
+	Memory         int      `json:"memory"`
 }
 
 // createSandbox creates a new sandbox and starts its container.
@@ -632,12 +634,14 @@ func (d *Daemon) createSandbox(ctx context.Context, opts CreateSandboxOpts) (*sa
 	if agentType == "" {
 		agentType = "default"
 	}
-	slog.InfoContext(ctx, "CreateSandbox", "agentType", agentType)
+	slog.InfoContext(ctx, "CreateSandbox", "agentType", agentType, "opts", opts)
 
-	sbox, err := d.boxer.NewSandbox(ctx, agentType, opts.ID, opts.CloneFromDir, opts.ImageName, opts.EnvFile, opts.AllowedDomains, opts.Volumes)
+	sbox, err := d.boxer.NewSandbox(ctx, agentType, opts.ID, opts.CloneFromDir, opts.ImageName,
+		opts.EnvFile, opts.AllowedDomains, opts.Volumes, opts.CPUs, opts.Memory)
 	if err != nil {
 		return nil, err
 	}
+	slog.InfoContext(ctx, "CreateSandbox", "sbox", sbox)
 
 	ctr, err := d.boxer.GetContainer(ctx, sbox.ContainerID)
 

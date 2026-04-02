@@ -135,6 +135,8 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 			Cloner:         c.Cloner,
 			AllowedDomains: allowedDomains,
 			Volumes:        c.Volume,
+			CPUs:           c.CPU,
+			Memory:         c.Memory,
 		})
 		if err != nil {
 			slog.ErrorContext(ctx, "CreateSandbox", "error", err)

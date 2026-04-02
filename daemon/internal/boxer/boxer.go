@@ -2,11 +2,8 @@ package boxer
 
 import (
 	"context"
-	"crypto/ed25519"
-	"crypto/rand"
 	"database/sql"
 	_ "embed"
-	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
@@ -25,7 +22,6 @@ import (
 	"github.com/banksean/sand/sandtypes"
 	"github.com/banksean/sand/sshimmer"
 	_ "github.com/golang-migrate/migrate/v4/database/sqlite"
-	"golang.org/x/crypto/ssh"
 	_ "modernc.org/sqlite"
 )
 
@@ -130,7 +126,7 @@ func (b *Boxer) SyncBox(ctx context.Context, sb *sandtypes.Box) error {
 // NewSandbox creates a new sandbox based on a clone of hostWorkDir.
 // TODO: clone envFile, if it exists, into the sandbox clone so every command exec'd in that sandbox container
 // uses the same env file, even if the original .env file has changed on the host machine.
-func (sb *Boxer) NewSandbox(ctx context.Context, agentType, id, hostWorkDir, imageName, envFile string, allowedDomains, volumes []string) (*sandtypes.Box, error) {
+func (sb *Boxer) NewSandbox(ctx context.Context, agentType, id, hostWorkDir, imageName, envFile string, allowedDomains, volumes []string, cpus, memory int) (*sandtypes.Box, error) {
 	slog.InfoContext(ctx, "Boxer.NewSandbox", "hostWorkDir", hostWorkDir, "id", id, "agentType", agentType)
 
 	// Get agent configuration from registry
@@ -198,6 +194,8 @@ func (sb *Boxer) NewSandbox(ctx context.Context, agentType, id, hostWorkDir, ima
 		Mounts:         append(mounts, sshKeysMountSpec),
 		ContainerHooks: hooks,
 		Keys:           keys,
+		CPUs:           cpus,
+		MemoryMB:       memory,
 		OriginalGitDetails: &sandtypes.GitDetails{
 			RemoteOrigin: gitRemote,
 			Branch:       gitBranch,
@@ -371,6 +369,8 @@ func (sb *Boxer) sandboxFromDB(s *db.Sandbox) *sandtypes.Box {
 			Commit:       fromNullString(s.OriginalGitCommit),
 			IsDirty:      s.OriginalGitIsDirty,
 		},
+		CPUs:     fromNullInt(s.Cpu),
+		MemoryMB: fromNullInt(s.MemoryMb),
 	}
 }
 
@@ -383,6 +383,17 @@ func fromNullString(ns sql.NullString) string {
 		return ns.String
 	}
 	return ""
+}
+
+func toNullInt(s int) sql.NullInt64 {
+	return sql.NullInt64{Int64: int64(s), Valid: true}
+}
+
+func fromNullInt(ns sql.NullInt64) int {
+	if ns.Valid {
+		return int(ns.Int64)
+	}
+	return -1
 }
 
 func domainsToNullString(domains []string) sql.NullString {
@@ -465,7 +476,10 @@ func (sber *Boxer) CreateContainer(ctx context.Context, sb *sandtypes.Box) error
 		Mount:     mountOpts,
 		Volume:    sb.Volumes,
 	}
-
+	resOpts := options.ResourceOptions{
+		CPUs:   sb.CPUs,
+		Memory: fmt.Sprintf("%dM", sb.MemoryMB),
+	}
 	if len(sb.AllowedDomains) > 0 {
 		mgmtOpts.InitImage = runtimedeps.CustomInitImage
 		mgmtOpts.DNS = "127.0.0.1"
@@ -483,6 +497,7 @@ func (sber *Boxer) CreateContainer(ctx context.Context, sb *sandtypes.Box) error
 				EnvFile:     sb.EnvFile,
 			},
 			ManagementOptions: mgmtOpts,
+			ResourceOptions:   resOpts,
 		},
 		sb.ImageName, nil)
 	if err != nil {
@@ -642,6 +657,8 @@ func (sb *Boxer) SaveSandbox(ctx context.Context, sbox *sandtypes.Box) error {
 		EnvFile:        toNullString(sbox.EnvFile),
 		AgentType:      toNullString(sbox.AgentType),
 		AllowedDomains: domainsToNullString(sbox.AllowedDomains),
+		Cpu:            toNullInt(sbox.CPUs),
+		MemoryMb:       toNullInt(sbox.MemoryMB),
 	}
 	if sbox.OriginalGitDetails != nil {
 		upsertParams.OriginalGitOrigin = toNullString(sbox.OriginalGitDetails.RemoteOrigin)
@@ -698,28 +715,4 @@ func (sb *Boxer) loadSandbox(ctx context.Context, id string) (*sandtypes.Box, er
 
 	box := sb.sandboxFromDB(&sandbox)
 	return box, nil
-}
-
-func writeKeyToFile(fileOps hostops.FileOps, keyBytes []byte, filename string) error {
-	err := fileOps.WriteFile(filename, keyBytes, 0o600)
-	return err
-}
-
-func genHostKeyPair() (ed25519.PublicKey, ed25519.PrivateKey, error) {
-	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
-	return publicKey, privateKey, err
-}
-
-// encodePrivateKeyToPEM encodes an Ed25519 private key for storage
-func encodePrivateKeyToPEM(privateKey ed25519.PrivateKey) []byte {
-	// No need to create a signer first, we can directly marshal the key
-
-	// Format and encode as a binary private key format
-	pkBytes, err := ssh.MarshalPrivateKey(privateKey, "sketch key")
-	if err != nil {
-		panic(fmt.Sprintf("failed to marshal private key: %v", err))
-	}
-
-	// Return PEM encoded bytes
-	return pem.EncodeToMemory(pkBytes)
 }

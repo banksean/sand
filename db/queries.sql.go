@@ -21,7 +21,7 @@ func (q *Queries) DeleteSandbox(ctx context.Context, id string) error {
 }
 
 const getSandbox = `-- name: GetSandbox :one
-SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains FROM sandboxes
+SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains, cpu, memory_mb FROM sandboxes
 WHERE id = ?
 LIMIT 1
 `
@@ -45,12 +45,14 @@ func (q *Queries) GetSandbox(ctx context.Context, id string) (Sandbox, error) {
 		&i.OriginalGitCommit,
 		&i.OriginalGitIsDirty,
 		&i.AllowedDomains,
+		&i.Cpu,
+		&i.MemoryMb,
 	)
 	return i, err
 }
 
 const getSandboxesByImage = `-- name: GetSandboxesByImage :many
-SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains FROM sandboxes
+SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains, cpu, memory_mb FROM sandboxes
 WHERE image_name = ?
 ORDER BY created_at DESC
 `
@@ -80,6 +82,8 @@ func (q *Queries) GetSandboxesByImage(ctx context.Context, imageName string) ([]
 			&i.OriginalGitCommit,
 			&i.OriginalGitIsDirty,
 			&i.AllowedDomains,
+			&i.Cpu,
+			&i.MemoryMb,
 		); err != nil {
 			return nil, err
 		}
@@ -95,7 +99,7 @@ func (q *Queries) GetSandboxesByImage(ctx context.Context, imageName string) ([]
 }
 
 const listSandboxes = `-- name: ListSandboxes :many
-SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains FROM sandboxes
+SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains, cpu, memory_mb FROM sandboxes
 ORDER BY created_at DESC
 `
 
@@ -124,6 +128,8 @@ func (q *Queries) ListSandboxes(ctx context.Context) ([]Sandbox, error) {
 			&i.OriginalGitCommit,
 			&i.OriginalGitIsDirty,
 			&i.AllowedDomains,
+			&i.Cpu,
+			&i.MemoryMb,
 		); err != nil {
 			return nil, err
 		}
@@ -160,8 +166,9 @@ INSERT INTO sandboxes (
     id, container_id, host_origin_dir, sandbox_work_dir,
     image_name, dns_domain, env_file, agent_type,
     original_git_origin, original_git_branch, original_git_commit,
-    original_git_is_dirty, allowed_domains
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    original_git_is_dirty, allowed_domains,
+    cpu, memory_mb
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(id) DO UPDATE SET
     container_id = excluded.container_id,
     host_origin_dir = excluded.host_origin_dir,
@@ -175,7 +182,9 @@ ON CONFLICT(id) DO UPDATE SET
     original_git_branch = excluded.original_git_branch,
     original_git_commit = excluded.original_git_commit,
     original_git_is_dirty = excluded.original_git_is_dirty,
-    allowed_domains = excluded.allowed_domains
+    allowed_domains = excluded.allowed_domains,
+    cpu = excluded.cpu,
+    memory_mb = excluded.memory_mb
 `
 
 type UpsertSandboxParams struct {
@@ -192,6 +201,8 @@ type UpsertSandboxParams struct {
 	OriginalGitCommit  sql.NullString `json:"original_git_commit"`
 	OriginalGitIsDirty bool           `json:"original_git_is_dirty"`
 	AllowedDomains     sql.NullString `json:"allowed_domains"`
+	Cpu                sql.NullInt64  `json:"cpu"`
+	MemoryMb           sql.NullInt64  `json:"memory_mb"`
 }
 
 func (q *Queries) UpsertSandbox(ctx context.Context, arg UpsertSandboxParams) error {
@@ -209,6 +220,8 @@ func (q *Queries) UpsertSandbox(ctx context.Context, arg UpsertSandboxParams) er
 		arg.OriginalGitCommit,
 		arg.OriginalGitIsDirty,
 		arg.AllowedDomains,
+		arg.Cpu,
+		arg.MemoryMb,
 	)
 	return err
 }

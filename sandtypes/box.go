@@ -37,6 +37,10 @@ type Box struct {
 	Mounts []MountSpec
 	// Volumes defines volume mounts in host:container format, passed directly to the container runtime.
 	Volumes []string
+	// CPUs is the number of CPUs to allocate to the sandbox
+	CPUs int
+	// MemoryMB is the amount of memory in MB to allocate to the sandbox
+	MemoryMB int
 	// SandboxWorkDirError and SandboxContainerError are the most recently updated error states of the sandbox
 	// work dir and container instance. In-memory only. Updated once either at
 	// server startup or sandbox creation time, and then updated periodically thereafter.

@@ -168,6 +168,7 @@ func (m *defaultClient) VSC(ctx context.Context, id string) error {
 }
 
 func (m *defaultClient) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*sandtypes.Box, error) {
+	slog.InfoContext(ctx, "defaultClient.CreateSandbox", "opts", opts)
 	var box sandtypes.Box
 	if err := m.doRequest(ctx, http.MethodPost, "/create", opts, &box); err != nil {
 		return nil, err

@@ -191,6 +191,8 @@ type ProcessOptions struct {
 	UID string `flag:"--uid"`
 	// WorkDir sets the initial working directory inside the container
 	WorkDir string `flag:"--workdir"`
+	// Unlimit sets resource limits (format: <type>=<soft>[:<hard>])
+	ULimit []string `flag:"--ulimit"`
 }
 
 type BuildOptions struct {

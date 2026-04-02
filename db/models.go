@@ -24,4 +24,6 @@ type Sandbox struct {
 	OriginalGitCommit  sql.NullString `json:"original_git_commit"`
 	OriginalGitIsDirty bool           `json:"original_git_is_dirty"`
 	AllowedDomains     sql.NullString `json:"allowed_domains"`
+	Cpu                sql.NullInt64  `json:"cpu"`
+	MemoryMb           sql.NullInt64  `json:"memory_mb"`
 }
