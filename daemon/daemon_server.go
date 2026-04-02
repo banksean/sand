@@ -27,6 +27,7 @@ const (
 	defaultSocketFile = "sandd.sock"
 	defaultLockFile   = "sandd.lock"
 	containerIDKey    = "containerID"
+	envMCPEnable      = "SAND_MCP"
 )
 
 type Daemon struct {
@@ -106,11 +107,13 @@ func (d *Daemon) startDaemonServer(ctx context.Context) error {
 	// Start unix domain socket HTTP server
 	go d.serveOutieSocket(ctx)
 
-	go func() {
-		if err := d.hostMCP.StartHostServices(ctx); err != nil {
-			slog.ErrorContext(ctx, "startDaemonServer MCP.StartMCPDeps", "error", err)
-		}
-	}()
+	if os.Getenv(envMCPEnable) != "" {
+		go func() {
+			if err := d.hostMCP.StartHostServices(ctx); err != nil {
+				slog.ErrorContext(ctx, "startDaemonServer MCP.StartMCPDeps", "error", err)
+			}
+		}()
+	}
 	// Wait for shutdown signal
 	<-d.shutdown
 
