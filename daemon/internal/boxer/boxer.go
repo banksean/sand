@@ -439,6 +439,14 @@ func (sb *Boxer) GetContainer(ctx context.Context, containerID string) (*types.C
 	return ctr.(*types.Container), nil
 }
 
+func (sb *Boxer) GetContainerStats(ctx context.Context, containerID ...string) ([]types.ContainerStats, error) {
+	stats, err := sb.ContainerService.Stats(ctx, containerID...)
+	if err != nil {
+		return nil, err
+	}
+	return stats, nil
+}
+
 func (b *Boxer) EffectiveMounts(sb *sandtypes.Box) []sandtypes.MountSpec {
 	if len(sb.Mounts) > 0 {
 		return sb.Mounts

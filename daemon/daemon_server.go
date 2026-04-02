@@ -179,6 +179,7 @@ func (d *Daemon) serveOutieSocket(ctx context.Context) {
 	mux.HandleFunc("/start", slogHandler(d.handleStart))
 	mux.HandleFunc("/create", slogHandler(d.handleCreate))
 	mux.HandleFunc("/export", slogHandler(d.handleExport))
+	mux.HandleFunc("/stats", slogHandler(d.handleStats))
 
 	server := &http.Server{
 		Handler: mux,
@@ -249,6 +250,7 @@ func (d *Daemon) serveInnieSocket(ctx context.Context, sandboxID string, unixLis
 	mux.HandleFunc("/vsc", slogHandler(fromSandbox(sandboxID, d.handleVSC)))
 	mux.HandleFunc("/sandbox-config", slogHandler(fromSandbox(sandboxID, d.handleSandboxConfig)))
 	mux.HandleFunc("/export", slogHandler(fromSandbox(sandboxID, d.handleExport)))
+	mux.HandleFunc("/stats", slogHandler(fromSandbox(sandboxID, d.handleStats)))
 
 	mux.HandleFunc("/", slogHandler(fromSandbox(sandboxID, func(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
@@ -387,6 +389,30 @@ func (d *Daemon) handleGet(w http.ResponseWriter, r *http.Request) {
 	}
 	sbox.Container = ctr
 	writeJSON(w, sbox)
+}
+
+func (d *Daemon) handleStats(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var args struct {
+		IDs []string `json:"ids,omitempty"`
+	}
+	slog.InfoContext(r.Context(), "Daemon.handleStats json decode request", "args", args)
+
+	if err := json.NewDecoder(r.Body).Decode(&args); err != nil {
+		slog.ErrorContext(r.Context(), "Daemon.handleStats json decode request", "error", err)
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	stats, err := d.boxer.GetContainerStats(r.Context(), args.IDs...)
+	if err != nil {
+		slog.ErrorContext(r.Context(), "Daemon.handleStats ContainerService.Stats", "error", err)
+		http.Error(w, "couldn't get container stats", http.StatusInternalServerError)
+	}
+	writeJSON(w, stats)
 }
 
 func (d *Daemon) handleRemove(w http.ResponseWriter, r *http.Request) {

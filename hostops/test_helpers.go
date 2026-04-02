@@ -16,6 +16,7 @@ type MockContainerOps struct {
 	ExecFunc       func(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, args ...string) (string, error)
 	ExecStreamFunc func(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, stdin io.Reader, stdout, stderr io.Writer, cmdArgs ...string) (func() error, error)
 	InspectFunc    func(ctx context.Context, containerID string) ([]types.Container, error)
+	StatsFunc      func(ctx context.Context, containerID ...string) ([]types.ContainerStats, error)
 	ExportFunc     func(ctx context.Context, containerID, image string) (string, error)
 }
 
@@ -71,4 +72,11 @@ func (m *MockContainerOps) Inspect(ctx context.Context, containerID string) ([]t
 		return m.InspectFunc(ctx, containerID)
 	}
 	return []types.Container{{Status: "running"}}, nil
+}
+
+func (m *MockContainerOps) Stats(ctx context.Context, containerID ...string) ([]types.ContainerStats, error) {
+	if m.StatsFunc != nil {
+		return m.StatsFunc(ctx, containerID...)
+	}
+	return nil, nil
 }

@@ -17,6 +17,7 @@ type ContainerOps interface {
 	Exec(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, args ...string) (string, error)
 	ExecStream(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, stdin io.Reader, stdout, stderr io.Writer, cmdArgs ...string) (func() error, error)
 	Inspect(ctx context.Context, containerID string) ([]types.Container, error)
+	Stats(ctx context.Context, containerID ...string) ([]types.ContainerStats, error)
 	Export(ctx context.Context, opts *options.ExportContainer, imageName string) (string, error)
 }
 
@@ -28,13 +29,18 @@ type ImageOps interface {
 
 type appleContainerOps struct{}
 
+func NewAppleContainerOps() ContainerOps {
+	return &appleContainerOps{}
+}
+
+// Stats implements [ContainerOps].
+func (a *appleContainerOps) Stats(ctx context.Context, containerID ...string) ([]types.ContainerStats, error) {
+	return ac.Containers.Stats(ctx, containerID...)
+}
+
 // Export implements [ContainerOps].
 func (a *appleContainerOps) Export(ctx context.Context, opts *options.ExportContainer, imageName string) (string, error) {
 	return ac.Containers.Export(ctx, opts, imageName)
-}
-
-func NewAppleContainerOps() ContainerOps {
-	return &appleContainerOps{}
 }
 
 func (a *appleContainerOps) Create(ctx context.Context, opts *options.CreateContainer, image string, args []string) (string, error) {

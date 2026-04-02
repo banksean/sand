@@ -38,6 +38,18 @@ type ContainerConfig struct {
 	Rosetta          bool                   `json:"rosetta"`
 }
 
+type ContainerStats struct {
+	BlockReadBytes   int    `json:"blockReadBytes"`
+	BlockWriteBytes  int    `json:"blockWriteBytes"`
+	CPUUsageUsec     int    `json:"cpuUsageUsec"`
+	ID               string `json:"id"`
+	MemoryLimitBytes int    `json:"memoryLimitBytes"`
+	MemoryUsageBytes int    `json:"memoryUsageBytes"`
+	NetworkRxBytes   int    `json:"networkRxBytes"`
+	NetworkTxBytes   int    `json:"networkTxBytes"`
+	NumProcesses     int    `json:"numProcesses"`
+}
+
 type Mount struct {
 	Type        MountType `json:"type"`
 	Source      string    `json:"source"`

@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/banksean/sand/applecontainer/types"
 	"github.com/banksean/sand/sandtypes"
 	"github.com/banksean/sand/version"
 )
@@ -29,6 +30,7 @@ type Client interface {
 	StopSandbox(ctx context.Context, id string) error
 	StartSandbox(ctx context.Context, id string) error
 	ExportImage(ctx context.Context, id, imageName string) error
+	Stats(ctx context.Context, id ...string) ([]types.ContainerStats, error)
 	VSC(ctx context.Context, id string) error
 	CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*sandtypes.Box, error)
 }
@@ -182,6 +184,15 @@ func (m *defaultClient) ExportImage(ctx context.Context, id string, imageName st
 	}
 
 	return nil
+}
+
+// Stats implements [Client].
+func (m *defaultClient) Stats(ctx context.Context, ids ...string) ([]types.ContainerStats, error) {
+	var stats []types.ContainerStats
+	if err := m.doRequest(ctx, http.MethodPost, "/stats", map[string]any{"ids": ids}, &stats); err != nil {
+		return nil, err
+	}
+	return stats, nil
 }
 
 // EnsureDaemon attempts to verify that the sandd daemon is running, and if not,

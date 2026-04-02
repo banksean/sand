@@ -39,6 +39,7 @@ type Outie struct {
 	Vsc                cli.VscCmd                `cmd:"" help:"launch a vscode remote window connected to the sandbox's container"`
 	InstallEBPFSupport cli.InstallEBPFSupportCmd `cmd:"" help:"install the BPFFS-enabled kernel build"`
 	ExportImage        cli.ExportCmd             `cmd:"" help:"export a container image based on a stopped sandbox"`
+	Stats              cli.StatsCmd              `cmd:"" help:"list container stats for sandboxes"`
 }
 
 func (c *Outie) initSlog() {

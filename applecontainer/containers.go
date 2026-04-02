@@ -237,3 +237,24 @@ func (c *ContainerSvc) Export(ctx context.Context, opts *options.ExportContainer
 
 	return string(out), nil
 }
+
+func (c *ContainerSvc) Stats(ctx context.Context, id ...string) ([]types.ContainerStats, error) {
+	args := []string{"stats", "--format", "json"}
+	if len(id) > 0 {
+		args = append(args, id...)
+	}
+	cmd := exec.CommandContext(ctx, "container", args...)
+	slog.InfoContext(ctx, "ContainerSvc.Stats", "cmd", strings.Join(cmd.Args, " "), "ids", len(id))
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		slog.ErrorContext(ctx, "ContainerSvc.Stats", "error", err, "out", string(out))
+		return nil, err
+	}
+
+	ret := []types.ContainerStats{}
+	if err := json.Unmarshal(out, &ret); err != nil {
+		return nil, err
+	}
+
+	return ret, nil
+}
