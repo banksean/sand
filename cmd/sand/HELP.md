@@ -2,7 +2,7 @@
 
 Manage lightweight linux container sandboxes on MacOS.
 
-Requires apple container CLI: https://github.com/apple/container/releases/tag/0.10.0
+Requires apple container CLI: https://github.com/apple/container/releases/tag/0.11.0
 
 ## Global Flags
 
@@ -46,8 +46,10 @@ sand new [flags] [SANDBOX-NAME]
 - `--rm` - remove the sandbox after the command terminates
 - `--allowed-domains-file` _`<file-path>`_ - path to allowed-domains.txt file for DNS egress filtering (overrides the init image default)
 - `-v, --volume` _`<host-path:container-path>,...`_ - bind mount a volume (can be specified multiple times)
+- `--cpu` _`2`_ - number of CPUs to allocate to the container (default: `2`)
+- `--memory` _`1024`_ - how much memory in MiB to allocate to the container (default: `1024`)
 - `-s, --shell` _`<shell-command>`_ - shell command to exec in the container (default: `/bin/zsh`)
-- `-c, --cloner` _`<claude|default|opencode>`_ - name of workspace cloner to use (default: `default`)
+- `-a, --agent` _`<claude|default|opencode>`_ - name of coding agent to use (default: `default`)
 - `-b, --branch` - create a new git branch inside the sandbox _container_ (not on your host workdir)
 - `-p, --prompt` _`<prompt>`_ - start the agent with this prompt in non-interactive (one-shot) mode and return immediately
 
@@ -83,6 +85,8 @@ sand exec [flags] <SANDBOX-NAME> <ARG>...
 - `--rm` - remove the sandbox after the command terminates
 - `--allowed-domains-file` _`<file-path>`_ - path to allowed-domains.txt file for DNS egress filtering (overrides the init image default)
 - `-v, --volume` _`<host-path:container-path>,...`_ - bind mount a volume (can be specified multiple times)
+- `--cpu` _`2`_ - number of CPUs to allocate to the container (default: `2`)
+- `--memory` _`1024`_ - how much memory in MiB to allocate to the container (default: `1024`)
 
 ## `sand ls`
 
@@ -116,6 +120,20 @@ stop sandbox container
 
 ```
 sand stop [flags] [SANDBOX-NAME]
+```
+
+**Flags:**
+
+- `-a, --all` - all sandboxes
+
+## `sand start`
+
+start sandbox container
+
+**Usage:**
+
+```
+sand start [flags] [SANDBOX-NAME]
 ```
 
 **Flags:**
@@ -220,4 +238,18 @@ sand export-image [flags] <SANDBOX-NAME>
 **Flags:**
 
 - `-i, --image-name` _`<container-image-name>`_ - name of container image to export
+
+## `sand stats`
+
+list container stats for sandboxes
+
+**Usage:**
+
+```
+sand stats [flags] [SANDBOX-NAME]
+```
+
+**Flags:**
+
+- `-a, --all` - all sandboxes
 

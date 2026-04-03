@@ -1,6 +1,34 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/banksean/sand.svg)](https://pkg.go.dev/github.com/banksean/sand) 
 [![Main Commit Queue](https://github.com/banksean/sand/actions/workflows/queue-main.yml/badge.svg)](https://github.com/banksean/sand/actions/workflows/queue-main.yml)
 
+# sand
+
+Lightweight, disposable Linux sandboxes for AI coding agents on Apple Silicon.
+
+## Why sand?
+
+Running an AI coding agent like Claude Code or opencode directly on your workstation is risky: agents can delete files, install packages, or make sweeping changes you didn't intend. But setting up isolation manually with `docker` or `apple/container` requires configuring bind mounts, SSH keys, DNS, agent CLIs, and credentials from scratch every time.
+
+`sand` handles all of that in a single command.
+
+### What you get that `docker` or `apple/container` alone don't provide
+
+| | docker / container | sand |
+|---|---|---|
+| Isolated workspace (not your live dir) | manual bind mount setup | automatic CoW clone |
+| SSH key forwarding | manual | automatic |
+| DNS name for container | manual | automatic |
+| Agent CLI setup | manual | `--agent claude\|opencode` |
+| Git-awareness | none | shows FROM GIT vs CURRENT GIT in `sand ls` |
+| Host files safe from `rm -rf` | risky with live bind mount | CoW clone, host unaffected |
+| Network access, exfil control | manual | kernel (eBPF) layer egress filtering with `--allowed-domains-file` |
+
+- **Isolated workspace**: your project is cloned into the container using APFS copy-on-write (`clonefile`), so it's instant, space-efficient, and changes inside the container cannot affect your real working directory.
+- **One-command agent launch**: `sand new -c claude` starts a sandboxed Claude Code session with your workspace, credentials, and agent CLI all wired up.
+- **Lightweight**: built on [Apple Containerization](https://github.com/apple/containerization) — hardware-isolated VMs via Apple Silicon with low memory overhead and fast start times.
+- **Git-aware**: `sand ls` shows which git commit each sandbox was created from vs. where it is now. SSH agent forwarding means `git push` just works inside the container without leaving credentials lying around.
+- **Familiar lifecycle**: treat sandboxes like git branches or tmux sessions — create, list, stop, delete.
+
 # TL;DR
 
 Installation:
@@ -47,26 +75,20 @@ Under the hood, the `sand new` command:
 
 # Design
 
-Aside from the basic requirements for any sandboxing tool in general, I've chosen a few more specific constraints for `sand`.
+## Trade-offs
 
-## Chosen Constraints
+`sand` runs entirely on your workstation — no remote hosting, no third-party access to your files. The trade-off is that it is bounded by your local hardware resources.
 
-- Local: Works entirely on your workstation (no remote hosting dependency)
-- Agnostic: use whatever coding agent you want to (including no agent at all)
-- Fast, easy: Make using sandboxes as easy and lightweight as using tmux sessions or git branches
+`sand` is agent-agnostic, which means it can't exploit deep agent-specific features. The upside is that sandbox lifecycles are independent of agent session lifecycles, and sandboxes are equally useful for manual coding without any agent.
 
-The design goals imply some obvious trade-offs. Most obvious is that by running locally on your workstation, it is limited by your workstation's hardware resources. However, this choice also makes it easy to create new sandboxes very quickly, and does not require you to trust a third party with your files.
-
-By being agent-agnostic, `sand` doesn't take advantage of agent-specific features that it could if it were more tightly coupled to them. On the other hand, this agnosticism makes it possible to treat sandbox lifecycles separately from agent session lifecycles. This trade-off also makes it possible to use sandboxes for manual coding tasks, without any agent whatsoever.
-
-Fast and easy: One way to achieve speed is by doing less, so the specific comparisons to git and tmux are intentional here. The trade-off is that you can use `git` and `tmux` with `sand`'s resources, but `sand` will only do so much to simplify sandbox-related `git` and `tmux` tasks if you aren't already familiar with those tools. Also similarly to git, you should be able to create a new sandbox from an existing sandbox as easily as you can create a git branch from an existing git branch.
+`sand` achieves speed partly by doing less — it won't automate `git` or `tmux` workflows beyond what's needed for sandbox management. You can create a new sandbox from an existing sandbox as easily as branching in git.
 
 ## Implementation Choices
 
 - Isolation Model: [Apple Containerization](https://github.com/apple/containerization)
   - hardware isolation via Apple Silicon
   - low memory overhead, fast start times
-  - based on [Kata](https://katacontainers.io/)
+  - kernel based on [Kata](https://katacontainers.io/)
   - supported in macOS 15 (Sonoma) and up
 - Filesystem:
     - Base container image: Minimal, with some dynamic provisioning based on which agent you're using

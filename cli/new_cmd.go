@@ -22,13 +22,13 @@ import (
 type NewCmd struct {
 	SandboxCreationFlags
 	ShellFlags
-	Cloner      string `short:"c" default:"default" placeholder:"<claude|default|opencode>" help:"name of workspace cloner to use"`
+	Agent       string `short:"a" default:"default" placeholder:"<claude|default|opencode>" help:"name of coding agent to use"`
 	Branch      bool   `short:"b" help:"create a new git branch inside the sandbox _container_ (not on your host workdir)"`
 	Prompt      string `short:"p" placeholder:"<prompt>" help:"start the agent with this prompt in non-interactive (one-shot) mode and return immediately"`
 	SandboxName string `arg:"" optional:"" help:"name of the sandbox to create"`
 }
 
-var defaultImageForCloner = map[string]string{
+var defaultImageForAgent = map[string]string{
 	"claude":   "ghcr.io/banksean/sand/claude:latest",
 	"codex":    "ghcr.io/banksean/sand/codex:latest",
 	"default":  "ghcr.io/banksean/sand/default:latest",
@@ -66,14 +66,14 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 		c.EnvFile = filepath.Join(c.CloneFromDir, c.EnvFile)
 	}
 
-	// When a prompt is given, default to the claude cloner for workspace preparation.
-	if c.Prompt != "" && c.Cloner == "default" {
-		c.Cloner = "claude"
+	// When a prompt is given, default to claude for workspace preparation.
+	if c.Prompt != "" && c.Agent == "default" {
+		c.Agent = "claude"
 	}
 
 	if c.ImageName == "" {
-		if c.Cloner != "" {
-			img, ok := defaultImageForCloner[c.Cloner]
+		if c.Agent != "" {
+			img, ok := defaultImageForAgent[c.Agent]
 			if ok {
 				c.ImageName = img
 			} else {
@@ -131,7 +131,7 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 			CloneFromDir:   c.CloneFromDir,
 			ImageName:      c.ImageName,
 			EnvFile:        c.EnvFile,
-			Cloner:         c.Cloner,
+			Agent:          c.Agent,
 			AllowedDomains: allowedDomains,
 			Volumes:        c.Volume,
 			CPUs:           c.CPU,
@@ -187,13 +187,13 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 		// The prompt is passed via an env var to avoid shell quoting issues.
 		containerSvc := hostops.NewAppleContainerOps()
 		agentOneShotCmd := ""
-		switch c.Cloner {
+		switch c.Agent {
 		case "claude":
 			agentOneShotCmd = `claude --permission-mode=auto --print "$SAND_ONESHOT_PROMPT"`
 		case "opencode":
 			agentOneShotCmd = `opencode run "$SAND_ONESHOT_PROMPT"`
 		default:
-			return fmt.Errorf("one-shot prompt mode not supported for %q", c.Cloner)
+			return fmt.Errorf("one-shot prompt mode not supported for %q", c.Agent)
 		}
 		wait, err := containerSvc.ExecStream(ctx,
 			&options.ExecContainer{
@@ -247,7 +247,7 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 		return fmt.Errorf("no container for sandbox %s", sbox.ContainerID)
 	}
 	var args []string
-	switch c.Cloner {
+	switch c.Agent {
 	case "claude":
 		args = []string{"-c", "claude --permission-mode=auto"}
 	case "opencode":

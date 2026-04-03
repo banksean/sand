@@ -148,8 +148,8 @@ func TestNewCmdDefaults(t *testing.T) {
 	if cli.New.EnvFile != ".env" {
 		t.Errorf("expected default EnvFile .env, got %q", cli.New.EnvFile)
 	}
-	if cli.New.Cloner != "default" {
-		t.Errorf("expected default Cloner 'default', got %q", cli.New.Cloner)
+	if cli.New.Agent != "default" {
+		t.Errorf("expected default Cloner 'default', got %q", cli.New.Agent)
 	}
 	if cli.New.Branch {
 		t.Error("expected Branch=false by default")
@@ -176,7 +176,7 @@ func TestNewCmdFlags(t *testing.T) {
 	kongParse(t, &cli, []string{
 		"new",
 		"-i", "myimage:v2",
-		"-c", "claude",
+		"-a", "claude",
 		"-b",
 		"-p", "fix the bug",
 		"-s", "/bin/sh",
@@ -185,8 +185,8 @@ func TestNewCmdFlags(t *testing.T) {
 	if cli.New.ImageName != "myimage:v2" {
 		t.Errorf("expected ImageName myimage:v2, got %q", cli.New.ImageName)
 	}
-	if cli.New.Cloner != "claude" {
-		t.Errorf("expected Cloner claude, got %q", cli.New.Cloner)
+	if cli.New.Agent != "claude" {
+		t.Errorf("expected Cloner claude, got %q", cli.New.Agent)
 	}
 	if !cli.New.Branch {
 		t.Error("expected Branch=true")

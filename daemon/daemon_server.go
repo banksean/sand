@@ -650,7 +650,7 @@ type CreateSandboxOpts struct {
 	CloneFromDir   string   `json:"cloneFromDir,omitempty"`
 	ImageName      string   `json:"imageName,omitempty"`
 	EnvFile        string   `json:"envFile,omitempty"`
-	Cloner         string   `json:"cloner,omitempty"`
+	Agent          string   `json:"agent,omitempty"`
 	AllowedDomains []string `json:"allowedDomains,omitempty"`
 	Volumes        []string `json:"volumes,omitempty"`
 	CPUs           int      `json:"cpus"`
@@ -659,7 +659,7 @@ type CreateSandboxOpts struct {
 
 // createSandbox creates a new sandbox and starts its container.
 func (d *Daemon) createSandbox(ctx context.Context, opts CreateSandboxOpts) (*sandtypes.Box, error) {
-	agentType := opts.Cloner
+	agentType := opts.Agent
 	if agentType == "" {
 		agentType = "default"
 	}
