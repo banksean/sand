@@ -11,6 +11,7 @@ Requires apple container CLI: https://github.com/apple/container/releases/tag/0.
 - `--log-level` _`<debug|info|warn|error>`_ - the logging level (debug, info, warn, error) (default: `info`)
 - `--app-base-dir` _`<app-base-dir>`_ - root dir to store sandbox clones of working directories. Leave unset to use '~/Library/Application Support/Sand'
 - `--timeout` _`0s`_ - if set to anything other than 0s, overrides the default timeout for an operation (default: `0s`)
+- `--version` - Print version and exit.
 
 ## Subcommands
 
@@ -195,14 +196,14 @@ print complete command help formatted as markdown
 sand doc
 ```
 
-## `sand version`
+## `sand build-info`
 
 print version infomation about this command
 
 **Usage:**
 
 ```
-sand version
+sand build-info
 ```
 
 ## `sand vsc`

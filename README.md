@@ -31,12 +31,24 @@ Running an AI coding agent like Claude Code or opencode directly on your worksta
 
 # TL;DR
 
-Installation:
+
+## Installation
+
+Note: `sand` only runs on macOS, as it depends on `apple/containerization` and Apple silicon.
+
+Install via Homebrew (recommended):
+```sh
+brew install banksean/tap/sand
+```
+
+Install from source:
 ```sh
 go install github.com/banksean/sand/cmd/...
 ```
 
-Manual usage:
+## Usage
+
+Manual, no agent:
 ```sh
 > sand new my-sandbox
 container hostname: my-sandbox
