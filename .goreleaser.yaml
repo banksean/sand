@@ -73,7 +73,7 @@ brews:
     ids: [sand-combined]
     repository:
       owner: banksean
-      name: homebrew-sand
+      name: homebrew-tap
       branch: main
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     homepage: "https://github.com/banksean/sand"
