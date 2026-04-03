@@ -52,16 +52,12 @@ builds:
       - -X 'github.com/banksean/sand/version.BuildTime={{ .Date }}'
 
 archives:
-  - id: sand
-    ids: [sand]
+  - id: sand-combined
+    ids: [sand, sandd]
     formats: [tar.gz]
-    name_template: "{{ .Binary }}_{{ .Os }}_{{ .Arch }}"
+    name_template: "sand_{{ .Os }}_{{ .Arch }}"
   - id: innie
     ids: [innie]
-    formats: [tar.gz]
-    name_template: "{{ .Binary }}_{{ .Os }}_{{ .Arch }}"
-  - id: sandd
-    ids: [sandd]
     formats: [tar.gz]
     name_template: "{{ .Binary }}_{{ .Os }}_{{ .Arch }}"
 
@@ -74,7 +70,7 @@ release:
 
 brews:
   - name: sand
-    ids: [sand, sandd]
+    ids: [sand-combined]
     repository:
       owner: banksean
       name: homebrew-sand
@@ -84,7 +80,7 @@ brews:
     description: "Local development sandbox containers"
     license: "Apache"
     install: |
-      bin.install "sand" |
+      bin.install "sand"
       bin.install "sandd"
     test: |
       system "#{bin}/sand version"
