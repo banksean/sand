@@ -85,12 +85,7 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 	}
 	// Check to make sure c.ImageName is already pulled and available first, so we
 	// don't block creating the new container on downloading the image for it.
-	exists, err := runtimedeps.CheckImageExistsLocally(cctx.Context, c.ImageName)
-	if err != nil {
-		return fmt.Errorf("error checking for container image %s: %w ", c.ImageName, err)
-	}
-
-	if !exists {
+	if exists := runtimedeps.CheckImageExistsLocally(cctx.Context, c.ImageName); !exists {
 		fmt.Printf("Pulling image %s...", c.ImageName)
 		applecontainer.Images.Pull(ctx, c.ImageName)
 	}
@@ -99,9 +94,8 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 	if strings.HasPrefix(c.ImageName, "ghcr.io") || strings.HasPrefix(c.ImageName, "docker.io") {
 		isLatest, err := runtimedeps.CheckImageIsLatest(ctx, c.ImageName)
 		if err != nil {
-			return fmt.Errorf("checking for latest version of %s: %w", c.ImageName, err)
-		}
-		if !isLatest {
+			fmt.Printf("Failed to check remote registry for latest version of %s, continuing with local version: %s\n", c.ImageName, err)
+		} else if !isLatest {
 			fmt.Printf("Local image digest doesn't match latest remote digest, pulling %s\n", c.ImageName)
 			wait, err := applecontainer.Images.Pull(ctx, c.ImageName)
 			if err != nil {

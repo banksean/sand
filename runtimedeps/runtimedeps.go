@@ -228,15 +228,12 @@ func getMacOSMajorVersion(ctx context.Context) (int, error) {
 	return majorVersion, nil
 }
 
-func CheckImageExistsLocally(ctx context.Context, imageName string) (bool, error) {
+func CheckImageExistsLocally(ctx context.Context, imageName string) bool {
 	imgs, err := applecontainer.Images.Inspect(ctx, imageName)
-	if err != nil {
-		return false, err
+	if err != nil || len(imgs) == 0 {
+		return false
 	}
-	if len(imgs) == 0 {
-		return false, fmt.Errorf("not found in local registry: %s", imageName)
-	}
-	return true, nil
+	return true
 }
 
 func CheckImageIsLatest(ctx context.Context, imageName string) (bool, error) {
