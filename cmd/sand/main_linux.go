@@ -31,14 +31,15 @@ type Innie struct {
 	LogLevel   string                    `default:"info" placeholder:"<debug|info|warn|error>" help:"the logging level (debug, info, warn, error)"`
 	AppBaseDir string                    `default:"" placeholder:"<app-base-dir>" help:"root dir to store sandbox clones of working directories. Leave unset to use '~/Library/Application Support/Sand'"`
 	Completion kongcompletion.Completion `cmd:"" help:"Outputs shell code for initialising tab completions"`
+	Version    cli.VersionFlag           `name:"version" help:"Print version and exit."`
 
-	New     cli.NewCmd     `cmd:"" help:"create a new sandbox and shell into its container"`
-	Ls      cli.LsCmd      `cmd:"" help:"list sandboxes"`
-	Rm      cli.RmCmd      `cmd:"" help:"remove sandbox container and its clone directory"`
-	Stop    cli.StopCmd    `cmd:"" help:"stop sandbox container"`
-	Git     cli.GitCmd     `cmd:"" help:"git operations with sandboxes"`
-	Version cli.VersionCmd `cmd:"" help:"print version infomation about this command"`
-	Vsc     cli.VscCmd     `cmd:"" help:"launch a vscode window on your host OS desktop, connected to this sandbox's container via ssh"`
+	New       cli.NewCmd       `cmd:"" help:"create a new sandbox and shell into its container"`
+	Ls        cli.LsCmd        `cmd:"" help:"list sandboxes"`
+	Rm        cli.RmCmd        `cmd:"" help:"remove sandbox container and its clone directory"`
+	Stop      cli.StopCmd      `cmd:"" help:"stop sandbox container"`
+	Git       cli.GitCmd       `cmd:"" help:"git operations with sandboxes"`
+	BuildInfo cli.BuildInfoCmd `cmd:"" help:"print version infomation about this command"`
+	Vsc       cli.VscCmd       `cmd:"" help:"launch a vscode window on your host OS desktop, connected to this sandbox's container via ssh"`
 }
 
 func (c *Innie) initSlog() {
@@ -112,6 +113,7 @@ func main() {
 
 	kongcompletion.Register(kongApp, kongcompletion.WithPredictor("sandbox-name", namePredictor))
 	kongCtx := kong.Parse(&app,
+		kong.UsageOnError(),
 		kong.Configuration(kong.JSON, ".sand.json", "~/.sand.json"),
 		kong.Description(description))
 

@@ -6,9 +6,9 @@ import (
 	"github.com/banksean/sand/version"
 )
 
-type VersionCmd struct{}
+type BuildInfoCmd struct{}
 
-func (c *VersionCmd) Run(cctx *CLIContext) error {
+func (c *BuildInfoCmd) Run(cctx *CLIContext) error {
 	versionInfo := version.Get()
 	fmt.Printf("Git Repository: %s\n", versionInfo.GitRepo)
 	fmt.Printf("Git Branch: %s\n", versionInfo.GitBranch)

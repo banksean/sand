@@ -25,6 +25,7 @@ type Outie struct {
 	AppBaseDir string                    `default:"" placeholder:"<app-base-dir>" help:"root dir to store sandbox clones of working directories. Leave unset to use '~/Library/Application Support/Sand'"`
 	Timeout    time.Duration             `default:"0s" help:"if set to anything other than 0s, overrides the default timeout for an operation"`
 	Completion kongcompletion.Completion `cmd:"" help:"Outputs shell code for initialising tab completions"`
+	Version    cli.VersionFlag           `name:"version" help:"Print version and exit."`
 
 	New                cli.NewCmd                `cmd:"" help:"create a new sandbox and shell into its container"`
 	Shell              cli.ShellCmd              `cmd:"" help:"shell into a sandbox container (and start the container, if necessary)"`
@@ -35,7 +36,7 @@ type Outie struct {
 	Start              cli.StartCmd              `cmd:"" help:"start sandbox container"`
 	Git                cli.GitCmd                `cmd:"" help:"git operations with sandboxes"`
 	Doc                DocCmd                    `cmd:"" help:"print complete command help formatted as markdown"`
-	Version            cli.VersionCmd            `cmd:"" help:"print version infomation about this command"`
+	BuildInfo          cli.BuildInfoCmd          `cmd:"" help:"print version infomation about this command"`
 	Vsc                cli.VscCmd                `cmd:"" help:"launch a vscode remote window connected to the sandbox's container"`
 	InstallEBPFSupport cli.InstallEBPFSupportCmd `cmd:"" help:"install the BPFFS-enabled kernel build"`
 	ExportImage        cli.ExportCmd             `cmd:"" help:"export a container image based on a stopped sandbox"`
@@ -134,9 +135,10 @@ func main() {
 	kongApp := kong.Must(&app)
 	kongcompletion.Register(kongApp, kongcompletion.WithPredictor("sandbox-name", namePredictor))
 	kongCtx := kong.Parse(&app,
+		kong.UsageOnError(),
 		kong.Configuration(kong.JSON, ".sand.json", "~/.sand.json"),
-		kong.Description(description))
-
+		kong.Description(description),
+	)
 	app.initSlog()
 
 	if err := runtimedeps.Verify(ctx,
