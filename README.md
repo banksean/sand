@@ -24,7 +24,7 @@ Running an AI coding agent like Claude Code or opencode directly on your worksta
 | Network access, exfil control | manual | kernel (eBPF) layer egress filtering with `--allowed-domains-file` |
 
 - **Isolated workspace**: your project is cloned into the container using APFS copy-on-write (`clonefile`), so it's instant, space-efficient, and changes inside the container cannot affect your real working directory.
-- **One-command agent launch**: `sand new -c claude` starts a sandboxed Claude Code session with your workspace, credentials, and agent CLI all wired up.
+- **One-command agent launch**: `sand new -a claude` starts a sandboxed Claude Code session with your workspace, credentials, and agent CLI all wired up.
 - **Lightweight**: built on [Apple Containerization](https://github.com/apple/containerization) — hardware-isolated VMs via Apple Silicon with low memory overhead and fast start times.
 - **Git-aware**: `sand ls` shows which git commit each sandbox was created from vs. where it is now. SSH agent forwarding means `git push` just works inside the container without leaving credentials lying around.
 - **Familiar lifecycle**: treat sandboxes like git branches or tmux sessions — create, list, stop, delete.
@@ -45,7 +45,7 @@ container hostname: my-sandbox
 
 Use with a coding agent, like claude or opencode:
 ```sh
-> sand new -c claude
+> sand new -a claude
 container hostname: shy-snow
 
  ▐▛███▜▌   Claude Code v2.1.71
