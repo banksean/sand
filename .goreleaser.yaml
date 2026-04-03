@@ -71,3 +71,20 @@ checksum:
 release:
   draft: false
   replace_existing_draft: true
+
+brews:
+  - name: sand
+    ids: [sand, sandd]
+    repository:
+      owner: banksean
+      name: homebrew-sand
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    homepage: "https://github.com/banksean/sand"
+    description: "Local development sandbox containers"
+    license: "Apache"
+    install: |
+      bin.install "sand" |
+      bin.install "sandd"
+    test: |
+      system "#{bin}/sand version"
