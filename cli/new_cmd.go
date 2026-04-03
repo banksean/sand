@@ -95,7 +95,8 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 	}
 	isLatest, err := runtimedeps.CheckImageIsLatest(ctx, c.ImageName)
 	if err != nil {
-		return fmt.Errorf("checking for latest version of %s: %w", c.ImageName, err)
+		slog.WarnContext(ctx, "could not check remote registry, using local image", "image", c.ImageName, "error", err)
+		isLatest = true
 	}
 	if !isLatest {
 		fmt.Printf("Local image digest doesn't match latest remote digest, pulling %s\n", c.ImageName)
