@@ -3,7 +3,7 @@
 You will need to install `sand` first, if you haven't done so yet.
 
 ```sh
-% go install github.com/banksean/sand/cmd/sand@latest
+% brew install banksean/tap/sand
 ```
 
 ## One-time (or once a year, rather) setup
@@ -14,19 +14,10 @@ On your macOS host machine, run:
 % claude setup-token
 ```
 
-Follow the directions to do the browser copy-and-paste dance, and then save that token value somewhere (e.g. your `~/.env` file).
-
-## Run `sand new --env-file .env` and then run `claude` in the container
-
+Follow the directions to do the browser copy-and-paste dance, and then save that `CLAUDE_CODE_OAUTH_TOKEN=<token>` a `.env` file (`sand` uses `./.env` as the default, but you can specify another location with `--env-file`).
 
 ```sh
-[macos host shell] % sand new --env-file .env
-
-# ... container starts up ...
-
-[linux container shell] % claude
-
-# ... "You're Absolutely Right" ...
+[macos host shell] % sand new -a claude
 ```
 
 You should now have a claude code session running in a sandbox, atop a clone of your original working directory. 
