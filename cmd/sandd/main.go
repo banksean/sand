@@ -12,8 +12,8 @@ import (
 	"syscall"
 
 	"github.com/alecthomas/kong"
-	"github.com/banksean/sand/applecontainer"
-	"github.com/banksean/sand/daemon"
+	"github.com/banksean/sand/internal/applecontainer"
+	"github.com/banksean/sand/internal/daemon"
 )
 
 // `sandd start` runs a long-lived process that manages sandboxes' lifecycles.

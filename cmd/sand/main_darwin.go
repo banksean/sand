@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/alecthomas/kong"
-	"github.com/banksean/sand/cli"
-	"github.com/banksean/sand/daemon"
-	"github.com/banksean/sand/runtimedeps"
+	"github.com/banksean/sand/internal/cli"
+	"github.com/banksean/sand/internal/daemon"
+	"github.com/banksean/sand/internal/runtimedeps"
 	kongcompletion "github.com/jotaen/kong-completion"
 )
 
