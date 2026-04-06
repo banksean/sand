@@ -37,7 +37,13 @@ func StartDaemon(t testing.TB, deps Deps, configure func(context.Context, Sandbo
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 
-	tmpDir := t.TempDir()
+	// Use a short prefix so the unix socket path (<tmpDir>/containersockets/<id>)
+	// stays within macOS's 104-byte sun_path limit even with long sandbox IDs.
+	tmpDir, err := os.MkdirTemp("", "sdt-*")
+	if err != nil {
+		t.Fatalf("daemontest: MkdirTemp: %v", err)
+	}
+	t.Cleanup(func() { os.RemoveAll(tmpDir) })
 
 	if deps.ContainerService == nil {
 		deps.ContainerService = &hostops.MockContainerOps{}
