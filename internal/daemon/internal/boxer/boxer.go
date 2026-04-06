@@ -29,6 +29,11 @@ const (
 	containerGetErrorMsg = "[error getting]"
 )
 
+// SSHimmer provisions SSH keys for a new sandbox.
+type SSHimmer interface {
+	NewKeys(ctx context.Context, domain string) (*sshimmer.Keys, error)
+}
+
 // Boxer manages the lifecycle of sandboxes.
 type Boxer struct {
 	appRoot          string
@@ -36,11 +41,54 @@ type Boxer struct {
 	sqlDB            *sql.DB
 	queries          *db.Queries
 	ContainerService hostops.ContainerOps
-	imageService     hostops.ImageOps
-	gitOps           hostops.GitOps
-	fileOps          hostops.FileOps
-	sshim            *sshimmer.LocalSSHimmer
-	agentRegistry    *cloning.AgentRegistry
+	ImageService     hostops.ImageOps
+	GitOps           hostops.GitOps
+	FileOps          hostops.FileOps
+	SSHim            SSHimmer
+	AgentRegistry    *cloning.AgentRegistry
+}
+
+// BoxerDeps holds the injectable dependencies for a Boxer.
+// Fields left nil will cause panics if the corresponding Boxer methods are called.
+type BoxerDeps struct {
+	ContainerService hostops.ContainerOps
+	ImageService     hostops.ImageOps
+	GitOps           hostops.GitOps
+	FileOps          hostops.FileOps
+	SSHim            SSHimmer
+	AgentRegistry    *cloning.AgentRegistry
+	Messenger        hostops.UserMessenger
+}
+
+// NewBoxerWithDeps creates a Boxer with explicitly provided dependencies and a fresh
+// SQLite database at appRoot. The appRoot directory is created with os.MkdirAll,
+// making this constructor usable on all platforms without darwin-specific file ops.
+func NewBoxerWithDeps(appRoot string, deps BoxerDeps) (*Boxer, error) {
+	if err := os.MkdirAll(appRoot, 0o750); err != nil {
+		return nil, err
+	}
+	sqlDB, err := db.Connect(appRoot)
+	if err != nil {
+		return nil, err
+	}
+	if deps.AgentRegistry == nil {
+		deps.AgentRegistry = cloning.NewAgentRegistry()
+	}
+	if deps.Messenger == nil {
+		deps.Messenger = hostops.NewTerminalMessenger(nil)
+	}
+	return &Boxer{
+		appRoot:          appRoot,
+		messenger:        deps.Messenger,
+		sqlDB:            sqlDB,
+		queries:          db.New(sqlDB),
+		ContainerService: deps.ContainerService,
+		ImageService:     deps.ImageService,
+		GitOps:           deps.GitOps,
+		FileOps:          deps.FileOps,
+		SSHim:            deps.SSHim,
+		AgentRegistry:    deps.AgentRegistry,
+	}, nil
 }
 
 func NewBoxer(appRoot, localDomain string, terminalWriter io.Writer) (*Boxer, error) {
@@ -69,11 +117,11 @@ func NewBoxer(appRoot, localDomain string, terminalWriter io.Writer) (*Boxer, er
 		sqlDB:            sqlDB,
 		queries:          db.New(sqlDB),
 		ContainerService: hostops.NewAppleContainerOps(),
-		imageService:     hostops.NewAppleImageOps(),
-		gitOps:           hostops.NewDefaultGitOps(),
-		fileOps:          fileOps,
-		sshim:            sshim,
-		agentRegistry:    agentRegistry,
+		ImageService:     hostops.NewAppleImageOps(),
+		GitOps:           hostops.NewDefaultGitOps(),
+		FileOps:          fileOps,
+		SSHim:            sshim,
+		AgentRegistry:    agentRegistry,
 	}
 	return sb, nil
 }
@@ -130,7 +178,7 @@ func (sb *Boxer) NewSandbox(ctx context.Context, agentType, id, hostWorkDir, ima
 	slog.InfoContext(ctx, "Boxer.NewSandbox", "hostWorkDir", hostWorkDir, "id", id, "agentType", agentType)
 
 	// Get agent configuration from registry
-	agentConfig := sb.agentRegistry.Get(agentType)
+	agentConfig := sb.AgentRegistry.Get(agentType)
 	if _, err := os.Stat(envFile); err != nil {
 		envFile = ""
 	}
@@ -150,7 +198,7 @@ func (sb *Boxer) NewSandbox(ctx context.Context, agentType, id, hostWorkDir, ima
 	hooks := agentConfig.Configuration.GetStartupHooks(*artifacts)
 
 	// TODO: move this to .Hydrate? Or make it a startup hook?
-	keys, err := sb.sshim.NewKeys(ctx, id+".test")
+	keys, err := sb.SSHim.NewKeys(ctx, id+".test")
 	if err != nil {
 		slog.ErrorContext(ctx, "Boxer.NewSanbox: sshim.Povision", "error", err)
 		return nil, err
@@ -169,17 +217,17 @@ func (sb *Boxer) NewSandbox(ctx context.Context, agentType, id, hostWorkDir, ima
 
 	// hostWorkDir may not be the same as the git root - should we save both here instead of
 	// only saving the gitTopLevel?
-	gitTopLevel := sb.gitOps.TopLevel(ctx, hostWorkDir)
+	gitTopLevel := sb.GitOps.TopLevel(ctx, hostWorkDir)
 	var gitRemote, gitBranch, gitCommit string
 	var gitIsDirty bool
 	slog.InfoContext(ctx, "NewSandbox", "gitTopLevel", gitTopLevel, "hostWorkDir", hostWorkDir)
 	if gitTopLevel != "" {
 		// Clone from git top level instead
 		hostWorkDir = gitTopLevel
-		gitRemote = sb.gitOps.RemoteURL(ctx, hostWorkDir, "origin")
-		gitBranch = sb.gitOps.Branch(ctx, hostWorkDir)
-		gitCommit = sb.gitOps.Commit(ctx, hostWorkDir)
-		gitIsDirty = sb.gitOps.IsDirty(ctx, hostWorkDir)
+		gitRemote = sb.GitOps.RemoteURL(ctx, hostWorkDir, "origin")
+		gitBranch = sb.GitOps.Branch(ctx, hostWorkDir)
+		gitCommit = sb.GitOps.Commit(ctx, hostWorkDir)
+		gitIsDirty = sb.GitOps.IsDirty(ctx, hostWorkDir)
 	}
 
 	ret := &sandtypes.Box{
@@ -212,10 +260,10 @@ func (sb *Boxer) NewSandbox(ctx context.Context, agentType, id, hostWorkDir, ima
 }
 
 func (sb *Boxer) saveSSHKeys(keysDir string, keys *sshimmer.Keys) error {
-	if err := sb.fileOps.MkdirAll(keysDir, 0o750); err != nil {
+	if err := sb.FileOps.MkdirAll(keysDir, 0o750); err != nil {
 		return err
 	}
-	hostPrivateKeyFile, err := sb.fileOps.Create(filepath.Join(keysDir, "ssh_host_key"))
+	hostPrivateKeyFile, err := sb.FileOps.Create(filepath.Join(keysDir, "ssh_host_key"))
 	if err != nil {
 		return err
 	}
@@ -224,7 +272,7 @@ func (sb *Boxer) saveSSHKeys(keysDir string, keys *sshimmer.Keys) error {
 		return err
 	}
 
-	hostPublicKeyFile, err := sb.fileOps.Create(filepath.Join(keysDir, "ssh_host_key.pub"))
+	hostPublicKeyFile, err := sb.FileOps.Create(filepath.Join(keysDir, "ssh_host_key.pub"))
 	if err != nil {
 		return err
 	}
@@ -233,7 +281,7 @@ func (sb *Boxer) saveSSHKeys(keysDir string, keys *sshimmer.Keys) error {
 		return err
 	}
 
-	hostKeyCertFile, err := sb.fileOps.Create(filepath.Join(keysDir, "ssh_host_key.pub-cert"))
+	hostKeyCertFile, err := sb.FileOps.Create(filepath.Join(keysDir, "ssh_host_key.pub-cert"))
 	if err != nil {
 		return err
 	}
@@ -242,7 +290,7 @@ func (sb *Boxer) saveSSHKeys(keysDir string, keys *sshimmer.Keys) error {
 		return err
 	}
 
-	userCAFile, err := sb.fileOps.Create(filepath.Join(keysDir, "user_ca.pub"))
+	userCAFile, err := sb.FileOps.Create(filepath.Join(keysDir, "user_ca.pub"))
 	if err != nil {
 		return err
 	}
@@ -319,11 +367,11 @@ func (sb *Boxer) Cleanup(ctx context.Context, sbox *sandtypes.Box) error {
 		slog.ErrorContext(ctx, "Boxer Containers.Delete", "sandbox", sbox.ID, "error", err, "out", out)
 	}
 
-	if err := sb.gitOps.RemoveRemote(ctx, sbox.HostOriginDir, cloning.ClonedWorkDirGitRemotePrefix+sbox.ID); err != nil {
+	if err := sb.GitOps.RemoveRemote(ctx, sbox.HostOriginDir, cloning.ClonedWorkDirGitRemotePrefix+sbox.ID); err != nil {
 		slog.ErrorContext(ctx, "Boxer Containers.Delete failed to remove git remote", "sandbox", sbox.ID, "error", err)
 	}
 
-	if err := sb.fileOps.RemoveAll(sbox.SandboxWorkDir); err != nil {
+	if err := sb.FileOps.RemoveAll(sbox.SandboxWorkDir); err != nil {
 		slog.ErrorContext(ctx, "Boxer Containers.Delete failed to remove workdir", "sandbox", sbox.ID, "error", err)
 	}
 
@@ -338,9 +386,9 @@ func (sb *Boxer) Cleanup(ctx context.Context, sbox *sandtypes.Box) error {
 func (sb *Boxer) getCurrentGitDetails(ctx context.Context, box *sandtypes.Box) *sandtypes.GitDetails {
 	currentGit := &sandtypes.GitDetails{}
 	appDir := filepath.Join(box.SandboxWorkDir, "app")
-	currentGit.Branch = sb.gitOps.Branch(ctx, appDir)
-	currentGit.Commit = sb.gitOps.Commit(ctx, appDir)
-	currentGit.IsDirty = sb.gitOps.IsDirty(ctx, appDir)
+	currentGit.Branch = sb.GitOps.Branch(ctx, appDir)
+	currentGit.Commit = sb.GitOps.Commit(ctx, appDir)
+	currentGit.IsDirty = sb.GitOps.IsDirty(ctx, appDir)
 
 	return currentGit
 }
@@ -519,7 +567,7 @@ func (sber *Boxer) CreateContainer(ctx context.Context, sb *sandtypes.Box) error
 
 func (sber *Boxer) checkImageHasEntrypoint(ctx context.Context, imageName string) error {
 	if imageName != "" {
-		img, err := sber.imageService.Inspect(ctx, imageName)
+		img, err := sber.ImageService.Inspect(ctx, imageName)
 		if err != nil {
 			return err
 		}
@@ -606,7 +654,7 @@ func (sber *Boxer) executeHooks(ctx context.Context, sb *sandtypes.Box, hooks []
 func (sb *Boxer) EnsureImage(ctx context.Context, imageName string) error {
 	slog.InfoContext(ctx, "Boxer.EnsureImage", "imageName", imageName)
 
-	images, err := sb.imageService.List(ctx)
+	images, err := sb.ImageService.List(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to list images: %w", err)
 	}
@@ -629,7 +677,7 @@ func (sb *Boxer) pullImage(ctx context.Context, imageName string) error {
 	sb.messenger.Message(ctx, fmt.Sprintf("This may take a while: pulling container image %s...", imageName))
 	start := time.Now()
 
-	waitFn, err := sb.imageService.Pull(ctx, imageName)
+	waitFn, err := sb.ImageService.Pull(ctx, imageName)
 	defer func() {
 		if waitFn != nil {
 			waitFn()

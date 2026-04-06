@@ -14,6 +14,7 @@ import (
 	"github.com/banksean/sand/internal/cloning"
 	"github.com/banksean/sand/internal/hostops"
 	"github.com/banksean/sand/internal/sandtypes"
+	"github.com/banksean/sand/internal/sshimmer"
 )
 
 type mockImageOps struct {
@@ -182,30 +183,46 @@ func (m *mockFileOps) Volume(path string) (*hostops.VolumeInfo, error) {
 	return nil, nil
 }
 
+type mockSSHimmer struct {
+	newKeysFunc func(ctx context.Context, domain string) (*sshimmer.Keys, error)
+}
+
+func (m *mockSSHimmer) NewKeys(ctx context.Context, domain string) (*sshimmer.Keys, error) {
+	if m.newKeysFunc != nil {
+		return m.newKeysFunc(ctx, domain)
+	}
+	return &sshimmer.Keys{
+		HostKey:     []byte("fake-host-key"),
+		HostKeyPub:  []byte("fake-host-key-pub"),
+		HostKeyCert: []byte("fake-host-key-cert"),
+		UserCAPub:   []byte("fake-user-ca-pub"),
+	}, nil
+}
+
 func newTestBoxer(t *testing.T, containerOps hostops.ContainerOps, imageOps hostops.ImageOps) *Boxer {
 	t.Helper()
 	tmpDir := path.Join(t.TempDir(), "Application Support", "Sand")
-	boxer, err := NewBoxer(tmpDir, "test", nil)
+	boxer, err := NewBoxerWithDeps(tmpDir, BoxerDeps{
+		ContainerService: containerOps,
+		ImageService:     imageOps,
+		GitOps:           &mockGitOps{},
+		SSHim:            &mockSSHimmer{},
+		FileOps: &mockFileOps{
+			lstatFunc: func(path string) (os.FileInfo, error) {
+				return nil, os.ErrNotExist
+			},
+			createFunc: func(path string) (*os.File, error) {
+				return nil, nil
+			},
+			mkdirAllFunc: func(path string, perm os.FileMode) error {
+				return nil
+			},
+		},
+	})
 	if err != nil {
 		t.Fatalf("Failed to create test Boxer: %v", err)
 	}
 	t.Cleanup(func() { boxer.Close() })
-
-	boxer.ContainerService = containerOps
-	boxer.imageService = imageOps
-	boxer.gitOps = &mockGitOps{}
-	boxer.fileOps = &mockFileOps{
-		lstatFunc: func(path string) (os.FileInfo, error) {
-			return nil, os.ErrNotExist
-		},
-		createFunc: func(path string) (*os.File, error) {
-			return nil, nil
-		},
-		mkdirAllFunc: func(path string, perm os.FileMode) error {
-			return nil
-		},
-	}
-
 	return boxer
 }
 
@@ -224,7 +241,10 @@ func TestBoxer_NewSandbox_EndToEnd(t *testing.T) {
 		mockImage := &mockImageOps{}
 
 		boxer := newTestBoxer(t, mockContainer, mockImage)
-		boxer.fileOps = hostops.NewDefaultFileOps()
+		boxer.FileOps = &mockFileOps{
+			mkdirAllFunc: os.MkdirAll,
+			createFunc:   os.Create,
+		}
 
 		// Register a test agent in the registry
 		testPrep := &mockWorkspacePreparation{
@@ -237,7 +257,7 @@ func TestBoxer_NewSandbox_EndToEnd(t *testing.T) {
 			},
 		}
 		testConfig := &mockContainerConfiguration{}
-		boxer.agentRegistry.Register(&cloning.AgentConfig{
+		boxer.AgentRegistry.Register(&cloning.AgentConfig{
 			Name:          "test-agent",
 			Preparation:   testPrep,
 			Configuration: testConfig,
@@ -289,7 +309,7 @@ func TestBoxer_NewSandbox_EndToEnd(t *testing.T) {
 			},
 		}
 		testConfig := &mockContainerConfiguration{}
-		boxer.agentRegistry.Register(&cloning.AgentConfig{
+		boxer.AgentRegistry.Register(&cloning.AgentConfig{
 			Name:          "test-error-agent",
 			Preparation:   testPrep,
 			Configuration: testConfig,
@@ -456,8 +476,8 @@ func TestBoxer_Cleanup_EndToEnd(t *testing.T) {
 
 		mockImage := &mockImageOps{}
 		boxer := newTestBoxer(t, mockContainer, mockImage)
-		boxer.gitOps = mockGit
-		boxer.fileOps = mockFile
+		boxer.GitOps = mockGit
+		boxer.FileOps = mockFile
 
 		sandboxDir := filepath.Join(boxer.appRoot, "clones", "test-sandbox")
 		box := &sandtypes.Box{
@@ -528,7 +548,7 @@ func TestBoxer_Cleanup_EndToEnd(t *testing.T) {
 
 		mockImage := &mockImageOps{}
 		boxer := newTestBoxer(t, mockContainer, mockImage)
-		boxer.fileOps = mockFile
+		boxer.FileOps = mockFile
 
 		box := &sandtypes.Box{
 			ID:             "test-sandbox",
@@ -562,7 +582,7 @@ func TestBoxer_Cleanup_EndToEnd(t *testing.T) {
 
 		mockImage := &mockImageOps{}
 		boxer := newTestBoxer(t, mockContainer, mockImage)
-		boxer.gitOps = mockGit
+		boxer.GitOps = mockGit
 
 		box := &sandtypes.Box{
 			ID:             "test-sandbox",
@@ -592,7 +612,7 @@ func TestBoxer_Cleanup_EndToEnd(t *testing.T) {
 
 		mockImage := &mockImageOps{}
 		boxer := newTestBoxer(t, mockContainer, mockImage)
-		boxer.fileOps = mockFile
+		boxer.FileOps = mockFile
 
 		box := &sandtypes.Box{
 			ID:             "test-sandbox",

@@ -6,8 +6,26 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/banksean/sand/internal/hostops"
 	"github.com/banksean/sand/internal/sandtypes"
 )
+
+// newDBBoxer creates a Boxer backed by a real SQLite DB, with minimal no-op mocks
+// for all platform-specific dependencies. Suitable for testing DB-level operations.
+func newDBBoxer(t *testing.T, appRoot string) *Boxer {
+	t.Helper()
+	b, err := NewBoxerWithDeps(appRoot, BoxerDeps{
+		ContainerService: &hostops.MockContainerOps{},
+		ImageService:     &mockImageOps{},
+		GitOps:           &mockGitOps{},
+		FileOps:          &mockFileOps{},
+	})
+	if err != nil {
+		t.Fatalf("newDBBoxer: %v", err)
+	}
+	t.Cleanup(func() { b.Close() })
+	return b
+}
 
 func TestSaveSandbox(t *testing.T) {
 	// Create a temporary directory for testing
@@ -18,11 +36,7 @@ func TestSaveSandbox(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// Create a Boxer
-	sb, err := NewBoxer(tmpDir, "test", nil)
-	if err != nil {
-		t.Fatalf("Failed to create Boxer: %v", err)
-	}
-	defer sb.Close()
+	sb := newDBBoxer(t, tmpDir)
 
 	// Create a test sandbox
 	testSandbox := &sandtypes.Box{
@@ -102,11 +116,7 @@ func TestLoadSandbox(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// Create a Boxer
-	sb, err := NewBoxer(tmpDir, "test", nil)
-	if err != nil {
-		t.Fatalf("Failed to create Boxer: %v", err)
-	}
-	defer sb.Close()
+	sb := newDBBoxer(t, tmpDir)
 
 	// Create a test sandbox directory
 	testID := "test-load-id"
@@ -171,11 +181,7 @@ func TestLoadSandboxNotFound(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// Create a Boxer
-	sb, err := NewBoxer(tmpDir, "test", nil)
-	if err != nil {
-		t.Fatalf("Failed to create Boxer: %v", err)
-	}
-	defer sb.Close()
+	sb := newDBBoxer(t, tmpDir)
 
 	// Try to load a non-existent sandbox
 	ctx := context.Background()
@@ -192,11 +198,7 @@ func TestListSandboxes(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	sb, err := NewBoxer(tmpDir, "test", nil)
-	if err != nil {
-		t.Fatalf("Failed to create Boxer: %v", err)
-	}
-	defer sb.Close()
+	sb := newDBBoxer(t, tmpDir)
 
 	ctx := context.Background()
 
@@ -244,11 +246,7 @@ func TestUpdateContainerID(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	sb, err := NewBoxer(tmpDir, "test", nil)
-	if err != nil {
-		t.Fatalf("Failed to create Boxer: %v", err)
-	}
-	defer sb.Close()
+	sb := newDBBoxer(t, tmpDir)
 
 	ctx := context.Background()
 	sandboxDir := filepath.Join(tmpDir, "test-update")
@@ -289,11 +287,7 @@ func TestGetSandboxesByImage(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	sb, err := NewBoxer(tmpDir, "test", nil)
-	if err != nil {
-		t.Fatalf("Failed to create Boxer: %v", err)
-	}
-	defer sb.Close()
+	sb := newDBBoxer(t, tmpDir)
 
 	ctx := context.Background()
 

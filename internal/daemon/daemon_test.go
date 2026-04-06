@@ -8,7 +8,24 @@ import (
 	"time"
 
 	"github.com/banksean/sand/internal/daemon/internal/boxer"
+	"github.com/banksean/sand/internal/hostops"
 )
+
+// newDaemonForTest creates a Daemon with a cross-platform test Boxer pre-injected,
+// avoiding the darwin-specific NewBoxer constructor.
+func newDaemonForTest(t *testing.T, appDir string) *Daemon {
+	t.Helper()
+	b, err := boxer.NewBoxerWithDeps(appDir, boxer.BoxerDeps{
+		ContainerService: &hostops.MockContainerOps{},
+	})
+	if err != nil {
+		t.Fatalf("NewBoxerWithDeps: %v", err)
+	}
+	t.Cleanup(func() { b.Close() })
+	d := NewDaemon(appDir, "test")
+	d.boxer = b
+	return d
+}
 
 func TestMuxHTTPPing(t *testing.T) {
 	// Create a temporary directory for the mux
@@ -19,7 +36,7 @@ func TestMuxHTTPPing(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// Create and start mux
-	mux := NewDaemon(tmpDir, "test")
+	mux := newDaemonForTest(t, tmpDir)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -75,7 +92,7 @@ func TestMuxHTTPList(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// Create and start mux
-	mux := NewDaemon(tmpDir, "test")
+	mux := newDaemonForTest(t, tmpDir)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -125,7 +142,7 @@ func TestMuxHTTPVersion(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// Create and start mux
-	mux := NewDaemon(tmpDir, "test")
+	mux := newDaemonForTest(t, tmpDir)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -173,12 +190,6 @@ func TestMuxPingNotRunning(t *testing.T) {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-
-	sber, err := boxer.NewBoxer(tmpDir, "test", nil)
-	if err != nil {
-		t.Fatalf("Failed to create Boxer: %v", err)
-	}
-	defer sber.Close()
 
 	ctx := context.Background()
 

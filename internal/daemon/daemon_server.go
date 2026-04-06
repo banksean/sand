@@ -92,15 +92,16 @@ func (d *Daemon) startDaemonServer(ctx context.Context) error {
 	d.outieListener = unixListener
 
 	d.shutdown = make(chan any)
-	sber, err := boxer.NewBoxer(d.AppBaseDir, d.LocalDomain, os.Stderr)
-	if err != nil {
-		return err
+	if d.boxer == nil {
+		sber, err := boxer.NewBoxer(d.AppBaseDir, d.LocalDomain, os.Stderr)
+		if err != nil {
+			return err
+		}
+		d.boxer = sber
 	}
-	if err := sber.Sync(ctx); err != nil {
+	if err := d.boxer.Sync(ctx); err != nil {
 		return fmt.Errorf("failed to sync Boxer db with current environment state: %v\n", err)
 	}
-
-	d.boxer = sber
 	// Handle cleanup on shutdown
 	go d.waitForShutdown(ctx)
 
