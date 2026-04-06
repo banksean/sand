@@ -41,148 +41,6 @@ func (m *mockImageOps) Pull(ctx context.Context, image string) (func() error, er
 	return func() error { return nil }, nil
 }
 
-type mockGitOps struct {
-	addRemoteFunc    func(ctx context.Context, dir, name, url string) error
-	removeRemoteFunc func(ctx context.Context, dir, name string) error
-	fetchFunc        func(ctx context.Context, dir, remote string) error
-	topLevelFunc     func(ctx context.Context, dir string) string
-	remoteURLFunc    func(ctx context.Context, dir, name string) string
-	branchFunc       func(ctx context.Context, dir string) string
-	commitFunc       func(ctx context.Context, dir string) string
-	isDirtyFunc      func(ctx context.Context, dir string) bool
-}
-
-func (m *mockGitOps) AddRemote(ctx context.Context, dir, name, url string) error {
-	if m.addRemoteFunc != nil {
-		return m.addRemoteFunc(ctx, dir, name, url)
-	}
-	return nil
-}
-
-func (m *mockGitOps) RemoveRemote(ctx context.Context, dir, name string) error {
-	if m.removeRemoteFunc != nil {
-		return m.removeRemoteFunc(ctx, dir, name)
-	}
-	return nil
-}
-
-func (m *mockGitOps) Fetch(ctx context.Context, dir, remote string) error {
-	if m.fetchFunc != nil {
-		return m.fetchFunc(ctx, dir, remote)
-	}
-	return nil
-}
-
-func (m *mockGitOps) TopLevel(ctx context.Context, dir string) string {
-	if m.topLevelFunc != nil {
-		return m.topLevelFunc(ctx, dir)
-	}
-	return ""
-}
-
-func (m *mockGitOps) RemoteURL(ctx context.Context, dir, name string) string {
-	if m.remoteURLFunc != nil {
-		return m.remoteURLFunc(ctx, dir, name)
-	}
-	return ""
-}
-
-func (m *mockGitOps) Branch(ctx context.Context, dir string) string {
-	if m.branchFunc != nil {
-		return m.branchFunc(ctx, dir)
-	}
-	return ""
-}
-
-func (m *mockGitOps) Commit(ctx context.Context, dir string) string {
-	if m.commitFunc != nil {
-		return m.commitFunc(ctx, dir)
-	}
-	return ""
-}
-
-func (m *mockGitOps) IsDirty(ctx context.Context, dir string) bool {
-	if m.isDirtyFunc != nil {
-		return m.isDirtyFunc(ctx, dir)
-	}
-	return false
-}
-
-type mockFileOps struct {
-	mkdirAllFunc  func(path string, perm os.FileMode) error
-	copyFunc      func(ctx context.Context, src, dst string) error
-	statFunc      func(path string) (os.FileInfo, error)
-	lstatFunc     func(path string) (os.FileInfo, error)
-	readlinkFunc  func(path string) (string, error)
-	createFunc    func(path string) (*os.File, error)
-	removeAllFunc func(path string) error
-	writeFileFunc func(path string, data []byte, perm os.FileMode) error
-	volumeFunc    func(path string) (*hostops.VolumeInfo, error)
-}
-
-func (m *mockFileOps) MkdirAll(path string, perm os.FileMode) error {
-	if m.mkdirAllFunc != nil {
-		return m.mkdirAllFunc(path, perm)
-	}
-	return nil
-}
-
-func (m *mockFileOps) Copy(ctx context.Context, src, dst string) error {
-	if m.copyFunc != nil {
-		return m.copyFunc(ctx, src, dst)
-	}
-	return nil
-}
-
-func (m *mockFileOps) Stat(path string) (os.FileInfo, error) {
-	if m.statFunc != nil {
-		return m.statFunc(path)
-	}
-	return nil, nil
-}
-
-func (m *mockFileOps) Lstat(path string) (os.FileInfo, error) {
-	if m.lstatFunc != nil {
-		return m.lstatFunc(path)
-	}
-	return nil, nil
-}
-
-func (m *mockFileOps) Readlink(path string) (string, error) {
-	if m.readlinkFunc != nil {
-		return m.readlinkFunc(path)
-	}
-	return "", nil
-}
-
-func (m *mockFileOps) Create(path string) (*os.File, error) {
-	if m.createFunc != nil {
-		return m.createFunc(path)
-	}
-	return nil, nil
-}
-
-func (m *mockFileOps) RemoveAll(path string) error {
-	if m.removeAllFunc != nil {
-		return m.removeAllFunc(path)
-	}
-	return nil
-}
-
-func (m *mockFileOps) WriteFile(path string, data []byte, perm os.FileMode) error {
-	if m.writeFileFunc != nil {
-		return m.writeFileFunc(path, data, perm)
-	}
-	return nil
-}
-
-func (m *mockFileOps) Volume(path string) (*hostops.VolumeInfo, error) {
-	if m.volumeFunc != nil {
-		return m.volumeFunc(path)
-	}
-	return nil, nil
-}
-
 type mockSSHimmer struct {
 	newKeysFunc func(ctx context.Context, domain string) (*sshimmer.Keys, error)
 }
@@ -205,16 +63,16 @@ func newTestBoxer(t *testing.T, containerOps hostops.ContainerOps, imageOps host
 	boxer, err := NewBoxerWithDeps(tmpDir, BoxerDeps{
 		ContainerService: containerOps,
 		ImageService:     imageOps,
-		GitOps:           &mockGitOps{},
+		GitOps:           &hostops.MockGitOps{},
 		SSHim:            &mockSSHimmer{},
-		FileOps: &mockFileOps{
-			lstatFunc: func(path string) (os.FileInfo, error) {
+		FileOps: &hostops.MockFileOps{
+			LstatFunc: func(path string) (os.FileInfo, error) {
 				return nil, os.ErrNotExist
 			},
-			createFunc: func(path string) (*os.File, error) {
+			CreateFunc: func(path string) (*os.File, error) {
 				return nil, nil
 			},
-			mkdirAllFunc: func(path string, perm os.FileMode) error {
+			MkdirAllFunc: func(path string, perm os.FileMode) error {
 				return nil
 			},
 		},
@@ -241,9 +99,9 @@ func TestBoxer_NewSandbox_EndToEnd(t *testing.T) {
 		mockImage := &mockImageOps{}
 
 		boxer := newTestBoxer(t, mockContainer, mockImage)
-		boxer.FileOps = &mockFileOps{
-			mkdirAllFunc: os.MkdirAll,
-			createFunc:   os.Create,
+		boxer.FileOps = &hostops.MockFileOps{
+			MkdirAllFunc: os.MkdirAll,
+			CreateFunc:   os.Create,
 		}
 
 		// Register a test agent in the registry
@@ -460,15 +318,15 @@ func TestBoxer_Cleanup_EndToEnd(t *testing.T) {
 			},
 		}
 
-		mockGit := &mockGitOps{
-			removeRemoteFunc: func(ctx context.Context, dir, name string) error {
+		mockGit := &hostops.MockGitOps{
+			RemoveRemoteFunc: func(ctx context.Context, dir, name string) error {
 				removeRemoteCalls = append(removeRemoteCalls, struct{ dir, name string }{dir, name})
 				return nil
 			},
 		}
 
-		mockFile := &mockFileOps{
-			removeAllFunc: func(path string) error {
+		mockFile := &hostops.MockFileOps{
+			RemoveAllFunc: func(path string) error {
 				removeAllCalls = append(removeAllCalls, path)
 				return nil
 			},
@@ -539,8 +397,8 @@ func TestBoxer_Cleanup_EndToEnd(t *testing.T) {
 			},
 		}
 
-		mockFile := &mockFileOps{
-			removeAllFunc: func(path string) error {
+		mockFile := &hostops.MockFileOps{
+			RemoveAllFunc: func(path string) error {
 				removeAllCalled = true
 				return nil
 			},
@@ -574,8 +432,8 @@ func TestBoxer_Cleanup_EndToEnd(t *testing.T) {
 	t.Run("cleanup returns error on git failure", func(t *testing.T) {
 		expectedErr := errors.New("git remove remote failed")
 		mockContainer := &hostops.MockContainerOps{}
-		mockGit := &mockGitOps{
-			removeRemoteFunc: func(ctx context.Context, dir, name string) error {
+		mockGit := &hostops.MockGitOps{
+			RemoveRemoteFunc: func(ctx context.Context, dir, name string) error {
 				return expectedErr
 			},
 		}
@@ -604,8 +462,8 @@ func TestBoxer_Cleanup_EndToEnd(t *testing.T) {
 	t.Run("cleanup returns error on file removal failure", func(t *testing.T) {
 		expectedErr := errors.New("remove all failed")
 		mockContainer := &hostops.MockContainerOps{}
-		mockFile := &mockFileOps{
-			removeAllFunc: func(path string) error {
+		mockFile := &hostops.MockFileOps{
+			RemoveAllFunc: func(path string) error {
 				return expectedErr
 			},
 		}

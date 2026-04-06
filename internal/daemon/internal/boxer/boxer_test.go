@@ -17,8 +17,8 @@ func newDBBoxer(t *testing.T, appRoot string) *Boxer {
 	b, err := NewBoxerWithDeps(appRoot, BoxerDeps{
 		ContainerService: &hostops.MockContainerOps{},
 		ImageService:     &mockImageOps{},
-		GitOps:           &mockGitOps{},
-		FileOps:          &mockFileOps{},
+		GitOps:           &hostops.MockGitOps{},
+		FileOps:          &hostops.MockFileOps{},
 	})
 	if err != nil {
 		t.Fatalf("newDBBoxer: %v", err)
