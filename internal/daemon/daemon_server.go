@@ -49,6 +49,16 @@ type Daemon struct {
 	httpSrv  http.Server
 }
 
+// NewDaemonWithBoxer creates a Daemon with a pre-built Boxer injected.
+// The boxer is used as-is; the daemon will not create a new one at startup.
+// This is the recommended constructor for tests and for callers that need
+// control over the Boxer's dependencies.
+func NewDaemonWithBoxer(appBaseDir, localDomain string, b *boxer.Boxer) *Daemon {
+	d := NewDaemon(appBaseDir, localDomain)
+	d.boxer = b
+	return d
+}
+
 func NewDaemon(appBaseDir, localDomain string) *Daemon {
 	return &Daemon{
 		AppBaseDir:  appBaseDir,

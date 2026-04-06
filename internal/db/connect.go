@@ -24,6 +24,9 @@ func Connect(appRoot string) (*sql.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database at %s: %w", dbPath, err)
 	}
+	// SQLite supports only one writer at a time. Limiting the pool to a single
+	// connection avoids SQLITE_BUSY errors when goroutines write concurrently.
+	sqlDB.SetMaxOpenConns(1)
 	dbDriver, err := sqlite.WithInstance(sqlDB, &sqlite.Config{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database driver: %w", err)
@@ -32,6 +35,11 @@ func Connect(appRoot string) (*sql.DB, error) {
 	if _, err := sqlDB.Exec("PRAGMA journal_mode=WAL"); err != nil {
 		sqlDB.Close()
 		return nil, fmt.Errorf("failed to enable WAL mode: %w", err)
+	}
+	// Retry for up to 5 seconds when the database is locked by a concurrent writer.
+	if _, err := sqlDB.Exec("PRAGMA busy_timeout=5000"); err != nil {
+		sqlDB.Close()
+		return nil, fmt.Errorf("failed to set busy_timeout: %w", err)
 	}
 
 	// Initialize or migrate db schema

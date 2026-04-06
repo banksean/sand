@@ -593,7 +593,7 @@ func (sber *Boxer) StartContainer(ctx context.Context, sb *sandtypes.Box) error 
 	}
 
 	// Get agent config to reconstruct hooks
-	agentConfig := cloning.GetGlobalRegistry().Get(sb.AgentType)
+	agentConfig := sber.AgentRegistry.Get(sb.AgentType)
 	hooks := agentConfig.Configuration.GetStartupHooks(artifacts)
 
 	slog.InfoContext(ctx, "Boxer.StartContainer", "box", *sb, "ContainerHooks", len(hooks))

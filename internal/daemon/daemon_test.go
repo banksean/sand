@@ -22,9 +22,7 @@ func newDaemonForTest(t *testing.T, appDir string) *Daemon {
 		t.Fatalf("NewBoxerWithDeps: %v", err)
 	}
 	t.Cleanup(func() { b.Close() })
-	d := NewDaemon(appDir, "test")
-	d.boxer = b
-	return d
+	return NewDaemonWithBoxer(appDir, "test", b)
 }
 
 func TestMuxHTTPPing(t *testing.T) {
