@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/user"
 	"path/filepath"
 	"strings"
 	"time"
@@ -253,6 +254,10 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 	case "opencode":
 		args = []string{"-c", "opencode --port 80 --hostname " + strings.TrimSuffix(ctrs[0].Networks[0].Hostname, ".")}
 	}
+	userInfo, err := user.Current()
+	if err != nil {
+		return err
+	}
 	wait, err := containerSvc.ExecStream(ctx,
 		&options.ExecContainer{
 			ProcessOptions: options.ProcessOptions{
@@ -261,6 +266,8 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 				WorkDir:     "/app",
 				Env:         env,
 				EnvFile:     sbox.EnvFile,
+				User:        userInfo.Username,
+				UID:         userInfo.Uid,
 			},
 		}, sbox.ContainerID, c.Shell, os.Environ(), os.Stdin, os.Stdout, os.Stderr, args...)
 	if err != nil {

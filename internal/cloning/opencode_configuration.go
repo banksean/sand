@@ -36,17 +36,17 @@ func (c *OpenCodeContainerConfiguration) GetStartupHooks(artifacts CloneArtifact
 
 	// Add OpenCode-specific hooks
 	hooks = append(hooks,
-		c.copyOpenCodeBinaryHook(),
-		c.openSSHTunnelHook(),
+		c.copyOpenCodeBinaryHook(artifacts.Username),
+		c.openSSHTunnelHook(artifacts.Username),
 	)
 
 	return hooks
 }
 
 // copyOpenCodeBinaryHook copies the OpenCode binary to /usr/local/bin in the container.
-func (c *OpenCodeContainerConfiguration) copyOpenCodeBinaryHook() sandtypes.ContainerStartupHook {
+func (c *OpenCodeContainerConfiguration) copyOpenCodeBinaryHook(username string) sandtypes.ContainerStartupHook {
 	return sandtypes.NewContainerStartupHook("Copy opencode binary to /usr/local/bin", func(ctx context.Context, ctr *types.Container, exec sandtypes.StartupHookFunc) error {
-		cpOut, err := exec(ctx, "cp", "-r", "/root/.opencode/bin/opencode", "/usr/local/bin/opencode")
+		cpOut, err := exec(ctx, "cp", "-r", "/home/"+username+"/.opencode/bin/opencode", "/usr/local/bin/opencode")
 		if err != nil {
 			slog.ErrorContext(ctx, "copyOpenCodeBinaryHook copying opencode binary", "error", err, "cpOut", cpOut)
 			return fmt.Errorf("copy opencode binary: %w", err)
@@ -56,12 +56,12 @@ func (c *OpenCodeContainerConfiguration) copyOpenCodeBinaryHook() sandtypes.Cont
 }
 
 // openSSHTunnelHook sets up an SSH reverse tunnel for Chrome DevTools MCP.
-func (c *OpenCodeContainerConfiguration) openSSHTunnelHook() sandtypes.ContainerStartupHook {
+func (c *OpenCodeContainerConfiguration) openSSHTunnelHook(username string) sandtypes.ContainerStartupHook {
 	return sandtypes.NewContainerStartupHook("open remote ssh tunnel for chrome-devtools mcp", func(ctx context.Context, ctr *types.Container, execFn sandtypes.StartupHookFunc) error {
 		hostname := getContainerHostname(ctr)
 
 		// No context - this should run in a separate process that outlives the cloner startup hook invocations.
-		cmd := exec.Command("ssh", "-R", "9222:127.0.0.1:9222", "-N", "-o", "ExitOnForwardFailure=yes", "-o", "BatchMode=yes", "root@"+hostname)
+		cmd := exec.Command("ssh", "-R", "9222:127.0.0.1:9222", "-N", "-o", "ExitOnForwardFailure=yes", "-o", "BatchMode=yes", username+"@"+hostname)
 		cmd.SysProcAttr = &syscall.SysProcAttr{
 			Setpgid: true,
 		}

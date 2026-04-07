@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
 	"strings"
 	"time"
@@ -30,6 +31,7 @@ type Keys struct {
 
 type LocalSSHimmer struct {
 	localDomain string
+	username    string
 
 	knownHostsPath   string
 	userIdentityPath string
@@ -73,8 +75,14 @@ func newLocalSSHimmerWithDeps(ctx context.Context, localDomain string, fs FileSy
 		}
 	}
 
+	currentUser, err := user.Current()
+	if err != nil {
+		return nil, fmt.Errorf("couldn't get current user: %w", err)
+	}
+
 	s := &LocalSSHimmer{
 		localDomain:      localDomain,
+		username:         currentUser.Username,
 		knownHostsPath:   filepath.Join(base, "known_hosts"),
 		userIdentityPath: filepath.Join(base, "user_key"),
 
@@ -108,7 +116,7 @@ func newLocalSSHimmerWithDeps(ctx context.Context, localDomain string, fs FileSy
 	s.userCertificate = userCert.Marshal()
 	userCertBytes := ssh.MarshalAuthorizedKey(userCert)
 	s.writeKeyToFile(userCertBytes, s.userIdentityPath+"-cert.pub")
-	if err := writeSandSSHConfig(s.localDomain, s.fs); err != nil {
+	if err := writeSandSSHConfig(s.localDomain, s.username, s.fs); err != nil {
 		return nil, fmt.Errorf("writeSandSSHConfig: %w", err)
 	}
 	// Load or create the host CA
@@ -286,7 +294,7 @@ func (s *LocalSSHimmer) issueUserCertificate(certPub ssh.PublicKey) (*ssh.Certif
 		Serial:          1,
 		CertType:        ssh.UserCert,
 		KeyId:           "sand-user",
-		ValidPrincipals: []string{"root"},                               // Only valid for root user in container
+		ValidPrincipals: []string{s.username},                          // Valid for the host OS user running sand
 		ValidAfter:      uint64(time.Now().Add(-24 * time.Hour).Unix()), // Valid from 1 day ago
 		ValidBefore:     uint64(time.Now().Add(720 * time.Hour).Unix()), // Valid for 30 days
 		Permissions: ssh.Permissions{
@@ -428,7 +436,7 @@ func CheckForIncludeWithFS(ctx context.Context, fs FileSystem) (func() error, er
 	return nil, nil
 }
 
-func writeSandSSHConfig(localDomain string, fs FileSystem) error {
+func writeSandSSHConfig(localDomain string, username string, fs FileSystem) error {
 	identityPath := filepath.Join(os.Getenv("HOME"), ".config", "sand", "user_key")
 	sandSSHConfigPath := filepath.Join(os.Getenv("HOME"), ".config", "sand", "ssh_config")
 	knownHostsPath := filepath.Join(os.Getenv("HOME"), ".config", "sand", "known_hosts")
@@ -445,10 +453,13 @@ func writeSandSSHConfig(localDomain string, fs FileSystem) error {
 				},
 				Nodes: []ssh_config.Node{
 					&ssh_config.KV{
+						Key:   "User",
+						Value: username,
+					},
+					&ssh_config.KV{
 						Key:   "IdentityFile",
 						Value: identityPath,
 					},
-
 					&ssh_config.KV{
 						Key:   "UserKnownHostsFile",
 						Value: knownHostsPath,

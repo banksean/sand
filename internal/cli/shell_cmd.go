@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/user"
 
 	"github.com/banksean/sand/internal/applecontainer/options"
 	"github.com/banksean/sand/internal/applecontainer/types"
@@ -51,7 +52,10 @@ func (c *ShellCmd) Run(cctx *CLIContext) error {
 			return fmt.Errorf("could not start container for %s: %w", sbox.ID, err)
 		}
 	}
-
+	userInfo, err := user.Current()
+	if err != nil {
+		return err
+	}
 	wait, err := containerSvc.ExecStream(ctx,
 		&options.ExecContainer{
 			ProcessOptions: options.ProcessOptions{
@@ -60,6 +64,8 @@ func (c *ShellCmd) Run(cctx *CLIContext) error {
 				WorkDir:     "/app",
 				Env:         env,
 				EnvFile:     sbox.EnvFile,
+				User:        userInfo.Username,
+				UID:         userInfo.Uid,
 			},
 		}, sbox.ContainerID, c.Shell, os.Environ(), os.Stdin, os.Stdout, os.Stderr)
 	if err != nil {

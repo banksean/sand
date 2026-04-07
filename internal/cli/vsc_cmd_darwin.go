@@ -34,7 +34,7 @@ func (c *VscCmd) Run(cctx *CLIContext) error {
 	}
 
 	hostname := types.GetContainerHostname(ctr)
-	vscCmd := exec.Command("code", "--remote", fmt.Sprintf("ssh-remote+root@%s", hostname), "/app", "-n")
+	vscCmd := exec.Command("code", "--remote", fmt.Sprintf("ssh-remote+%s", hostname), "/app", "-n")
 	slog.InfoContext(ctx, "main: running vsc with", "cmd", strings.Join(vscCmd.Args, " "))
 	out, err := vscCmd.CombinedOutput()
 	if err != nil {

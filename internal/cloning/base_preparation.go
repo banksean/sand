@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/user"
 	"path/filepath"
 
 	"github.com/banksean/sand/internal/hostops"
@@ -56,9 +57,15 @@ func (p *BaseWorkspacePreparation) Prepare(ctx context.Context, req CloneRequest
 		return nil, fmt.Errorf("failed to clone dotfiles for sandbox %s: %w", req.ID, err)
 	}
 
+	currentUser, err := user.Current()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current user for sandbox %s: %w", req.ID, err)
+	}
+
 	return &CloneArtifacts{
 		SandboxWorkDir: sandboxRoot,
 		PathRegistry:   pathRegistry,
+		Username:       currentUser.Username,
 	}, nil
 }
 

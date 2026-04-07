@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"os/user"
 	"path/filepath"
 	"strings"
 	"time"
@@ -585,11 +586,20 @@ func (sber *Boxer) checkImageHasEntrypoint(ctx context.Context, imageName string
 
 // StartContainer starts a container instance. The container must exist, and it should not be in the "running" state.
 func (sber *Boxer) StartContainer(ctx context.Context, sb *sandtypes.Box) error {
+
 	// Reconstruct runtime configuration from agent type
 	pathRegistry := cloning.NewStandardPathRegistry(sb.SandboxWorkDir)
+
+	currentUser, err := user.Current()
+	if err != nil {
+		return fmt.Errorf("failed to get current user for sandbox %s: %w", sb.ID, err)
+	}
+
 	artifacts := cloning.CloneArtifacts{
 		SandboxWorkDir: sb.SandboxWorkDir,
 		PathRegistry:   pathRegistry,
+		Username:       currentUser.Username,
+		Uid:            currentUser.Uid,
 	}
 
 	// Get agent config to reconstruct hooks

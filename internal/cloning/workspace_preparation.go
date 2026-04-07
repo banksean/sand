@@ -25,4 +25,7 @@ type CloneArtifacts struct {
 	SandboxWorkDir string
 	// PathRegistry provides structured access to all paths within the sandbox
 	PathRegistry PathRegistry
+	// Username is the host OS username of the user who invoked sand
+	Username string
+	Uid      string
 }

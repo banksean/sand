@@ -7,6 +7,7 @@ RUN apk add --no-cache \
   bash \
   curl \
   delta \
+  doas \
   fzf \
   git \
   htop \
@@ -40,6 +41,9 @@ ENV EDITOR=nano
 ENV VISUAL=nano
 
 # Configure SSH for GitHub authentication
+# TODO: move this to a container hook so it runs for the actual user name instead of root.
+# For now, we just copy these to the user home dir in defaultContainerHook after we create
+# the user.
 RUN mkdir -p /root/.ssh && \
   chmod 700 /root/.ssh && \
   ssh-keyscan github.com >> /root/.ssh/known_hosts && \
@@ -55,6 +59,13 @@ RUN ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') && \
   tar -C /usr/local/bin -xzf "innie_linux_${ARCH}.tar.gz" && \
   mv /usr/local/bin/innie /usr/local/bin/sand && \
   rm "innie_linux_${ARCH}.tar.gz"
+
+# This is common in Docker to avoid interactive password prompts
+# TODO: nix this, just use doas instead.
+RUN echo '%wheel ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/wheel
+
+# Use doas instead of sudo since we're on alpine:
+RUN echo 'permit nopass :wheel' > /etc/doas.d/doas.conf
 
 ARG ZSH_IN_DOCKER_VERSION=1.2.1
 RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/v${ZSH_IN_DOCKER_VERSION}/zsh-in-docker.sh)" -- \
