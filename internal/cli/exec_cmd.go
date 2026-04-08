@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/user"
 	"time"
 
 	"github.com/banksean/sand/internal/applecontainer/options"
+	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/daemon"
 	"github.com/banksean/sand/internal/hostops"
 	"github.com/goombaio/namegenerator"
@@ -15,7 +17,9 @@ import (
 type ExecCmd struct {
 	SandboxCreationFlags
 	SandboxNameFlag
-	Arg []string `arg:"" passthrough:"" help:"command args to exec in the container"`
+	Username string   `help:"name of user to exec as (defaults to $USER)"`
+	Uid      string   `help:"id of user to exec as (defaults to $UID)"`
+	Arg      []string `arg:"" passthrough:"" help:"command args to exec in the container"`
 }
 
 func (c *ExecCmd) Run(cctx *CLIContext) error {
@@ -42,7 +46,16 @@ func (c *ExecCmd) Run(cctx *CLIContext) error {
 	if c.ImageName == "" {
 		c.ImageName = DefaultImageName
 	}
-
+	userInfo, err := user.Current()
+	if err != nil {
+		return err
+	}
+	if c.Username == "" {
+		c.Username = userInfo.Username
+	}
+	if c.Uid == "" {
+		c.Uid = userInfo.Uid
+	}
 	// Try to get existing sandbox
 	sbox, err := mc.GetSandbox(ctx, c.SandboxName)
 	if err != nil {
@@ -54,6 +67,10 @@ func (c *ExecCmd) Run(cctx *CLIContext) error {
 			ImageName:    c.ImageName,
 			EnvFile:      c.EnvFile,
 			Volumes:      c.Volume,
+			CPUs:         c.CPU,
+			Memory:       c.Memory,
+			Username:     c.Username,
+			Uid:          c.Uid,
 		})
 		if err != nil {
 			slog.ErrorContext(ctx, "CreateSandbox", "error", err)
@@ -74,14 +91,20 @@ func (c *ExecCmd) Run(cctx *CLIContext) error {
 		args = c.Arg[1:]
 	}
 	containerSvc := hostops.NewAppleContainerOps()
+	hostname := types.GetContainerHostname(sbox.Container)
+	env := map[string]string{
+		"HOSTNAME": hostname,
+	}
 	out, err := containerSvc.Exec(ctx,
 		&options.ExecContainer{
 			ProcessOptions: options.ProcessOptions{
 				WorkDir: "/app",
+				Env:     env,
 				EnvFile: sbox.EnvFile,
+				User:    c.Username,
+				UID:     c.Uid,
 			},
-		}, sbox.ContainerID, "/bin/sh", os.Environ(),
-		append([]string{c.Arg[0]}, args...)...)
+		}, sbox.ContainerID, c.Arg[0], os.Environ(), args...)
 	if err != nil {
 		slog.ErrorContext(ctx, "sbox.exec", "error", err, "out", out)
 	}
