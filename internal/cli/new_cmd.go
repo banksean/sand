@@ -197,8 +197,7 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 					User:    c.Username,
 					UID:     c.Uid,
 				},
-			}, sbox.ContainerID, "/bin/sh", os.Environ(),
-			"git", "checkout", "-b", sbox.ID)
+			}, sbox.ContainerID, "git", os.Environ(), "checkout", "-b", sbox.ID)
 		if err != nil {
 			slog.ErrorContext(ctx, "sbox.new git checkout", "error", err, "out", out)
 		}
