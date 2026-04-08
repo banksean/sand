@@ -194,6 +194,8 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 				ProcessOptions: options.ProcessOptions{
 					WorkDir: "/app",
 					EnvFile: sbox.EnvFile,
+					User:    c.Username,
+					UID:     c.Uid,
 				},
 			}, sbox.ContainerID, "/bin/sh", os.Environ(),
 			"git", "checkout", "-b", sbox.ID)
@@ -221,7 +223,8 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 					WorkDir: "/app",
 					EnvFile: sbox.EnvFile,
 					Env:     map[string]string{"SAND_ONESHOT_PROMPT": c.Prompt},
-				},
+					User:    c.Username,
+					UID:     c.Uid},
 			}, sbox.ContainerID, "/bin/sh", os.Environ(),
 			os.Stdin, os.Stdout, os.Stderr,
 			"-c", agentOneShotCmd)
