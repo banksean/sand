@@ -53,6 +53,8 @@ sand new [flags] [SANDBOX-NAME]
 - `-a, --agent` _`<claude|default|opencode>`_ - name of coding agent to use (default: `default`)
 - `-b, --branch` - create a new git branch inside the sandbox _container_ (not on your host workdir)
 - `-p, --prompt` _`<prompt>`_ - start the agent with this prompt in non-interactive (one-shot) mode and return immediately
+- `--username` _`STRING`_ - name of default user to create (defaults to $USER)
+- `--uid` _`STRING`_ - id of default user to create (defaults to $UID)
 
 ## `sand shell`
 
