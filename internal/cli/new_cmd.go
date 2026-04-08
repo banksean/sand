@@ -98,8 +98,14 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 	// Check to make sure c.ImageName is already pulled and available first, so we
 	// don't block creating the new container on downloading the image for it.
 	if exists := runtimedeps.CheckImageExistsLocally(cctx.Context, c.ImageName); !exists {
-		fmt.Printf("Pulling image %s...", c.ImageName)
-		applecontainer.Images.Pull(ctx, c.ImageName)
+		fmt.Printf("Pulling image %s...\n", c.ImageName)
+		wait, err := applecontainer.Images.Pull(ctx, c.ImageName)
+		if err != nil {
+			return fmt.Errorf("couldn't initiate image pull for %s: %w", c.ImageName, err)
+		}
+		if err := wait(); err != nil {
+			return fmt.Errorf("couldn't pull image %s: %w", c.ImageName, err)
+		}
 	}
 
 	// If the image is from a remote registry, check if we have the most recent version of it.

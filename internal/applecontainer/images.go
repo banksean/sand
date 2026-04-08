@@ -35,6 +35,7 @@ func (i *ImagesSvc) List(ctx context.Context) ([]types.ImageEntry, error) {
 
 // Inspect returns details about the image with the given name, or an error.
 func (i *ImagesSvc) Inspect(ctx context.Context, name string) ([]*types.ImageManifest, error) {
+	slog.InfoContext(ctx, "ImageSvc.Inspect", "cmd", "container image inspect "+name)
 	rawJSON, err := exec.CommandContext(ctx, "container", "image", "inspect", name).Output()
 	if err != nil {
 		return nil, err
@@ -42,10 +43,8 @@ func (i *ImagesSvc) Inspect(ctx context.Context, name string) ([]*types.ImageMan
 
 	var entries []*types.ImageManifest
 	if err := json.Unmarshal([]byte(rawJSON), &entries); err != nil {
+		slog.ErrorContext(ctx, "ImageSvc.Inspect json parse error", "image", name, "error", err)
 		return nil, fmt.Errorf("failed to parse image JSON: %w", err)
-	}
-	if len(entries) == 0 {
-		return nil, fmt.Errorf("no image entries found in inspect output")
 	}
 	return entries, nil
 }

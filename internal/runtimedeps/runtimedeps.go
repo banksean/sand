@@ -239,11 +239,11 @@ func CheckImageExistsLocally(ctx context.Context, imageName string) bool {
 func CheckImageIsLatest(ctx context.Context, imageName string) (bool, error) {
 	remoteDigest, err := crane.Digest(imageName, crane.WithAuth(authn.Anonymous))
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("failed to get digest for %s from remote registry: %w", imageName, err)
 	}
 	imgs, err := applecontainer.Images.Inspect(ctx, imageName)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("failed to inspect local registry for %s: %w", imageName, err)
 	}
 	if len(imgs) == 0 {
 		return false, fmt.Errorf("not found in local registry: %s", imageName)
