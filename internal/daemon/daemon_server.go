@@ -42,6 +42,13 @@ type Daemon struct {
 
 	innieServersMu sync.Mutex
 	// TODO: sync with container lifecycle for cases like restarting sandd with sandboxes running.
+	// Note that this is particularly tricky because apple/container appears to treat these volume
+	// mounted socket files as special cases by using some kind of VSOCK magic. Whatever it is,
+	// it doesn't appear to get re-established by apple/container automatically.
+	//
+	// For now, just be aware that restarting the daemon means that any running sandbox containers
+	// won't be able to talk to sandd on the host machine any more (unless they restart the sandbox
+	// manually, after the daemon restart).
 	innieServers map[string]*http.Server
 
 	lockFile *os.File
