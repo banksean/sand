@@ -203,7 +203,7 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 		agentOneShotCmd := ""
 		switch c.Agent {
 		case "claude":
-			agentOneShotCmd = `claude --permission-mode=auto --print "$SAND_ONESHOT_PROMPT"`
+			agentOneShotCmd = `claude --permission-mode=bypassPermissions --print "$SAND_ONESHOT_PROMPT"`
 		case "opencode":
 			agentOneShotCmd = `opencode run "$SAND_ONESHOT_PROMPT"`
 		default:
@@ -263,7 +263,7 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 	var args []string
 	switch c.Agent {
 	case "claude":
-		args = []string{"-c", "claude --permission-mode=auto"}
+		args = []string{"-c", "claude --permission-mode=bypassPermissions"}
 	case "opencode":
 		args = []string{"-c", "opencode --port 80 --hostname " + strings.TrimSuffix(ctrs[0].Networks[0].Hostname, ".")}
 	}
