@@ -52,9 +52,13 @@ func (c *ShellCmd) Run(cctx *CLIContext) error {
 			return fmt.Errorf("could not start container for %s: %w", sbox.ID, err)
 		}
 	}
-	userInfo, err := user.Current()
-	if err != nil {
-		return err
+	if sbox.Username == "" {
+		userInfo, err := user.Current()
+		if err != nil {
+			return err
+		}
+		sbox.Username = userInfo.Username
+		sbox.Uid = userInfo.Uid
 	}
 	wait, err := containerSvc.ExecStream(ctx,
 		&options.ExecContainer{
@@ -64,8 +68,8 @@ func (c *ShellCmd) Run(cctx *CLIContext) error {
 				WorkDir:     "/app",
 				Env:         env,
 				EnvFile:     sbox.EnvFile,
-				User:        userInfo.Username,
-				UID:         userInfo.Uid,
+				User:        sbox.Username,
+				UID:         sbox.Uid,
 			},
 		}, sbox.ContainerID, c.Shell, os.Environ(), os.Stdin, os.Stdout, os.Stderr)
 	if err != nil {

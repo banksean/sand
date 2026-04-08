@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kevinburke/ssh_config"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -347,7 +348,7 @@ func TestCreateKeyPairIfMissing(t *testing.T) {
 
 func TestNewKeys(t *testing.T) {
 	ssh, mockFS, mockKG := setupTestLocalSSHimmer(t)
-	keys, err := ssh.NewKeys(t.Context(), "test-host-name")
+	keys, err := ssh.NewKeys(t.Context(), "test-host-name", "test-username")
 	if err != nil {
 		t.Errorf("NewKeys should return nil err, but it returned %s", err.Error())
 	}
@@ -451,6 +452,151 @@ func TestLocalSSHimmerWithErrors(t *testing.T) {
 	_, err = newLocalSSHimmerWithDeps(t.Context(), "test", mockFS, mockKG)
 	if err == nil || !strings.Contains(err.Error(), "key generation error") {
 		t.Errorf("Should have failed with key generation error, got: %v", err)
+	}
+}
+
+func TestAddIndentityTo_existingCfgNoUsers(t *testing.T) {
+	hostPat, _ := ssh_config.NewPattern("*.test")
+	cfg := &ssh_config.Config{
+		Hosts: []*ssh_config.Host{
+			{
+				Patterns: []*ssh_config.Pattern{
+					hostPat,
+				},
+				Nodes: []ssh_config.Node{
+					&ssh_config.KV{
+						Key:   "UserKnownHostsFile",
+						Value: "knownHostsPath",
+					},
+					&ssh_config.KV{
+						Key:   "CanonicalizeHostname",
+						Value: "yes",
+					},
+					&ssh_config.KV{
+						Key:   "CanonicalDomains",
+						Value: "test",
+					},
+				},
+			},
+		},
+	}
+	if err := addIndentityTo(cfg, hostPat, "knownHosts", "test", "testuser", "/Users/testuser/.config/sand/user_key-testuser"); err != nil {
+		t.Error(err)
+	}
+	if len(cfg.Hosts) != 1 {
+		t.Errorf("cfg.Hosts: expected 1, got %d", len(cfg.Hosts))
+		t.Fail()
+	}
+	if len(cfg.Hosts[0].Patterns) != 1 {
+		t.Errorf("cfg.Hosts[0].Patterns: expected 1, got %d", len(cfg.Hosts[0].Patterns))
+		t.Fail()
+	}
+	nodes := cfg.Hosts[0].Nodes
+	if len(nodes) != 5 {
+		t.Errorf("nodes: expected 5, got %d", len(nodes))
+		t.Fail()
+	}
+}
+
+func TestAddIndentityTo_existingCfgDupUser(t *testing.T) {
+	hostPat, _ := ssh_config.NewPattern("*.test")
+	cfg := &ssh_config.Config{
+		Hosts: []*ssh_config.Host{
+			{
+				Patterns: []*ssh_config.Pattern{
+					hostPat,
+				},
+				Nodes: []ssh_config.Node{
+					&ssh_config.KV{
+						Key:   "UserKnownHostsFile",
+						Value: "knownHostsPath",
+					},
+					&ssh_config.KV{
+						Key:   "CanonicalizeHostname",
+						Value: "yes",
+					},
+					&ssh_config.KV{
+						Key:   "CanonicalDomains",
+						Value: "test",
+					},
+					&ssh_config.KV{
+						Key:   "User",
+						Value: "testuser",
+					},
+					&ssh_config.KV{
+						Key:   "IdentityFile",
+						Value: "/Users/testuser/.config/sand/user_key-testuser",
+					},
+				},
+			},
+		},
+	}
+	if err := addIndentityTo(cfg, hostPat, "knownHosts", "test", "testuser", "/Users/testuser/.config/sand/user_key-testuser"); err != nil {
+		t.Error(err)
+	}
+	if len(cfg.Hosts) != 1 {
+		t.Errorf("cfg.Hosts: expected 1, got %d", len(cfg.Hosts))
+		t.Fail()
+	}
+	if len(cfg.Hosts[0].Patterns) != 1 {
+		t.Errorf("cfg.Hosts[0].Patterns: expected 1, got %d", len(cfg.Hosts[0].Patterns))
+		t.Fail()
+	}
+	nodes := cfg.Hosts[0].Nodes
+	if len(nodes) != 5 {
+		t.Errorf("nodes: expected 5, got %d", len(nodes))
+		t.Fail()
+	}
+}
+
+func TestAddIndentityTo_existingCfgNewUser(t *testing.T) {
+	hostPat, _ := ssh_config.NewPattern("*.test")
+	cfg := &ssh_config.Config{
+		Hosts: []*ssh_config.Host{
+			{
+				Patterns: []*ssh_config.Pattern{
+					hostPat,
+				},
+				Nodes: []ssh_config.Node{
+					&ssh_config.KV{
+						Key:   "UserKnownHostsFile",
+						Value: "knownHostsPath",
+					},
+					&ssh_config.KV{
+						Key:   "CanonicalizeHostname",
+						Value: "yes",
+					},
+					&ssh_config.KV{
+						Key:   "CanonicalDomains",
+						Value: "test",
+					},
+					&ssh_config.KV{
+						Key:   "User",
+						Value: "testuser",
+					},
+					&ssh_config.KV{
+						Key:   "IdentityFile",
+						Value: "/Users/testuser/.config/sand/user_key-testuser",
+					},
+				},
+			},
+		},
+	}
+	if err := addIndentityTo(cfg, hostPat, "knownHosts", "test", "testuser2", "/Users/testuser/.config/sand/user_key-testuser2"); err != nil {
+		t.Error(err)
+	}
+	if len(cfg.Hosts) != 1 {
+		t.Errorf("cfg.Hosts: expected 1, got %d", len(cfg.Hosts))
+		t.Fail()
+	}
+	if len(cfg.Hosts[0].Patterns) != 1 {
+		t.Errorf("cfg.Hosts[0].Patterns: expected 1, got %d", len(cfg.Hosts[0].Patterns))
+		t.Fail()
+	}
+	nodes := cfg.Hosts[0].Nodes
+	if len(nodes) != 7 {
+		t.Errorf("nodes: expected 7, got %d", len(nodes))
+		t.Fail()
 	}
 }
 

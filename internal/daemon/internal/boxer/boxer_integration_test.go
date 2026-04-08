@@ -42,12 +42,12 @@ func (m *mockImageOps) Pull(ctx context.Context, image string) (func() error, er
 }
 
 type mockSSHimmer struct {
-	newKeysFunc func(ctx context.Context, domain string) (*sshimmer.Keys, error)
+	newKeysFunc func(ctx context.Context, domain, username string) (*sshimmer.Keys, error)
 }
 
-func (m *mockSSHimmer) NewKeys(ctx context.Context, domain string) (*sshimmer.Keys, error) {
+func (m *mockSSHimmer) NewKeys(ctx context.Context, domain, username string) (*sshimmer.Keys, error) {
 	if m.newKeysFunc != nil {
-		return m.newKeysFunc(ctx, domain)
+		return m.newKeysFunc(ctx, domain, username)
 	}
 	return &sshimmer.Keys{
 		HostKey:     []byte("fake-host-key"),
@@ -122,7 +122,7 @@ func TestBoxer_NewSandbox_EndToEnd(t *testing.T) {
 		})
 
 		hostWorkDir := t.TempDir()
-		result, err := boxer.NewSandbox(ctx, "test-agent", "test-sandbox", hostWorkDir, "test-image:latest", "", nil, nil, 2, 1024)
+		result, err := boxer.NewSandbox(ctx, "test-agent", "test-sandbox", hostWorkDir, "test-image:latest", "", "", "", nil, nil, 2, 1024)
 		if err != nil {
 			t.Fatalf("NewSandbox() error = %v", err)
 		}
@@ -173,7 +173,7 @@ func TestBoxer_NewSandbox_EndToEnd(t *testing.T) {
 			Configuration: testConfig,
 		})
 
-		_, err := boxer.NewSandbox(ctx, "test-error-agent", "test-sandbox", "/host/work", "test-image", "", nil, nil, 2, 1024)
+		_, err := boxer.NewSandbox(ctx, "test-error-agent", "test-sandbox", "/host/work", "test-image", "", "", "", nil, nil, 2, 1024)
 		if err == nil {
 			t.Fatal("Expected error from preparation, got nil")
 		}

@@ -26,6 +26,8 @@ type NewCmd struct {
 	Agent       string `short:"a" default:"default" placeholder:"<claude|default|opencode>" help:"name of coding agent to use"`
 	Branch      bool   `short:"b" help:"create a new git branch inside the sandbox _container_ (not on your host workdir)"`
 	Prompt      string `short:"p" placeholder:"<prompt>" help:"start the agent with this prompt in non-interactive (one-shot) mode and return immediately"`
+	Username    string `help:"name of default user to create (defaults to $USER)"`
+	Uid         string `help:"id of default user to create (defaults to $UID)"`
 	SandboxName string `arg:"" optional:"" help:"name of the sandbox to create"`
 }
 
@@ -55,7 +57,16 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 	if c.CloneFromDir == "" {
 		c.CloneFromDir = cwd
 	}
-
+	userInfo, err := user.Current()
+	if err != nil {
+		return err
+	}
+	if c.Username == "" {
+		c.Username = userInfo.Username
+	}
+	if c.Uid == "" {
+		c.Uid = userInfo.Uid
+	}
 	// Generate a new ID if one was not provided
 	if c.SandboxName == "" {
 		seed := time.Now().UTC().UnixNano()
@@ -137,6 +148,8 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 			Volumes:        c.Volume,
 			CPUs:           c.CPU,
 			Memory:         c.Memory,
+			Username:       c.Username,
+			Uid:            c.Uid,
 		})
 		if err != nil {
 			slog.ErrorContext(ctx, "CreateSandbox", "error", err)
@@ -254,10 +267,7 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 	case "opencode":
 		args = []string{"-c", "opencode --port 80 --hostname " + strings.TrimSuffix(ctrs[0].Networks[0].Hostname, ".")}
 	}
-	userInfo, err := user.Current()
-	if err != nil {
-		return err
-	}
+
 	wait, err := containerSvc.ExecStream(ctx,
 		&options.ExecContainer{
 			ProcessOptions: options.ProcessOptions{
@@ -266,8 +276,8 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 				WorkDir:     "/app",
 				Env:         env,
 				EnvFile:     sbox.EnvFile,
-				User:        userInfo.Username,
-				UID:         userInfo.Uid,
+				User:        c.Username,
+				UID:         c.Uid,
 			},
 		}, sbox.ContainerID, c.Shell, os.Environ(), os.Stdin, os.Stdout, os.Stderr, args...)
 	if err != nil {

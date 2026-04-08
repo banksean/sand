@@ -657,11 +657,14 @@ func (d *Daemon) StartSandbox(ctx context.Context, id string) error {
 }
 
 type CreateSandboxOpts struct {
-	ID             string   `json:"id,omitempty"`
-	CloneFromDir   string   `json:"cloneFromDir,omitempty"`
-	ImageName      string   `json:"imageName,omitempty"`
-	EnvFile        string   `json:"envFile,omitempty"`
-	Agent          string   `json:"agent,omitempty"`
+	ID           string `json:"id,omitempty"`
+	CloneFromDir string `json:"cloneFromDir,omitempty"`
+	ImageName    string `json:"imageName,omitempty"`
+	EnvFile      string `json:"envFile,omitempty"`
+	Agent        string `json:"agent,omitempty"`
+	Username     string `json:"username,omitempty"`
+	Uid          string `json:"uid,omitempty"`
+
 	AllowedDomains []string `json:"allowedDomains,omitempty"`
 	Volumes        []string `json:"volumes,omitempty"`
 	CPUs           int      `json:"cpus"`
@@ -674,14 +677,15 @@ func (d *Daemon) createSandbox(ctx context.Context, opts CreateSandboxOpts) (*sa
 	if agentType == "" {
 		agentType = "default"
 	}
-	slog.InfoContext(ctx, "CreateSandbox", "agentType", agentType, "opts", opts)
+	slog.InfoContext(ctx, "createSandbox", "agentType", agentType, "opts", opts)
 
+	// TODO: holy hell, just pass opts here instead of each field individually.
 	sbox, err := d.boxer.NewSandbox(ctx, agentType, opts.ID, opts.CloneFromDir, opts.ImageName,
-		opts.EnvFile, opts.AllowedDomains, opts.Volumes, opts.CPUs, opts.Memory)
+		opts.EnvFile, opts.Username, opts.Uid, opts.AllowedDomains, opts.Volumes, opts.CPUs, opts.Memory)
 	if err != nil {
 		return nil, err
 	}
-	slog.InfoContext(ctx, "CreateSandbox", "sbox", sbox)
+	slog.InfoContext(ctx, "createSandbox", "sbox", sbox)
 
 	ctr, err := d.boxer.GetContainer(ctx, sbox.ContainerID)
 

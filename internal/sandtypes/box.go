@@ -49,6 +49,11 @@ type Box struct {
 	// a sandbox container instance if the sandbox's work dir is not available.
 	SandboxWorkDirError   string
 	SandboxContainerError string
+	// Username is the name of the default user to create for the container
+	Username string
+	// Uid is the uid of the default user to create for the container
+	Uid string
+
 	// ContainerHooks run after the container has started to perform any bootstrap logic.
 	ContainerHooks     []ContainerStartupHook `json:"-"`
 	OriginalGitDetails *GitDetails

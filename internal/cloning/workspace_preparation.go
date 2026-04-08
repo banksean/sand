@@ -17,6 +17,8 @@ type CloneRequest struct {
 	ID          string
 	HostWorkDir string
 	EnvFile     string
+	Username    string
+	Uid         string
 }
 
 // CloneArtifacts describes the file system artifacts created during workspace preparation.

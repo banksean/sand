@@ -9,7 +9,6 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"os/user"
 	"path/filepath"
 	"strings"
 	"time"
@@ -32,7 +31,7 @@ const (
 
 // SSHimmer provisions SSH keys for a new sandbox.
 type SSHimmer interface {
-	NewKeys(ctx context.Context, domain string) (*sshimmer.Keys, error)
+	NewKeys(ctx context.Context, domain, username string) (*sshimmer.Keys, error)
 }
 
 // Boxer manages the lifecycle of sandboxes.
@@ -175,7 +174,7 @@ func (b *Boxer) SyncBox(ctx context.Context, sb *sandtypes.Box) error {
 // NewSandbox creates a new sandbox based on a clone of hostWorkDir.
 // TODO: clone envFile, if it exists, into the sandbox clone so every command exec'd in that sandbox container
 // uses the same env file, even if the original .env file has changed on the host machine.
-func (sb *Boxer) NewSandbox(ctx context.Context, agentType, id, hostWorkDir, imageName, envFile string, allowedDomains, volumes []string, cpus, memory int) (*sandtypes.Box, error) {
+func (sb *Boxer) NewSandbox(ctx context.Context, agentType, id, hostWorkDir, imageName, envFile, username, uid string, allowedDomains, volumes []string, cpus, memory int) (*sandtypes.Box, error) {
 	slog.InfoContext(ctx, "Boxer.NewSandbox", "hostWorkDir", hostWorkDir, "id", id, "agentType", agentType)
 
 	// Get agent configuration from registry
@@ -189,6 +188,8 @@ func (sb *Boxer) NewSandbox(ctx context.Context, agentType, id, hostWorkDir, ima
 		ID:          id,
 		HostWorkDir: hostWorkDir,
 		EnvFile:     envFile,
+		Username:    username,
+		Uid:         uid,
 	})
 	if err != nil {
 		return nil, err
@@ -199,7 +200,7 @@ func (sb *Boxer) NewSandbox(ctx context.Context, agentType, id, hostWorkDir, ima
 	hooks := agentConfig.Configuration.GetStartupHooks(*artifacts)
 
 	// TODO: move this to .Hydrate? Or make it a startup hook?
-	keys, err := sb.SSHim.NewKeys(ctx, id+".test")
+	keys, err := sb.SSHim.NewKeys(ctx, id+".test", username) // pass username here!
 	if err != nil {
 		slog.ErrorContext(ctx, "Boxer.NewSanbox: sshim.Povision", "error", err)
 		return nil, err
@@ -245,6 +246,8 @@ func (sb *Boxer) NewSandbox(ctx context.Context, agentType, id, hostWorkDir, ima
 		Keys:           keys,
 		CPUs:           cpus,
 		MemoryMB:       memory,
+		Username:       username,
+		Uid:            uid,
 		OriginalGitDetails: &sandtypes.GitDetails{
 			RemoteOrigin: gitRemote,
 			Branch:       gitBranch,
@@ -420,6 +423,8 @@ func (sb *Boxer) sandboxFromDB(s *db.Sandbox) *sandtypes.Box {
 		},
 		CPUs:     fromNullInt(s.Cpu),
 		MemoryMB: fromNullInt(s.MemoryMb),
+		Username: fromNullString(s.DefaultUsername),
+		Uid:      fromNullString(s.DefaultUid),
 	}
 }
 
@@ -590,16 +595,11 @@ func (sber *Boxer) StartContainer(ctx context.Context, sb *sandtypes.Box) error 
 	// Reconstruct runtime configuration from agent type
 	pathRegistry := cloning.NewStandardPathRegistry(sb.SandboxWorkDir)
 
-	currentUser, err := user.Current()
-	if err != nil {
-		return fmt.Errorf("failed to get current user for sandbox %s: %w", sb.ID, err)
-	}
-
 	artifacts := cloning.CloneArtifacts{
 		SandboxWorkDir: sb.SandboxWorkDir,
 		PathRegistry:   pathRegistry,
-		Username:       currentUser.Username,
-		Uid:            currentUser.Uid,
+		Username:       sb.Username,
+		Uid:            sb.Uid,
 	}
 
 	// Get agent config to reconstruct hooks
@@ -611,6 +611,8 @@ func (sber *Boxer) StartContainer(ctx context.Context, sb *sandtypes.Box) error 
 		return err
 	}
 
+	// TODO: figure out how to separate the "run these every time the container starts" hooks from the
+	// "only run these the first time the container starts" hooks.
 	return sber.executeHooks(ctx, sb, hooks)
 }
 
@@ -714,17 +716,19 @@ func (sb *Boxer) SaveSandbox(ctx context.Context, sbox *sandtypes.Box) error {
 	slog.InfoContext(ctx, "Boxer.SaveSandbox", "id", sbox.ID)
 
 	upsertParams := db.UpsertSandboxParams{
-		ID:             sbox.ID,
-		ContainerID:    toNullString(sbox.ContainerID),
-		HostOriginDir:  sbox.HostOriginDir,
-		SandboxWorkDir: sbox.SandboxWorkDir,
-		ImageName:      sbox.ImageName,
-		DnsDomain:      toNullString(sbox.DNSDomain),
-		EnvFile:        toNullString(sbox.EnvFile),
-		AgentType:      toNullString(sbox.AgentType),
-		AllowedDomains: domainsToNullString(sbox.AllowedDomains),
-		Cpu:            toNullInt(sbox.CPUs),
-		MemoryMb:       toNullInt(sbox.MemoryMB),
+		ID:              sbox.ID,
+		ContainerID:     toNullString(sbox.ContainerID),
+		HostOriginDir:   sbox.HostOriginDir,
+		SandboxWorkDir:  sbox.SandboxWorkDir,
+		ImageName:       sbox.ImageName,
+		DnsDomain:       toNullString(sbox.DNSDomain),
+		EnvFile:         toNullString(sbox.EnvFile),
+		AgentType:       toNullString(sbox.AgentType),
+		AllowedDomains:  domainsToNullString(sbox.AllowedDomains),
+		Cpu:             toNullInt(sbox.CPUs),
+		MemoryMb:        toNullInt(sbox.MemoryMB),
+		DefaultUsername: toNullString(sbox.Username),
+		DefaultUid:      toNullString(sbox.Uid),
 	}
 	if sbox.OriginalGitDetails != nil {
 		upsertParams.OriginalGitOrigin = toNullString(sbox.OriginalGitDetails.RemoteOrigin)

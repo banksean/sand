@@ -26,4 +26,6 @@ type Sandbox struct {
 	AllowedDomains     sql.NullString `json:"allowed_domains"`
 	Cpu                sql.NullInt64  `json:"cpu"`
 	MemoryMb           sql.NullInt64  `json:"memory_mb"`
+	DefaultUsername    sql.NullString `json:"default_username"`
+	DefaultUid         sql.NullString `json:"default_uid"`
 }

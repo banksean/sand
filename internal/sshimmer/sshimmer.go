@@ -12,7 +12,6 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
-	"os/user"
 	"path/filepath"
 	"strings"
 	"time"
@@ -31,7 +30,6 @@ type Keys struct {
 
 type LocalSSHimmer struct {
 	localDomain string
-	username    string
 
 	knownHostsPath   string
 	userIdentityPath string
@@ -75,14 +73,8 @@ func newLocalSSHimmerWithDeps(ctx context.Context, localDomain string, fs FileSy
 		}
 	}
 
-	currentUser, err := user.Current()
-	if err != nil {
-		return nil, fmt.Errorf("couldn't get current user: %w", err)
-	}
-
 	s := &LocalSSHimmer{
 		localDomain:      localDomain,
-		username:         currentUser.Username,
 		knownHostsPath:   filepath.Join(base, "known_hosts"),
 		userIdentityPath: filepath.Join(base, "user_key"),
 
@@ -102,23 +94,6 @@ func newLocalSSHimmerWithDeps(ctx context.Context, localDomain string, fs FileSy
 	s.userCA = userCASigner
 	s.userCAPublicKey = userCAPublicKey
 
-	// Load or create the user keypair
-	userPubKey, _, err := s.getOrCreateKeyPair(s.userIdentityPath)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't create user identity from %s: %w", s.userIdentityPath, err)
-	}
-
-	// Issue a user certificate (TODO: skip this if the user key cert file already exits)
-	userCert, err := s.issueUserCertificate(userPubKey)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't issue user cert: %w", err)
-	}
-	s.userCertificate = userCert.Marshal()
-	userCertBytes := ssh.MarshalAuthorizedKey(userCert)
-	s.writeKeyToFile(userCertBytes, s.userIdentityPath+"-cert.pub")
-	if err := writeSandSSHConfig(s.localDomain, s.username, s.fs); err != nil {
-		return nil, fmt.Errorf("writeSandSSHConfig: %w", err)
-	}
 	// Load or create the host CA
 	slog.InfoContext(ctx, "newLocalSSHimmerWithDeps", "getOrCreateCA hostCAPath", s.hostCAPath)
 	hostCASigner, hostCAPublicKey, err := s.getOrCreateCA(s.hostCAPath)
@@ -134,7 +109,7 @@ func newLocalSSHimmerWithDeps(ctx context.Context, localDomain string, fs FileSy
 	return s, nil
 }
 
-func (s *LocalSSHimmer) NewKeys(ctx context.Context, hostName string) (*Keys, error) {
+func (s *LocalSSHimmer) NewKeys(ctx context.Context, hostName, username string) (*Keys, error) {
 	privateKey, publicKey, err := s.kg.GenerateKeyPair()
 	if err != nil {
 		return nil, fmt.Errorf("error generating key pair: %w", err)
@@ -153,6 +128,26 @@ func (s *LocalSSHimmer) NewKeys(ctx context.Context, hostName string) (*Keys, er
 		return nil, fmt.Errorf("couldn't issue host cert: %w", err)
 	}
 
+	// Load or create the user keypair
+	userPubKey, _, err := s.getOrCreateKeyPair(s.userIdentityPath + "-" + username)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't create user identity from %s: %w", s.userIdentityPath+"-"+username, err)
+	}
+
+	// Issue a user certificate (TODO: skip this if the user key cert file already exits)
+	userCert, err := s.issueUserCertificate(userPubKey, username)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't issue user cert: %w", err)
+	}
+	s.userCertificate = userCert.Marshal()
+	userCertBytes := ssh.MarshalAuthorizedKey(userCert)
+	s.writeKeyToFile(userCertBytes, s.userIdentityPath+"-"+username+"-cert.pub")
+	if err := writeSandSSHConfig(s.localDomain, username, s.fs); err != nil {
+		slog.ErrorContext(ctx, "LocalSSHimmer writeSandSSHConfig", "error", err)
+		return nil, fmt.Errorf("writeSandSSHConfig: %w", err)
+	}
+
+	slog.InfoContext(ctx, "LocalSSHimmer wrote sand ssh confg")
 	ret := &Keys{
 		HostKey:     hostPrivKey,
 		HostKeyPub:  ssh.MarshalAuthorizedKey(hostPubKey),
@@ -287,14 +282,14 @@ func (c *LocalSSHimmer) addHostCAToKnownHosts() error {
 	return nil
 }
 
-func (s *LocalSSHimmer) issueUserCertificate(certPub ssh.PublicKey) (*ssh.Certificate, error) {
+func (s *LocalSSHimmer) issueUserCertificate(certPub ssh.PublicKey, username string) (*ssh.Certificate, error) {
 	// Create a new user certificate
 	cert := &ssh.Certificate{
 		Key:             certPub,
 		Serial:          1,
 		CertType:        ssh.UserCert,
 		KeyId:           "sand-user",
-		ValidPrincipals: []string{s.username},                          // Valid for the host OS user running sand
+		ValidPrincipals: []string{username},                             // Valid for the host OS user running sand
 		ValidAfter:      uint64(time.Now().Add(-24 * time.Hour).Unix()), // Valid from 1 day ago
 		ValidBefore:     uint64(time.Now().Add(720 * time.Hour).Unix()), // Valid for 30 days
 		Permissions: ssh.Permissions{
@@ -436,45 +431,135 @@ func CheckForIncludeWithFS(ctx context.Context, fs FileSystem) (func() error, er
 	return nil, nil
 }
 
+func addIndentityTo(cfg *ssh_config.Config, hostPattern *ssh_config.Pattern, knownHostsPath, localDomain, username, identityPath string) error {
+	var cfgHost *ssh_config.Host
+	var idx = -1
+	var host *ssh_config.Host
+	for idx, host = range cfg.Hosts {
+		for _, pat := range host.Patterns {
+			if pat.String() != hostPattern.String() {
+				continue
+			}
+			cfgHost = host
+			break
+		}
+		if cfgHost != nil {
+			break
+		}
+	}
+	if cfgHost == nil {
+		cfgHost = &ssh_config.Host{
+			Patterns: []*ssh_config.Pattern{
+				hostPattern,
+			},
+		}
+	}
+
+	hasUsername := false
+	hasIdentityFile := false
+
+	for _, node := range cfgHost.Nodes {
+		if kv, ok := node.(*ssh_config.KV); ok {
+			if kv.Key == "User" && kv.Value == username {
+				hasUsername = true
+			}
+			if kv.Key == "IdentityFile" && kv.Value == identityPath {
+				hasIdentityFile = true
+			}
+		}
+	}
+
+	if len(cfgHost.Nodes) == 0 {
+		cfgHost.Nodes = []ssh_config.Node{
+			&ssh_config.KV{
+				Key:   "UserKnownHostsFile",
+				Value: knownHostsPath,
+			},
+			&ssh_config.KV{
+				Key:   "CanonicalizeHostname",
+				Value: "yes",
+			},
+			&ssh_config.KV{
+				Key:   "CanonicalDomains",
+				Value: localDomain,
+			},
+		}
+	}
+	if !hasUsername {
+		cfgHost.Nodes = append(cfgHost.Nodes, &ssh_config.KV{
+			Key:   "User",
+			Value: username,
+		})
+	}
+
+	if !hasIdentityFile {
+		cfgHost.Nodes = append(cfgHost.Nodes, &ssh_config.KV{
+			Key:   "IdentityFile",
+			Value: identityPath,
+		})
+	}
+
+	cfg.Hosts[idx] = cfgHost
+	return nil
+}
+
 func writeSandSSHConfig(localDomain string, username string, fs FileSystem) error {
-	identityPath := filepath.Join(os.Getenv("HOME"), ".config", "sand", "user_key")
+	identityPath := filepath.Join(os.Getenv("HOME"), ".config", "sand", "user_key-"+username)
 	sandSSHConfigPath := filepath.Join(os.Getenv("HOME"), ".config", "sand", "ssh_config")
 	knownHostsPath := filepath.Join(os.Getenv("HOME"), ".config", "sand", "known_hosts")
+
+	// Read the existing SSH config file
+	existingContent, err := fs.ReadFile(sandSSHConfigPath)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	// Parse the config file
+	cfg, err := ssh_config.Decode(bytes.NewReader(existingContent))
+	if err != nil {
+		return fmt.Errorf("couldn't decode ssh_config: %w", err)
+	}
 
 	hostPattern, err := ssh_config.NewPattern("*." + localDomain)
 	if err != nil {
 		return err
 	}
-	cfg := &ssh_config.Config{
-		Hosts: []*ssh_config.Host{
-			{
-				Patterns: []*ssh_config.Pattern{
-					hostPattern,
-				},
-				Nodes: []ssh_config.Node{
-					&ssh_config.KV{
-						Key:   "User",
-						Value: username,
+	if cfg != nil && len(cfg.Hosts) > 0 {
+		if err := addIndentityTo(cfg, hostPattern, knownHostsPath, localDomain, username, identityPath); err != nil {
+			return err
+		}
+	} else {
+		cfg = &ssh_config.Config{
+			Hosts: []*ssh_config.Host{
+				{
+					Patterns: []*ssh_config.Pattern{
+						hostPattern,
 					},
-					&ssh_config.KV{
-						Key:   "IdentityFile",
-						Value: identityPath,
-					},
-					&ssh_config.KV{
-						Key:   "UserKnownHostsFile",
-						Value: knownHostsPath,
-					},
-					&ssh_config.KV{
-						Key:   "CanonicalizeHostname",
-						Value: "yes",
-					},
-					&ssh_config.KV{
-						Key:   "CanonicalDomains",
-						Value: localDomain,
+					Nodes: []ssh_config.Node{
+						&ssh_config.KV{
+							Key:   "User",
+							Value: username,
+						},
+						&ssh_config.KV{
+							Key:   "IdentityFile",
+							Value: identityPath,
+						},
+						&ssh_config.KV{
+							Key:   "UserKnownHostsFile",
+							Value: knownHostsPath,
+						},
+						&ssh_config.KV{
+							Key:   "CanonicalizeHostname",
+							Value: "yes",
+						},
+						&ssh_config.KV{
+							Key:   "CanonicalDomains",
+							Value: localDomain,
+						},
 					},
 				},
 			},
-		},
+		}
 	}
 
 	cfgBytes, err := cfg.MarshalText()
