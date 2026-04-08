@@ -122,7 +122,7 @@ func TestBoxer_NewSandbox_EndToEnd(t *testing.T) {
 		})
 
 		hostWorkDir := t.TempDir()
-		result, err := boxer.NewSandbox(ctx, "test-agent", "test-sandbox", hostWorkDir, "test-image:latest", "", "", "", nil, nil, 2, 1024)
+		result, err := boxer.NewSandbox(ctx, NewSandboxOpts{AgentType: "test-agent", ID: "test-sandbox", HostWorkDir: hostWorkDir, ImageName: "test-image:latest", CPUs: 2, Memory: 1024})
 		if err != nil {
 			t.Fatalf("NewSandbox() error = %v", err)
 		}
@@ -173,7 +173,7 @@ func TestBoxer_NewSandbox_EndToEnd(t *testing.T) {
 			Configuration: testConfig,
 		})
 
-		_, err := boxer.NewSandbox(ctx, "test-error-agent", "test-sandbox", "/host/work", "test-image", "", "", "", nil, nil, 2, 1024)
+		_, err := boxer.NewSandbox(ctx, NewSandboxOpts{AgentType: "test-error-agent", ID: "test-sandbox", HostWorkDir: "/host/work", ImageName: "test-image", CPUs: 2, Memory: 1024})
 		if err == nil {
 			t.Fatal("Expected error from preparation, got nil")
 		}

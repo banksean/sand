@@ -171,25 +171,41 @@ func (b *Boxer) SyncBox(ctx context.Context, sb *sandtypes.Box) error {
 	return nil
 }
 
+// NewSandboxOpts holds the parameters for creating a new sandbox.
+type NewSandboxOpts struct {
+	AgentType      string
+	ID             string
+	HostWorkDir    string
+	ImageName      string
+	EnvFile        string
+	Username       string
+	Uid            string
+	AllowedDomains []string
+	Volumes        []string
+	CPUs           int
+	Memory         int
+}
+
 // NewSandbox creates a new sandbox based on a clone of hostWorkDir.
 // TODO: clone envFile, if it exists, into the sandbox clone so every command exec'd in that sandbox container
 // uses the same env file, even if the original .env file has changed on the host machine.
-func (sb *Boxer) NewSandbox(ctx context.Context, agentType, id, hostWorkDir, imageName, envFile, username, uid string, allowedDomains, volumes []string, cpus, memory int) (*sandtypes.Box, error) {
-	slog.InfoContext(ctx, "Boxer.NewSandbox", "hostWorkDir", hostWorkDir, "id", id, "agentType", agentType)
+func (sb *Boxer) NewSandbox(ctx context.Context, opts NewSandboxOpts) (*sandtypes.Box, error) {
+	slog.InfoContext(ctx, "Boxer.NewSandbox", "hostWorkDir", opts.HostWorkDir, "id", opts.ID, "agentType", opts.AgentType)
 
 	// Get agent configuration from registry
-	agentConfig := sb.AgentRegistry.Get(agentType)
+	agentConfig := sb.AgentRegistry.Get(opts.AgentType)
+	envFile := opts.EnvFile
 	if _, err := os.Stat(envFile); err != nil {
 		envFile = ""
 	}
 
 	// Prepare workspace
 	artifacts, err := agentConfig.Preparation.Prepare(ctx, cloning.CloneRequest{
-		ID:          id,
-		HostWorkDir: hostWorkDir,
+		ID:          opts.ID,
+		HostWorkDir: opts.HostWorkDir,
 		EnvFile:     envFile,
-		Username:    username,
-		Uid:         uid,
+		Username:    opts.Username,
+		Uid:         opts.Uid,
 	})
 	if err != nil {
 		return nil, err
@@ -200,7 +216,7 @@ func (sb *Boxer) NewSandbox(ctx context.Context, agentType, id, hostWorkDir, ima
 	hooks := agentConfig.Configuration.GetStartupHooks(*artifacts)
 
 	// TODO: move this to .Hydrate? Or make it a startup hook?
-	keys, err := sb.SSHim.NewKeys(ctx, id+".test", username) // pass username here!
+	keys, err := sb.SSHim.NewKeys(ctx, opts.ID+".test", opts.Username) // pass username here!
 	if err != nil {
 		slog.ErrorContext(ctx, "Boxer.NewSanbox: sshim.Povision", "error", err)
 		return nil, err
@@ -219,6 +235,7 @@ func (sb *Boxer) NewSandbox(ctx context.Context, agentType, id, hostWorkDir, ima
 
 	// hostWorkDir may not be the same as the git root - should we save both here instead of
 	// only saving the gitTopLevel?
+	hostWorkDir := opts.HostWorkDir
 	gitTopLevel := sb.GitOps.TopLevel(ctx, hostWorkDir)
 	var gitRemote, gitBranch, gitCommit string
 	var gitIsDirty bool
@@ -233,21 +250,21 @@ func (sb *Boxer) NewSandbox(ctx context.Context, agentType, id, hostWorkDir, ima
 	}
 
 	ret := &sandtypes.Box{
-		ID:             id,
-		AgentType:      agentType,
+		ID:             opts.ID,
+		AgentType:      opts.AgentType,
 		HostOriginDir:  hostWorkDir,
 		SandboxWorkDir: artifacts.SandboxWorkDir,
-		ImageName:      imageName,
+		ImageName:      opts.ImageName,
 		EnvFile:        envFile,
-		AllowedDomains: allowedDomains,
-		Volumes:        volumes,
+		AllowedDomains: opts.AllowedDomains,
+		Volumes:        opts.Volumes,
 		Mounts:         append(mounts, sshKeysMountSpec),
 		ContainerHooks: hooks,
 		Keys:           keys,
-		CPUs:           cpus,
-		MemoryMB:       memory,
-		Username:       username,
-		Uid:            uid,
+		CPUs:           opts.CPUs,
+		MemoryMB:       opts.Memory,
+		Username:       opts.Username,
+		Uid:            opts.Uid,
 		OriginalGitDetails: &sandtypes.GitDetails{
 			RemoteOrigin: gitRemote,
 			Branch:       gitBranch,

@@ -679,9 +679,19 @@ func (d *Daemon) createSandbox(ctx context.Context, opts CreateSandboxOpts) (*sa
 	}
 	slog.InfoContext(ctx, "createSandbox", "agentType", agentType, "opts", opts)
 
-	// TODO: holy hell, just pass opts here instead of each field individually.
-	sbox, err := d.boxer.NewSandbox(ctx, agentType, opts.ID, opts.CloneFromDir, opts.ImageName,
-		opts.EnvFile, opts.Username, opts.Uid, opts.AllowedDomains, opts.Volumes, opts.CPUs, opts.Memory)
+	sbox, err := d.boxer.NewSandbox(ctx, boxer.NewSandboxOpts{
+		AgentType:      agentType,
+		ID:             opts.ID,
+		HostWorkDir:    opts.CloneFromDir,
+		ImageName:      opts.ImageName,
+		EnvFile:        opts.EnvFile,
+		Username:       opts.Username,
+		Uid:            opts.Uid,
+		AllowedDomains: opts.AllowedDomains,
+		Volumes:        opts.Volumes,
+		CPUs:           opts.CPUs,
+		Memory:         opts.Memory,
+	})
 	if err != nil {
 		return nil, err
 	}

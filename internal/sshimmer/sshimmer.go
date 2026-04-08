@@ -163,7 +163,6 @@ func (s *LocalSSHimmer) writeKeyToFile(keyBytes []byte, filename string) error {
 
 // TODO: return ssh.Signer instead of []byte for the private key?
 func (s *LocalSSHimmer) getOrCreateKeyPair(idPath string) (ssh.PublicKey, []byte, error) {
-	// TODO: fix this - it should read the key pair from these files if they exist, rather than return nils.
 	if _, err := s.fs.Stat(idPath); err == nil {
 		pubkeyBytes, err := s.fs.ReadFile(idPath + ".pub")
 		if err != nil {
