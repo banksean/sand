@@ -228,18 +228,14 @@ func fromSandbox(sandboxID string, h http.HandlerFunc) http.HandlerFunc {
 
 func sandboxIDOf(r *http.Request) (string, error) {
 	ctx := r.Context()
-	ret, ok := ctx.Value(containerIDKey).(string)
-	if ok {
-		return ret, nil
+	if id, ok := ctx.Value(containerIDKey).(string); ok {
+		return id, nil
 	}
-	var args struct {
-		ID string `json:"id"`
+	var req IDRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		return "", err
 	}
-	if err := json.NewDecoder(r.Body).Decode(&args); err != nil {
-		return ret, err
-	}
-
-	return args.ID, nil
+	return req.ID, nil
 }
 
 func (d *Daemon) stopInnieServer(ctx context.Context, id string) error {
@@ -294,7 +290,7 @@ func (d *Daemon) serveInnieSocket(ctx context.Context, sandboxID string, unixLis
 func writeJSONError(w http.ResponseWriter, err error, code int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+	json.NewEncoder(w).Encode(ErrorResponse{Error: err.Error()})
 }
 
 func writeJSON(w http.ResponseWriter, data any) {
@@ -309,7 +305,7 @@ func (d *Daemon) handleShutdown(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, map[string]string{"status": "ok"})
+	writeJSON(w, StatusResponse{Status: "ok"})
 
 	// Shutdown daemon after response is sent
 	go func() {
@@ -320,10 +316,7 @@ func (d *Daemon) handleShutdown(w http.ResponseWriter, r *http.Request) {
 
 func (d *Daemon) handleExport(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	var args struct {
-		ID        string `json:"id"`
-		ImageName string `json:"imageName"`
-	}
+	var args ExportRequest
 	if err := json.NewDecoder(r.Body).Decode(&args); err != nil {
 		writeJSONError(w, err, http.StatusBadRequest)
 		return
@@ -341,7 +334,7 @@ func (d *Daemon) handlePing(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	writeJSON(w, map[string]string{"status": "pong"})
+	writeJSON(w, StatusResponse{Status: "pong"})
 }
 
 func (d *Daemon) handleVersion(w http.ResponseWriter, r *http.Request) {
@@ -414,9 +407,7 @@ func (d *Daemon) handleStats(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	var args struct {
-		IDs []string `json:"ids,omitempty"`
-	}
+	var args StatsRequest
 	slog.InfoContext(r.Context(), "Daemon.handleStats json decode request", "args", args)
 
 	if err := json.NewDecoder(r.Body).Decode(&args); err != nil {
@@ -449,7 +440,7 @@ func (d *Daemon) handleRemove(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, err, http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, map[string]string{"status": "ok"})
+	writeJSON(w, StatusResponse{Status: "ok"})
 }
 
 func (d *Daemon) handleStop(w http.ResponseWriter, r *http.Request) {
@@ -468,7 +459,7 @@ func (d *Daemon) handleStop(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, err, http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, map[string]string{"status": "ok"})
+	writeJSON(w, StatusResponse{Status: "ok"})
 }
 
 func (d *Daemon) handleStart(w http.ResponseWriter, r *http.Request) {
@@ -487,7 +478,7 @@ func (d *Daemon) handleStart(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, err, http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, map[string]string{"status": "ok"})
+	writeJSON(w, StatusResponse{Status: "ok"})
 }
 
 func (d *Daemon) handleCreate(w http.ResponseWriter, r *http.Request) {
@@ -582,7 +573,7 @@ func (d *Daemon) handleSandboxConfig(w http.ResponseWriter, r *http.Request) {
 			slog.InfoContext(r.Context(), "handleSandboxConfig checking box network", "n", n, "ip", ip, "callerIP", callerIP)
 			if ip == callerIP {
 				slog.InfoContext(r.Context(), "handleSandboxConfig matched", "sandbox", box.ID, "callerIP", callerIP)
-				writeJSON(w, map[string]any{"domains": box.AllowedDomains})
+				writeJSON(w, SandboxConfigResponse{Domains: box.AllowedDomains})
 				return
 			}
 		}

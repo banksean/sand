@@ -88,9 +88,7 @@ func (m *defaultClient) doRequest(ctx context.Context, method, path string, body
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		var errResp struct {
-			Error string `json:"error"`
-		}
+		var errResp ErrorResponse
 		if json.NewDecoder(resp.Body).Decode(&errResp) == nil && errResp.Error != "" {
 			return fmt.Errorf("%s", errResp.Error)
 		}
@@ -110,11 +108,7 @@ func (m *defaultClient) doRequest(ctx context.Context, method, path string, body
 }
 
 func (m *defaultClient) Ping(ctx context.Context) error {
-	var resp map[string]string
-	if err := m.doRequest(ctx, http.MethodGet, "/ping", nil, &resp); err != nil {
-		return err
-	}
-	return nil
+	return m.doRequest(ctx, http.MethodGet, "/ping", nil, nil)
 }
 
 func (m *defaultClient) Version(ctx context.Context) (version.Info, error) {
@@ -126,12 +120,7 @@ func (m *defaultClient) Version(ctx context.Context) (version.Info, error) {
 }
 
 func (m *defaultClient) Shutdown(ctx context.Context) error {
-	var resp map[string]string
-	if err := m.doRequest(ctx, http.MethodPost, "/shutdown", nil, &resp); err != nil {
-		return err
-	}
-
-	return nil
+	return m.doRequest(ctx, http.MethodPost, "/shutdown", nil, nil)
 }
 
 func (m *defaultClient) ListSandboxes(ctx context.Context) ([]sandtypes.Box, error) {
@@ -144,7 +133,7 @@ func (m *defaultClient) ListSandboxes(ctx context.Context) ([]sandtypes.Box, err
 
 func (m *defaultClient) GetSandbox(ctx context.Context, id string) (*sandtypes.Box, error) {
 	var box sandtypes.Box
-	if err := m.doRequest(ctx, http.MethodPost, "/get", map[string]string{"id": id}, &box); err != nil {
+	if err := m.doRequest(ctx, http.MethodPost, "/get", IDRequest{ID: id}, &box); err != nil {
 		if strings.Contains(err.Error(), "404") {
 			return nil, fmt.Errorf("id not found: %q", id)
 		}
@@ -154,19 +143,19 @@ func (m *defaultClient) GetSandbox(ctx context.Context, id string) (*sandtypes.B
 }
 
 func (m *defaultClient) RemoveSandbox(ctx context.Context, id string) error {
-	return m.doRequest(ctx, http.MethodPost, "/remove", map[string]string{"id": id}, nil)
+	return m.doRequest(ctx, http.MethodPost, "/remove", IDRequest{ID: id}, nil)
 }
 
 func (m *defaultClient) StopSandbox(ctx context.Context, id string) error {
-	return m.doRequest(ctx, http.MethodPost, "/stop", map[string]string{"id": id}, nil)
+	return m.doRequest(ctx, http.MethodPost, "/stop", IDRequest{ID: id}, nil)
 }
 
 func (m *defaultClient) StartSandbox(ctx context.Context, id string) error {
-	return m.doRequest(ctx, http.MethodPost, "/start", map[string]string{"id": id}, nil)
+	return m.doRequest(ctx, http.MethodPost, "/start", IDRequest{ID: id}, nil)
 }
 
 func (m *defaultClient) VSC(ctx context.Context, id string) error {
-	return m.doRequest(ctx, http.MethodPost, "/vsc", map[string]string{"id": id}, nil)
+	return m.doRequest(ctx, http.MethodPost, "/vsc", IDRequest{ID: id}, nil)
 }
 
 func (m *defaultClient) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*sandtypes.Box, error) {
@@ -179,17 +168,13 @@ func (m *defaultClient) CreateSandbox(ctx context.Context, opts CreateSandboxOpt
 }
 
 func (m *defaultClient) ExportImage(ctx context.Context, id string, imageName string) error {
-	if err := m.doRequest(ctx, http.MethodPost, "/export", map[string]string{"id": id, "imageName": imageName}, nil); err != nil {
-		return err
-	}
-
-	return nil
+	return m.doRequest(ctx, http.MethodPost, "/export", ExportRequest{ID: id, ImageName: imageName}, nil)
 }
 
 // Stats implements [Client].
 func (m *defaultClient) Stats(ctx context.Context, ids ...string) ([]types.ContainerStats, error) {
 	var stats []types.ContainerStats
-	if err := m.doRequest(ctx, http.MethodPost, "/stats", map[string]any{"ids": ids}, &stats); err != nil {
+	if err := m.doRequest(ctx, http.MethodPost, "/stats", StatsRequest{IDs: ids}, &stats); err != nil {
 		return nil, err
 	}
 	return stats, nil
