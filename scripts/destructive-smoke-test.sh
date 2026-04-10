@@ -44,6 +44,8 @@ sand exec smoke ls
 sand exec smoke whoami
 sand exec smoke apk add go
 sand exec smoke go test ./...
+sand exec smoke sand ls
+sand vsc smoke
 
 # Clean everything up 
 sand rm -a
