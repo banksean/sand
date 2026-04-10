@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
 
 	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/sandtypes"
@@ -42,7 +41,6 @@ func (c *BaseContainerConfiguration) GetMounts(artifacts CloneArtifacts) []sandt
 func (c *BaseContainerConfiguration) GetStartupHooks(artifacts CloneArtifacts) []sandtypes.ContainerStartupHook {
 	return []sandtypes.ContainerStartupHook{
 		c.defaultContainerHook(artifacts.Username, artifacts.Uid),
-		c.githubSSHContainerHook(),
 	}
 }
 
@@ -135,20 +133,5 @@ func (c *BaseContainerConfiguration) defaultContainerHook(username, uid string) 
 
 		slog.InfoContext(ctx, "defaultContainerHook completed", "hook", "default container bootstrap")
 		return nil
-	})
-}
-
-// githubSSHContainerHook verifies that SSH authentication to GitHub works (via ssh-agent calling back out to the host OS).
-func (c *BaseContainerConfiguration) githubSSHContainerHook() sandtypes.ContainerStartupHook {
-	return sandtypes.NewContainerStartupHook("git ssh auth check", func(ctx context.Context, ctr *types.Container, exec sandtypes.StartupHookFunc) error {
-		var errs []error
-
-		sshOut, err := exec(ctx, "/usr/bin/ssh", "-T", "git@github.com")
-		if err != nil && strings.Contains(sshOut, "git@github.com: Permission denied (publickey)") {
-			slog.ErrorContext(ctx, "githubSSHContainerHook checking for ssh auth", "error", err, "sshOut", sshOut)
-			errs = append(errs, fmt.Errorf("you may need to run `ssh-add --apple-use-keychain ~/.ssh/<github ssh key>` for ssh-agent to work with your git remote: %w", err))
-		}
-
-		return errors.Join(errs...)
 	})
 }
