@@ -15,10 +15,10 @@ builds:
       - amd64
       - arm64
     ldflags:
-      - -X 'github.com/banksean/sand/version.GitRepo={{ .Env.RELEASE_GIT_REPO }}'
-      - -X 'github.com/banksean/sand/version.GitBranch={{ .Tag }}'
-      - -X 'github.com/banksean/sand/version.GitCommit={{ .FullCommit }}'
-      - -X 'github.com/banksean/sand/version.BuildTime={{ .Date }}'
+      - -X 'github.com/banksean/sand/internal/version.GitRepo={{ .Env.RELEASE_GIT_REPO }}'
+      - -X 'github.com/banksean/sand/internal/version.GitBranch={{ .Tag }}'
+      - -X 'github.com/banksean/sand/internal/version.GitCommit={{ .FullCommit }}'
+      - -X 'github.com/banksean/sand/internal/version.BuildTime={{ .Date }}'
 
   # Container-side CLI (Linux only) — built from the same cmd/sand package
   # using the linux build tag, producing the "innie" binary
@@ -31,10 +31,10 @@ builds:
       - amd64
       - arm64
     ldflags:
-      - -X 'github.com/banksean/sand/version.GitRepo={{ .Env.RELEASE_GIT_REPO }}'
-      - -X 'github.com/banksean/sand/version.GitBranch={{ .Tag }}'
-      - -X 'github.com/banksean/sand/version.GitCommit={{ .FullCommit }}'
-      - -X 'github.com/banksean/sand/version.BuildTime={{ .Date }}'
+      - -X 'github.com/banksean/sand/internal/version.GitRepo={{ .Env.RELEASE_GIT_REPO }}'
+      - -X 'github.com/banksean/sand/internal/version.GitBranch={{ .Tag }}'
+      - -X 'github.com/banksean/sand/internal/version.GitCommit={{ .FullCommit }}'
+      - -X 'github.com/banksean/sand/internal/version.BuildTime={{ .Date }}'
 
   # Daemon process (macOS only)
   - id: sandd
@@ -46,10 +46,10 @@ builds:
       - amd64
       - arm64
     ldflags:
-      - -X 'github.com/banksean/sand/version.GitRepo={{ .Env.RELEASE_GIT_REPO }}'
-      - -X 'github.com/banksean/sand/version.GitBranch={{ .Tag }}'
-      - -X 'github.com/banksean/sand/version.GitCommit={{ .FullCommit }}'
-      - -X 'github.com/banksean/sand/version.BuildTime={{ .Date }}'
+      - -X 'github.com/banksean/sand/internal/version.GitRepo={{ .Env.RELEASE_GIT_REPO }}'
+      - -X 'github.com/banksean/sand/internal/version.GitBranch={{ .Tag }}'
+      - -X 'github.com/banksean/sand/internal/version.GitCommit={{ .FullCommit }}'
+      - -X 'github.com/banksean/sand/internal/version.BuildTime={{ .Date }}'
 
 archives:
   - id: sand-combined
