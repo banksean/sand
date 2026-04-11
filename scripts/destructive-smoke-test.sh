@@ -44,8 +44,23 @@ sand exec smoke ls
 sand exec smoke whoami
 sand exec smoke apk add go
 sand exec smoke go test ./...
-sand exec smoke sand ls
+
+# Try to use the packaged sand innie binary from the default image
+sand exec smoke sand --verison
+sand exec smoke sand build-info
+
+# Now try to build and use the sand innie binary built from this checkout
+sand exec smoke go build ./cmd/...
+sand exec smoke ./sand --version
+sand exec smoke ./sand build-info
+
+# This is kind of annoying since it doesn't automatically close the window.
+# TODO: figure out how to automatically close the window.
 sand vsc smoke
+
+# Try connecting to the container via ssh. Should Just Work and avoid TOFU prompt, warnings etc.
+# TODO: get the domain extension from apple/container instead of assuming it's .test.
+ssh smoke.test whoami
 
 # Clean everything up 
 sand rm -a
