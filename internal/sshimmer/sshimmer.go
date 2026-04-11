@@ -432,7 +432,7 @@ func CheckForIncludeWithFS(ctx context.Context, fs FileSystem) (func() error, er
 
 func addIndentityTo(cfg *ssh_config.Config, hostPattern *ssh_config.Pattern, knownHostsPath, localDomain, username, identityPath string) error {
 	var cfgHost *ssh_config.Host
-	var idx = -1
+	idx := -1
 	var host *ssh_config.Host
 	for idx, host = range cfg.Hosts {
 		for _, pat := range host.Patterns {

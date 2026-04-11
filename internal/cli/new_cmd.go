@@ -223,7 +223,8 @@ func (c *NewCmd) Run(cctx *CLIContext) error {
 					EnvFile: sbox.EnvFile,
 					Env:     map[string]string{"SAND_ONESHOT_PROMPT": c.Prompt},
 					User:    c.Username,
-					UID:     c.Uid},
+					UID:     c.Uid,
+				},
 			}, sbox.ContainerID, "/bin/sh", os.Environ(),
 			os.Stdin, os.Stdout, os.Stderr,
 			"-c", agentOneShotCmd)

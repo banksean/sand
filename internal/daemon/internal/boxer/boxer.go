@@ -608,7 +608,6 @@ func (sber *Boxer) checkImageHasEntrypoint(ctx context.Context, imageName string
 
 // StartContainer starts a container instance. The container must exist, and it should not be in the "running" state.
 func (sber *Boxer) StartContainer(ctx context.Context, sb *sandtypes.Box) error {
-
 	// Reconstruct runtime configuration from agent type
 	pathRegistry := cloning.NewStandardPathRegistry(sb.SandboxWorkDir)
 
