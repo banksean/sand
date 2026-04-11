@@ -6,9 +6,12 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -16,6 +19,7 @@ import (
 	"github.com/banksean/sand/internal/cli"
 	"github.com/banksean/sand/internal/daemon"
 	"github.com/banksean/sand/internal/runtimedeps"
+	"github.com/banksean/sand/internal/version"
 	kongcompletion "github.com/jotaen/kong-completion"
 )
 
@@ -107,6 +111,91 @@ func appHomeDir() (string, error) {
 	return appSupportDir, nil
 }
 
+// ensureDaemon attempts to verify that the sandd daemon is running, and if not,
+// starts a new instance of it.
+func ensureDaemon(ctx context.Context, appBaseDir string) error {
+	socketPath := filepath.Join(appBaseDir, daemon.DefaultSocketFile)
+	slog.Info("EnsureDaemon", "socketPath", socketPath)
+
+	// Try to connect to existing daemon
+	conn, err := net.DialTimeout("unix", socketPath, 500*time.Millisecond)
+	if err == nil {
+		conn.Close()
+		// Daemon is running, check if version matches
+		if err := checkDaemonVersion(ctx, appBaseDir); err != nil {
+			slog.Info("EnsureDaemon", "versionMismatch", err.Error())
+			// Version mismatch, shut down old daemon
+			if err := shutdownDaemon(appBaseDir); err != nil {
+				slog.Warn("EnsureDaemon", "shutdownError", err.Error())
+				// Continue to try starting new daemon anyway
+			}
+			// Fall through to start new daemon
+		} else {
+			return nil // Daemon running with correct version
+		}
+	}
+
+	// Start daemon in background
+	cmd := exec.Command("sandd", "start", "--app-base-dir", appBaseDir)
+	slog.Info("EnsureDaemon", "cmd", strings.Join(cmd.Args, " "))
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+	cmd.Stdin = nil
+	cmd.Dir = appBaseDir
+
+	// Detach from parent process
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Setpgid: true,
+	}
+
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+
+	// Wait for daemon to be ready
+	for i := 0; i < 20; i++ {
+		time.Sleep(100 * time.Millisecond)
+		conn, err := net.DialTimeout("unix", socketPath, 100*time.Millisecond)
+		if err == nil {
+			conn.Close()
+			return nil
+		}
+	}
+
+	return fmt.Errorf("daemon failed to start")
+}
+
+func checkDaemonVersion(ctx context.Context, appBaseDir string) error {
+	client, err := daemon.NewUnixSocketClient(ctx, appBaseDir)
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
+
+	daemonVersion, err := client.Version(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get daemon version: %w", err)
+	}
+
+	cliVersion := version.Get()
+	if !cliVersion.Equal(daemonVersion) {
+		return fmt.Errorf("version mismatch: CLI=%s, Daemon=%s", cliVersion.GitCommit, daemonVersion.GitCommit)
+	}
+
+	return nil
+}
+
+func shutdownDaemon(appBaseDir string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	client, err := daemon.NewUnixSocketClient(ctx, appBaseDir)
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
+
+	return client.Shutdown(ctx)
+}
+
 func main() {
 	var app Outie
 	slog.SetLogLoggerLevel(slog.LevelError)
@@ -153,7 +242,7 @@ func main() {
 
 	slog.Info("main", "appBaseDir", appBaseDir)
 
-	if err := daemon.EnsureDaemon(ctx, appBaseDir); err != nil {
+	if err := ensureDaemon(ctx, appBaseDir); err != nil {
 		fmt.Fprintf(os.Stderr, "daemon not running, and failed to start it. error: %v\n", err)
 		os.Exit(1)
 	}

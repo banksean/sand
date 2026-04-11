@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	defaultSocketFile = "sandd.sock"
+	DefaultSocketFile = "sandd.sock"
 	defaultLockFile   = "sandd.lock"
 	containerIDKey    = "containerID"
 	envMCPEnable      = "SAND_MCP"
@@ -69,7 +69,7 @@ func NewDaemonWithBoxer(appBaseDir, localDomain string, b *boxer.Boxer) *Daemon 
 func NewDaemon(appBaseDir, localDomain string) *Daemon {
 	return &Daemon{
 		AppBaseDir:  appBaseDir,
-		SocketPath:  filepath.Join(appBaseDir, defaultSocketFile),
+		SocketPath:  filepath.Join(appBaseDir, DefaultSocketFile),
 		LocalDomain: localDomain,
 		hostMCP: &HostMCP{
 			ChromeDevToolsPort: 9222,
@@ -82,7 +82,7 @@ func NewDaemon(appBaseDir, localDomain string) *Daemon {
 // ServeUnixSocket serves the unix domain socket that sandd clients (the host-side CLI, e.g.) connect to.
 func (d *Daemon) ServeUnixSocket(ctx context.Context) error {
 	lockFilePath := filepath.Join(d.AppBaseDir, defaultLockFile)
-	slog.InfoContext(ctx, "Daemon.ServeUnix", "mux", d, "pid", os.Getpid(), "lockFilePath", lockFilePath)
+	slog.InfoContext(ctx, "Daemon.ServeUnix", "daemon", d, "pid", os.Getpid(), "lockFilePath", lockFilePath)
 	lockFile, err := acquireLock(lockFilePath)
 	if err != nil {
 		return err

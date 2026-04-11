@@ -7,11 +7,8 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
-	"time"
 
 	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/sandtypes"
@@ -35,7 +32,7 @@ type Client interface {
 	CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*sandtypes.Box, error)
 }
 
-// defaultClient is the concrete implementation of MuxClient that communicates
+// defaultClient is the concrete implementation of Client that communicates
 // with the sandd daemon over HTTP (unix socket or TCP).
 type defaultClient struct {
 	base       string
@@ -46,7 +43,7 @@ func NewUnixSocketClient(ctx context.Context, appBaseDir string) (Client, error)
 	httpClient := &http.Client{
 		Transport: &http.Transport{
 			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				return net.Dial("unix", filepath.Join(appBaseDir, defaultSocketFile))
+				return net.Dial("unix", filepath.Join(appBaseDir, DefaultSocketFile))
 			},
 		},
 	}
@@ -178,92 +175,4 @@ func (m *defaultClient) Stats(ctx context.Context, ids ...string) ([]types.Conta
 		return nil, err
 	}
 	return stats, nil
-}
-
-// EnsureDaemon attempts to verify that the sandd daemon is running, and if not,
-// starting a new instance of it.
-//
-// TODO: Make sure this doesn't get called from an innie.  That probably means moving
-// this function to somewhere under mux/internal/...
-func EnsureDaemon(ctx context.Context, appBaseDir string) error {
-	socketPath := filepath.Join(appBaseDir, defaultSocketFile)
-	slog.Info("EnsureDaemon", "socketPath", socketPath)
-
-	// Try to connect to existing daemon
-	conn, err := net.DialTimeout("unix", socketPath, 500*time.Millisecond)
-	if err == nil {
-		conn.Close()
-		// Daemon is running, check if version matches
-		if err := checkDaemonVersion(ctx, appBaseDir); err != nil {
-			slog.Info("EnsureDaemon", "versionMismatch", err.Error())
-			// Version mismatch, shut down old daemon
-			if err := shutdownDaemon(appBaseDir); err != nil {
-				slog.Warn("EnsureDaemon", "shutdownError", err.Error())
-				// Continue to try starting new daemon anyway
-			}
-			// Fall through to start new daemon
-		} else {
-			return nil // Daemon running with correct version
-		}
-	}
-
-	// Start daemon in background
-	cmd := exec.Command("sandd", "start", "--app-base-dir", appBaseDir)
-	slog.Info("EnsureDaemon", "cmd", strings.Join(cmd.Args, " "))
-	cmd.Stdout = nil
-	cmd.Stderr = nil
-	cmd.Stdin = nil
-	cmd.Dir = appBaseDir
-
-	// Detach from parent process
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setpgid: true,
-	}
-
-	if err := cmd.Start(); err != nil {
-		return err
-	}
-
-	// Wait for daemon to be ready
-	for i := 0; i < 20; i++ {
-		time.Sleep(100 * time.Millisecond)
-		conn, err := net.DialTimeout("unix", socketPath, 100*time.Millisecond)
-		if err == nil {
-			conn.Close()
-			return nil
-		}
-	}
-
-	return fmt.Errorf("daemon failed to start")
-}
-
-func checkDaemonVersion(ctx context.Context, appBaseDir string) error {
-	client, err := NewUnixSocketClient(ctx, appBaseDir)
-	if err != nil {
-		return fmt.Errorf("failed to create client: %w", err)
-	}
-
-	daemonVersion, err := client.Version(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get daemon version: %w", err)
-	}
-
-	cliVersion := version.Get()
-	if !cliVersion.Equal(daemonVersion) {
-		return fmt.Errorf("version mismatch: CLI=%s, Daemon=%s", cliVersion.GitCommit, daemonVersion.GitCommit)
-	}
-
-	return nil
-}
-
-func shutdownDaemon(appBaseDir string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	client, err := NewUnixSocketClient(ctx, appBaseDir)
-	if err != nil {
-		return fmt.Errorf("failed to create client: %w", err)
-	}
-
-	return client.Shutdown(ctx)
 }

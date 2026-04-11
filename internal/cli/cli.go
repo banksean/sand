@@ -2,8 +2,8 @@
 // The struct types contain field tags that github.com/alecthomas/kong reads and interprets
 // to provide automatic documentation, default flag values and so on.
 //
-// In general, code in this package should not depend on any sand/mux details besides the
-// sand/daemon#Client type. That type handles the transport details for communicating with
+// In general, code in this package should not depend on any internal/daemon details besides the
+// internal/daemon#Client type. That type handles the transport details for communicating with
 // the sandd daemon, whether by unix domain socket (when running on the host OS) or by TCP
 // socket (when running inside a container).
 package cli

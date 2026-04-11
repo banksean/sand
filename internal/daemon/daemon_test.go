@@ -25,28 +25,28 @@ func newDaemonForTest(t *testing.T, appDir string) *Daemon {
 	return NewDaemonWithBoxer(appDir, "test", b)
 }
 
-func TestMuxHTTPPing(t *testing.T) {
-	// Create a temporary directory for the mux
-	tmpDir, err := os.MkdirTemp("", "mux-test-*")
+func TestDaemonHTTPPing(t *testing.T) {
+	// Create a temporary directory for the dmn
+	tmpDir, err := os.MkdirTemp("", "dmn-test-*")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// Create and start mux
-	mux := newDaemonForTest(t, tmpDir)
+	// Create and start dmn
+	dmn := newDaemonForTest(t, tmpDir)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// Start the mux server in a goroutine
+	// Start the dmn server in a goroutine
 	go func() {
-		if err := mux.ServeUnixSocket(ctx); err != nil {
+		if err := dmn.ServeUnixSocket(ctx); err != nil {
 			t.Logf("Mux serve error: %v", err)
 		}
 	}()
 
 	// Wait for the socket to be ready
-	socketPath := filepath.Join(tmpDir, defaultSocketFile)
+	socketPath := filepath.Join(tmpDir, DefaultSocketFile)
 	for i := 0; i < 20; i++ {
 		if _, err := os.Stat(socketPath); err == nil {
 			break
@@ -81,29 +81,29 @@ func TestMuxHTTPPing(t *testing.T) {
 	}
 }
 
-func TestMuxHTTPList(t *testing.T) {
-	// Create a temporary directory for the mux
-	tmpDir, err := os.MkdirTemp("", "mux-test-*")
+func TestDaemonHTTPList(t *testing.T) {
+	// Create a temporary directory for the dmn
+	tmpDir, err := os.MkdirTemp("", "dmn-test-*")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// Create and start mux
-	mux := newDaemonForTest(t, tmpDir)
+	// Create and start dmn
+	dmn := newDaemonForTest(t, tmpDir)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// Start the mux server
+	// Start the dmn server
 	go func() {
-		if err := mux.ServeUnixSocket(ctx); err != nil {
+		if err := dmn.ServeUnixSocket(ctx); err != nil {
 			t.Logf("Mux serve error: %v", err)
 		}
 	}()
 
 	// Wait for the socket to be ready
 	for i := 0; i < 20; i++ {
-		if _, err := os.Stat(mux.SocketPath); err == nil {
+		if _, err := os.Stat(dmn.SocketPath); err == nil {
 			break
 		}
 		time.Sleep(100 * time.Millisecond)
@@ -131,28 +131,28 @@ func TestMuxHTTPList(t *testing.T) {
 	}
 }
 
-func TestMuxHTTPVersion(t *testing.T) {
-	// Create a temporary directory for the mux
-	tmpDir, err := os.MkdirTemp("", "mux-test-*")
+func TestDaemonHTTPVersion(t *testing.T) {
+	// Create a temporary directory for the dmn
+	tmpDir, err := os.MkdirTemp("", "dmn-test-*")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// Create and start mux
-	mux := newDaemonForTest(t, tmpDir)
+	// Create and start dmn
+	dmn := newDaemonForTest(t, tmpDir)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// Start the mux server in a goroutine
+	// Start the dmn server in a goroutine
 	go func() {
-		if err := mux.ServeUnixSocket(ctx); err != nil {
+		if err := dmn.ServeUnixSocket(ctx); err != nil {
 			t.Logf("Mux serve error: %v", err)
 		}
 	}()
 
 	// Wait for the socket to be ready
-	socketPath := filepath.Join(tmpDir, defaultSocketFile)
+	socketPath := filepath.Join(tmpDir, DefaultSocketFile)
 	for i := 0; i < 20; i++ {
 		if _, err := os.Stat(socketPath); err == nil {
 			break
@@ -181,9 +181,9 @@ func TestMuxHTTPVersion(t *testing.T) {
 	}
 }
 
-func TestMuxPingNotRunning(t *testing.T) {
-	// Create a temporary directory for the mux
-	tmpDir, err := os.MkdirTemp("", "mux-test-*")
+func TestDaemonPingNotRunning(t *testing.T) {
+	// Create a temporary directory for the dmn
+	tmpDir, err := os.MkdirTemp("", "dmn-test-*")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
