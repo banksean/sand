@@ -16,12 +16,18 @@ func NewClaudeContainerConfiguration() *ClaudeContainerConfiguration {
 	}
 }
 
+var _ ContainerConfiguration = &ClaudeContainerConfiguration{}
+
 func (c *ClaudeContainerConfiguration) GetMounts(artifacts CloneArtifacts) []sandtypes.MountSpec {
 	// Claude uses the same mounts as base
 	return c.base.GetMounts(artifacts)
 }
 
-func (c *ClaudeContainerConfiguration) GetStartupHooks(artifacts CloneArtifacts) []sandtypes.ContainerStartupHook {
+func (c *ClaudeContainerConfiguration) GetFirstStartHooks(artifacts CloneArtifacts) []sandtypes.ContainerHook {
 	// Claude uses the same hooks as base
-	return c.base.GetStartupHooks(artifacts)
+	return c.base.GetFirstStartHooks(artifacts)
+}
+
+func (c *ClaudeContainerConfiguration) GetStartHooks(artifacts CloneArtifacts) []sandtypes.ContainerHook {
+	return nil
 }

@@ -30,28 +30,28 @@ func (m MountSpec) String() string {
 	return strings.Join(parts, ",")
 }
 
-type StartupHookFunc func(ctx context.Context, shellCmd string, args ...string) (string, error)
+type HookFunc func(ctx context.Context, shellCmd string, args ...string) (string, error)
 
-// ContainerStartupHook allows callers to inject container startup customisation.
-type ContainerStartupHook interface {
+// ContainerHook allows callers to inject container customisation step.
+type ContainerHook interface {
 	Name() string
-	OnStart(ctx context.Context, ctr *types.Container, exec StartupHookFunc) error
+	Run(ctx context.Context, ctr *types.Container, exec HookFunc) error
 }
 
 type containerHook struct {
 	name string
-	fn   func(ctx context.Context, ctr *types.Container, exec StartupHookFunc) error
+	fn   func(ctx context.Context, ctr *types.Container, exec HookFunc) error
 }
 
 func (h containerHook) Name() string {
 	return h.name
 }
 
-func (h containerHook) OnStart(ctx context.Context, ctr *types.Container, exec StartupHookFunc) error {
+func (h containerHook) Run(ctx context.Context, ctr *types.Container, exec HookFunc) error {
 	return h.fn(ctx, ctr, exec)
 }
 
-// NewContainerStartupHook helps callers construct hook instances without exporting internals.
-func NewContainerStartupHook(name string, fn func(ctx context.Context, ctr *types.Container, exec StartupHookFunc) error) ContainerStartupHook {
+// NewContainerHook helps callers construct hook instances without exporting internals.
+func NewContainerHook(name string, fn func(ctx context.Context, ctr *types.Container, exec HookFunc) error) ContainerHook {
 	return containerHook{name: name, fn: fn}
 }

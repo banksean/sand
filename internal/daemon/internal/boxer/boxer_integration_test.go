@@ -208,8 +208,15 @@ func (m *mockWorkspacePreparation) Prepare(ctx context.Context, req cloning.Clon
 
 type mockContainerConfiguration struct {
 	getMountsFunc       func(artifacts cloning.CloneArtifacts) []sandtypes.MountSpec
-	getStartupHooksFunc func(artifacts cloning.CloneArtifacts) []sandtypes.ContainerStartupHook
+	getStartupHooksFunc func(artifacts cloning.CloneArtifacts) []sandtypes.ContainerHook
 }
+
+// GetStartHooks implements [cloning.ContainerConfiguration].
+func (m *mockContainerConfiguration) GetStartHooks(artifacts cloning.CloneArtifacts) []sandtypes.ContainerHook {
+	panic("unimplemented")
+}
+
+var _ cloning.ContainerConfiguration = &mockContainerConfiguration{}
 
 func (m *mockContainerConfiguration) GetMounts(artifacts cloning.CloneArtifacts) []sandtypes.MountSpec {
 	if m.getMountsFunc != nil {
@@ -218,11 +225,11 @@ func (m *mockContainerConfiguration) GetMounts(artifacts cloning.CloneArtifacts)
 	return []sandtypes.MountSpec{}
 }
 
-func (m *mockContainerConfiguration) GetStartupHooks(artifacts cloning.CloneArtifacts) []sandtypes.ContainerStartupHook {
+func (m *mockContainerConfiguration) GetFirstStartHooks(artifacts cloning.CloneArtifacts) []sandtypes.ContainerHook {
 	if m.getStartupHooksFunc != nil {
 		return m.getStartupHooksFunc(artifacts)
 	}
-	return []sandtypes.ContainerStartupHook{}
+	return []sandtypes.ContainerHook{}
 }
 
 func TestBoxer_Sync(t *testing.T) {

@@ -213,7 +213,6 @@ func (sb *Boxer) NewSandbox(ctx context.Context, opts NewSandboxOpts) (*sandtype
 
 	// Get mounts and hooks from configuration
 	mounts := agentConfig.Configuration.GetMounts(*artifacts)
-	hooks := agentConfig.Configuration.GetStartupHooks(*artifacts)
 
 	// TODO: move this to .Hydrate? Or make it a startup hook?
 	keys, err := sb.SSHim.NewKeys(ctx, opts.ID+".test", opts.Username) // pass username here!
@@ -259,7 +258,6 @@ func (sb *Boxer) NewSandbox(ctx context.Context, opts NewSandboxOpts) (*sandtype
 		AllowedDomains: opts.AllowedDomains,
 		Volumes:        opts.Volumes,
 		Mounts:         append(mounts, sshKeysMountSpec),
-		ContainerHooks: hooks,
 		Keys:           keys,
 		CPUs:           opts.CPUs,
 		MemoryMB:       opts.Memory,
@@ -606,8 +604,8 @@ func (sber *Boxer) checkImageHasEntrypoint(ctx context.Context, imageName string
 	return fmt.Errorf("image %q has no command or entrypoint specified for container process", imageName)
 }
 
-// StartContainer starts a container instance. The container must exist, and it should not be in the "running" state.
-func (sber *Boxer) StartContainer(ctx context.Context, sb *sandtypes.Box) error {
+// StartNewContainer starts a new container instance. The container must exist, and it should not be in the "running" state.
+func (sber *Boxer) StartNewContainer(ctx context.Context, sb *sandtypes.Box) error {
 	// Reconstruct runtime configuration from agent type
 	pathRegistry := cloning.NewStandardPathRegistry(sb.SandboxWorkDir)
 
@@ -620,15 +618,38 @@ func (sber *Boxer) StartContainer(ctx context.Context, sb *sandtypes.Box) error 
 
 	// Get agent config to reconstruct hooks
 	agentConfig := sber.AgentRegistry.Get(sb.AgentType)
-	hooks := agentConfig.Configuration.GetStartupHooks(artifacts)
+	hooks := agentConfig.Configuration.GetFirstStartHooks(artifacts)
 
-	slog.InfoContext(ctx, "Boxer.StartContainer", "box", *sb, "ContainerHooks", len(hooks))
+	slog.InfoContext(ctx, "Boxer.StartNewContainer", "box", *sb, "ContainerHooks", len(hooks))
 	if err := sber.startContainerProcess(ctx, sb.ContainerID); err != nil {
 		return err
 	}
 
-	// TODO: figure out how to separate the "run these every time the container starts" hooks from the
-	// "only run these the first time the container starts" hooks.
+	return sber.executeHooks(ctx, sb, hooks)
+}
+
+// StartExistingContainer starts an existing (previously-started) container instance.
+// The container must exist, and it should be in the "stopped" state.
+func (sber *Boxer) StartExistingContainer(ctx context.Context, sb *sandtypes.Box) error {
+	// Reconstruct runtime configuration from agent type
+	pathRegistry := cloning.NewStandardPathRegistry(sb.SandboxWorkDir)
+
+	artifacts := cloning.CloneArtifacts{
+		SandboxWorkDir: sb.SandboxWorkDir,
+		PathRegistry:   pathRegistry,
+		Username:       sb.Username,
+		Uid:            sb.Uid,
+	}
+
+	// Get agent config to reconstruct hooks
+	agentConfig := sber.AgentRegistry.Get(sb.AgentType)
+	hooks := agentConfig.Configuration.GetStartHooks(artifacts)
+
+	slog.InfoContext(ctx, "Boxer.StartExistingContainer", "box", *sb, "ContainerHooks", len(hooks))
+	if err := sber.startContainerProcess(ctx, sb.ContainerID); err != nil {
+		return err
+	}
+
 	return sber.executeHooks(ctx, sb, hooks)
 }
 
@@ -643,7 +664,7 @@ func (sb *Boxer) startContainerProcess(ctx context.Context, containerID string) 
 	return nil
 }
 
-func (sber *Boxer) executeHooks(ctx context.Context, sb *sandtypes.Box, hooks []sandtypes.ContainerStartupHook) error {
+func (sber *Boxer) executeHooks(ctx context.Context, sb *sandtypes.Box, hooks []sandtypes.ContainerHook) error {
 	var hookErrs []error
 	for _, hook := range hooks {
 		slog.InfoContext(ctx, "Boxer.executeHooks running hook", "hook", hook.Name())
@@ -652,7 +673,7 @@ func (sber *Boxer) executeHooks(ctx context.Context, sb *sandtypes.Box, hooks []
 		if err != nil {
 			return err
 		}
-		if err := hook.OnStart(ctx, ctr, func(ctx context.Context, shellCmd string, args ...string) (string, error) {
+		if err := hook.Run(ctx, ctr, func(ctx context.Context, shellCmd string, args ...string) (string, error) {
 			output, err := sber.ContainerService.Exec(ctx,
 				&options.ExecContainer{
 					ProcessOptions: options.ProcessOptions{

@@ -14,6 +14,8 @@ import (
 // It sets up standard mounts and container startup hooks for SSH and dotfiles.
 type BaseContainerConfiguration struct{}
 
+var _ ContainerConfiguration = &BaseContainerConfiguration{}
+
 // NewBaseContainerConfiguration creates a new base container configuration instance.
 func NewBaseContainerConfiguration() *BaseContainerConfiguration {
 	return &BaseContainerConfiguration{}
@@ -38,15 +40,19 @@ func (c *BaseContainerConfiguration) GetMounts(artifacts CloneArtifacts) []sandt
 	}
 }
 
-func (c *BaseContainerConfiguration) GetStartupHooks(artifacts CloneArtifacts) []sandtypes.ContainerStartupHook {
-	return []sandtypes.ContainerStartupHook{
+func (c *BaseContainerConfiguration) GetStartHooks(artifacts CloneArtifacts) []sandtypes.ContainerHook {
+	return nil
+}
+
+func (c *BaseContainerConfiguration) GetFirstStartHooks(artifacts CloneArtifacts) []sandtypes.ContainerHook {
+	return []sandtypes.ContainerHook{
 		c.defaultContainerHook(artifacts.Username, artifacts.Uid),
 	}
 }
 
 // defaultContainerHook sets up dotfiles and SSH in the container.
-func (c *BaseContainerConfiguration) defaultContainerHook(username, uid string) sandtypes.ContainerStartupHook {
-	return sandtypes.NewContainerStartupHook("default container bootstrap", func(ctx context.Context, ctr *types.Container, exec sandtypes.StartupHookFunc) error {
+func (c *BaseContainerConfiguration) defaultContainerHook(username, uid string) sandtypes.ContainerHook {
+	return sandtypes.NewContainerHook("default container bootstrap", func(ctx context.Context, ctr *types.Container, exec sandtypes.HookFunc) error {
 		var errs []error
 
 		// We create a group and a user with the same name and uid as the the host user.

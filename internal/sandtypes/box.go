@@ -54,8 +54,6 @@ type Box struct {
 	// Uid is the uid of the default user to create for the container
 	Uid string
 
-	// ContainerHooks run after the container has started to perform any bootstrap logic.
-	ContainerHooks     []ContainerStartupHook `json:"-"`
 	OriginalGitDetails *GitDetails
 	CurrentGitDetails  *GitDetails
 	Container          *types.Container

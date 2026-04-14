@@ -651,7 +651,7 @@ func (d *Daemon) StartSandbox(ctx context.Context, id string) error {
 	}
 	go d.serveInnieSocket(ctx, id, unixListener)
 
-	return d.boxer.StartContainer(ctx, sbox)
+	return d.boxer.StartExistingContainer(ctx, sbox)
 }
 
 type CreateSandboxOpts struct {
@@ -695,6 +695,7 @@ func (d *Daemon) createSandbox(ctx context.Context, opts CreateSandboxOpts) (*sa
 	}
 	slog.InfoContext(ctx, "createSandbox", "sbox", sbox)
 
+	// TODO: move all this container creation logic into boxer.StartContainer.
 	ctr, err := d.boxer.GetContainer(ctx, sbox.ContainerID)
 
 	if ctr == nil {
@@ -718,7 +719,7 @@ func (d *Daemon) createSandbox(ctx context.Context, opts CreateSandboxOpts) (*sa
 	}
 
 	if ctr.Status != "running" {
-		err := d.boxer.StartContainer(ctx, sbox)
+		err := d.boxer.StartNewContainer(ctx, sbox)
 		if err != nil {
 			return nil, err
 		}

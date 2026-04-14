@@ -25,14 +25,28 @@ func NewOpenCodeContainerConfiguration() *OpenCodeContainerConfiguration {
 	}
 }
 
+var _ ContainerConfiguration = &OpenCodeContainerConfiguration{}
+
 func (c *OpenCodeContainerConfiguration) GetMounts(artifacts CloneArtifacts) []sandtypes.MountSpec {
 	// OpenCode uses the same mounts as base
 	return c.base.GetMounts(artifacts)
 }
 
-func (c *OpenCodeContainerConfiguration) GetStartupHooks(artifacts CloneArtifacts) []sandtypes.ContainerStartupHook {
+func (c *OpenCodeContainerConfiguration) GetStartHooks(artifacts CloneArtifacts) []sandtypes.ContainerHook {
 	// Start with base hooks
-	hooks := c.base.GetStartupHooks(artifacts)
+	hooks := c.base.GetStartHooks(artifacts)
+
+	// Add OpenCode-specific hooks
+	hooks = append(hooks,
+		c.openSSHTunnelHook(artifacts.Username),
+	)
+
+	return hooks
+}
+
+func (c *OpenCodeContainerConfiguration) GetFirstStartHooks(artifacts CloneArtifacts) []sandtypes.ContainerHook {
+	// Start with base hooks
+	hooks := c.base.GetFirstStartHooks(artifacts)
 
 	// Add OpenCode-specific hooks
 	hooks = append(hooks,
@@ -44,8 +58,13 @@ func (c *OpenCodeContainerConfiguration) GetStartupHooks(artifacts CloneArtifact
 }
 
 // copyOpenCodeBinaryHook copies the OpenCode binary to /usr/local/bin in the container.
-func (c *OpenCodeContainerConfiguration) copyOpenCodeBinaryHook(username string) sandtypes.ContainerStartupHook {
-	return sandtypes.NewContainerStartupHook("Copy opencode binary to /usr/local/bin", func(ctx context.Context, ctr *types.Container, exec sandtypes.StartupHookFunc) error {
+func (c *OpenCodeContainerConfiguration) copyOpenCodeBinaryHook(username string) sandtypes.ContainerHook {
+	return sandtypes.NewContainerHook("Copy opencode binary to /usr/local/bin", func(ctx context.Context, ctr *types.Container, exec sandtypes.HookFunc) error {
+		mkdirOut, err := exec(ctx, "mkdir", "-p", "/home/"+username+"/.opencode/bin")
+		if err != nil {
+			slog.ErrorContext(ctx, "copyOpenCodeBinaryHook mkdir for opencode binary", "error", err, "mkdirOut", mkdirOut)
+			return fmt.Errorf("mkdir for opencode binary: %w", err)
+		}
 		cpOut, err := exec(ctx, "cp", "-r", "/home/"+username+"/.opencode/bin/opencode", "/usr/local/bin/opencode")
 		if err != nil {
 			slog.ErrorContext(ctx, "copyOpenCodeBinaryHook copying opencode binary", "error", err, "cpOut", cpOut)
@@ -56,8 +75,8 @@ func (c *OpenCodeContainerConfiguration) copyOpenCodeBinaryHook(username string)
 }
 
 // openSSHTunnelHook sets up an SSH reverse tunnel for Chrome DevTools MCP.
-func (c *OpenCodeContainerConfiguration) openSSHTunnelHook(username string) sandtypes.ContainerStartupHook {
-	return sandtypes.NewContainerStartupHook("open remote ssh tunnel for chrome-devtools mcp", func(ctx context.Context, ctr *types.Container, execFn sandtypes.StartupHookFunc) error {
+func (c *OpenCodeContainerConfiguration) openSSHTunnelHook(username string) sandtypes.ContainerHook {
+	return sandtypes.NewContainerHook("open remote ssh tunnel for chrome-devtools mcp", func(ctx context.Context, ctr *types.Container, execFn sandtypes.HookFunc) error {
 		hostname := getContainerHostname(ctr)
 
 		// No context - this should run in a separate process that outlives the cloner startup hook invocations.
