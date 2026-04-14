@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -13,7 +14,9 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/banksean/sand/internal/applecontainer"
+	"github.com/banksean/sand/internal/cli"
 	"github.com/banksean/sand/internal/daemon"
+	"github.com/banksean/sand/internal/version"
 )
 
 // `sandd start` runs a long-lived process that manages sandboxes' lifecycles.
@@ -36,10 +39,11 @@ type App struct {
 }
 
 type DaemonCmd struct {
-	LogFile    string `default:"/tmp/sand/daemon/log" placeholder:"<log-file-path>" help:"location of log file"`
-	LogLevel   string `default:"info" placeholder:"<debug|info|warn|error>" help:"the logging level (debug, info, warn, error)"`
-	AppBaseDir string `default:"" placeholder:"<app-base-dir>" help:"root dir to store sandbox clones of working directories. Leave unset to use '~/Library/Application Support/Sand'"`
-	Action     string `arg:"" optional:"" default:"status" enum:"start,stop,status,version" help:"Action to perform: start, stop, or status (default). Shows daemon status if omitted."`
+	LogFile    string          `default:"/tmp/sand/daemon/log" placeholder:"<log-file-path>" help:"location of log file"`
+	LogLevel   string          `default:"info" placeholder:"<debug|info|warn|error>" help:"the logging level (debug, info, warn, error)"`
+	AppBaseDir string          `default:"" placeholder:"<app-base-dir>" help:"root dir to store sandbox clones of working directories. Leave unset to use '~/Library/Application Support/Sand'"`
+	Version    cli.VersionFlag `name:"version" help:"Print version and exit."`
+	Action     string          `arg:"" optional:"" default:"status" enum:"start,stop,status,build-info" help:"Action to perform: start, stop, or status (default). Shows daemon status if omitted."`
 }
 
 // Run handles all daemon command variants
@@ -58,8 +62,8 @@ func (c *DaemonCmd) Run(cctx *App) error {
 		return c.startDaemon(ctx, server)
 	case "stop":
 		return c.stopDaemon(ctx, server)
-	case "version":
-		return c.version(ctx, server)
+	case "build-info":
+		return c.buildInfo(ctx, server)
 	case "status":
 		fallthrough
 	default:
@@ -68,7 +72,14 @@ func (c *DaemonCmd) Run(cctx *App) error {
 	}
 }
 
-func (c *DaemonCmd) version(ctx context.Context, server *daemon.Daemon) error {
+func (c *DaemonCmd) buildInfo(ctx context.Context, server *daemon.Daemon) error {
+	runningErr := c.runningVersion(ctx, server)
+	fmt.Println()
+	cliErr := c.cliVersion(ctx)
+	return errors.Join(runningErr, cliErr)
+}
+
+func (c *DaemonCmd) runningVersion(ctx context.Context, server *daemon.Daemon) error {
 	mc, err := daemon.NewUnixSocketClient(ctx, c.AppBaseDir)
 	if err != nil {
 		fmt.Println("Daemon is not running")
@@ -81,6 +92,33 @@ func (c *DaemonCmd) version(ctx context.Context, server *daemon.Daemon) error {
 		return nil
 	}
 
+	fmt.Printf("==== Currently running daemon ==== \n")
+	fmt.Printf("Git Repository: %s\n", versionInfo.GitRepo)
+	fmt.Printf("Git Branch: %s\n", versionInfo.GitBranch)
+	fmt.Printf("Git Commit: %s\n", versionInfo.GitCommit)
+	fmt.Printf("Build Time: %s\n", versionInfo.BuildTime)
+	buildInfo := versionInfo.BuildInfo
+	if buildInfo == nil {
+		return nil
+	}
+	for _, setting := range buildInfo.Settings {
+		if setting.Key == "vcs.revision" && versionInfo.GitCommit == "" {
+			fmt.Printf("Git Commit: %s\n", setting.Value)
+		}
+		if setting.Key == "vcs.time" && versionInfo.BuildTime == "" {
+			fmt.Printf("Commit Time: %s\n", setting.Value)
+		}
+		if setting.Key == "vcs.modified" {
+			fmt.Printf("Modified: %s\n", setting.Value)
+		}
+	}
+	return nil
+}
+
+func (c *DaemonCmd) cliVersion(ctx context.Context) error {
+	fmt.Printf("==== Sandd cli binary ==== \n")
+
+	versionInfo := version.Get()
 	fmt.Printf("Git Repository: %s\n", versionInfo.GitRepo)
 	fmt.Printf("Git Branch: %s\n", versionInfo.GitBranch)
 	fmt.Printf("Git Commit: %s\n", versionInfo.GitCommit)
