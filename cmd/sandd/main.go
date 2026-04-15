@@ -260,8 +260,10 @@ func main() {
 	defer stop()
 
 	cli.initSlog()
+	versionInfo := version.Get()
+
 	cwd, err := os.Getwd()
-	slog.InfoContext(ctx, "sandd main", "cwd", cwd, "error", err)
+	slog.InfoContext(ctx, "sandd main", "version", versionInfo, "cwd", cwd, "error", err)
 
 	appBaseDir, err := appHomeDir()
 	if err != nil {
