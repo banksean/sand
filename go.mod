@@ -4,7 +4,6 @@ go 1.25.7
 
 require (
 	github.com/alecthomas/kong v1.13.0
-	github.com/creack/pty v1.1.24
 	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/google/go-containerregistry v0.21.3
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
@@ -14,6 +13,7 @@ require (
 	golang.org/x/crypto v0.45.0
 	golang.org/x/sync v0.20.0
 	golang.org/x/term v0.37.0
+	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	modernc.org/sqlite v1.39.0
 )
 

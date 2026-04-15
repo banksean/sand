@@ -17,6 +17,7 @@ import (
 	"github.com/banksean/sand/internal/cli"
 	"github.com/banksean/sand/internal/daemon"
 	"github.com/banksean/sand/internal/version"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 // `sandd start` runs a long-lived process that manages sandboxes' lifecycles.
@@ -201,27 +202,23 @@ func (c *DaemonCmd) initSlog() {
 		level = slog.LevelInfo // Default to info if invalid
 	}
 
-	// Create a new logger with a JSON handler writing to standard error
-	var f *os.File
-	var err error
 	if c.LogFile == "" {
-		f, err = os.CreateTemp("/tmp/sand/daemon", "log")
-		if err != nil {
-			panic(err)
-		}
-	} else {
-		logDir := filepath.Dir(c.LogFile)
-		if err := os.MkdirAll(logDir, 0o755); err != nil {
-			panic(err)
-		}
-		f, err = os.OpenFile(c.LogFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
-		if err != nil {
-			panic(err)
-		}
-		c.LogFile = f.Name()
+		c.LogFile = "/tmp/sand/daemon/log"
+	}
+	logDir := filepath.Dir(c.LogFile)
+	if err := os.MkdirAll(logDir, 0o755); err != nil {
+		panic(err)
 	}
 
-	logger := slog.New(slog.NewJSONHandler(f, &slog.HandlerOptions{
+	w := &lumberjack.Logger{
+		Filename:   c.LogFile,
+		MaxSize:    100, // MB
+		MaxBackups: 5,
+		MaxAge:     30, // days
+		Compress:   true,
+	}
+
+	logger := slog.New(slog.NewJSONHandler(w, &slog.HandlerOptions{
 		Level: level,
 	}))
 	slog.SetDefault(logger)
