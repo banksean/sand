@@ -1,4 +1,5 @@
 #!/usr/bin/env bash -x
+set -euo pipefail
 
 # DANGER: this smoke test will: 
 # - remove all sandboxes
@@ -14,29 +15,49 @@
 # - apple/container is already installed on the host machine
 
 # Stop and uninstall everything
-sand rm -a
-sandd stop
 
-brew uninstall banksean/tap/sand
+if command -v sand &> /dev/null; then
+	echo "Removing sandboxes"
+	sand rm -a
+	echo "Stopping daemon"
+	sandd stop
 
-rm $(which sand)
-rm $(which sandd)
+	if brew list "banksean/tap/sand" &>/dev/null; then
+		echo "Uninstalling brew package"
+		brew uninstall banksean/tap/sand
+	else
+		echo "Removing non-brew binary installation"
+		rm $(which sand)
+		rm $(which sandd)
+	fi
+fi
 
 rm -rf ~/.config/sand
 rm -rf ~/Library/Application\ Support/Sand
 
-container image rm ghcr.io/banksean/sand/default
+if container image inspect ghcr.io/banksean/sand/default &>/dev/null; then 
+	echo "Removing ghcr.io/banksean/sand/default from local image registry"
+	container image rm ghcr.io/banksean/sand/default
+fi
 
 # Install sand and sandd from source
 go install ./cmd/...
+
+# Re-evaluate where the sand binary is located in $PATH
+# Without this, the script will continue to try to use the
+# binary installed by brew instead of the one we just built.
+hash -r
+which sand
+which sandd
 
 # Execute some commands that should work without any issues
 sand --version
 sand build-info
 sand ls
 
-# Create a new sandox and exit back to this script
-echo "exit" | sand new smoke
+# Create a new sandox and exit back to this smoke test.
+# Use the `script` command here to avoid tty errors.
+echo "exit" | script -q /dev/null sand new smoke
 sand ls
 
 # TODO: Automate verification for the output of these commands
@@ -46,7 +67,7 @@ sand exec smoke apk add go
 sand exec smoke go test ./...
 
 # Try to use the packaged sand innie binary from the default image
-sand exec smoke sand --verison
+sand exec smoke sand --version
 sand exec smoke sand build-info
 
 # Now try to build and use the sand innie binary built from this checkout
