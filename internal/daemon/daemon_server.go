@@ -750,6 +750,12 @@ func (d *Daemon) RemoveSandbox(ctx context.Context, id string) error {
 	if err := d.stopInnieServer(ctx, id); err != nil {
 		return err
 	}
-
+	// Remove the container socket, if there is one.
+	socketPath := filepath.Join(d.AppBaseDir, "containersockets", id)
+	if _, err := os.Stat(socketPath); err == nil {
+		if err := os.Remove(socketPath); err != nil {
+			return err
+		}
+	}
 	return d.boxer.Cleanup(ctx, sbox)
 }
