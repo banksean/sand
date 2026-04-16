@@ -13,6 +13,7 @@ import (
 	"syscall"
 
 	"github.com/alecthomas/kong"
+	kongyaml "github.com/alecthomas/kong-yaml"
 	"github.com/banksean/sand/internal/applecontainer"
 	"github.com/banksean/sand/internal/cli"
 	"github.com/banksean/sand/internal/daemon"
@@ -249,7 +250,7 @@ func main() {
 	var cli DaemonCmd
 
 	kongCtx := kong.Parse(&cli,
-		kong.Configuration(kong.JSON, ".sand.json", "~/.sand.json"),
+		kong.Configuration(kongyaml.Loader, ".sand.yaml", "~/.sand.yaml"),
 		kong.Description(description))
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

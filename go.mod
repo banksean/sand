@@ -3,7 +3,8 @@ module github.com/banksean/sand
 go 1.25.7
 
 require (
-	github.com/alecthomas/kong v1.13.0
+	github.com/alecthomas/kong v1.15.0
+	github.com/alecthomas/kong-yaml v0.2.0
 	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/google/go-containerregistry v0.21.3
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
@@ -14,6 +15,7 @@ require (
 	golang.org/x/sync v0.20.0
 	golang.org/x/term v0.37.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
+	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.39.0
 )
 
@@ -27,6 +29,7 @@ require (
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/klauspost/compress v1.18.4 // indirect
+	github.com/kr/text v0.2.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/ncruces/go-strftime v0.1.9 // indirect

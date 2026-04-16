@@ -5,5 +5,5 @@ testbin
 .env.*
 .claude
 .claude.json
-.sand.json
+.sand.*
 coverage.out

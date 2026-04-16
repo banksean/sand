@@ -29,7 +29,7 @@ type LogCmd struct {
 
 type DiffCmd struct {
 	SandboxNameFlag
-	Branch             string `short:"b" default:"" placeholder:"<branch name>" help:"remote branch to diff against (default: active git branch name in cwd)"`
+	Branch             string `short:"b" placeholder:"<branch name>" help:"remote branch to diff against (default: active git branch name in cwd)"`
 	IncludeUncommitted bool   `short:"u" default:"false" help:"include uncommitted changes from sandbox working tree"`
 }
 

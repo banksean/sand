@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net"
@@ -16,6 +17,7 @@ import (
 	"time"
 
 	"github.com/alecthomas/kong"
+	kongyaml "github.com/alecthomas/kong-yaml"
 	"github.com/banksean/sand/internal/cli"
 	"github.com/banksean/sand/internal/daemon"
 	"github.com/banksean/sand/internal/runtimedeps"
@@ -30,6 +32,7 @@ type Outie struct {
 	Timeout    time.Duration             `default:"0s" help:"if set to anything other than 0s, overrides the default timeout for an operation"`
 	Completion kongcompletion.Completion `cmd:"" help:"Outputs shell code for initialising tab completions"`
 	Version    cli.VersionFlag           `name:"version" help:"Print version and exit."`
+	DryRun     bool                      `default:"false" help:"just print out the operations instead of executing them"`
 
 	New                cli.NewCmd                `cmd:"" help:"create a new sandbox and shell into its container"`
 	Shell              cli.ShellCmd              `cmd:"" help:"shell into a sandbox container (and start the container, if necessary)"`
@@ -45,6 +48,7 @@ type Outie struct {
 	InstallEBPFSupport cli.InstallEBPFSupportCmd `cmd:"" help:"install the BPFFS-enabled kernel build"`
 	ExportImage        cli.ExportCmd             `cmd:"" help:"export a container image based on a stopped sandbox"`
 	Stats              cli.StatsCmd              `cmd:"" help:"list container stats for sandboxes"`
+	Config             cli.ConfigCmd             `cmd:"" help:"list, get, or set default values for flags"`
 }
 
 func (c *Outie) initSlog() {
@@ -225,9 +229,19 @@ func main() {
 	kongcompletion.Register(kongApp, kongcompletion.WithPredictor("sandbox-name", namePredictor))
 	kongCtx := kong.Parse(&app,
 		kong.UsageOnError(),
-		kong.Configuration(kong.JSON, ".sand.json", "~/.sand.json"),
+		kong.Configuration(kongyaml.Loader, ".sand.yaml", "~/.sand.yaml"),
 		kong.Description(description),
 	)
+
+	if app.DryRun {
+		appJSON, err := json.MarshalIndent(app, "", "  ")
+		if err != nil {
+			panic(err)
+		}
+		fmt.Printf("%s\n", string(appJSON))
+		return
+	}
+
 	app.initSlog()
 
 	if err := runtimedeps.Verify(ctx,
@@ -260,6 +274,7 @@ func main() {
 		ctx, cancel = context.WithTimeout(ctx, app.Timeout)
 		defer cancel()
 	}
+
 	err = kongCtx.Run(&cli.CLIContext{
 		Daemon:     mc,
 		Context:    ctx,

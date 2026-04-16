@@ -12,6 +12,7 @@ import (
 	"syscall"
 
 	"github.com/alecthomas/kong"
+	kongyaml "github.com/alecthomas/kong-yaml"
 	"github.com/banksean/sand/internal/cli"
 	"github.com/banksean/sand/internal/daemon"
 	kongcompletion "github.com/jotaen/kong-completion"
@@ -114,7 +115,7 @@ func main() {
 	kongcompletion.Register(kongApp, kongcompletion.WithPredictor("sandbox-name", namePredictor))
 	kongCtx := kong.Parse(&app,
 		kong.UsageOnError(),
-		kong.Configuration(kong.JSON, ".sand.json", "~/.sand.json"),
+		kong.Configuration(kongyaml.Loader, ".sand.yaml", "~/.sand.yaml"),
 		kong.Description(description))
 
 	app.initSlog()
