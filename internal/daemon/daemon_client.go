@@ -201,20 +201,59 @@ func (m *defaultClient) EnsureImage(ctx context.Context, imageName string, w io.
 		return fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
 
-	// Read the streaming plain-text body line by line.
+	// Read the streaming plain-text body.
 	// The daemon writes "OK\n" on success or "ERR <message>\n" on failure as the final line.
+	// PTY progress output uses \r for in-place terminal updates, which would make the
+	// default ScanLines accumulate a token > 64 KB. scanLinesOrCR splits on \r, \n, or \r\n
+	// and includes the terminator in the token so the caller receives each progress chunk
+	// immediately and \r-terminated lines overwrite correctly in the user's terminal.
 	scanner := bufio.NewScanner(resp.Body)
+	scanner.Split(scanLinesOrCR)
+	scanner.Buffer(make([]byte, 64*1024), 512*1024)
 	for scanner.Scan() {
-		line := scanner.Text()
-		if line == "OK" {
+		raw := scanner.Bytes()
+		s := strings.TrimRight(string(raw), "\r\n")
+		if s == "OK" {
 			return nil
 		}
-		if strings.HasPrefix(line, "ERR ") {
-			return errors.New(strings.TrimPrefix(line, "ERR "))
+		if strings.HasPrefix(s, "ERR ") {
+			return errors.New(s[4:])
 		}
-		fmt.Fprintln(w, line)
+		w.Write(raw)
 	}
 	return scanner.Err()
+}
+
+// scanLinesOrCR is a bufio.SplitFunc that splits on \r, \n, or \r\n and
+// includes the terminator in the returned token. This lets callers forward
+// each chunk to a terminal immediately and preserves \r-based in-place
+// progress updates (as used by 'container image pull').
+func scanLinesOrCR(data []byte, atEOF bool) (advance int, token []byte, err error) {
+	if atEOF && len(data) == 0 {
+		return 0, nil, nil
+	}
+	for i, b := range data {
+		switch b {
+		case '\n':
+			return i + 1, data[:i+1], nil
+		case '\r':
+			if i+1 < len(data) {
+				if data[i+1] == '\n' {
+					return i + 2, data[:i+2], nil // CRLF: consume both
+				}
+				return i + 1, data[:i+1], nil // lone CR
+			}
+			if !atEOF {
+				// CR at end of buffer but not EOF: might be CRLF, request more data
+				return 0, nil, nil
+			}
+			return i + 1, data[:i+1], nil
+		}
+	}
+	if atEOF {
+		return len(data), data, nil
+	}
+	return 0, nil, nil
 }
 
 func (m *defaultClient) ExportImage(ctx context.Context, id string, imageName string) error {
