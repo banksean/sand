@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
-	"os"
 	"os/exec"
 	"strings"
 	"syscall"
@@ -50,7 +50,10 @@ func (i *ImagesSvc) Inspect(ctx context.Context, name string) ([]*types.ImageMan
 }
 
 // Pull pulls the image with the given name and returns a wait func to release the cmd resources, or returns an error.
-func (i *ImagesSvc) Pull(ctx context.Context, name string) (func() error, error) {
+// Progress output from the 'container' command is written to w. Note that the 'container' command may detect
+// when it is not writing to a tty and suppress its progress output; the wrapper messages in Boxer.pullImage
+// will still be written regardless.
+func (i *ImagesSvc) Pull(ctx context.Context, name string, w io.Writer) (func() error, error) {
 	cmd := exec.CommandContext(ctx, "container", "image", "pull", name)
 	slog.InfoContext(ctx, "ImagesSvc.Pull", "cmd.Dir", cmd.Dir, "cmd", strings.Join(cmd.Args, " "))
 
@@ -58,11 +61,8 @@ func (i *ImagesSvc) Pull(ctx context.Context, name string) (func() error, error)
 	// It may not be necessary on MacOS at all.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
-	// Go ahead and write these to our stdio.  It turns out that the 'container' command sometimes
-	// detects when it's not writing to a tty, and goes slient.  Which means we can't pipe its terminal
-	// updates into somewhere else, so we just show them to the user as they happen.
-	cmd.Stderr = os.Stderr
-	cmd.Stdout = os.Stdout
+	cmd.Stderr = w
+	cmd.Stdout = w
 
 	if err := cmd.Start(); err != nil {
 		return cmd.Wait, err

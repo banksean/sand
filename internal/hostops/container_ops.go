@@ -23,7 +23,7 @@ type ContainerOps interface {
 
 type ImageOps interface {
 	List(ctx context.Context) ([]types.ImageEntry, error)
-	Pull(ctx context.Context, image string) (func() error, error)
+	Pull(ctx context.Context, image string, w io.Writer) (func() error, error)
 	Inspect(ctx context.Context, name string) ([]*types.ImageManifest, error)
 }
 
@@ -81,8 +81,8 @@ func (a *appleImageOps) List(ctx context.Context) ([]types.ImageEntry, error) {
 	return ac.Images.List(ctx)
 }
 
-func (a *appleImageOps) Pull(ctx context.Context, image string) (func() error, error) {
-	return ac.Images.Pull(ctx, image)
+func (a *appleImageOps) Pull(ctx context.Context, image string, w io.Writer) (func() error, error) {
+	return ac.Images.Pull(ctx, image, w)
 }
 
 func (a *appleImageOps) Inspect(ctx context.Context, name string) ([]*types.ImageManifest, error) {

@@ -744,7 +744,7 @@ func (sb *Boxer) pullImage(ctx context.Context, imageName string, w io.Writer) e
 	fmt.Fprintf(w, "Pulling image %s...\n", imageName)
 	start := time.Now()
 
-	waitFn, err := sb.ImageService.Pull(ctx, imageName)
+	waitFn, err := sb.ImageService.Pull(ctx, imageName, w)
 	defer func() {
 		if waitFn != nil {
 			waitFn()

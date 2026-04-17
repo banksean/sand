@@ -20,7 +20,7 @@ import (
 
 type mockImageOps struct {
 	listFunc func(ctx context.Context) ([]types.ImageEntry, error)
-	pullFunc func(ctx context.Context, image string) (func() error, error)
+	pullFunc func(ctx context.Context, image string, w io.Writer) (func() error, error)
 }
 
 // Inspect implements [hostops.ImageOps].
@@ -35,9 +35,9 @@ func (m *mockImageOps) List(ctx context.Context) ([]types.ImageEntry, error) {
 	return []types.ImageEntry{}, nil
 }
 
-func (m *mockImageOps) Pull(ctx context.Context, image string) (func() error, error) {
+func (m *mockImageOps) Pull(ctx context.Context, image string, w io.Writer) (func() error, error) {
 	if m.pullFunc != nil {
-		return m.pullFunc(ctx, image)
+		return m.pullFunc(ctx, image, w)
 	}
 	return func() error { return nil }, nil
 }
@@ -585,7 +585,7 @@ func TestBoxer_EnsureImage(t *testing.T) {
 					{Reference: "other-image:v1"},
 				}, nil
 			},
-			pullFunc: func(ctx context.Context, image string) (func() error, error) {
+			pullFunc: func(ctx context.Context, image string, w io.Writer) (func() error, error) {
 				pullCalled = true
 				if image != "new-image:latest" {
 					t.Errorf("Expected pull 'new-image:latest', got %s", image)
@@ -636,7 +636,7 @@ func TestBoxer_EnsureImage(t *testing.T) {
 			listFunc: func(ctx context.Context) ([]types.ImageEntry, error) {
 				return []types.ImageEntry{}, nil
 			},
-			pullFunc: func(ctx context.Context, image string) (func() error, error) {
+			pullFunc: func(ctx context.Context, image string, w io.Writer) (func() error, error) {
 				return nil, expectedErr
 			},
 		}
@@ -656,7 +656,7 @@ func TestBoxer_EnsureImage(t *testing.T) {
 			listFunc: func(ctx context.Context) ([]types.ImageEntry, error) {
 				return []types.ImageEntry{}, nil
 			},
-			pullFunc: func(ctx context.Context, image string) (func() error, error) {
+			pullFunc: func(ctx context.Context, image string, w io.Writer) (func() error, error) {
 				return func() error {
 					return expectedErr
 				}, nil
