@@ -75,10 +75,10 @@ func TestWalkMerge_NestedMaps(t *testing.T) {
 	}
 
 	type visit struct {
-		path     []string
-		name     string
-		allNil   bool
-		leafVal  any
+		path    []string
+		name    string
+		allNil  bool
+		leafVal any
 	}
 	var visits []visit
 	walkMerge(nil, proj, nil, nil, func(path []string, name string, aVal, bVal, cVal any) {
@@ -157,7 +157,7 @@ func TestLoadEffectiveConfigMaps_ProjFile(t *testing.T) {
 	t.Setenv("HOME", homeDir)
 	t.Chdir(projDir)
 
-	if err := os.WriteFile(filepath.Join(projDir, ".sand.yaml"), []byte("image: proj-image\n"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(projDir, ".sand.yaml"), []byte("image: proj-image\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -180,7 +180,7 @@ func TestLoadEffectiveConfigMaps_UserFile(t *testing.T) {
 	t.Setenv("HOME", homeDir)
 	t.Chdir(projDir)
 
-	if err := os.WriteFile(filepath.Join(homeDir, ".sand.yaml"), []byte("image: user-image\n"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(homeDir, ".sand.yaml"), []byte("image: user-image\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -203,10 +203,10 @@ func TestLoadEffectiveConfigMaps_BothFiles(t *testing.T) {
 	t.Setenv("HOME", homeDir)
 	t.Chdir(tmp)
 
-	if err := os.WriteFile(filepath.Join(tmp, ".sand.yaml"), []byte("cpu: 8\n"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(tmp, ".sand.yaml"), []byte("cpu: 8\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(homeDir, ".sand.yaml"), []byte("memory: 4096\n"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(homeDir, ".sand.yaml"), []byte("memory: 4096\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
