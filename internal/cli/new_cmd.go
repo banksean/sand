@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alecthomas/kong"
 	"github.com/banksean/sand/internal/applecontainer"
 	"github.com/banksean/sand/internal/applecontainer/options"
 	"github.com/banksean/sand/internal/applecontainer/types"
@@ -38,11 +39,33 @@ var defaultImageForAgent = map[string]string{
 	"opencode": "ghcr.io/banksean/sand/opencode:latest",
 }
 
-func (c *NewCmd) Run(cctx *CLIContext) error {
+func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 	ctx := cctx.Context
 	mc := cctx.Daemon
 
 	slog.InfoContext(ctx, "NewCmd.Run")
+
+	projCfg, userCfg, defaultsCfg, userCfgPath, err := loadEffectiveConfigMaps(k)
+	if err != nil {
+		slog.WarnContext(ctx, "NewCmd: could not load effective config", "error", err)
+	} else {
+		walkMerge(nil, projCfg, userCfg, defaultsCfg, func(path []string, name string, projVal, userVal, defaultVal any) {
+			var val any
+			source := "default"
+			if projVal != nil {
+				val = projVal
+				source = "./.sand.yaml"
+			} else if userVal != nil {
+				val = userVal
+				source = userCfgPath
+			} else if defaultVal != nil {
+				val = defaultVal
+			}
+			if val != nil {
+				slog.InfoContext(ctx, "effective config", "key", strings.Join(path, "."), "value", val, "source", source)
+			}
+		})
+	}
 
 	if err := runtimedeps.Verify(ctx, cctx.AppBaseDir, runtimedeps.GitDir); err != nil {
 		return err

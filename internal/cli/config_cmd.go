@@ -20,23 +20,10 @@ type ConfigCmd struct {
 type ConfigLsCmd struct{}
 
 func (c *ConfigLsCmd) Run(k *kong.Kong, cctx *CLIContext) error {
-	projCfg := map[string]any{}
-	err := decodeYAML("./.sand.yaml", &projCfg)
-	if !os.IsNotExist(err) && err != io.EOF && err != nil {
-		return err
-	}
-
-	userCfg := map[string]any{}
-	home, err := os.UserHomeDir()
+	projCfg, userCfg, defaultsCfg, userCfgPath, err := loadEffectiveConfigMaps(k)
 	if err != nil {
 		return err
 	}
-	userCfgFilename := filepath.Join(home, ".sand.yaml")
-	err = decodeYAML(userCfgFilename, &userCfg)
-	if !os.IsNotExist(err) && err != io.EOF && err != nil {
-		return err
-	}
-	defaultsCfg := encodeNodeDetail(k.Model.Node)
 	walkMerge(nil, projCfg, userCfg, defaultsCfg, func(path []string, name string, projVal, userVal, defaultVal any) {
 		var val any
 		source := ""
@@ -45,7 +32,7 @@ func (c *ConfigLsCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 			source = " # ./.sand.yaml"
 		} else if userVal != nil {
 			val = userVal
-			source = " # " + userCfgFilename
+			source = " # " + userCfgPath
 		} else if defaultVal != nil {
 			val = defaultVal
 		}
@@ -57,6 +44,31 @@ func (c *ConfigLsCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 		}
 	})
 	return nil
+}
+
+// loadEffectiveConfigMaps loads the project-level (./.sand.yaml) and user-level
+// (~/.sand.yaml) config files and returns their contents along with kong-derived
+// defaults. userCfgPath is the resolved path to the user config file, useful for
+// source annotations. Any of the returned maps may be empty if the corresponding
+// file does not exist.
+func loadEffectiveConfigMaps(k *kong.Kong) (projCfg, userCfg, defaultsCfg map[string]any, userCfgPath string, err error) {
+	projCfg = map[string]any{}
+	if e := decodeYAML("./.sand.yaml", &projCfg); e != nil && !os.IsNotExist(e) && e != io.EOF {
+		return nil, nil, nil, "", e
+	}
+
+	userCfg = map[string]any{}
+	home, herr := os.UserHomeDir()
+	if herr != nil {
+		return nil, nil, nil, "", herr
+	}
+	userCfgPath = filepath.Join(home, ".sand.yaml")
+	if e := decodeYAML(userCfgPath, &userCfg); e != nil && !os.IsNotExist(e) && e != io.EOF {
+		return nil, nil, nil, "", e
+	}
+
+	defaultsCfg = encodeNodeDetail(k.Model.Node)
+	return projCfg, userCfg, defaultsCfg, userCfgPath, nil
 }
 
 func walkMerge(path []string, a, b, c map[string]any, f func(path []string, name string, aVal any, bVal any, cVal any)) {
