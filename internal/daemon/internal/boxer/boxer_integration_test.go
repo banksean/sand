@@ -3,6 +3,7 @@ package boxer
 import (
 	"context"
 	"errors"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
@@ -568,7 +569,7 @@ func TestBoxer_EnsureImage(t *testing.T) {
 		mockContainer := &hostops.MockContainerOps{}
 		boxer := newTestBoxer(t, mockContainer, mockImage)
 
-		err := boxer.EnsureImage(ctx, "test-image:latest")
+		err := boxer.EnsureImage(ctx, "test-image:latest", io.Discard)
 		if err != nil {
 			t.Fatalf("EnsureImage() error = %v", err)
 		}
@@ -599,7 +600,7 @@ func TestBoxer_EnsureImage(t *testing.T) {
 		mockContainer := &hostops.MockContainerOps{}
 		boxer := newTestBoxer(t, mockContainer, mockImage)
 
-		err := boxer.EnsureImage(ctx, "new-image:latest")
+		err := boxer.EnsureImage(ctx, "new-image:latest", io.Discard)
 		if err != nil {
 			t.Fatalf("EnsureImage() error = %v", err)
 		}
@@ -623,7 +624,7 @@ func TestBoxer_EnsureImage(t *testing.T) {
 		mockContainer := &hostops.MockContainerOps{}
 		boxer := newTestBoxer(t, mockContainer, mockImage)
 
-		err := boxer.EnsureImage(ctx, "test-image:latest")
+		err := boxer.EnsureImage(ctx, "test-image:latest", io.Discard)
 		if err == nil {
 			t.Fatal("Expected error from list, got nil")
 		}
@@ -643,7 +644,7 @@ func TestBoxer_EnsureImage(t *testing.T) {
 		mockContainer := &hostops.MockContainerOps{}
 		boxer := newTestBoxer(t, mockContainer, mockImage)
 
-		err := boxer.EnsureImage(ctx, "test-image:latest")
+		err := boxer.EnsureImage(ctx, "test-image:latest", io.Discard)
 		if err == nil {
 			t.Fatal("Expected error from pull, got nil")
 		}
@@ -665,7 +666,7 @@ func TestBoxer_EnsureImage(t *testing.T) {
 		mockContainer := &hostops.MockContainerOps{}
 		boxer := newTestBoxer(t, mockContainer, mockImage)
 
-		err := boxer.EnsureImage(ctx, "test-image:latest")
+		err := boxer.EnsureImage(ctx, "test-image:latest", io.Discard)
 		if err == nil {
 			t.Fatal("Expected error from wait, got nil")
 		}

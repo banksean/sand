@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/alecthomas/kong"
-	"github.com/banksean/sand/internal/applecontainer"
 	"github.com/banksean/sand/internal/applecontainer/options"
 	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/daemon"
@@ -118,34 +117,8 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 			c.ImageName = DefaultImageName
 		}
 	}
-	// Check to make sure c.ImageName is already pulled and available first, so we
-	// don't block creating the new container on downloading the image for it.
-	if exists := runtimedeps.CheckImageExistsLocally(cctx.Context, c.ImageName); !exists {
-		fmt.Printf("Pulling image %s...\n", c.ImageName)
-		wait, err := applecontainer.Images.Pull(ctx, c.ImageName)
-		if err != nil {
-			return fmt.Errorf("couldn't initiate image pull for %s: %w", c.ImageName, err)
-		}
-		if err := wait(); err != nil {
-			return fmt.Errorf("couldn't pull image %s: %w", c.ImageName, err)
-		}
-	}
-
-	// If the image is from a remote registry, check if we have the most recent version of it.
-	if strings.HasPrefix(c.ImageName, "ghcr.io") || strings.HasPrefix(c.ImageName, "docker.io") {
-		isLatest, err := runtimedeps.CheckImageIsLatest(ctx, c.ImageName)
-		if err != nil {
-			fmt.Printf("Failed to check remote registry for latest version of %s, continuing with local version: %s\n", c.ImageName, err)
-		} else if !isLatest {
-			fmt.Printf("Local image digest doesn't match latest remote digest, pulling %s\n", c.ImageName)
-			wait, err := applecontainer.Images.Pull(ctx, c.ImageName)
-			if err != nil {
-				return fmt.Errorf("pulling %s: %w", c.ImageName, err)
-			}
-			if err := wait(); err != nil {
-				return fmt.Errorf("waiting for pull of %s: %w", c.ImageName, err)
-			}
-		}
+	if err := mc.EnsureImage(ctx, c.ImageName, os.Stdout); err != nil {
+		return fmt.Errorf("ensuring image %s: %w", c.ImageName, err)
 	}
 
 	var allowedDomains []string

@@ -699,8 +699,9 @@ func (sber *Boxer) executeHooks(ctx context.Context, sb *sandtypes.Box, hooks []
 	return nil
 }
 
-// EnsureImage makes sure the requested container image is present locally, pulling it if required.
-func (sb *Boxer) EnsureImage(ctx context.Context, imageName string) error {
+// EnsureImage makes sure the requested container image is present locally and up to date,
+// pulling it if required. Progress messages are written to w.
+func (sb *Boxer) EnsureImage(ctx context.Context, imageName string, w io.Writer) error {
 	slog.InfoContext(ctx, "Boxer.EnsureImage", "imageName", imageName)
 
 	images, err := sb.ImageService.List(ctx)
@@ -708,22 +709,39 @@ func (sb *Boxer) EnsureImage(ctx context.Context, imageName string) error {
 		return fmt.Errorf("failed to list images: %w", err)
 	}
 
+	imagePresent := false
 	for _, image := range images {
 		if image.Reference == imageName {
 			slog.InfoContext(ctx, "Boxer.EnsureImage", "status", "already-present", "imageName", imageName)
-			return nil
+			imagePresent = true
+			break
 		}
 	}
 
-	slog.InfoContext(ctx, "Boxer.EnsureImage", "status", "pulling", "imageName", imageName)
-	return sb.pullImage(ctx, imageName)
+	if !imagePresent {
+		slog.InfoContext(ctx, "Boxer.EnsureImage", "status", "pulling", "imageName", imageName)
+		return sb.pullImage(ctx, imageName, w)
+	}
+
+	// Image is present locally; for remote registry images, check for a newer digest.
+	if strings.HasPrefix(imageName, "ghcr.io") || strings.HasPrefix(imageName, "docker.io") {
+		isLatest, err := runtimedeps.CheckImageIsLatest(ctx, imageName)
+		if err != nil {
+			fmt.Fprintf(w, "Failed to check remote registry for latest version of %s, continuing with local version: %s\n", imageName, err)
+		} else if !isLatest {
+			fmt.Fprintf(w, "Local image digest doesn't match latest remote digest, pulling %s\n", imageName)
+			return sb.pullImage(ctx, imageName, w)
+		}
+	}
+
+	return nil
 }
 
-// pullImage wraps the apple container image pull helper with user feedback.
-func (sb *Boxer) pullImage(ctx context.Context, imageName string) error {
+// pullImage pulls imageName and writes progress messages to w.
+func (sb *Boxer) pullImage(ctx context.Context, imageName string, w io.Writer) error {
 	slog.InfoContext(ctx, "Boxer.pullImage", "imageName", imageName)
 
-	sb.messenger.Message(ctx, fmt.Sprintf("This may take a while: pulling container image %s...", imageName))
+	fmt.Fprintf(w, "Pulling image %s...\n", imageName)
 	start := time.Now()
 
 	waitFn, err := sb.ImageService.Pull(ctx, imageName)
@@ -744,7 +762,7 @@ func (sb *Boxer) pullImage(ctx context.Context, imageName string) error {
 		}
 	}
 
-	sb.messenger.Message(ctx, fmt.Sprintf("Done pulling container image. Took %v.", time.Since(start)))
+	fmt.Fprintf(w, "Done pulling image. Took %v.\n", time.Since(start))
 	return nil
 }
 

@@ -196,6 +196,7 @@ func (d *Daemon) serveOutieSocket(ctx context.Context) {
 	mux.HandleFunc("/stop", slogHandler(d.handleStop))
 	mux.HandleFunc("/start", slogHandler(d.handleStart))
 	mux.HandleFunc("/create", slogHandler(d.handleCreate))
+	mux.HandleFunc("/ensure-image", slogHandler(d.handleEnsureImage))
 	mux.HandleFunc("/export", slogHandler(d.handleExport))
 	mux.HandleFunc("/stats", slogHandler(d.handleStats))
 
@@ -284,6 +285,26 @@ func (d *Daemon) serveInnieSocket(ctx context.Context, sandboxID string, unixLis
 	if err != nil {
 		slog.ErrorContext(ctx, "Daemon.serveInnieSocket", "error", err)
 	}
+}
+
+// flushWriter wraps an http.ResponseWriter and flushes after every write so
+// streaming responses reach the client incrementally.
+type flushWriter struct {
+	w http.ResponseWriter
+	f http.Flusher
+}
+
+func newFlushWriter(w http.ResponseWriter) *flushWriter {
+	f, _ := w.(http.Flusher)
+	return &flushWriter{w: w, f: f}
+}
+
+func (fw *flushWriter) Write(p []byte) (int, error) {
+	n, err := fw.w.Write(p)
+	if fw.f != nil {
+		fw.f.Flush()
+	}
+	return n, err
 }
 
 // HTTP handler helpers
@@ -479,6 +500,33 @@ func (d *Daemon) handleStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, StatusResponse{Status: "ok"})
+}
+
+// handleEnsureImage pulls the requested image if it is absent or stale, streaming
+// progress lines to the client as plain text. The final line is "OK\n" on success
+// or "ERR <message>\n" on failure.
+func (d *Daemon) handleEnsureImage(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req EnsureImageRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.WriteHeader(http.StatusOK)
+
+	fw := newFlushWriter(w)
+	if err := d.boxer.EnsureImage(r.Context(), req.ImageName, fw); err != nil {
+		fmt.Fprintf(fw, "ERR %s\n", err.Error())
+		return
+	}
+	fmt.Fprintln(fw, "OK")
 }
 
 func (d *Daemon) handleCreate(w http.ResponseWriter, r *http.Request) {

@@ -1,9 +1,12 @@
 package daemon
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -30,6 +33,9 @@ type Client interface {
 	Stats(ctx context.Context, id ...string) ([]types.ContainerStats, error)
 	VSC(ctx context.Context, id string) error
 	CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*sandtypes.Box, error)
+	// EnsureImage ensures imageName is present locally and up to date, pulling if needed.
+	// Progress lines from the daemon are written to w as they arrive.
+	EnsureImage(ctx context.Context, imageName string, w io.Writer) error
 }
 
 // defaultClient is the concrete implementation of Client that communicates
@@ -162,6 +168,53 @@ func (m *defaultClient) CreateSandbox(ctx context.Context, opts CreateSandboxOpt
 		return nil, err
 	}
 	return &box, nil
+}
+
+// EnsureImage streams progress from the daemon's /ensure-image endpoint to w.
+// The daemon uses "OK\n" as the success sentinel and "ERR <msg>\n" for failures,
+// allowing the method to distinguish terminal state from progress text.
+func (m *defaultClient) EnsureImage(ctx context.Context, imageName string, w io.Writer) error {
+	slog.InfoContext(ctx, "defaultClient.EnsureImage", "imageName", imageName)
+
+	body, err := json.Marshal(EnsureImageRequest{ImageName: imageName})
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, m.base+"/ensure-image", strings.NewReader(string(body)))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := m.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("couldn't complete request to daemon: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Pre-streaming error (e.g. bad request): parse as JSON error response.
+	if resp.StatusCode >= 400 {
+		var errResp ErrorResponse
+		if json.NewDecoder(resp.Body).Decode(&errResp) == nil && errResp.Error != "" {
+			return fmt.Errorf("%s", errResp.Error)
+		}
+		return fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+
+	// Read the streaming plain-text body line by line.
+	// The daemon writes "OK\n" on success or "ERR <message>\n" on failure as the final line.
+	scanner := bufio.NewScanner(resp.Body)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "OK" {
+			return nil
+		}
+		if strings.HasPrefix(line, "ERR ") {
+			return errors.New(strings.TrimPrefix(line, "ERR "))
+		}
+		fmt.Fprintln(w, line)
+	}
+	return scanner.Err()
 }
 
 func (m *defaultClient) ExportImage(ctx context.Context, id string, imageName string) error {

@@ -1,5 +1,10 @@
 package daemon
 
+// EnsureImageRequest is the request body for the /ensure-image endpoint.
+type EnsureImageRequest struct {
+	ImageName string `json:"imageName"`
+}
+
 // IDRequest is the request body for endpoints that operate on a single sandbox by ID.
 type IDRequest struct {
 	ID string `json:"id"`
