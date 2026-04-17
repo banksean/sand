@@ -63,12 +63,30 @@ func (i *ImagesSvc) Pull(ctx context.Context, name string, w io.Writer) (func() 
 	// It may not be necessary on MacOS at all.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
-	// Attach a PTY so 'container image pull' sees a TTY and emits live progress.
-	// pty.Start sets cmd.Stdin/Stdout/Stderr to the PTY slave before calling cmd.Start.
-	ptmx, err := pty.Start(cmd)
+	// Open a PTY pair and attach the slave to the command's stdio. This makes
+	// isatty() return true in the subprocess so 'container image pull' emits
+	// live progress rather than going silent.
+	//
+	// We use pty.Open + cmd.Start rather than pty.Start because pty.Start sets
+	// Setsid+Setctty in SysProcAttr, and the Setctty path (TIOCSCTTY) causes
+	// EPERM in the daemon's security context. isatty() only checks whether the
+	// fd is a TTY character device, not whether it is the controlling terminal,
+	// so this works without Setctty.
+	ptmx, tty, err := pty.Open()
 	if err != nil {
 		return nil, err
 	}
+	cmd.Stdin = tty
+	cmd.Stdout = tty
+	cmd.Stderr = tty
+
+	if err := cmd.Start(); err != nil {
+		tty.Close()
+		ptmx.Close()
+		return nil, err
+	}
+	// Close the slave in the parent now that the child has inherited it.
+	tty.Close()
 
 	// Copy PTY master output to w until the master is closed.
 	// When the subprocess exits the slave closes, causing reads from the master
