@@ -57,7 +57,7 @@ func (c *ShellCmd) Run(cctx *CLIContext) error {
 	var cmdArgs []string
 	if c.Tmux {
 		c.Shell = "/usr/bin/tmux"
-		cmdArgs = append(cmdArgs, "attach-session")
+		cmdArgs = append(cmdArgs, "new-session", "-A")
 	}
 
 	cmdEnv := os.Environ()
