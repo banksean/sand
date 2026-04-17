@@ -165,17 +165,10 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 
 	// At this point the sandbox and container exist and are running (created by daemon)
 	// Now attach to the shell directly (not through daemon)
-	ctr := sbox.Container
-
-	if ctr == nil {
+	if sbox.Container == nil {
 		return fmt.Errorf("sandbox's container field is nil")
 	}
-	hostname := types.GetContainerHostname(ctr)
-	env := map[string]string{
-		"HOSTNAME": hostname,
-		"LANG":     os.Getenv("LANG"),
-		"TERM":     os.Getenv("TERM"),
-	}
+	hostname := types.GetContainerHostname(sbox.Container)
 
 	slog.InfoContext(ctx, "main: sbox.new starting")
 
@@ -257,16 +250,7 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 
 	}
 
-	// This will only work on the *host* OS, since it makes calls to apple's container service.
 	// TODO: Sort out how "new" and "shell" should work when invoked inside a container.
-	containerSvc := hostops.NewAppleContainerOps()
-	ctrs, err := containerSvc.Inspect(ctx, sbox.ContainerID)
-	if err != nil {
-		return fmt.Errorf("could not inspect container for sandbox %s: %w", sbox.ContainerID, err)
-	}
-	if len(ctrs) == 0 {
-		return fmt.Errorf("no container for sandbox %s", sbox.ContainerID)
-	}
 	var args []string
 	switch c.Agent {
 	case "claude":
@@ -276,7 +260,7 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 			args = []string{"-c", "claude --permission-mode=bypassPermissions"}
 		}
 	case "opencode":
-		args = []string{"-c", "opencode --port 80 --hostname " + strings.TrimSuffix(ctrs[0].Networks[0].Hostname, ".")}
+		args = []string{"-c", "opencode --port 80 --hostname " + strings.TrimSuffix(hostname, ".")}
 	}
 	if c.Tmux {
 		c.Shell = "/usr/bin/tmux"
@@ -285,26 +269,8 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 		}
 	}
 
-	cmdEnv := os.Environ()
-
-	wait, err := containerSvc.ExecStream(ctx,
-		&options.ExecContainer{
-			ProcessOptions: options.ProcessOptions{
-				Interactive: true,
-				TTY:         true,
-				WorkDir:     "/app",
-				Env:         env,
-				EnvFile:     sbox.EnvFile,
-				User:        c.Username,
-				UID:         c.Uid,
-			},
-		}, sbox.ContainerID, c.Shell, cmdEnv, os.Stdin, os.Stdout, os.Stderr, args...)
-	if err != nil {
-		slog.ErrorContext(ctx, "shell: containerService.ExecStream", "sandbox", sbox.ID, "error", err)
-		return fmt.Errorf("failed to execute shell command for sandbox %s: %w", sbox.ID, err)
-	}
-	if err := wait(); err != nil {
-		slog.ErrorContext(ctx, "sbox.new", "error", err)
+	if err := runShell(ctx, sbox, c.Shell, args); err != nil {
+		return err
 	}
 
 	if c.Rm {
