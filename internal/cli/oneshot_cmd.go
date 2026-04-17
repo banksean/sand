@@ -15,9 +15,9 @@ import (
 	"github.com/goombaio/namegenerator"
 )
 
-// RunCmd creates a sandbox (or reuses an existing one) and runs an AI agent
+// OneshotCmd creates a sandbox (or reuses an existing one) and runs an AI agent
 // non-interactively with the given prompt, streaming output to stdout.
-type RunCmd struct {
+type OneshotCmd struct {
 	SandboxCreationFlags
 	Agent       string `short:"a" default:"claude" placeholder:"<claude|opencode>" help:"coding agent to use"`
 	Username    string `help:"name of default user to create (defaults to $USER)"`
@@ -26,7 +26,7 @@ type RunCmd struct {
 	Prompt      string `arg:"" help:"prompt to pass to the agent"`
 }
 
-func (c *RunCmd) Run(cctx *CLIContext) error {
+func (c *OneshotCmd) Run(cctx *CLIContext) error {
 	ctx := cctx.Context
 	mc := cctx.Daemon
 
