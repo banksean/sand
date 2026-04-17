@@ -8,7 +8,10 @@ import (
 	"log/slog"
 	"os/exec"
 	"strings"
+	"sync"
 	"syscall"
+
+	"github.com/creack/pty"
 
 	"github.com/banksean/sand/internal/applecontainer/types"
 )
@@ -50,9 +53,8 @@ func (i *ImagesSvc) Inspect(ctx context.Context, name string) ([]*types.ImageMan
 }
 
 // Pull pulls the image with the given name and returns a wait func to release the cmd resources, or returns an error.
-// Progress output from the 'container' command is written to w. Note that the 'container' command may detect
-// when it is not writing to a tty and suppress its progress output; the wrapper messages in Boxer.pullImage
-// will still be written regardless.
+// It runs the command under a PTY so the 'container' subprocess sees a TTY and emits live progress output.
+// All subprocess output is copied to w. The returned wait func is idempotent.
 func (i *ImagesSvc) Pull(ctx context.Context, name string, w io.Writer) (func() error, error) {
 	cmd := exec.CommandContext(ctx, "container", "image", "pull", name)
 	slog.InfoContext(ctx, "ImagesSvc.Pull", "cmd.Dir", cmd.Dir, "cmd", strings.Join(cmd.Args, " "))
@@ -61,12 +63,33 @@ func (i *ImagesSvc) Pull(ctx context.Context, name string, w io.Writer) (func() 
 	// It may not be necessary on MacOS at all.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
-	cmd.Stderr = w
-	cmd.Stdout = w
-
-	if err := cmd.Start(); err != nil {
-		return cmd.Wait, err
+	// Attach a PTY so 'container image pull' sees a TTY and emits live progress.
+	// pty.Start sets cmd.Stdin/Stdout/Stderr to the PTY slave before calling cmd.Start.
+	ptmx, err := pty.Start(cmd)
+	if err != nil {
+		return nil, err
 	}
 
-	return cmd.Wait, nil
+	// Copy PTY master output to w until the master is closed.
+	// When the subprocess exits the slave closes, causing reads from the master
+	// to return EIO (macOS) or EOF. Either is expected and silently discarded.
+	copyDone := make(chan struct{})
+	go func() {
+		defer close(copyDone)
+		io.Copy(w, ptmx) //nolint:errcheck // EIO/EOF on process exit is expected
+	}()
+
+	// The wait func is idempotent via sync.Once: boxer.pullImage has both a
+	// defer and an explicit call, so we must tolerate being called twice.
+	var once sync.Once
+	var waitErr error
+	waitFn := func() error {
+		once.Do(func() {
+			waitErr = cmd.Wait()
+			ptmx.Close()
+			<-copyDone
+		})
+		return waitErr
+	}
+	return waitFn, nil
 }
