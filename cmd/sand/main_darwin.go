@@ -35,6 +35,7 @@ type Outie struct {
 	DryRun     bool                      `default:"false" help:"just print out the operations instead of executing them"`
 
 	New                cli.NewCmd                `cmd:"" help:"create a new sandbox and shell into its container"`
+	Run                cli.RunCmd                `cmd:"" help:"run an AI agent non-interactively with a prompt"`
 	Shell              cli.ShellCmd              `cmd:"" help:"shell into a sandbox container (and start the container, if necessary)"`
 	Exec               cli.ExecCmd               `cmd:"" help:"execute a single command in a sanbox"`
 	Ls                 cli.LsCmd                 `cmd:"" help:"list sandboxes"`

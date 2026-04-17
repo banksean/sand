@@ -154,9 +154,6 @@ func TestNewCmdDefaults(t *testing.T) {
 	if cli.New.Branch {
 		t.Error("expected Branch=false by default")
 	}
-	if cli.New.Prompt != "" {
-		t.Errorf("expected empty Prompt, got %q", cli.New.Prompt)
-	}
 }
 
 func TestNewCmdWithSandboxName(t *testing.T) {
@@ -178,7 +175,6 @@ func TestNewCmdFlags(t *testing.T) {
 		"-i", "myimage:v2",
 		"-a", "claude",
 		"-b",
-		"-p", "fix the bug",
 		"-s", "/bin/sh",
 		"sandbox-42",
 	})
@@ -190,9 +186,6 @@ func TestNewCmdFlags(t *testing.T) {
 	}
 	if !cli.New.Branch {
 		t.Error("expected Branch=true")
-	}
-	if cli.New.Prompt != "fix the bug" {
-		t.Errorf("expected Prompt 'fix the bug', got %q", cli.New.Prompt)
 	}
 	if cli.New.Shell != "/bin/sh" {
 		t.Errorf("expected Shell /bin/sh, got %q", cli.New.Shell)

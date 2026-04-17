@@ -25,7 +25,6 @@ type NewCmd struct {
 	ShellFlags
 	Agent       string `short:"a" placeholder:"<claude|codex|opencode>" help:"name of coding agent to use"`
 	Branch      bool   `short:"b" help:"create a new git branch inside the sandbox _container_ (not on your host workdir)"`
-	Prompt      string `short:"p" placeholder:"<prompt>" help:"start the agent with this prompt in non-interactive (one-shot) mode and return immediately"`
 	Username    string `help:"name of default user to create (defaults to $USER)"`
 	Uid         string `help:"id of default user to create (defaults to $UID)"`
 	SandboxName string `arg:"" optional:"" help:"name of the sandbox to create"`
@@ -98,11 +97,6 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 
 	if c.EnvFile != "" && !filepath.IsAbs(c.EnvFile) {
 		c.EnvFile = filepath.Join(c.CloneFromDir, c.EnvFile)
-	}
-
-	// When a prompt is given, default to claude for workspace preparation.
-	if c.Prompt != "" && c.Agent == "default" {
-		c.Agent = "claude"
 	}
 
 	if c.ImageName == "" {
@@ -192,41 +186,6 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 		if err != nil {
 			slog.ErrorContext(ctx, "sbox.new git checkout", "error", err, "out", out)
 		}
-	}
-
-	if c.Prompt != "" {
-		// One-shot mode: run the agent inside the container, streaming output to stdio.
-		// The prompt is passed via an env var to avoid shell quoting issues.
-		containerSvc := hostops.NewAppleContainerOps()
-		agentOneShotCmd := ""
-		switch c.Agent {
-		case "claude":
-			agentOneShotCmd = `claude --permission-mode=bypassPermissions --print "$SAND_ONESHOT_PROMPT"`
-		case "opencode":
-			agentOneShotCmd = `opencode run "$SAND_ONESHOT_PROMPT"`
-		default:
-			return fmt.Errorf("one-shot prompt mode not supported for %q", c.Agent)
-		}
-		wait, err := containerSvc.ExecStream(ctx,
-			&options.ExecContainer{
-				ProcessOptions: options.ProcessOptions{
-					WorkDir: "/app",
-					EnvFile: sbox.EnvFile,
-					Env:     map[string]string{"SAND_ONESHOT_PROMPT": c.Prompt},
-					User:    c.Username,
-					UID:     c.Uid,
-				},
-			}, sbox.ContainerID, "/bin/sh", os.Environ(),
-			os.Stdin, os.Stdout, os.Stderr,
-			"-c", agentOneShotCmd)
-		if err != nil {
-			slog.ErrorContext(ctx, "NewCmd: start agent oneshot", "error", err)
-			return fmt.Errorf("failed to start agent in sandbox %s: %w", sbox.ID, err)
-		}
-		if err := wait(); err != nil {
-			slog.ErrorContext(ctx, "NewCmd: agent oneshot wait", "error", err)
-		}
-		return nil
 	}
 
 	updateSSHConfFunc, err := sshimmer.CheckSSHReachability(ctx, hostname)
