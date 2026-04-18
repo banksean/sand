@@ -136,6 +136,27 @@ Using `ssh-agent` also means you don't have to leave copies of your github crede
 
 See [doc/GIT_REMOTES.md](doc/GIT_REMOTES.md) for a more detailed explanation of how `sand` uses git locally to link the MacOS-side clones back to your original working directory.  If you are a git enthusiast, you can probably figure out how move changes around between your MacOS host and your sandbox containers without involving github at all.
 
+## Non-interactive (one-shot) agent runs
+
+`sand oneshot` runs an agent non-interactively with a single prompt and streams its output to stdout. Useful for scripting or CI pipelines:
+
+```sh
+$ sand oneshot --agent claude "Add unit tests for the auth package"
+$ sand oneshot --agent claude --rm "Summarize the open TODOs in this repo"
+```
+
+The sandbox is created fresh (or reused by name with `-n`). Pass `--rm` to tear it down automatically when the agent finishes, or `--stop` to just stop it.
+
+## Configuration defaults
+
+`sand config ls` shows the effective configuration, merged from built-in defaults, your user-level `~/.sand.yaml`, and the project-level `./.sand.yaml`, with a comment next to each value indicating which source set it:
+
+```sh
+$ sand config ls
+```
+
+You can commit a `.sand.yaml` at the root of a project to share default flag values (image name, allowed-domains file, CPU/memory limits, etc.) with your team.
+
 ## Some other handy commands
 
 ```sh
