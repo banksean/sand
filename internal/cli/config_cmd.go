@@ -54,7 +54,7 @@ func (c *ConfigLsCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 func loadEffectiveConfigMaps(k *kong.Kong) (projCfg, userCfg, defaultsCfg map[string]any, userCfgPath string, err error) {
 	projCfg = map[string]any{}
 	if e := decodeYAML("./.sand.yaml", &projCfg); e != nil && !os.IsNotExist(e) && e != io.EOF {
-		return nil, nil, nil, "", e
+		return nil, nil, nil, "", fmt.Errorf("loadEffectiveConfigMaps: %w", e)
 	}
 
 	userCfg = map[string]any{}
@@ -119,7 +119,6 @@ func walkMerge(path []string, a, b, c map[string]any, f func(path []string, name
 func decodeYAML(filename string, value any) error {
 	f, err := os.Open(filename)
 	if err != nil {
-		fmt.Printf("err: %v\n", err)
 		return err
 	}
 	defer f.Close()
