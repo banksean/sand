@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/banksean/sand/internal/applecontainer/options"
+	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/daemon"
 	"github.com/banksean/sand/internal/hostops"
 	"github.com/banksean/sand/internal/runtimedeps"
@@ -19,10 +20,11 @@ import (
 // non-interactively with the given prompt, streaming output to stdout.
 type OneshotCmd struct {
 	SandboxCreationFlags
-	Agent       string `short:"a" default:"claude" placeholder:"<claude|opencode>" help:"coding agent to use"`
+	Agent       string `short:"a" placeholder:"<claude|opencode>" help:"coding agent to use"`
 	Username    string `help:"name of default user to create (defaults to $USER)"`
 	Uid         string `help:"id of default user to create (defaults to $UID)"`
 	SandboxName string `short:"n" placeholder:"<name>" help:"name of the sandbox to use (generated if omitted)"`
+	Stop        bool   `help:"stop the container when the command completes"`
 	Prompt      string `arg:"" help:"prompt to pass to the agent"`
 }
 
@@ -86,9 +88,20 @@ func (c *OneshotCmd) Run(cctx *CLIContext) error {
 		allowedDomains = domains
 	}
 
+	var agentCmd string
+	switch c.Agent {
+	case "claude":
+		agentCmd = `claude --permission-mode=bypassPermissions --print "$SAND_ONESHOT_PROMPT"`
+	case "opencode":
+		agentCmd = `opencode run "$SAND_ONESHOT_PROMPT"`
+	default:
+		return fmt.Errorf("one-shot mode not supported for agent %q", c.Agent)
+	}
+
 	sbox, err := mc.GetSandbox(ctx, c.SandboxName)
 	if sbox == nil || err != nil {
-		slog.InfoContext(ctx, "RunCmd: creating sandbox", "id", c.SandboxName)
+		slog.InfoContext(ctx, "OneshotCmd: creating sandbox", "id", c.SandboxName)
+		fmt.Printf("creating new sandbox...\n")
 		sbox, err = mc.CreateSandbox(ctx, daemon.CreateSandboxOpts{
 			ID:             c.SandboxName,
 			CloneFromDir:   c.CloneFromDir,
@@ -106,26 +119,26 @@ func (c *OneshotCmd) Run(cctx *CLIContext) error {
 			return fmt.Errorf("creating sandbox: %w", err)
 		}
 	}
-
-	var agentCmd string
-	switch c.Agent {
-	case "claude":
-		agentCmd = `claude --permission-mode=bypassPermissions --print "$SAND_ONESHOT_PROMPT"`
-	case "opencode":
-		agentCmd = `opencode run "$SAND_ONESHOT_PROMPT"`
-	default:
-		return fmt.Errorf("one-shot mode not supported for agent %q", c.Agent)
-	}
+	fmt.Printf("executing in sanbox: %s\n", sbox.ID)
 
 	containerSvc := hostops.NewAppleContainerOps()
+	hostname := types.GetContainerHostname(sbox.Container)
+	env := map[string]string{
+		"HOSTNAME":            hostname,
+		"LANG":                os.Getenv("LANG"),
+		"TERM":                os.Getenv("TERM"),
+		"SAND_ONESHOT_PROMPT": c.Prompt,
+	}
 	wait, err := containerSvc.ExecStream(ctx,
 		&options.ExecContainer{
 			ProcessOptions: options.ProcessOptions{
-				WorkDir: "/app",
-				EnvFile: sbox.EnvFile,
-				Env:     map[string]string{"SAND_ONESHOT_PROMPT": c.Prompt},
-				User:    c.Username,
-				UID:     c.Uid,
+				Interactive: true,
+				TTY:         true,
+				WorkDir:     "/app",
+				EnvFile:     sbox.EnvFile,
+				Env:         env,
+				User:        c.Username,
+				UID:         c.Uid,
 			},
 		}, sbox.ContainerID, "/bin/sh", os.Environ(),
 		os.Stdin, os.Stdout, os.Stderr,
@@ -134,14 +147,22 @@ func (c *OneshotCmd) Run(cctx *CLIContext) error {
 		return fmt.Errorf("starting agent in sandbox %s: %w", sbox.ID, err)
 	}
 	if err := wait(); err != nil {
-		slog.ErrorContext(ctx, "RunCmd: agent wait", "sandbox", sbox.ID, "error", err)
+		slog.ErrorContext(ctx, "OneshotCmd: agent wait", "sandbox", sbox.ID, "error", err)
 	}
 
-	if c.Rm {
-		slog.InfoContext(ctx, "RunCmd: removing sandbox", "id", sbox.ID)
-		if err := mc.RemoveSandbox(ctx, sbox.ID); err != nil {
-			slog.ErrorContext(ctx, "RunCmd: RemoveSandbox", "error", err)
+	if c.Stop {
+		slog.InfoContext(ctx, "OneshotCmd: stopping sandbox container", "id", sbox.ID)
+		if err := mc.StopSandbox(ctx, sbox.ID); err != nil {
+			slog.ErrorContext(ctx, "OneshotCmd: StopContainer", "error", err)
 		}
+		fmt.Printf("stopped sandbox: %s\n", sbox.ID)
+	}
+	if c.Rm {
+		slog.InfoContext(ctx, "OneshotCmd: removing sandbox", "id", sbox.ID)
+		if err := mc.RemoveSandbox(ctx, sbox.ID); err != nil {
+			slog.ErrorContext(ctx, "OneshotCmd: RemoveSandbox", "error", err)
+		}
+		fmt.Printf("removed sandbox: %s\n", sbox.ID)
 	}
 
 	return nil
