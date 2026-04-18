@@ -12,8 +12,8 @@ type IDRequest struct {
 
 // ExportRequest is the request body for the /export endpoint.
 type ExportRequest struct {
-	ID        string `json:"id"`
-	ImageName string `json:"imageName"`
+	ID              string `json:"id"`
+	DestinationPath string `json:"destinationPath"`
 }
 
 // StatsRequest is the request body for the /stats endpoint.

@@ -256,8 +256,8 @@ func scanLinesOrCR(data []byte, atEOF bool) (advance int, token []byte, err erro
 	return 0, nil, nil
 }
 
-func (m *defaultClient) ExportImage(ctx context.Context, id string, imageName string) error {
-	return m.doRequest(ctx, http.MethodPost, "/export", ExportRequest{ID: id, ImageName: imageName}, nil)
+func (m *defaultClient) ExportImage(ctx context.Context, id string, destinationPath string) error {
+	return m.doRequest(ctx, http.MethodPost, "/export", ExportRequest{ID: id, DestinationPath: destinationPath}, nil)
 }
 
 // Stats implements [Client].

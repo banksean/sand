@@ -113,7 +113,7 @@ type ExecContainer struct {
 }
 
 type ExportContainer struct {
-	Image string `flag:"--image"`
+	Output string `flag:"--output"`
 }
 
 type ManagementOptions struct {

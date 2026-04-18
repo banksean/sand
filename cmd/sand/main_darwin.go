@@ -47,7 +47,7 @@ type Outie struct {
 	BuildInfo          cli.BuildInfoCmd          `cmd:"" help:"print version infomation about this command"`
 	Vsc                cli.VscCmd                `cmd:"" help:"launch a vscode remote window connected to the sandbox's container"`
 	InstallEBPFSupport cli.InstallEBPFSupportCmd `cmd:"" help:"install the BPFFS-enabled kernel build"`
-	ExportImage        cli.ExportCmd             `cmd:"" help:"export a container image based on a stopped sandbox"`
+	ExportFS           cli.ExportCmd             `cmd:"" help:"export a container's filesystem"`
 	Stats              cli.StatsCmd              `cmd:"" help:"list container stats for sandboxes"`
 	Config             cli.ConfigCmd             `cmd:"" help:"list, get, or set default values for flags"`
 }

@@ -347,7 +347,7 @@ func (d *Daemon) handleExport(w http.ResponseWriter, r *http.Request) {
 		args.ID = ctxID
 	}
 
-	d.boxer.ContainerService.Export(ctx, &options.ExportContainer{Image: args.ImageName}, args.ID)
+	d.boxer.ContainerService.Export(ctx, &options.ExportContainer{Output: args.DestinationPath}, args.ID)
 }
 
 func (d *Daemon) handlePing(w http.ResponseWriter, r *http.Request) {

@@ -2,11 +2,13 @@ package cli
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 )
 
 type ExportCmd struct {
 	SandboxNameFlag
-	ImageName string `short:"i" placeholder:"<container-image-name>" help:"name of container image to export"`
+	OutputPath string `short:"o" required:"" placeholder:"<host FS path>" help:"where to write the exported FS archive to"`
 }
 
 const expectedStatus = "stopped"
@@ -23,7 +25,13 @@ func (c *ExportCmd) Run(cctx *CLIContext) error {
 		return fmt.Errorf("sandbox container %s is in state %q, but this command only works with %q", c.SandboxName, sb.Container.Status, expectedStatus)
 	}
 
-	err = mc.ExportImage(ctx, c.SandboxName, c.ImageName)
+	wd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	destinationPath := filepath.Join(wd, c.OutputPath)
+
+	err = mc.ExportImage(ctx, c.SandboxName, destinationPath)
 
 	return err
 }
