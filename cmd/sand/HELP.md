@@ -12,6 +12,7 @@ Requires apple container CLI: https://github.com/apple/container/releases/tag/0.
 - `--app-base-dir` _`<app-base-dir>`_ - root dir to store sandbox clones of working directories. Leave unset to use '~/Library/Application Support/Sand'
 - `--timeout` _`0s`_ - if set to anything other than 0s, overrides the default timeout for an operation (default: `0s`)
 - `--version` - Print version and exit.
+- `--dry-run` - just print out the operations instead of executing them (default: `false`)
 
 ## Subcommands
 
@@ -50,11 +51,37 @@ sand new [flags] [SANDBOX-NAME]
 - `--cpu` _`2`_ - number of CPUs to allocate to the container (default: `2`)
 - `--memory` _`1024`_ - how much memory in MiB to allocate to the container (default: `1024`)
 - `-s, --shell` _`<shell-command>`_ - shell command to exec in the container (default: `/bin/zsh`)
-- `-a, --agent` _`<claude|default|opencode>`_ - name of coding agent to use (default: `default`)
+- `-t, --tmux` - create or reconnect to a container-side tmux session
+- `-a, --agent` _`<claude|codex|opencode>`_ - name of coding agent to use
 - `-b, --branch` - create a new git branch inside the sandbox _container_ (not on your host workdir)
-- `-p, --prompt` _`<prompt>`_ - start the agent with this prompt in non-interactive (one-shot) mode and return immediately
 - `--username` _`STRING`_ - name of default user to create (defaults to $USER)
 - `--uid` _`STRING`_ - id of default user to create (defaults to $UID)
+
+## `sand oneshot`
+
+run an AI agent non-interactively with a prompt
+
+**Usage:**
+
+```
+sand oneshot [flags] <PROMPT>
+```
+
+**Flags:**
+
+- `-i, --image-name` _`<container-image-name>`_ - name of container image to use
+- `-d, --clone-from-dir` _`<project-dir>`_ - directory to clone into the sandbox. Defaults to current working directory, if unset.
+- `-e, --env-file` _`".env"`_ - path to env file to use when creating a new shell (default: `.env`)
+- `--rm` - remove the sandbox after the command terminates
+- `--allowed-domains-file` _`<file-path>`_ - path to allowed-domains.txt file for DNS egress filtering (overrides the init image default)
+- `-v, --volume` _`<host-path:container-path>,...`_ - bind mount a volume (can be specified multiple times)
+- `--cpu` _`2`_ - number of CPUs to allocate to the container (default: `2`)
+- `--memory` _`1024`_ - how much memory in MiB to allocate to the container (default: `1024`)
+- `-a, --agent` _`<claude|opencode>`_ - coding agent to use
+- `--username` _`STRING`_ - name of default user to create (defaults to $USER)
+- `--uid` _`STRING`_ - id of default user to create (defaults to $UID)
+- `-n, --sandbox-name` _`<name>`_ - name of the sandbox to use (generated if omitted)
+- `--stop` - stop the container when the command completes
 
 ## `sand shell`
 
@@ -69,6 +96,7 @@ sand shell [flags] <SANDBOX-NAME>
 **Flags:**
 
 - `-s, --shell` _`<shell-command>`_ - shell command to exec in the container (default: `/bin/zsh`)
+- `-t, --tmux` - create or reconnect to a container-side tmux session
 
 ## `sand exec`
 
@@ -90,6 +118,8 @@ sand exec [flags] <SANDBOX-NAME> <ARG>...
 - `-v, --volume` _`<host-path:container-path>,...`_ - bind mount a volume (can be specified multiple times)
 - `--cpu` _`2`_ - number of CPUs to allocate to the container (default: `2`)
 - `--memory` _`1024`_ - how much memory in MiB to allocate to the container (default: `1024`)
+- `--username` _`STRING`_ - name of user to exec as (defaults to $USER)
+- `--uid` _`STRING`_ - id of user to exec as (defaults to $UID)
 
 ## `sand ls`
 
@@ -255,4 +285,24 @@ sand stats [flags] [SANDBOX-NAME]
 **Flags:**
 
 - `-a, --all` - all sandboxes
+
+## `sand config`
+
+list, get, or set default values for flags
+
+**Usage:**
+
+```
+sand config
+```
+
+### `sand config ls`
+
+show effective configuration with sources
+
+**Usage:**
+
+```
+sand config ls
+```
 

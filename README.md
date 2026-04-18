@@ -141,18 +141,59 @@ See [doc/GIT_REMOTES.md](doc/GIT_REMOTES.md) for a more detailed explanation of 
 `sand oneshot` runs an agent non-interactively with a single prompt and streams its output to stdout. Useful for scripting or CI pipelines:
 
 ```sh
-$ sand oneshot --agent claude "Add unit tests for the auth package"
 $ sand oneshot --agent claude --rm "Summarize the open TODOs in this repo"
+creating new sandbox...
+executing in sanbox: small-pond
+[...]
 ```
+
+Will create new sandbox, run claude the that prompt, write Claude's summary to stdout and then remove the sandbox.
+
+```sh
+$ sand oneshot --agent claude "Add unit tests for the auth package and commit"
+creating new sandbox...
+executing in sanbox: holy-waterfall
+[...]
+```
+
+Will create a new sandbox, have Claude add unit tests and commit them, leaving the sandbox running. Adding a `--stop` flag will stop the sandbox container. Either way, whatever changes Claude committed will be available in the git remote `sand/holy-waterfall` (which you can pull using regular git commands).
 
 The sandbox is created fresh (or reused by name with `-n`). Pass `--rm` to tear it down automatically when the agent finishes, or `--stop` to just stop it.
 
 ## Configuration defaults
 
-`sand config ls` shows the effective configuration, merged from built-in defaults, your user-level `~/.sand.yaml`, and the project-level `./.sand.yaml`, with a comment next to each value indicating which source set it:
+`sand config ls` shows the effective configuration, merged from built-in defaults, your user-level `~/.sand.yaml`, and the project-level `./.sand.yaml`, with a comment next to each value indicating which source set it (unless that value came from the hard-coded flag defaults).
 
+Here's mine, for example. I use a combination of global defaults in `~/.sand.yaml` and project defaults in `.sand.yaml`: 
 ```sh
 $ sand config ls
+app-base-dir: /Users/seanmccullough/Library/Application Support/Sand
+dry-run: false
+log-file: /tmp/sand/outie/log
+log-level: info
+timeout: 0s
+exec:
+  cpu: 2
+  env-file: .env
+  memory: 1024
+git:
+  diff:
+    include-uncommitted: true # /Users/seanmccullough/.sand.yaml
+new:
+  cpu: 2
+  env-file: .env
+  memory: 1024
+  shell: /bin/zsh
+  tmux: true # /Users/seanmccullough/.sand.yaml
+oneshot:
+  agent: claude # ./.sand.yaml
+  cpu: 2
+  env-file: .env
+  memory: 1024
+  stop: true # ./.sand.yaml
+shell:
+  shell: /bin/zsh
+  tmux: true # /Users/seanmccullough/.sand.yaml
 ```
 
 You can commit a `.sand.yaml` at the root of a project to share default flag values (image name, allowed-domains file, CPU/memory limits, etc.) with your team.
