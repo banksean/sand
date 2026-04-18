@@ -92,6 +92,8 @@ func (c *OneshotCmd) Run(cctx *CLIContext) error {
 	switch c.Agent {
 	case "claude":
 		agentCmd = `claude --permission-mode=bypassPermissions --print "$SAND_ONESHOT_PROMPT"`
+	case "gemini":
+		agentCmd = `gemini --approval-mode=yolo -p "$SAND_ONESHOT_PROMPT"`
 	case "opencode":
 		agentCmd = `opencode run "$SAND_ONESHOT_PROMPT"`
 	default:

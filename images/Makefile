@@ -18,6 +18,9 @@ codex: base
 default: base
 	$(BUILD_CMD) $(REGISTRY)/default:latest default/
 
+gemini: base
+	$(BUILD_CMD) $(REGISTRY)/gemini:latest gemini/
+
 opencode:
 	$(BUILD_CMD) $(REGISTRY)/opencode:latest opencode/
 

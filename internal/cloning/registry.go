@@ -34,6 +34,13 @@ func InitializeGlobalRegistry(appRoot string, messenger hostops.UserMessenger, g
 			Configuration: NewClaudeContainerConfiguration(),
 		})
 
+		// Register gemini agent
+		globalRegistry.Register(&AgentConfig{
+			Name:          "gemini",
+			Preparation:   NewBaseWorkspacePreparation(cloneRoot, messenger, gitOps, fileOps),
+			Configuration: NewBaseContainerConfiguration(),
+		})
+
 		// Register opencode agent
 		globalRegistry.Register(&AgentConfig{
 			Name:          "opencode",

@@ -23,7 +23,7 @@ import (
 type NewCmd struct {
 	SandboxCreationFlags
 	ShellFlags
-	Agent       string `short:"a" placeholder:"<claude|codex|opencode>" help:"name of coding agent to use"`
+	Agent       string `short:"a" placeholder:"<claude|codex|gemini|opencode>" help:"name of coding agent to use"`
 	Branch      bool   `short:"b" help:"create a new git branch inside the sandbox _container_ (not on your host workdir)"`
 	Username    string `help:"name of default user to create (defaults to $USER)"`
 	Uid         string `help:"id of default user to create (defaults to $UID)"`
@@ -34,6 +34,7 @@ var defaultImageForAgent = map[string]string{
 	"claude":   "ghcr.io/banksean/sand/claude:latest",
 	"codex":    "ghcr.io/banksean/sand/codex:latest",
 	"default":  "ghcr.io/banksean/sand/default:latest",
+	"gemini":   "ghcr.io/banksean/sand/gemini:latest",
 	"opencode": "ghcr.io/banksean/sand/opencode:latest",
 }
 
@@ -217,6 +218,12 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 			args = []string{"new-session", "-A", "-s", "claude-" + sbox.ID, "claude --permission-mode=bypassPermissions"}
 		} else {
 			args = []string{"-c", "claude --permission-mode=bypassPermissions"}
+		}
+	case "gemini":
+		if c.Tmux {
+			args = []string{"new-session", "-A", "-s", "gemini-" + sbox.ID, "gemini --approval-mode=yolo"}
+		} else {
+			args = []string{"-c", "gemini --approval-mode=yolo"}
 		}
 	case "opencode":
 		args = []string{"-c", "opencode --port 80 --hostname " + strings.TrimSuffix(hostname, ".")}
