@@ -35,7 +35,6 @@ type Innie struct {
 	Version    cli.VersionFlag           `name:"version" help:"Print version and exit."`
 
 	New       cli.NewCmd       `cmd:"" help:"create a new sandbox and shell into its container"`
-	Run       cli.RunCmd       `cmd:"" help:"run an AI agent non-interactively with a prompt"`
 	Ls        cli.LsCmd        `cmd:"" help:"list sandboxes"`
 	Rm        cli.RmCmd        `cmd:"" help:"remove sandbox container and its clone directory"`
 	Stop      cli.StopCmd      `cmd:"" help:"stop sandbox container"`
