@@ -53,7 +53,7 @@ RUN mkdir -p /root/.ssh && \
 ADD sshd_config /etc/ssh/sshd_config
 
 # Install innie (container-side sand cli binary)
-ARG SAND_CLI_VERSION=v0.0.7
+ARG SAND_CLI_VERSION=v0.0.8
 RUN ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') && \
   wget "https://github.com/banksean/sand/releases/download/${SAND_CLI_VERSION}/innie_linux_${ARCH}.tar.gz" && \
   tar -C /usr/local/bin -xzf "innie_linux_${ARCH}.tar.gz" && \
