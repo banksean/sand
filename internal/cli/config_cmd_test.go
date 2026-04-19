@@ -132,7 +132,7 @@ func TestLoadEffectiveConfigMaps_NoFiles(t *testing.T) {
 	t.Chdir(tmp)
 
 	k := newKong(t)
-	proj, user, defs, userCfgPath, err := loadEffectiveConfigMaps(k)
+	proj, user, defs, _, userCfgPath, err := loadEffectiveConfigMaps(k)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -162,7 +162,7 @@ func TestLoadEffectiveConfigMaps_ProjFile(t *testing.T) {
 	}
 
 	k := newKong(t)
-	proj, user, _, _, err := loadEffectiveConfigMaps(k)
+	proj, user, _, _, _, err := loadEffectiveConfigMaps(k)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -185,7 +185,7 @@ func TestLoadEffectiveConfigMaps_UserFile(t *testing.T) {
 	}
 
 	k := newKong(t)
-	proj, user, _, _, err := loadEffectiveConfigMaps(k)
+	proj, user, _, _, _, err := loadEffectiveConfigMaps(k)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -211,7 +211,7 @@ func TestLoadEffectiveConfigMaps_BothFiles(t *testing.T) {
 	}
 
 	k := newKong(t)
-	proj, user, _, _, err := loadEffectiveConfigMaps(k)
+	proj, user, _, _, _, err := loadEffectiveConfigMaps(k)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
