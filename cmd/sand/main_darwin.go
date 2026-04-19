@@ -228,9 +228,13 @@ func main() {
 
 	kongApp := kong.Must(&app)
 	kongcompletion.Register(kongApp, kongcompletion.WithPredictor("sandbox-name", namePredictor))
+	kongConfigPaths := []string{"~/.sand.yaml"}
+	if p := cli.FindProjectConfig(); p != "" {
+		kongConfigPaths = append([]string{p}, kongConfigPaths...)
+	}
 	kongCtx := kong.Parse(&app,
 		kong.UsageOnError(),
-		kong.Configuration(kongyaml.Loader, ".sand.yaml", "~/.sand.yaml"),
+		kong.Configuration(kongyaml.Loader, kongConfigPaths...),
 		kong.Description(description),
 	)
 

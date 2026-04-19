@@ -20,7 +20,7 @@ type ConfigCmd struct {
 type ConfigLsCmd struct{}
 
 func (c *ConfigLsCmd) Run(k *kong.Kong, cctx *CLIContext) error {
-	projCfg, userCfg, defaultsCfg, userCfgPath, err := loadEffectiveConfigMaps(k)
+	projCfg, userCfg, defaultsCfg, projCfgPath, userCfgPath, err := loadEffectiveConfigMaps(k)
 	if err != nil {
 		return err
 	}
@@ -29,7 +29,7 @@ func (c *ConfigLsCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 		source := ""
 		if projVal != nil {
 			val = projVal
-			source = " # ./.sand.yaml"
+			source = " # " + projCfgPath
 		} else if userVal != nil {
 			val = userVal
 			source = " # " + userCfgPath
@@ -46,29 +46,52 @@ func (c *ConfigLsCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 	return nil
 }
 
-// loadEffectiveConfigMaps loads the project-level (./.sand.yaml) and user-level
-// (~/.sand.yaml) config files and returns their contents along with kong-derived
-// defaults. userCfgPath is the resolved path to the user config file, useful for
-// source annotations. Any of the returned maps may be empty if the corresponding
-// file does not exist.
-func loadEffectiveConfigMaps(k *kong.Kong) (projCfg, userCfg, defaultsCfg map[string]any, userCfgPath string, err error) {
+// FindProjectConfig searches cwd and its ancestors for a .sand.yaml file,
+// returning the first path found or "" if none exists.
+func FindProjectConfig() string {
+	dir, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	for {
+		candidate := filepath.Join(dir, ".sand.yaml")
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	return ""
+}
+
+// loadEffectiveConfigMaps loads the project-level and user-level (~/.sand.yaml)
+// config files and returns their contents along with kong-derived defaults.
+// projCfgPath and userCfgPath are the resolved paths, useful for source annotations.
+// Any of the returned maps may be empty if the corresponding file does not exist.
+func loadEffectiveConfigMaps(k *kong.Kong) (projCfg, userCfg, defaultsCfg map[string]any, projCfgPath, userCfgPath string, err error) {
 	projCfg = map[string]any{}
-	if e := decodeYAML("./.sand.yaml", &projCfg); e != nil && !os.IsNotExist(e) && e != io.EOF {
-		return nil, nil, nil, "", fmt.Errorf("loadEffectiveConfigMaps: %w", e)
+	projCfgPath = FindProjectConfig()
+	if projCfgPath != "" {
+		if e := decodeYAML(projCfgPath, &projCfg); e != nil && !os.IsNotExist(e) && e != io.EOF {
+			return nil, nil, nil, "", "", fmt.Errorf("loadEffectiveConfigMaps: %w", e)
+		}
 	}
 
 	userCfg = map[string]any{}
 	home, herr := os.UserHomeDir()
 	if herr != nil {
-		return nil, nil, nil, "", herr
+		return nil, nil, nil, "", "", herr
 	}
 	userCfgPath = filepath.Join(home, ".sand.yaml")
 	if e := decodeYAML(userCfgPath, &userCfg); e != nil && !os.IsNotExist(e) && e != io.EOF {
-		return nil, nil, nil, "", e
+		return nil, nil, nil, "", "", e
 	}
 
 	defaultsCfg = encodeNodeDetail(k.Model.Node)
-	return projCfg, userCfg, defaultsCfg, userCfgPath, nil
+	return projCfg, userCfg, defaultsCfg, projCfgPath, userCfgPath, nil
 }
 
 func walkMerge(path []string, a, b, c map[string]any, f func(path []string, name string, aVal any, bVal any, cVal any)) {

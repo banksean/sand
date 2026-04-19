@@ -44,7 +44,7 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 
 	slog.InfoContext(ctx, "NewCmd.Run")
 
-	projCfg, userCfg, defaultsCfg, userCfgPath, err := loadEffectiveConfigMaps(k)
+	projCfg, userCfg, defaultsCfg, projCfgPath, userCfgPath, err := loadEffectiveConfigMaps(k)
 	if err != nil {
 		slog.WarnContext(ctx, "NewCmd: could not load effective config", "error", err)
 	} else {
@@ -53,7 +53,7 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 			source := "default"
 			if projVal != nil {
 				val = projVal
-				source = "./.sand.yaml"
+				source = projCfgPath
 			} else if userVal != nil {
 				val = userVal
 				source = userCfgPath
