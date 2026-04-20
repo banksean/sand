@@ -16,6 +16,12 @@ type BaseContainerConfiguration struct{}
 
 var _ ContainerConfiguration = &BaseContainerConfiguration{}
 
+const (
+	goModCachePath   = "/opt/tool-cache/go/mod"
+	goBuildCachePath = "/opt/tool-cache/go/build"
+	miseCachePath    = "/opt/tool-cache/mise"
+)
+
 // NewBaseContainerConfiguration creates a new base container configuration instance.
 func NewBaseContainerConfiguration() *BaseContainerConfiguration {
 	return &BaseContainerConfiguration{}
@@ -42,13 +48,22 @@ func (c *BaseContainerConfiguration) GetMounts(artifacts CloneArtifacts) []sandt
 	if artifacts.SharedCacheMounts.GoModuleCacheHostDir != "" {
 		mounts = append(mounts, sandtypes.MountSpec{
 			Source: artifacts.SharedCacheMounts.GoModuleCacheHostDir,
-			Target: "/sand-go-pkgmod",
+			Target: goModCachePath,
 		})
 	}
+
 	if artifacts.SharedCacheMounts.GoBuildCacheHostDir != "" {
+
 		mounts = append(mounts, sandtypes.MountSpec{
 			Source: artifacts.SharedCacheMounts.GoBuildCacheHostDir,
-			Target: "/sand-go-build",
+			Target: goBuildCachePath,
+		})
+	}
+
+	if artifacts.SharedCacheMounts.MiseCacheHostDir != "" {
+		mounts = append(mounts, sandtypes.MountSpec{
+			Source: artifacts.SharedCacheMounts.MiseCacheHostDir,
+			Target: miseCachePath,
 		})
 	}
 
@@ -141,15 +156,16 @@ func (c *BaseContainerConfiguration) defaultContainerHook(username, uid string, 
 			errs = append(errs, fmt.Errorf("chown: %w", err))
 		}
 
+		// TODO: set GOCACHE, GOMODCACHE env vars to /opt/tool-cache/... instead of symlinking to the default paths.
 		if sharedCaches.GoModuleCacheHostDir != "" {
-			lnGoPkgOut, err := exec(ctx, "ln", "-sfn", "/sand-go-pkgmod", "/home/"+username+"/go/pkg/mod")
+			lnGoPkgOut, err := exec(ctx, "ln", "-sfn", goModCachePath, "/home/"+username+"/go/pkg/mod")
 			if err != nil {
 				slog.ErrorContext(ctx, "defaultContainerHook linking go module cache", "error", err, "lnGoPkgOut", lnGoPkgOut, "username", username)
 				errs = append(errs, fmt.Errorf("link go module cache: %w", err))
 			}
 		}
 		if sharedCaches.GoBuildCacheHostDir != "" {
-			lnGoBuildOut, err := exec(ctx, "ln", "-sfn", "/sand-go-build", "/home/"+username+"/.cache/go-build")
+			lnGoBuildOut, err := exec(ctx, "ln", "-sfn", goBuildCachePath, "/home/"+username+"/.cache/go-build")
 			if err != nil {
 				slog.ErrorContext(ctx, "defaultContainerHook linking go build cache", "error", err, "lnGoBuildOut", lnGoBuildOut, "username", username)
 				errs = append(errs, fmt.Errorf("link go build cache: %w", err))
@@ -179,6 +195,12 @@ func (c *BaseContainerConfiguration) defaultContainerHook(username, uid string, 
 		if err != nil {
 			slog.ErrorContext(ctx, "defaultContainerHook starting sshd", "error", err, "sshdOut", sshdOut)
 			errs = append(errs, fmt.Errorf("start sshd: %w", err))
+		}
+
+		entryPointOut, err := exec(ctx, "entrypoint.sh")
+		if err != nil {
+			slog.ErrorContext(ctx, "defaultContainerHook starting entrypoint.sh", "error", err, "entryPointOut", entryPointOut)
+			errs = append(errs, fmt.Errorf("entrypoint.sh: %w", err))
 		}
 
 		if len(errs) > 0 {

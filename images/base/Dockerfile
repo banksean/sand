@@ -77,3 +77,23 @@ RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/
   -a '[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh'
 
 RUN curl -s https://ohmyposh.dev/install.sh | bash -s -- -d /usr/local/bin
+
+# Install mise
+RUN curl https://mise.jdx.dev/install.sh | sh
+RUN cp /root/.local/bin/mise /usr/local/bin/mise
+
+ENV PATH="/root/.local/share/mise/bin:$PATH"
+
+WORKDIR /app
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+RUN echo "# Initializing..." > /etc/shared_env.sh
+RUN echo "source /etc/shared_env.sh" >> /etc/bash.bashrc
+
+RUN if [ -x "$(command -v zsh)" ]; then \
+    echo "source /etc/shared_env.sh" >> /etc/zsh/zshenv; \
+    echo "source /etc/shared_env.sh" >> /etc/zsh/zshrc; \
+    fi
+
+ENV BASH_ENV=/etc/shared_env.sh
+ENV ENV=/etc/shared_env.sh

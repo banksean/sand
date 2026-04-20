@@ -64,7 +64,8 @@ type Box struct {
 }
 
 type SharedCacheConfig struct {
-	Go GoSharedCacheConfig `json:"go,omitempty"`
+	Go   GoSharedCacheConfig `json:"go,omitempty"`
+	Mise bool                `json:"mise,omitempty"`
 }
 
 type GoSharedCacheConfig struct {
@@ -76,6 +77,7 @@ type GoSharedCacheConfig struct {
 type SharedCacheMounts struct {
 	GoModuleCacheHostDir string
 	GoBuildCacheHostDir  string
+	MiseCacheHostDir     string
 }
 
 type GitDetails struct {

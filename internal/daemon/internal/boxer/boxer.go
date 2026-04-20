@@ -557,6 +557,13 @@ func (sb *Boxer) ensureSharedCacheMounts(cfg sandtypes.SharedCacheConfig) (sandt
 		}
 	}
 
+	if cfg.Mise {
+		mounts.MiseCacheHostDir = filepath.Join(sb.appRoot, "caches", "mise")
+		if err := sb.FileOps.MkdirAll(mounts.MiseCacheHostDir, 0o755); err != nil {
+			return sandtypes.SharedCacheMounts{}, fmt.Errorf("create shared mise cache dir: %w", err)
+		}
+	}
+
 	return mounts, nil
 }
 

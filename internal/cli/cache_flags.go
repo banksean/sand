@@ -5,7 +5,8 @@ import "github.com/banksean/sand/internal/sandtypes"
 // CacheFlags defines global shared-cache configuration that can be loaded by Kong
 // from ~/.sand.yaml and project .sand.yaml without introducing a "caches" subcommand.
 type CacheFlags struct {
-	Go GoCacheFlags `embed:"" prefix:"go-"`
+	Go   GoCacheFlags `embed:"" prefix:"go-"`
+	Mise *bool        `name:"mise" help:"enable mise"`
 }
 
 type GoCacheFlags struct {
@@ -38,6 +39,10 @@ func (c CacheFlags) SharedCacheConfig() sandtypes.SharedCacheConfig {
 	}
 	if !cfg.Go.ModuleCache && !cfg.Go.BuildCache {
 		cfg.Go.Enabled = false
+	}
+
+	if c.Mise != nil {
+		cfg.Mise = *c.Mise
 	}
 
 	return cfg
