@@ -22,7 +22,7 @@ func NewBaseContainerConfiguration() *BaseContainerConfiguration {
 }
 
 func (c *BaseContainerConfiguration) GetMounts(artifacts CloneArtifacts) []sandtypes.MountSpec {
-	return []sandtypes.MountSpec{
+	mounts := []sandtypes.MountSpec{
 		{
 			Source:   artifacts.PathRegistry.SSHKeysDir(),
 			Target:   "/sshkeys",
@@ -38,6 +38,21 @@ func (c *BaseContainerConfiguration) GetMounts(artifacts CloneArtifacts) []sandt
 			Target: "/app",
 		},
 	}
+
+	if artifacts.SharedCacheMounts.GoModuleCacheHostDir != "" {
+		mounts = append(mounts, sandtypes.MountSpec{
+			Source: artifacts.SharedCacheMounts.GoModuleCacheHostDir,
+			Target: "/sand-go-pkgmod",
+		})
+	}
+	if artifacts.SharedCacheMounts.GoBuildCacheHostDir != "" {
+		mounts = append(mounts, sandtypes.MountSpec{
+			Source: artifacts.SharedCacheMounts.GoBuildCacheHostDir,
+			Target: "/sand-go-build",
+		})
+	}
+
+	return mounts
 }
 
 func (c *BaseContainerConfiguration) GetStartHooks(artifacts CloneArtifacts) []sandtypes.ContainerHook {
@@ -46,12 +61,12 @@ func (c *BaseContainerConfiguration) GetStartHooks(artifacts CloneArtifacts) []s
 
 func (c *BaseContainerConfiguration) GetFirstStartHooks(artifacts CloneArtifacts) []sandtypes.ContainerHook {
 	return []sandtypes.ContainerHook{
-		c.defaultContainerHook(artifacts.Username, artifacts.Uid),
+		c.defaultContainerHook(artifacts.Username, artifacts.Uid, artifacts.SharedCacheMounts),
 	}
 }
 
 // defaultContainerHook sets up dotfiles and SSH in the container.
-func (c *BaseContainerConfiguration) defaultContainerHook(username, uid string) sandtypes.ContainerHook {
+func (c *BaseContainerConfiguration) defaultContainerHook(username, uid string, sharedCaches sandtypes.SharedCacheMounts) sandtypes.ContainerHook {
 	return sandtypes.NewContainerHook("default container bootstrap", func(ctx context.Context, ctr *types.Container, exec sandtypes.HookFunc) error {
 		var errs []error
 
@@ -100,12 +115,45 @@ func (c *BaseContainerConfiguration) defaultContainerHook(username, uid string) 
 			errs = append(errs, fmt.Errorf("copy /root/.ssh: %w", err))
 		}
 
+		// Create the parent directories before chown so the container user owns them,
+		// but delay the symlink creation until after chown so we don't traverse into
+		// shared host-mounted cache dirs.
+		if sharedCaches.GoModuleCacheHostDir != "" {
+			mkdirGoPkgOut, err := exec(ctx, "mkdir", "-p", "/home/"+username+"/go/pkg")
+			if err != nil {
+				slog.ErrorContext(ctx, "defaultContainerHook preparing go module cache parent", "error", err, "mkdirGoPkgOut", mkdirGoPkgOut, "username", username)
+				errs = append(errs, fmt.Errorf("mkdir go module cache parent: %w", err))
+			}
+		}
+		if sharedCaches.GoBuildCacheHostDir != "" {
+			mkdirGoBuildOut, err := exec(ctx, "mkdir", "-p", "/home/"+username+"/.cache")
+			if err != nil {
+				slog.ErrorContext(ctx, "defaultContainerHook preparing go build cache parent", "error", err, "mkdirGoBuildOut", mkdirGoBuildOut, "username", username)
+				errs = append(errs, fmt.Errorf("mkdir go build cache parent: %w", err))
+			}
+		}
+
 		// Fix ownership
 		cOut, err := exec(ctx, "chown", "-R", username+":"+username,
 			"/home/"+username)
 		if err != nil {
 			slog.ErrorContext(ctx, "defaultContainerHook chown homedir", "error", err, "cOut", cOut, "username", username)
 			errs = append(errs, fmt.Errorf("chown: %w", err))
+		}
+
+		if sharedCaches.GoModuleCacheHostDir != "" {
+			lnGoPkgOut, err := exec(ctx, "ln", "-sfn", "/sand-go-pkgmod", "/home/"+username+"/go/pkg/mod")
+			if err != nil {
+				slog.ErrorContext(ctx, "defaultContainerHook linking go module cache", "error", err, "lnGoPkgOut", lnGoPkgOut, "username", username)
+				errs = append(errs, fmt.Errorf("link go module cache: %w", err))
+			}
+		}
+		if sharedCaches.GoBuildCacheHostDir != "" {
+			lnGoBuildOut, err := exec(ctx, "ln", "-sfn", "/sand-go-build", "/home/"+username+"/.cache/go-build")
+			if err != nil {
+				slog.ErrorContext(ctx, "defaultContainerHook linking go build cache", "error", err, "lnGoBuildOut", lnGoBuildOut, "username", username)
+				errs = append(errs, fmt.Errorf("link go build cache: %w", err))
+			}
 		}
 
 		// Copy SSH keys to /etc/ssh

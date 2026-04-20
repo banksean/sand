@@ -37,6 +37,9 @@ type Box struct {
 	Mounts []MountSpec
 	// Volumes defines volume mounts in host:container format, passed directly to the container runtime.
 	Volumes []string
+	// SharedCacheMounts holds additional host-managed shared caches to mount into the container.
+	// This is runtime-only metadata; it is not currently persisted in the DB.
+	SharedCacheMounts SharedCacheMounts
 	// CPUs is the number of CPUs to allocate to the sandbox
 	CPUs int
 	// MemoryMB is the amount of memory in MB to allocate to the sandbox
@@ -58,6 +61,21 @@ type Box struct {
 	CurrentGitDetails  *GitDetails
 	Container          *types.Container
 	Keys               *sshimmer.Keys
+}
+
+type SharedCacheConfig struct {
+	Go GoSharedCacheConfig `json:"go,omitempty"`
+}
+
+type GoSharedCacheConfig struct {
+	Enabled     bool `json:"enabled,omitempty"`
+	ModuleCache bool `json:"moduleCache,omitempty"`
+	BuildCache  bool `json:"buildCache,omitempty"`
+}
+
+type SharedCacheMounts struct {
+	GoModuleCacheHostDir string
+	GoBuildCacheHostDir  string
 }
 
 type GitDetails struct {

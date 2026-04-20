@@ -198,6 +198,16 @@ shell:
 
 You can commit a `.sand.yaml` at the root of a project to share default flag values (image name, allowed-domains file, CPU/memory limits, etc.) with your team.
 
+For shared Go caches across sandboxes, add this to `~/.sand.yaml` or a project `.sand.yaml`:
+
+```yaml
+caches:
+  go:
+    enabled: true
+```
+
+That makes new sandboxes mount sand-managed host cache directories for both the Go module cache and the Go build cache, so repeated `go mod download`, `go test`, and `go build` work can be reused across containers.
+
 ## Some other handy commands
 
 ```sh

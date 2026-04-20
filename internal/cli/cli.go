@@ -11,16 +11,19 @@ package cli
 import (
 	"context"
 
+	"github.com/banksean/sand/internal/sandtypes"
+
 	"github.com/banksean/sand/internal/daemon"
 )
 
 type CLIContext struct {
-	AppBaseDir string
-	LogFile    string
-	LogLevel   string
-	CloneRoot  string
-	Context    context.Context
-	Daemon     daemon.Client
+	AppBaseDir   string
+	LogFile      string
+	LogLevel     string
+	CloneRoot    string
+	Context      context.Context
+	Daemon       daemon.Client
+	SharedCaches sandtypes.SharedCacheConfig
 }
 
 const (

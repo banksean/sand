@@ -711,10 +711,11 @@ type CreateSandboxOpts struct {
 	Username     string `json:"username,omitempty"`
 	Uid          string `json:"uid,omitempty"`
 
-	AllowedDomains []string `json:"allowedDomains,omitempty"`
-	Volumes        []string `json:"volumes,omitempty"`
-	CPUs           int      `json:"cpus"`
-	Memory         int      `json:"memory"`
+	AllowedDomains []string                    `json:"allowedDomains,omitempty"`
+	Volumes        []string                    `json:"volumes,omitempty"`
+	SharedCaches   sandtypes.SharedCacheConfig `json:"sharedCaches,omitempty"`
+	CPUs           int                         `json:"cpus"`
+	Memory         int                         `json:"memory"`
 }
 
 // createSandbox creates a new sandbox and starts its container.
@@ -735,6 +736,7 @@ func (d *Daemon) createSandbox(ctx context.Context, opts CreateSandboxOpts) (*sa
 		Uid:            opts.Uid,
 		AllowedDomains: opts.AllowedDomains,
 		Volumes:        opts.Volumes,
+		SharedCaches:   opts.SharedCaches,
 		CPUs:           opts.CPUs,
 		Memory:         opts.Memory,
 	})

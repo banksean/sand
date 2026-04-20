@@ -250,7 +250,7 @@ func main() {
 	var cli DaemonCmd
 
 	kongCtx := kong.Parse(&cli,
-		kong.Configuration(kongyaml.Loader, ".sand.yaml", "~/.sand.yaml"),
+		kong.Configuration(kongyaml.Loader, "~/.sand.yaml", ".sand.yaml"),
 		kong.Description(description))
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

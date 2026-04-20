@@ -4,11 +4,57 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 
 	"github.com/banksean/sand/internal/hostops"
 	"github.com/banksean/sand/internal/sandtypes"
 )
+
+func TestEnsureSharedCacheMounts_GoCaches(t *testing.T) {
+	var mkdirs []string
+	b := &Boxer{
+		appRoot: "/tmp/sand-app",
+		FileOps: &hostops.MockFileOps{
+			MkdirAllFunc: func(path string, perm os.FileMode) error {
+				mkdirs = append(mkdirs, path)
+				return nil
+			},
+		},
+	}
+
+	mounts, err := b.ensureSharedCacheMounts(sandtypes.SharedCacheConfig{
+		Go: sandtypes.GoSharedCacheConfig{
+			Enabled:     true,
+			ModuleCache: true,
+			BuildCache:  true,
+		},
+	})
+	if err != nil {
+		t.Fatalf("ensureSharedCacheMounts: %v", err)
+	}
+
+	if mounts.GoModuleCacheHostDir != "/tmp/sand-app/caches/go/pkgmod" {
+		t.Fatalf("unexpected module cache dir: %q", mounts.GoModuleCacheHostDir)
+	}
+	if mounts.GoBuildCacheHostDir != "/tmp/sand-app/caches/go/build" {
+		t.Fatalf("unexpected build cache dir: %q", mounts.GoBuildCacheHostDir)
+	}
+
+	sort.Strings(mkdirs)
+	want := []string{
+		"/tmp/sand-app/caches/go/build",
+		"/tmp/sand-app/caches/go/pkgmod",
+	}
+	if len(mkdirs) != len(want) {
+		t.Fatalf("expected %d mkdir calls, got %d: %v", len(want), len(mkdirs), mkdirs)
+	}
+	for i := range want {
+		if mkdirs[i] != want[i] {
+			t.Fatalf("mkdir call %d: want %q, got %q", i, want[i], mkdirs[i])
+		}
+	}
+}
 
 // newDBBoxer creates a Boxer backed by a real SQLite DB, with minimal no-op mocks
 // for all platform-specific dependencies. Suitable for testing DB-level operations.

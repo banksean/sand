@@ -33,6 +33,7 @@ type Innie struct {
 	AppBaseDir string                    `default:"" placeholder:"<app-base-dir>" help:"root dir to store sandbox clones of working directories. Leave unset to use '~/Library/Application Support/Sand'"`
 	Completion kongcompletion.Completion `cmd:"" help:"Outputs shell code for initialising tab completions"`
 	Version    cli.VersionFlag           `name:"version" help:"Print version and exit."`
+	Caches     cli.CacheFlags            `embed:"" prefix:"caches-"`
 
 	New       cli.NewCmd       `cmd:"" help:"create a new sandbox and shell into its container"`
 	Ls        cli.LsCmd        `cmd:"" help:"list sandboxes"`
@@ -115,7 +116,7 @@ func main() {
 	kongcompletion.Register(kongApp, kongcompletion.WithPredictor("sandbox-name", namePredictor))
 	kongConfigPaths := []string{"~/.sand.yaml"}
 	if p := cli.FindProjectConfig(); p != "" {
-		kongConfigPaths = append([]string{p}, kongConfigPaths...)
+		kongConfigPaths = append(kongConfigPaths, p)
 	}
 	kongCtx := kong.Parse(&app,
 		kong.UsageOnError(),
@@ -136,12 +137,13 @@ func main() {
 		os.Exit(1)
 	}
 	err = kongCtx.Run(&cli.CLIContext{
-		Daemon:     mc,
-		Context:    ctx,
-		AppBaseDir: appBaseDir,
-		LogFile:    app.LogFile,
-		LogLevel:   app.LogLevel,
-		CloneRoot:  app.AppBaseDir,
+		Daemon:       mc,
+		Context:      ctx,
+		AppBaseDir:   appBaseDir,
+		LogFile:      app.LogFile,
+		LogLevel:     app.LogLevel,
+		CloneRoot:    app.AppBaseDir,
+		SharedCaches: app.Caches.SharedCacheConfig(),
 	})
 	kongCtx.FatalIfErrorf(err)
 }

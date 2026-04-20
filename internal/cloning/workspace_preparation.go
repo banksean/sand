@@ -2,6 +2,8 @@ package cloning
 
 import (
 	"context"
+
+	"github.com/banksean/sand/internal/sandtypes"
 )
 
 // WorkspacePreparation handles the file system operations needed to prepare
@@ -14,11 +16,12 @@ type WorkspacePreparation interface {
 
 // CloneRequest captures the inputs necessary to prepare a sandbox workspace.
 type CloneRequest struct {
-	ID          string
-	HostWorkDir string
-	EnvFile     string
-	Username    string
-	Uid         string
+	ID                string
+	HostWorkDir       string
+	EnvFile           string
+	Username          string
+	Uid               string
+	SharedCacheMounts sandtypes.SharedCacheMounts
 }
 
 // CloneArtifacts describes the file system artifacts created during workspace preparation.
@@ -30,4 +33,6 @@ type CloneArtifacts struct {
 	// Username is the host OS username of the user who invoked sand
 	Username string
 	Uid      string
+	// SharedCacheMounts carries host-managed caches that should be mounted into the container.
+	SharedCacheMounts sandtypes.SharedCacheMounts
 }

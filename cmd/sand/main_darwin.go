@@ -33,6 +33,7 @@ type Outie struct {
 	Completion kongcompletion.Completion `cmd:"" help:"Outputs shell code for initialising tab completions"`
 	Version    cli.VersionFlag           `name:"version" help:"Print version and exit."`
 	DryRun     bool                      `default:"false" help:"just print out the operations instead of executing them"`
+	Caches     cli.CacheFlags            `embed:"" prefix:"caches-"`
 
 	New                cli.NewCmd                `cmd:"" help:"create a new sandbox and shell into its container"`
 	Oneshot            cli.OneshotCmd            `cmd:"" help:"run an AI agent non-interactively with a prompt"`
@@ -230,7 +231,7 @@ func main() {
 	kongcompletion.Register(kongApp, kongcompletion.WithPredictor("sandbox-name", namePredictor))
 	kongConfigPaths := []string{"~/.sand.yaml"}
 	if p := cli.FindProjectConfig(); p != "" {
-		kongConfigPaths = append([]string{p}, kongConfigPaths...)
+		kongConfigPaths = append(kongConfigPaths, p)
 	}
 	kongCtx := kong.Parse(&app,
 		kong.UsageOnError(),
@@ -281,12 +282,13 @@ func main() {
 	}
 
 	err = kongCtx.Run(&cli.CLIContext{
-		Daemon:     mc,
-		Context:    ctx,
-		AppBaseDir: appBaseDir,
-		LogFile:    app.LogFile,
-		LogLevel:   app.LogLevel,
-		CloneRoot:  app.AppBaseDir,
+		Daemon:       mc,
+		Context:      ctx,
+		AppBaseDir:   appBaseDir,
+		LogFile:      app.LogFile,
+		LogLevel:     app.LogLevel,
+		CloneRoot:    app.AppBaseDir,
+		SharedCaches: app.Caches.SharedCacheConfig(),
 	})
 	kongCtx.FatalIfErrorf(err)
 }

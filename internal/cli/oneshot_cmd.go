@@ -102,6 +102,7 @@ func (c *OneshotCmd) Run(cctx *CLIContext) error {
 			Agent:          c.Agent,
 			AllowedDomains: allowedDomains,
 			Volumes:        c.Volume,
+			SharedCaches:   cctx.SharedCaches,
 			CPUs:           c.CPU,
 			Memory:         c.Memory,
 			Username:       c.Username,

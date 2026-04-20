@@ -182,6 +182,7 @@ type NewSandboxOpts struct {
 	Uid            string
 	AllowedDomains []string
 	Volumes        []string
+	SharedCaches   sandtypes.SharedCacheConfig
 	CPUs           int
 	Memory         int
 }
@@ -198,14 +199,19 @@ func (sb *Boxer) NewSandbox(ctx context.Context, opts NewSandboxOpts) (*sandtype
 	if _, err := os.Stat(envFile); err != nil {
 		envFile = ""
 	}
+	sharedCacheMounts, err := sb.ensureSharedCacheMounts(opts.SharedCaches)
+	if err != nil {
+		return nil, err
+	}
 
 	// Prepare workspace
 	artifacts, err := agentConfig.Preparation.Prepare(ctx, cloning.CloneRequest{
-		ID:          opts.ID,
-		HostWorkDir: opts.HostWorkDir,
-		EnvFile:     envFile,
-		Username:    opts.Username,
-		Uid:         opts.Uid,
+		ID:                opts.ID,
+		HostWorkDir:       opts.HostWorkDir,
+		EnvFile:           envFile,
+		Username:          opts.Username,
+		Uid:               opts.Uid,
+		SharedCacheMounts: sharedCacheMounts,
 	})
 	if err != nil {
 		return nil, err
@@ -249,20 +255,21 @@ func (sb *Boxer) NewSandbox(ctx context.Context, opts NewSandboxOpts) (*sandtype
 	}
 
 	ret := &sandtypes.Box{
-		ID:             opts.ID,
-		AgentType:      opts.AgentType,
-		HostOriginDir:  hostWorkDir,
-		SandboxWorkDir: artifacts.SandboxWorkDir,
-		ImageName:      opts.ImageName,
-		EnvFile:        envFile,
-		AllowedDomains: opts.AllowedDomains,
-		Volumes:        opts.Volumes,
-		Mounts:         append(mounts, sshKeysMountSpec),
-		Keys:           keys,
-		CPUs:           opts.CPUs,
-		MemoryMB:       opts.Memory,
-		Username:       opts.Username,
-		Uid:            opts.Uid,
+		ID:                opts.ID,
+		AgentType:         opts.AgentType,
+		HostOriginDir:     hostWorkDir,
+		SandboxWorkDir:    artifacts.SandboxWorkDir,
+		ImageName:         opts.ImageName,
+		EnvFile:           envFile,
+		AllowedDomains:    opts.AllowedDomains,
+		Volumes:           opts.Volumes,
+		SharedCacheMounts: sharedCacheMounts,
+		Mounts:            append(mounts, sshKeysMountSpec),
+		Keys:              keys,
+		CPUs:              opts.CPUs,
+		MemoryMB:          opts.Memory,
+		Username:          opts.Username,
+		Uid:               opts.Uid,
 		OriginalGitDetails: &sandtypes.GitDetails{
 			RemoteOrigin: gitRemote,
 			Branch:       gitBranch,
@@ -528,9 +535,29 @@ func (b *Boxer) EffectiveMounts(sb *sandtypes.Box) []sandtypes.MountSpec {
 	pathRegistry := cloning.NewStandardPathRegistry(sb.SandboxWorkDir)
 	baseConfig := cloning.NewBaseContainerConfiguration()
 	return baseConfig.GetMounts(cloning.CloneArtifacts{
-		SandboxWorkDir: sb.SandboxWorkDir,
-		PathRegistry:   pathRegistry,
+		SandboxWorkDir:    sb.SandboxWorkDir,
+		PathRegistry:      pathRegistry,
+		SharedCacheMounts: sb.SharedCacheMounts,
 	})
+}
+
+func (sb *Boxer) ensureSharedCacheMounts(cfg sandtypes.SharedCacheConfig) (sandtypes.SharedCacheMounts, error) {
+	var mounts sandtypes.SharedCacheMounts
+
+	if cfg.Go.ModuleCache {
+		mounts.GoModuleCacheHostDir = filepath.Join(sb.appRoot, "caches", "go", "pkgmod")
+		if err := sb.FileOps.MkdirAll(mounts.GoModuleCacheHostDir, 0o755); err != nil {
+			return sandtypes.SharedCacheMounts{}, fmt.Errorf("create shared go module cache dir: %w", err)
+		}
+	}
+	if cfg.Go.BuildCache {
+		mounts.GoBuildCacheHostDir = filepath.Join(sb.appRoot, "caches", "go", "build")
+		if err := sb.FileOps.MkdirAll(mounts.GoBuildCacheHostDir, 0o755); err != nil {
+			return sandtypes.SharedCacheMounts{}, fmt.Errorf("create shared go build cache dir: %w", err)
+		}
+	}
+
+	return mounts, nil
 }
 
 // CreateContainer creates a new container instance. The container image must exist.
@@ -610,10 +637,11 @@ func (sber *Boxer) StartNewContainer(ctx context.Context, sb *sandtypes.Box) err
 	pathRegistry := cloning.NewStandardPathRegistry(sb.SandboxWorkDir)
 
 	artifacts := cloning.CloneArtifacts{
-		SandboxWorkDir: sb.SandboxWorkDir,
-		PathRegistry:   pathRegistry,
-		Username:       sb.Username,
-		Uid:            sb.Uid,
+		SandboxWorkDir:    sb.SandboxWorkDir,
+		PathRegistry:      pathRegistry,
+		Username:          sb.Username,
+		Uid:               sb.Uid,
+		SharedCacheMounts: sb.SharedCacheMounts,
 	}
 
 	// Get agent config to reconstruct hooks
@@ -635,10 +663,11 @@ func (sber *Boxer) StartExistingContainer(ctx context.Context, sb *sandtypes.Box
 	pathRegistry := cloning.NewStandardPathRegistry(sb.SandboxWorkDir)
 
 	artifacts := cloning.CloneArtifacts{
-		SandboxWorkDir: sb.SandboxWorkDir,
-		PathRegistry:   pathRegistry,
-		Username:       sb.Username,
-		Uid:            sb.Uid,
+		SandboxWorkDir:    sb.SandboxWorkDir,
+		PathRegistry:      pathRegistry,
+		Username:          sb.Username,
+		Uid:               sb.Uid,
+		SharedCacheMounts: sb.SharedCacheMounts,
 	}
 
 	// Get agent config to reconstruct hooks
