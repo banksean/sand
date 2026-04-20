@@ -13,6 +13,7 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/banksean/sand/internal/applecontainer/options"
 	"github.com/banksean/sand/internal/applecontainer/types"
+	"github.com/banksean/sand/internal/cli/agentlaunch"
 	"github.com/banksean/sand/internal/daemon"
 	"github.com/banksean/sand/internal/hostops"
 	"github.com/banksean/sand/internal/runtimedeps"
@@ -211,31 +212,12 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 	}
 
 	// TODO: Sort out how "new" and "shell" should work when invoked inside a container.
-	var args []string
-	switch c.Agent {
-	case "claude":
-		if c.Tmux {
-			args = []string{"new-session", "-A", "-s", "claude-" + sbox.ID, "claude --permission-mode=bypassPermissions"}
-		} else {
-			args = []string{"-c", "claude --permission-mode=bypassPermissions"}
-		}
-	case "gemini":
-		if c.Tmux {
-			args = []string{"new-session", "-A", "-s", "gemini-" + sbox.ID, "gemini --approval-mode=yolo"}
-		} else {
-			args = []string{"-c", "gemini --approval-mode=yolo"}
-		}
-	case "opencode":
-		args = []string{"-c", "opencode --port 80 --hostname " + strings.TrimSuffix(hostname, ".")}
-	}
-	if c.Tmux {
-		c.Shell = "/usr/bin/tmux"
-		if c.Agent == "" {
-			args = []string{"new-session", "-A", "-s", sbox.ID}
-		}
+	shell, args, err := agentlaunch.BuildInteractiveExec(c.Agent, c.Shell, sbox.ID, hostname, c.Tmux)
+	if err != nil {
+		return err
 	}
 
-	if err := runShell(ctx, sbox, c.Shell, args); err != nil {
+	if err := runShell(ctx, sbox, shell, args); err != nil {
 		return err
 	}
 

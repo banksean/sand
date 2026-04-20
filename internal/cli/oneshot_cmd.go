@@ -10,6 +10,7 @@ import (
 
 	"github.com/banksean/sand/internal/applecontainer/options"
 	"github.com/banksean/sand/internal/applecontainer/types"
+	"github.com/banksean/sand/internal/cli/agentlaunch"
 	"github.com/banksean/sand/internal/daemon"
 	"github.com/banksean/sand/internal/hostops"
 	"github.com/banksean/sand/internal/runtimedeps"
@@ -20,7 +21,7 @@ import (
 // non-interactively with the given prompt, streaming output to stdout.
 type OneshotCmd struct {
 	SandboxCreationFlags
-	Agent       string `short:"a" required:"" placeholder:"<claude|opencode>" help:"coding agent to use"`
+	Agent       string `short:"a" required:"" placeholder:"<claude|gemini|opencode>" help:"coding agent to use"`
 	Username    string `help:"name of default user to create (defaults to $USER)"`
 	Uid         string `help:"id of default user to create (defaults to $UID)"`
 	SandboxName string `short:"n" placeholder:"<name>" help:"name of the sandbox to use (generated if omitted)"`
@@ -88,16 +89,9 @@ func (c *OneshotCmd) Run(cctx *CLIContext) error {
 		allowedDomains = domains
 	}
 
-	var agentCmd string
-	switch c.Agent {
-	case "claude":
-		agentCmd = `claude --permission-mode=bypassPermissions --print "$SAND_ONESHOT_PROMPT"`
-	case "gemini":
-		agentCmd = `gemini --approval-mode=yolo -p "$SAND_ONESHOT_PROMPT"`
-	case "opencode":
-		agentCmd = `opencode run "$SAND_ONESHOT_PROMPT"`
-	default:
-		return fmt.Errorf("one-shot mode not supported for agent %q", c.Agent)
+	agentCmd, err := agentlaunch.BuildOneShotExec(c.Agent)
+	if err != nil {
+		return err
 	}
 
 	sbox, err := mc.GetSandbox(ctx, c.SandboxName)
