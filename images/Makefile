@@ -7,22 +7,22 @@ PUSH_CMD := container image push
 all: base claude codex default opencode
 
 base:
-	$(BUILD_CMD) $(REGISTRY)/base:latest base/
+	$(BUILD_CMD) $(REGISTRY)/base:latest -t $(REGISTRY)/base:local base/
 
 claude: base
-	$(BUILD_CMD) $(REGISTRY)/claude:latest claude/
+	$(BUILD_CMD) $(REGISTRY)/claude:latest -t $(REGISTRY)/claude:local claude/
 
 codex: base
-	$(BUILD_CMD) $(REGISTRY)/codex:latest codex/
+	$(BUILD_CMD) $(REGISTRY)/codex:latest -t $(REGISTRY)/codex:local codex/
 
 default: base
-	$(BUILD_CMD) $(REGISTRY)/default:latest default/
+	$(BUILD_CMD) $(REGISTRY)/default:latest -t $(REGISTRY)/default:local default/
 
 gemini: base
-	$(BUILD_CMD) $(REGISTRY)/gemini:latest gemini/
+	$(BUILD_CMD) $(REGISTRY)/gemini:latest -t $(REGISTRY)/gemini:local gemini/
 
 opencode:
-	$(BUILD_CMD) $(REGISTRY)/opencode:latest opencode/
+	$(BUILD_CMD) $(REGISTRY)/opencode:latest -t $(REGISTRY)/opencode:local opencode/
 
 push: push-base push-claude push-codex push-default push-opencode
 
