@@ -8,6 +8,7 @@ import (
 type spec struct {
 	interactive func(hostname string) string
 	oneshot     string
+	image       string
 }
 
 var specs = map[string]spec{
@@ -16,23 +17,27 @@ var specs = map[string]spec{
 			return "claude --permission-mode=bypassPermissions"
 		},
 		oneshot: `claude --permission-mode=bypassPermissions --print "$SAND_ONESHOT_PROMPT"`,
+		image:   "ghcr.io/banksean/sand/claude:latest",
 	},
 	"codex": {
 		interactive: func(_ string) string {
 			return "codex --dangerously-bypass-approvals-and-sandbox"
 		},
+		image: "ghcr.io/banksean/sand/codex:latest",
 	},
 	"gemini": {
 		interactive: func(_ string) string {
 			return "gemini --approval-mode=yolo"
 		},
 		oneshot: `gemini --approval-mode=yolo -p "$SAND_ONESHOT_PROMPT"`,
+		image:   "ghcr.io/banksean/sand/gemini:latest",
 	},
 	"opencode": {
 		interactive: func(hostname string) string {
 			return "opencode --port 80 --hostname " + strings.TrimSuffix(hostname, ".")
 		},
 		oneshot: `opencode run "$SAND_ONESHOT_PROMPT"`,
+		image:   "ghcr.io/banksean/sand/opencode:latest",
 	},
 }
 
@@ -74,4 +79,12 @@ func BuildOneShotExec(agent string) (string, error) {
 		return "", fmt.Errorf("one-shot mode not supported for agent %q", agent)
 	}
 	return spec.oneshot, nil
+}
+
+func DefaultImage(agent, fallback string) string {
+	spec, ok := specs[agent]
+	if !ok || spec.image == "" {
+		return fallback
+	}
+	return spec.image
 }

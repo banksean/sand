@@ -31,14 +31,6 @@ type NewCmd struct {
 	SandboxName string `arg:"" optional:"" help:"name of the sandbox to create"`
 }
 
-var defaultImageForAgent = map[string]string{
-	"claude":   "ghcr.io/banksean/sand/claude:latest",
-	"codex":    "ghcr.io/banksean/sand/codex:latest",
-	"default":  "ghcr.io/banksean/sand/default:latest",
-	"gemini":   "ghcr.io/banksean/sand/gemini:latest",
-	"opencode": "ghcr.io/banksean/sand/opencode:latest",
-}
-
 func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 	ctx := cctx.Context
 	mc := cctx.Daemon
@@ -102,16 +94,7 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 	}
 
 	if c.ImageName == "" {
-		if c.Agent != "" {
-			img, ok := defaultImageForAgent[c.Agent]
-			if ok {
-				c.ImageName = img
-			} else {
-				c.ImageName = DefaultImageName
-			}
-		} else {
-			c.ImageName = DefaultImageName
-		}
+		c.ImageName = agentlaunch.DefaultImage(c.Agent, DefaultImageName)
 	}
 	if err := mc.EnsureImage(ctx, c.ImageName, os.Stdout); err != nil {
 		return fmt.Errorf("ensuring image %s: %w", c.ImageName, err)
