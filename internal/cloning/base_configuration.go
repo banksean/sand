@@ -53,7 +53,6 @@ func (c *BaseContainerConfiguration) GetMounts(artifacts CloneArtifacts) []sandt
 	}
 
 	if artifacts.SharedCacheMounts.GoBuildCacheHostDir != "" {
-
 		mounts = append(mounts, sandtypes.MountSpec{
 			Source: artifacts.SharedCacheMounts.GoBuildCacheHostDir,
 			Target: goBuildCachePath,
