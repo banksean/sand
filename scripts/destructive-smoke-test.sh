@@ -33,6 +33,7 @@ if command -v sand &> /dev/null; then
 fi
 
 rm -rf ~/.config/sand
+chmod -R u+w ~/Library/Application\ Support/Sand
 rm -rf ~/Library/Application\ Support/Sand
 
 if container image inspect ghcr.io/banksean/sand/default &>/dev/null; then 
@@ -57,21 +58,23 @@ sand ls
 
 # Create a new sandox and exit back to this smoke test.
 # Use the `script` command here to avoid tty errors.
-echo "exit" | script -q /dev/null sand new smoke
+echo "exit" | script -q /dev/null sand new -i default:local smoke
 sand ls
 
 # TODO: Automate verification for the output of these commands
 sand exec smoke ls
 sand exec smoke whoami
-sand exec smoke apk add go
-sand exec smoke go test ./...
+# Cold cache for both go toolchain and build artifacts
+time sand exec smoke zsh -c "go test ./..."
+# Warm chache, should be much faster this time
+time sand exec smoke zsh -c "go test ./..."
 
 # Try to use the packaged sand innie binary from the default image
 sand exec smoke sand --version
 sand exec smoke sand build-info
 
 # Now try to build and use the sand innie binary built from this checkout
-sand exec smoke go build ./cmd/...
+sand exec smoke zsh -c "go build ./cmd/..."
 sand exec smoke ./sand --version
 sand exec smoke ./sand build-info
 
@@ -89,4 +92,5 @@ sandd stop
 rm $(which sand)
 rm $(which sandd)
 rm -rf ~/.config/sand
+chmod -R u+w ~/Library/Application\ Support/Sand
 rm -rf ~/Library/Application\ Support/Sand
