@@ -75,9 +75,7 @@ type GoSharedCacheConfig struct {
 }
 
 type SharedCacheMounts struct {
-	GoModuleCacheHostDir string
-	GoBuildCacheHostDir  string
-	MiseCacheHostDir     string
+	MiseCacheHostDir string
 }
 
 type GitDetails struct {

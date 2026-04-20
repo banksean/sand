@@ -20,8 +20,8 @@ else
 fi
 
 # Set language-specific caches within the same shared mount
-export GOMODCACHE="/opt/tool-cache/go/mod"
-export GOCACHE="/opt/tool-cache/go/build"
+export GOMODCACHE="$MISE_DATA_DIR/go/mod"
+export GOCACHE="$MISE_DATA_DIR/go/build"
 export PIP_CACHE_DIR="/opt/tool-cache/python/pip"
 
 {

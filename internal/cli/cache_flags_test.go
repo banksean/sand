@@ -21,6 +21,7 @@ func TestCacheFlagsSharedCacheConfig(t *testing.T) {
 			enabled bool
 			module  bool
 			build   bool
+			mise    bool
 		}
 	}{
 		{
@@ -32,7 +33,8 @@ func TestCacheFlagsSharedCacheConfig(t *testing.T) {
 				enabled bool
 				module  bool
 				build   bool
-			}{enabled: true, module: true, build: true},
+				mise    bool
+			}{enabled: true, module: true, build: true, mise: true},
 		},
 		{
 			name: "explicit module false overrides inherited enable",
@@ -43,7 +45,8 @@ func TestCacheFlagsSharedCacheConfig(t *testing.T) {
 				enabled bool
 				module  bool
 				build   bool
-			}{enabled: true, module: false, build: true},
+				mise    bool
+			}{enabled: true, module: false, build: true, mise: true},
 		},
 		{
 			name: "explicit disable clears both caches",
@@ -54,7 +57,8 @@ func TestCacheFlagsSharedCacheConfig(t *testing.T) {
 				enabled bool
 				module  bool
 				build   bool
-			}{enabled: false, module: false, build: false},
+				mise    bool
+			}{enabled: false, module: false, build: false, mise: false},
 		},
 		{
 			name: "single cache enables overall config",
@@ -65,15 +69,28 @@ func TestCacheFlagsSharedCacheConfig(t *testing.T) {
 				enabled bool
 				module  bool
 				build   bool
-			}{enabled: true, module: false, build: true},
+				mise    bool
+			}{enabled: true, module: false, build: true, mise: true},
+		},
+		{
+			name: "mise can be enabled directly",
+			flags: CacheFlags{
+				Mise: boolPtr(true),
+			},
+			want: struct {
+				enabled bool
+				module  bool
+				build   bool
+				mise    bool
+			}{enabled: false, module: false, build: false, mise: true},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := tt.flags.SharedCacheConfig()
-			if got.Go.Enabled != tt.want.enabled || got.Go.ModuleCache != tt.want.module || got.Go.BuildCache != tt.want.build {
-				t.Fatalf("got %+v, want enabled=%v module=%v build=%v", got.Go, tt.want.enabled, tt.want.module, tt.want.build)
+			if got.Go.Enabled != tt.want.enabled || got.Go.ModuleCache != tt.want.module || got.Go.BuildCache != tt.want.build || got.Mise != tt.want.mise {
+				t.Fatalf("got %+v mise=%v, want enabled=%v module=%v build=%v mise=%v", got.Go, got.Mise, tt.want.enabled, tt.want.module, tt.want.build, tt.want.mise)
 			}
 		})
 	}
@@ -105,7 +122,7 @@ func TestCacheFlagsLoadedByKongYAML(t *testing.T) {
 	}
 
 	got := parsed.Caches.SharedCacheConfig()
-	if !got.Go.Enabled || got.Go.ModuleCache || !got.Go.BuildCache {
-		t.Fatalf("got %+v, want enabled=true module=false build=true", got.Go)
+	if !got.Go.Enabled || got.Go.ModuleCache || !got.Go.BuildCache || !got.Mise {
+		t.Fatalf("got %+v mise=%v, want enabled=true module=false build=true mise=true", got.Go, got.Mise)
 	}
 }

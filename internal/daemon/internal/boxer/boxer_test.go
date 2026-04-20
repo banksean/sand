@@ -11,7 +11,7 @@ import (
 	"github.com/banksean/sand/internal/sandtypes"
 )
 
-func TestEnsureSharedCacheMounts_GoCaches(t *testing.T) {
+func TestEnsureSharedCacheMounts_GoCachesUseMiseMount(t *testing.T) {
 	var mkdirs []string
 	b := &Boxer{
 		appRoot: "/tmp/sand-app",
@@ -34,17 +34,13 @@ func TestEnsureSharedCacheMounts_GoCaches(t *testing.T) {
 		t.Fatalf("ensureSharedCacheMounts: %v", err)
 	}
 
-	if mounts.GoModuleCacheHostDir != "/tmp/sand-app/caches/go/pkgmod" {
-		t.Fatalf("unexpected module cache dir: %q", mounts.GoModuleCacheHostDir)
-	}
-	if mounts.GoBuildCacheHostDir != "/tmp/sand-app/caches/go/build" {
-		t.Fatalf("unexpected build cache dir: %q", mounts.GoBuildCacheHostDir)
+	if mounts.MiseCacheHostDir != "/tmp/sand-app/caches/mise" {
+		t.Fatalf("unexpected mise cache dir: %q", mounts.MiseCacheHostDir)
 	}
 
 	sort.Strings(mkdirs)
 	want := []string{
-		"/tmp/sand-app/caches/go/build",
-		"/tmp/sand-app/caches/go/pkgmod",
+		"/tmp/sand-app/caches/mise",
 	}
 	if len(mkdirs) != len(want) {
 		t.Fatalf("expected %d mkdir calls, got %d: %v", len(want), len(mkdirs), mkdirs)

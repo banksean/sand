@@ -17,9 +17,9 @@ type BaseContainerConfiguration struct{}
 var _ ContainerConfiguration = &BaseContainerConfiguration{}
 
 const (
-	goModCachePath   = "/opt/tool-cache/go/mod"
-	goBuildCachePath = "/opt/tool-cache/go/build"
 	miseCachePath    = "/opt/tool-cache/mise"
+	goModCachePath   = miseCachePath + "/go/mod"
+	goBuildCachePath = miseCachePath + "/go/build"
 )
 
 // NewBaseContainerConfiguration creates a new base container configuration instance.
@@ -43,20 +43,6 @@ func (c *BaseContainerConfiguration) GetMounts(artifacts CloneArtifacts) []sandt
 			Source: artifacts.PathRegistry.WorkDir(),
 			Target: "/app",
 		},
-	}
-
-	if artifacts.SharedCacheMounts.GoModuleCacheHostDir != "" {
-		mounts = append(mounts, sandtypes.MountSpec{
-			Source: artifacts.SharedCacheMounts.GoModuleCacheHostDir,
-			Target: goModCachePath,
-		})
-	}
-
-	if artifacts.SharedCacheMounts.GoBuildCacheHostDir != "" {
-		mounts = append(mounts, sandtypes.MountSpec{
-			Source: artifacts.SharedCacheMounts.GoBuildCacheHostDir,
-			Target: goBuildCachePath,
-		})
 	}
 
 	if artifacts.SharedCacheMounts.MiseCacheHostDir != "" {
@@ -132,14 +118,13 @@ func (c *BaseContainerConfiguration) defaultContainerHook(username, uid string, 
 		// Create the parent directories before chown so the container user owns them,
 		// but delay the symlink creation until after chown so we don't traverse into
 		// shared host-mounted cache dirs.
-		if sharedCaches.GoModuleCacheHostDir != "" {
+		if sharedCaches.MiseCacheHostDir != "" {
 			mkdirGoPkgOut, err := exec(ctx, "mkdir", "-p", "/home/"+username+"/go/pkg")
 			if err != nil {
 				slog.ErrorContext(ctx, "defaultContainerHook preparing go module cache parent", "error", err, "mkdirGoPkgOut", mkdirGoPkgOut, "username", username)
 				errs = append(errs, fmt.Errorf("mkdir go module cache parent: %w", err))
 			}
-		}
-		if sharedCaches.GoBuildCacheHostDir != "" {
+
 			mkdirGoBuildOut, err := exec(ctx, "mkdir", "-p", "/home/"+username+"/.cache")
 			if err != nil {
 				slog.ErrorContext(ctx, "defaultContainerHook preparing go build cache parent", "error", err, "mkdirGoBuildOut", mkdirGoBuildOut, "username", username)
@@ -155,15 +140,15 @@ func (c *BaseContainerConfiguration) defaultContainerHook(username, uid string, 
 			errs = append(errs, fmt.Errorf("chown: %w", err))
 		}
 
-		// TODO: set GOCACHE, GOMODCACHE env vars to /opt/tool-cache/... instead of symlinking to the default paths.
-		if sharedCaches.GoModuleCacheHostDir != "" {
+		// entrypoint.sh exports GOMODCACHE/GOCACHE directly, and these symlinks keep
+		// direct process execs aligned with the same mise-backed cache paths.
+		if sharedCaches.MiseCacheHostDir != "" {
 			lnGoPkgOut, err := exec(ctx, "ln", "-sfn", goModCachePath, "/home/"+username+"/go/pkg/mod")
 			if err != nil {
 				slog.ErrorContext(ctx, "defaultContainerHook linking go module cache", "error", err, "lnGoPkgOut", lnGoPkgOut, "username", username)
 				errs = append(errs, fmt.Errorf("link go module cache: %w", err))
 			}
-		}
-		if sharedCaches.GoBuildCacheHostDir != "" {
+
 			lnGoBuildOut, err := exec(ctx, "ln", "-sfn", goBuildCachePath, "/home/"+username+"/.cache/go-build")
 			if err != nil {
 				slog.ErrorContext(ctx, "defaultContainerHook linking go build cache", "error", err, "lnGoBuildOut", lnGoBuildOut, "username", username)

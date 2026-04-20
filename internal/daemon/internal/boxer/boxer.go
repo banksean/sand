@@ -544,20 +544,7 @@ func (b *Boxer) EffectiveMounts(sb *sandtypes.Box) []sandtypes.MountSpec {
 func (sb *Boxer) ensureSharedCacheMounts(cfg sandtypes.SharedCacheConfig) (sandtypes.SharedCacheMounts, error) {
 	var mounts sandtypes.SharedCacheMounts
 
-	if cfg.Go.ModuleCache {
-		mounts.GoModuleCacheHostDir = filepath.Join(sb.appRoot, "caches", "go", "pkgmod")
-		if err := sb.FileOps.MkdirAll(mounts.GoModuleCacheHostDir, 0o755); err != nil {
-			return sandtypes.SharedCacheMounts{}, fmt.Errorf("create shared go module cache dir: %w", err)
-		}
-	}
-	if cfg.Go.BuildCache {
-		mounts.GoBuildCacheHostDir = filepath.Join(sb.appRoot, "caches", "go", "build")
-		if err := sb.FileOps.MkdirAll(mounts.GoBuildCacheHostDir, 0o755); err != nil {
-			return sandtypes.SharedCacheMounts{}, fmt.Errorf("create shared go build cache dir: %w", err)
-		}
-	}
-
-	if cfg.Mise {
+	if cfg.Mise || cfg.Go.ModuleCache || cfg.Go.BuildCache {
 		mounts.MiseCacheHostDir = filepath.Join(sb.appRoot, "caches", "mise")
 		if err := sb.FileOps.MkdirAll(mounts.MiseCacheHostDir, 0o755); err != nil {
 			return sandtypes.SharedCacheMounts{}, fmt.Errorf("create shared mise cache dir: %w", err)

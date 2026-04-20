@@ -45,5 +45,11 @@ func (c CacheFlags) SharedCacheConfig() sandtypes.SharedCacheConfig {
 		cfg.Mise = *c.Mise
 	}
 
+	// Legacy Go cache flags now opt into the shared mise cache mount, which also
+	// owns GOMODCACHE/GOCACHE inside the container.
+	if cfg.Go.ModuleCache || cfg.Go.BuildCache {
+		cfg.Mise = true
+	}
+
 	return cfg
 }
