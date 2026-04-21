@@ -181,6 +181,7 @@ func (c *BaseContainerConfiguration) defaultContainerHook(username, uid string, 
 			errs = append(errs, fmt.Errorf("start sshd: %w", err))
 		}
 
+		// TODO: stream output from from this command, because it can take quite a while to run if mise's cache is cold.
 		entryPointOut, err := exec(ctx, "entrypoint.sh")
 		if err != nil {
 			slog.ErrorContext(ctx, "defaultContainerHook starting entrypoint.sh", "error", err, "entryPointOut", entryPointOut)

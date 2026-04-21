@@ -6,6 +6,14 @@ export MISE_DATA_DIR="/opt/tool-cache/mise"
 export MISE_CONFIG_DIR="/opt/tool-cache/mise/config"
 export MISE_CACHE_DIR="/opt/tool-cache/mise/cache"
 
+# Since we're running Alpine, we don't have glibc so the offocial node builds won't work.
+# Setting the following vars tell mise to use community-provided musl builds,
+# and to download them rather than try to compile from source (which is a whole
+# other shitshow).
+export MISE_NODE_MIRROR_URL="https://unofficial-builds.nodejs.org/download/release/"
+export MISE_NODE_FLAVOR="musl"
+export MISE_NODE_COMPILE="false"
+
 # Automatically install runtimes defined in .tool-versions or mise.toml
 if [ -f ".tool-versions" ] || [ -f "mise.toml" ]; then
     echo "🛠 Detecting runtimes from config..."
