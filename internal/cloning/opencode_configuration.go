@@ -59,14 +59,14 @@ func (c *OpenCodeContainerConfiguration) GetFirstStartHooks(artifacts CloneArtif
 
 // copyOpenCodeBinaryHook copies the OpenCode binary to /usr/local/bin in the container.
 func (c *OpenCodeContainerConfiguration) copyOpenCodeBinaryHook(username string) sandtypes.ContainerHook {
-	return sandtypes.NewContainerHook("Copy opencode binary to /usr/local/bin", func(ctx context.Context, ctr *types.Container, exec sandtypes.HookFunc) error {
+	return sandtypes.NewContainerHook("Copy opencode binary to /usr/local/bin", func(ctx context.Context, ctr *types.Container, exec sandtypes.HookStreamer) error {
 		// The Dockerfile doesn't know about username, only root. So that's where it ends up installing the opencode binary.
-		mkdirOut, err := exec(ctx, "mkdir", "-p", "/root/.opencode/bin")
+		mkdirOut, err := exec.Exec(ctx, "mkdir", "-p", "/root/.opencode/bin")
 		if err != nil {
 			slog.ErrorContext(ctx, "copyOpenCodeBinaryHook mkdir for opencode binary", "error", err, "mkdirOut", mkdirOut)
 			return fmt.Errorf("mkdir for opencode binary: %w", err)
 		}
-		cpOut, err := exec(ctx, "cp", "-r", "/root/.opencode/bin/opencode", "/usr/local/bin/opencode")
+		cpOut, err := exec.Exec(ctx, "cp", "-r", "/root/.opencode/bin/opencode", "/usr/local/bin/opencode")
 		if err != nil {
 			slog.ErrorContext(ctx, "copyOpenCodeBinaryHook copying opencode binary", "error", err, "cpOut", cpOut)
 			return fmt.Errorf("copy opencode binary: %w", err)
@@ -77,7 +77,7 @@ func (c *OpenCodeContainerConfiguration) copyOpenCodeBinaryHook(username string)
 
 // openSSHTunnelHook sets up an SSH reverse tunnel for Chrome DevTools MCP.
 func (c *OpenCodeContainerConfiguration) openSSHTunnelHook(username string) sandtypes.ContainerHook {
-	return sandtypes.NewContainerHook("open remote ssh tunnel for chrome-devtools mcp", func(ctx context.Context, ctr *types.Container, execFn sandtypes.HookFunc) error {
+	return sandtypes.NewContainerHook("open remote ssh tunnel for chrome-devtools mcp", func(ctx context.Context, ctr *types.Container, execFn sandtypes.HookStreamer) error {
 		hostname := getContainerHostname(ctr)
 
 		// No context - this should run in a separate process that outlives the cloner startup hook invocations.

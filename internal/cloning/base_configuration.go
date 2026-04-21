@@ -1,6 +1,7 @@
 package cloning
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -67,12 +68,12 @@ func (c *BaseContainerConfiguration) GetFirstStartHooks(artifacts CloneArtifacts
 
 // defaultContainerHook sets up dotfiles and SSH in the container.
 func (c *BaseContainerConfiguration) defaultContainerHook(username, uid string, sharedCaches sandtypes.SharedCacheMounts) sandtypes.ContainerHook {
-	return sandtypes.NewContainerHook("default container bootstrap", func(ctx context.Context, ctr *types.Container, exec sandtypes.HookFunc) error {
+	return sandtypes.NewContainerHook("default container bootstrap", func(ctx context.Context, ctr *types.Container, exec sandtypes.HookStreamer) error {
 		var errs []error
 
 		// We create a group and a user with the same name and uid as the the host user.
 		// This avoids potential permissions issues with volumes mounted from host.
-		agOut, err := exec(ctx, "addgroup", "-g", uid, username)
+		agOut, err := exec.Exec(ctx, "addgroup", "-g", uid, username)
 		if err != nil {
 			slog.ErrorContext(ctx, "defaultContainerHook adding group for user", "error", err, "agOut", agOut, "username", username)
 			errs = append(errs, fmt.Errorf("addgroup: %w", err))
@@ -81,7 +82,7 @@ func (c *BaseContainerConfiguration) defaultContainerHook(username, uid string, 
 		// Create the user if they don't exist
 		// Since we're on Alpine, uses busybox's `adduser` instead of the usual `useradd`.
 		// -D for no password
-		uaOut, err := exec(ctx, "adduser", "-u", uid, "-D", "-G", username, "-s", "/bin/zsh", username)
+		uaOut, err := exec.Exec(ctx, "adduser", "-u", uid, "-D", "-G", username, "-s", "/bin/zsh", username)
 		if err != nil {
 			slog.ErrorContext(ctx, "defaultContainerHook creating user", "error", err, "uaOut", uaOut, "username", username)
 			errs = append(errs, fmt.Errorf("useradd: %w", err))
@@ -89,27 +90,27 @@ func (c *BaseContainerConfiguration) defaultContainerHook(username, uid string, 
 
 		// Unlock the account: adduser -D sets the shadow password to "!" which
 		// OpenSSH treats as a locked account and rejects before trying key/cert auth.
-		puOut, err := exec(ctx, "passwd", "-u", username)
+		puOut, err := exec.Exec(ctx, "passwd", "-u", username)
 		if err != nil {
 			slog.ErrorContext(ctx, "defaultContainerHook unlocking account", "error", err, "puOut", puOut, "username", username)
 			errs = append(errs, fmt.Errorf("passwd -u: %w", err))
 		}
 
-		agwOut, err := exec(ctx, "addgroup", username, "wheel")
+		agwOut, err := exec.Exec(ctx, "addgroup", username, "wheel")
 		if err != nil {
 			slog.ErrorContext(ctx, "defaultContainerHook adding user to wheel", "error", err, "agwOut", agwOut, "username", username)
 			errs = append(errs, fmt.Errorf("addgroup: %w", err))
 		}
 
 		// Copy dotfiles to the user's home directory
-		cpOut, err := exec(ctx, "cp", "-r", "/dotfiles/.", "/home/"+username+"/.")
+		cpOut, err := exec.Exec(ctx, "cp", "-r", "/dotfiles/.", "/home/"+username+"/.")
 		if err != nil {
 			slog.ErrorContext(ctx, "defaultContainerHook copying dotfiles", "error", err, "cpOut", cpOut, "username", username)
 			errs = append(errs, fmt.Errorf("copy dotfiles: %w", err))
 		}
 
 		// Copy config and known_hosts from /root/.ssh to make sure github host keys are already known for the user.
-		dotsshOut, err := exec(ctx, "cp", "-r", "/root/.ssh", "/home/"+username+"/.ssh")
+		dotsshOut, err := exec.Exec(ctx, "cp", "-r", "/root/.ssh", "/home/"+username+"/.ssh")
 		if err != nil {
 			slog.ErrorContext(ctx, "defaultContainerHook copying /root/.ssh to ~/.ssh", "error", err, "dotsshOut", dotsshOut, "username", username)
 			errs = append(errs, fmt.Errorf("copy /root/.ssh: %w", err))
@@ -119,13 +120,13 @@ func (c *BaseContainerConfiguration) defaultContainerHook(username, uid string, 
 		// but delay the symlink creation until after chown so we don't traverse into
 		// shared host-mounted cache dirs.
 		if sharedCaches.MiseCacheHostDir != "" {
-			mkdirGoPkgOut, err := exec(ctx, "mkdir", "-p", "/home/"+username+"/go/pkg")
+			mkdirGoPkgOut, err := exec.Exec(ctx, "mkdir", "-p", "/home/"+username+"/go/pkg")
 			if err != nil {
 				slog.ErrorContext(ctx, "defaultContainerHook preparing go module cache parent", "error", err, "mkdirGoPkgOut", mkdirGoPkgOut, "username", username)
 				errs = append(errs, fmt.Errorf("mkdir go module cache parent: %w", err))
 			}
 
-			mkdirGoBuildOut, err := exec(ctx, "mkdir", "-p", "/home/"+username+"/.cache")
+			mkdirGoBuildOut, err := exec.Exec(ctx, "mkdir", "-p", "/home/"+username+"/.cache")
 			if err != nil {
 				slog.ErrorContext(ctx, "defaultContainerHook preparing go build cache parent", "error", err, "mkdirGoBuildOut", mkdirGoBuildOut, "username", username)
 				errs = append(errs, fmt.Errorf("mkdir go build cache parent: %w", err))
@@ -133,7 +134,7 @@ func (c *BaseContainerConfiguration) defaultContainerHook(username, uid string, 
 		}
 
 		// Fix ownership
-		cOut, err := exec(ctx, "chown", "-R", username+":"+username,
+		cOut, err := exec.Exec(ctx, "chown", "-R", username+":"+username,
 			"/home/"+username)
 		if err != nil {
 			slog.ErrorContext(ctx, "defaultContainerHook chown homedir", "error", err, "cOut", cOut, "username", username)
@@ -143,13 +144,13 @@ func (c *BaseContainerConfiguration) defaultContainerHook(username, uid string, 
 		// entrypoint.sh exports GOMODCACHE/GOCACHE directly, and these symlinks keep
 		// direct process execs aligned with the same mise-backed cache paths.
 		if sharedCaches.MiseCacheHostDir != "" {
-			lnGoPkgOut, err := exec(ctx, "ln", "-sfn", goModCachePath, "/home/"+username+"/go/pkg/mod")
+			lnGoPkgOut, err := exec.Exec(ctx, "ln", "-sfn", goModCachePath, "/home/"+username+"/go/pkg/mod")
 			if err != nil {
 				slog.ErrorContext(ctx, "defaultContainerHook linking go module cache", "error", err, "lnGoPkgOut", lnGoPkgOut, "username", username)
 				errs = append(errs, fmt.Errorf("link go module cache: %w", err))
 			}
 
-			lnGoBuildOut, err := exec(ctx, "ln", "-sfn", goBuildCachePath, "/home/"+username+"/.cache/go-build")
+			lnGoBuildOut, err := exec.Exec(ctx, "ln", "-sfn", goBuildCachePath, "/home/"+username+"/.cache/go-build")
 			if err != nil {
 				slog.ErrorContext(ctx, "defaultContainerHook linking go build cache", "error", err, "lnGoBuildOut", lnGoBuildOut, "username", username)
 				errs = append(errs, fmt.Errorf("link go build cache: %w", err))
@@ -157,14 +158,14 @@ func (c *BaseContainerConfiguration) defaultContainerHook(username, uid string, 
 		}
 
 		// Copy SSH keys to /etc/ssh
-		sshkeysOut, err := exec(ctx, "cp", "-r", "/sshkeys/.", "/etc/ssh/.")
+		sshkeysOut, err := exec.Exec(ctx, "cp", "-r", "/sshkeys/.", "/etc/ssh/.")
 		if err != nil {
 			slog.ErrorContext(ctx, "defaultContainerHook copying host keys", "error", err, "sshkeysOut", sshkeysOut)
 			errs = append(errs, fmt.Errorf("copy host keys: %w", err))
 		}
 
 		// Set SSH key permissions
-		sshkeysChmodOut, err := exec(ctx, "chmod", "600",
+		sshkeysChmodOut, err := exec.Exec(ctx, "chmod", "600",
 			"/etc/ssh/ssh_host_key",
 			"/etc/ssh/ssh_host_key.pub",
 			"/etc/ssh/ssh_host_key.pub-cert",
@@ -175,15 +176,16 @@ func (c *BaseContainerConfiguration) defaultContainerHook(username, uid string, 
 		}
 
 		// Start sshd
-		sshdOut, err := exec(ctx, "/usr/sbin/sshd", "-f", "/etc/ssh/sshd_config")
+		sshdOut, err := exec.Exec(ctx, "/usr/sbin/sshd", "-f", "/etc/ssh/sshd_config")
 		if err != nil {
 			slog.ErrorContext(ctx, "defaultContainerHook starting sshd", "error", err, "sshdOut", sshdOut)
 			errs = append(errs, fmt.Errorf("start sshd: %w", err))
 		}
 
-		// TODO: stream output from from this command, because it can take quite a while to run if mise's cache is cold.
-		entryPointOut, err := exec(ctx, "entrypoint.sh")
+		var entryPointBuf bytes.Buffer
+		err = exec.ExecStream(ctx, &entryPointBuf, &entryPointBuf, "entrypoint.sh")
 		if err != nil {
+			entryPointOut := entryPointBuf.String()
 			slog.ErrorContext(ctx, "defaultContainerHook starting entrypoint.sh", "error", err, "entryPointOut", entryPointOut)
 			errs = append(errs, fmt.Errorf("entrypoint.sh: %w", err))
 		}

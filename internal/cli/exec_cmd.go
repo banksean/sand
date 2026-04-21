@@ -72,7 +72,7 @@ func (c *ExecCmd) Run(cctx *CLIContext) error {
 			Memory:       c.Memory,
 			Username:     c.Username,
 			Uid:          c.Uid,
-		})
+		}, os.Stdout)
 		if err != nil {
 			slog.ErrorContext(ctx, "CreateSandbox", "error", err)
 			return err

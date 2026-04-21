@@ -1,5 +1,7 @@
 package daemon
 
+import "github.com/banksean/sand/internal/sandtypes"
+
 // EnsureImageRequest is the request body for the /ensure-image endpoint.
 type EnsureImageRequest struct {
 	ImageName string `json:"imageName"`
@@ -34,4 +36,11 @@ type ErrorResponse struct {
 // SandboxConfigResponse is the response body for the /sandbox-config endpoint.
 type SandboxConfigResponse struct {
 	Domains []string `json:"domains"`
+}
+
+type CreateSandboxEvent struct {
+	Type  string         `json:"type"`
+	Data  string         `json:"data,omitempty"`
+	Error string         `json:"error,omitempty"`
+	Box   *sandtypes.Box `json:"box,omitempty"`
 }

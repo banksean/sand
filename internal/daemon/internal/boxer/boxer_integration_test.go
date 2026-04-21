@@ -1,6 +1,7 @@
 package boxer
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -671,6 +672,53 @@ func TestBoxer_EnsureImage(t *testing.T) {
 			t.Fatal("Expected error from wait, got nil")
 		}
 	})
+}
+
+func TestBoxer_ExecuteHooks_StreamsProgress(t *testing.T) {
+	ctx := context.Background()
+
+	var execStreamCalls []string
+	mockContainer := &hostops.MockContainerOps{
+		InspectFunc: func(ctx context.Context, containerID string) ([]types.Container, error) {
+			return []types.Container{{Status: "running"}}, nil
+		},
+		ExecStreamFunc: func(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, stdin io.Reader, stdout, stderr io.Writer, cmdArgs ...string) (func() error, error) {
+			execStreamCalls = append(execStreamCalls, cmd)
+			if _, err := io.WriteString(stdout, "warming cache\n"); err != nil {
+				return nil, err
+			}
+			return func() error { return nil }, nil
+		},
+	}
+	mockImage := &mockImageOps{}
+	boxer := newTestBoxer(t, mockContainer, mockImage)
+
+	hooks := []sandtypes.ContainerHook{
+		sandtypes.NewContainerHook("streamed hook", func(ctx context.Context, ctr *types.Container, exec sandtypes.HookStreamer) error {
+			return exec.ExecStream(ctx, io.Discard, io.Discard, "entrypoint.sh")
+		}),
+	}
+
+	var progress bytes.Buffer
+	err := boxer.executeHooks(ctx, &sandtypes.Box{
+		ID:          "test-sandbox",
+		ContainerID: "test-container",
+	}, hooks, &progress)
+	if err != nil {
+		t.Fatalf("executeHooks() error = %v", err)
+	}
+
+	if len(execStreamCalls) != 1 || execStreamCalls[0] != "entrypoint.sh" {
+		t.Fatalf("executeHooks() ExecStream calls = %v, want [entrypoint.sh]", execStreamCalls)
+	}
+
+	got := progress.String()
+	if !strings.Contains(got, "[sand] streamed hook\n") {
+		t.Fatalf("executeHooks() progress missing hook banner: %q", got)
+	}
+	if !strings.Contains(got, "warming cache\n") {
+		t.Fatalf("executeHooks() progress missing streamed output: %q", got)
+	}
 }
 
 func TestBoxer_StopContainer(t *testing.T) {

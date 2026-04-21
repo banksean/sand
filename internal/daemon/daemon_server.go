@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -195,7 +196,7 @@ func (d *Daemon) serveOutieSocket(ctx context.Context) {
 	mux.HandleFunc("/remove", slogHandler(d.handleRemove))
 	mux.HandleFunc("/stop", slogHandler(d.handleStop))
 	mux.HandleFunc("/start", slogHandler(d.handleStart))
-	mux.HandleFunc("/create", slogHandler(d.handleCreate))
+	mux.HandleFunc("/create-stream", slogHandler(d.handleCreateStream))
 	mux.HandleFunc("/ensure-image", slogHandler(d.handleEnsureImage))
 	mux.HandleFunc("/export", slogHandler(d.handleExport))
 	mux.HandleFunc("/stats", slogHandler(d.handleStats))
@@ -261,7 +262,7 @@ func (d *Daemon) serveInnieSocket(ctx context.Context, sandboxID string, unixLis
 	mux.HandleFunc("/get", slogHandler(fromSandbox(sandboxID, d.handleGet)))
 	mux.HandleFunc("/remove", slogHandler(fromSandbox(sandboxID, d.handleRemove)))
 	mux.HandleFunc("/stop", slogHandler(fromSandbox(sandboxID, d.handleStop)))
-	mux.HandleFunc("/create", slogHandler(fromSandbox(sandboxID, d.handleCreate)))
+	mux.HandleFunc("/create-stream", slogHandler(fromSandbox(sandboxID, d.handleCreateStream)))
 	mux.HandleFunc("/vsc", slogHandler(fromSandbox(sandboxID, d.handleVSC)))
 	mux.HandleFunc("/sandbox-config", slogHandler(fromSandbox(sandboxID, d.handleSandboxConfig)))
 	mux.HandleFunc("/export", slogHandler(fromSandbox(sandboxID, d.handleExport)))
@@ -305,6 +306,41 @@ func (fw *flushWriter) Write(p []byte) (int, error) {
 		fw.f.Flush()
 	}
 	return n, err
+}
+
+type createSandboxStreamWriter struct {
+	fw  *flushWriter
+	enc *json.Encoder
+	mu  sync.Mutex
+}
+
+func newCreateSandboxStreamWriter(w http.ResponseWriter) *createSandboxStreamWriter {
+	fw := newFlushWriter(w)
+	return &createSandboxStreamWriter{
+		fw:  fw,
+		enc: json.NewEncoder(fw),
+	}
+}
+
+func (sw *createSandboxStreamWriter) Write(p []byte) (int, error) {
+	sw.mu.Lock()
+	defer sw.mu.Unlock()
+	if err := sw.enc.Encode(CreateSandboxEvent{Type: "progress", Data: string(p)}); err != nil {
+		return 0, err
+	}
+	return len(p), nil
+}
+
+func (sw *createSandboxStreamWriter) Result(box *sandtypes.Box) error {
+	sw.mu.Lock()
+	defer sw.mu.Unlock()
+	return sw.enc.Encode(CreateSandboxEvent{Type: "result", Box: box})
+}
+
+func (sw *createSandboxStreamWriter) Error(err error) error {
+	sw.mu.Lock()
+	defer sw.mu.Unlock()
+	return sw.enc.Encode(CreateSandboxEvent{Type: "error", Error: err.Error()})
 }
 
 // HTTP handler helpers
@@ -529,7 +565,7 @@ func (d *Daemon) handleEnsureImage(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(fw, "OK")
 }
 
-func (d *Daemon) handleCreate(w http.ResponseWriter, r *http.Request) {
+func (d *Daemon) handleCreateStream(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -541,12 +577,21 @@ func (d *Daemon) handleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sbox, err := d.createSandbox(r.Context(), opts)
+	w.Header().Set("Content-Type", "application/x-ndjson")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.WriteHeader(http.StatusOK)
+
+	stream := newCreateSandboxStreamWriter(w)
+	sbox, err := d.createSandbox(r.Context(), opts, stream)
 	if err != nil {
-		writeJSONError(w, err, http.StatusInternalServerError)
+		if writeErr := stream.Error(err); writeErr != nil {
+			slog.ErrorContext(r.Context(), "handleCreateStream stream error", "error", writeErr)
+		}
 		return
 	}
-	writeJSON(w, sbox)
+	if err := stream.Result(sbox); err != nil {
+		slog.ErrorContext(r.Context(), "handleCreateStream stream result", "error", err)
+	}
 }
 
 func (d *Daemon) handleVSC(w http.ResponseWriter, r *http.Request) {
@@ -719,7 +764,7 @@ type CreateSandboxOpts struct {
 }
 
 // createSandbox creates a new sandbox and starts its container.
-func (d *Daemon) createSandbox(ctx context.Context, opts CreateSandboxOpts) (*sandtypes.Box, error) {
+func (d *Daemon) createSandbox(ctx context.Context, opts CreateSandboxOpts, progress io.Writer) (*sandtypes.Box, error) {
 	agentType := opts.Agent
 	if agentType == "" {
 		agentType = "default"
@@ -769,7 +814,7 @@ func (d *Daemon) createSandbox(ctx context.Context, opts CreateSandboxOpts) (*sa
 	}
 
 	if ctr.Status != "running" {
-		err := d.boxer.StartNewContainer(ctx, sbox)
+		err := d.boxer.StartNewContainer(ctx, sbox, progress)
 		if err != nil {
 			return nil, err
 		}

@@ -32,7 +32,7 @@ type Client interface {
 	ExportImage(ctx context.Context, id, imageName string) error
 	Stats(ctx context.Context, id ...string) ([]types.ContainerStats, error)
 	VSC(ctx context.Context, id string) error
-	CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*sandtypes.Box, error)
+	CreateSandbox(ctx context.Context, opts CreateSandboxOpts, w io.Writer) (*sandtypes.Box, error)
 	// EnsureImage ensures imageName is present locally and up to date, pulling if needed.
 	// Progress lines from the daemon are written to w as they arrive.
 	EnsureImage(ctx context.Context, imageName string, w io.Writer) error
@@ -161,13 +161,63 @@ func (m *defaultClient) VSC(ctx context.Context, id string) error {
 	return m.doRequest(ctx, http.MethodPost, "/vsc", IDRequest{ID: id}, nil)
 }
 
-func (m *defaultClient) CreateSandbox(ctx context.Context, opts CreateSandboxOpts) (*sandtypes.Box, error) {
+func (m *defaultClient) CreateSandbox(ctx context.Context, opts CreateSandboxOpts, w io.Writer) (*sandtypes.Box, error) {
 	slog.InfoContext(ctx, "defaultClient.CreateSandbox", "opts", opts)
-	var box sandtypes.Box
-	if err := m.doRequest(ctx, http.MethodPost, "/create", opts, &box); err != nil {
+
+	body, err := json.Marshal(opts)
+	if err != nil {
 		return nil, err
 	}
-	return &box, nil
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, m.base+"/create-stream", strings.NewReader(string(body)))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := m.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't complete request to daemon: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		var errResp ErrorResponse
+		if json.NewDecoder(resp.Body).Decode(&errResp) == nil && errResp.Error != "" {
+			return nil, fmt.Errorf("%s", errResp.Error)
+		}
+		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+
+	decoder := json.NewDecoder(resp.Body)
+	for {
+		var event CreateSandboxEvent
+		if err := decoder.Decode(&event); err != nil {
+			if errors.Is(err, io.EOF) {
+				return nil, io.ErrUnexpectedEOF
+			}
+			return nil, err
+		}
+		switch event.Type {
+		case "progress":
+			if w != nil {
+				if _, err := io.WriteString(w, event.Data); err != nil {
+					return nil, err
+				}
+			}
+		case "result":
+			if event.Box == nil {
+				return nil, fmt.Errorf("create-stream response missing sandbox result")
+			}
+			return event.Box, nil
+		case "error":
+			if event.Error == "" {
+				return nil, fmt.Errorf("sandbox creation failed")
+			}
+			return nil, errors.New(event.Error)
+		default:
+			return nil, fmt.Errorf("unknown create-stream event type %q", event.Type)
+		}
+	}
 }
 
 // EnsureImage streams progress from the daemon's /ensure-image endpoint to w.

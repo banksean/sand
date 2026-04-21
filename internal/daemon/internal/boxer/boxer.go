@@ -48,6 +48,66 @@ type Boxer struct {
 	AgentRegistry    *cloning.AgentRegistry
 }
 
+type hookExecutor struct {
+	ctx         context.Context
+	sandboxID   string
+	containerID string
+	envFile     string
+	container   hostops.ContainerOps
+	progress    io.Writer
+}
+
+func (h hookExecutor) Exec(ctx context.Context, shellCmd string, args ...string) (string, error) {
+	output, err := h.container.Exec(ctx,
+		&options.ExecContainer{
+			ProcessOptions: options.ProcessOptions{
+				Interactive: false,
+				TTY:         true,
+				WorkDir:     "/app",
+				EnvFile:     h.envFile,
+			},
+		}, h.containerID, shellCmd, os.Environ(), args...)
+	if err != nil {
+		slog.ErrorContext(h.ctx, "shell: containerService.Exec", "sandbox", h.sandboxID, "error", err, "output", output)
+		return output, fmt.Errorf("failed to execute command for sandbox %s: %w", h.sandboxID, err)
+	}
+	return output, nil
+}
+
+func (h hookExecutor) ExecStream(ctx context.Context, stdout, stderr io.Writer, shellCmd string, args ...string) error {
+	if stdout == nil {
+		stdout = io.Discard
+	}
+	if stderr == nil {
+		stderr = io.Discard
+	}
+
+	if h.progress != nil {
+		stdout = io.MultiWriter(stdout, h.progress)
+		stderr = io.MultiWriter(stderr, h.progress)
+	}
+
+	wait, err := h.container.ExecStream(ctx,
+		&options.ExecContainer{
+			ProcessOptions: options.ProcessOptions{
+				Interactive: false,
+				TTY:         true,
+				WorkDir:     "/app",
+				EnvFile:     h.envFile,
+			},
+		}, h.containerID, shellCmd, os.Environ(),
+		nil, stdout, stderr, args...)
+	if err != nil {
+		slog.ErrorContext(h.ctx, "shell: containerService.ExecStream", "sandbox", h.sandboxID, "error", err, "command", shellCmd)
+		return fmt.Errorf("failed to start command for sandbox %s: %w", h.sandboxID, err)
+	}
+	if err := wait(); err != nil {
+		slog.ErrorContext(h.ctx, "shell: containerService.ExecStream wait", "sandbox", h.sandboxID, "error", err, "command", shellCmd)
+		return fmt.Errorf("failed to execute command for sandbox %s: %w", h.sandboxID, err)
+	}
+	return nil
+}
+
 // BoxerDeps holds the injectable dependencies for a Boxer.
 // Fields left nil will cause panics if the corresponding Boxer methods are called.
 type BoxerDeps struct {
@@ -626,7 +686,7 @@ func (sber *Boxer) checkImageHasEntrypoint(ctx context.Context, imageName string
 }
 
 // StartNewContainer starts a new container instance. The container must exist, and it should not be in the "running" state.
-func (sber *Boxer) StartNewContainer(ctx context.Context, sb *sandtypes.Box) error {
+func (sber *Boxer) StartNewContainer(ctx context.Context, sb *sandtypes.Box, progress io.Writer) error {
 	// Reconstruct runtime configuration from agent type
 	pathRegistry := cloning.NewStandardPathRegistry(sb.SandboxWorkDir)
 
@@ -647,7 +707,7 @@ func (sber *Boxer) StartNewContainer(ctx context.Context, sb *sandtypes.Box) err
 		return err
 	}
 
-	return sber.executeHooks(ctx, sb, hooks)
+	return sber.executeHooks(ctx, sb, hooks, progress)
 }
 
 // StartExistingContainer starts an existing (previously-started) container instance.
@@ -673,7 +733,7 @@ func (sber *Boxer) StartExistingContainer(ctx context.Context, sb *sandtypes.Box
 		return err
 	}
 
-	return sber.executeHooks(ctx, sb, hooks)
+	return sber.executeHooks(ctx, sb, hooks, nil)
 }
 
 func (sb *Boxer) startContainerProcess(ctx context.Context, containerID string) error {
@@ -687,31 +747,27 @@ func (sb *Boxer) startContainerProcess(ctx context.Context, containerID string) 
 	return nil
 }
 
-func (sber *Boxer) executeHooks(ctx context.Context, sb *sandtypes.Box, hooks []sandtypes.ContainerHook) error {
+func (sber *Boxer) executeHooks(ctx context.Context, sb *sandtypes.Box, hooks []sandtypes.ContainerHook, progress io.Writer) error {
 	var hookErrs []error
 	for _, hook := range hooks {
 		slog.InfoContext(ctx, "Boxer.executeHooks running hook", "hook", hook.Name())
+		if progress != nil {
+			fmt.Fprintf(progress, "[sand] %s\n", hook.Name())
+		}
 		// Need something that can call GetContaner and Exec on sb, since sb can no longer do those things.
 		ctr, err := sber.GetContainer(ctx, sb.ContainerID)
 		if err != nil {
 			return err
 		}
-		if err := hook.Run(ctx, ctr, func(ctx context.Context, shellCmd string, args ...string) (string, error) {
-			output, err := sber.ContainerService.Exec(ctx,
-				&options.ExecContainer{
-					ProcessOptions: options.ProcessOptions{
-						Interactive: false,
-						TTY:         true,
-						WorkDir:     "/app",
-						EnvFile:     sb.EnvFile,
-					},
-				}, sb.ContainerID, shellCmd, os.Environ(), args...)
-			if err != nil {
-				slog.ErrorContext(ctx, "shell: containerService.Exec", "sandbox", sb.ID, "error", err, "output", output)
-				return output, fmt.Errorf("failed to execute command for sandbox %s: %w", sb.ID, err)
-			}
-			return output, nil
-		}); err != nil {
+		exec := hookExecutor{
+			ctx:         ctx,
+			sandboxID:   sb.ID,
+			containerID: sb.ContainerID,
+			envFile:     sb.EnvFile,
+			container:   sber.ContainerService,
+			progress:    progress,
+		}
+		if err := hook.Run(ctx, ctr, exec); err != nil {
 			slog.ErrorContext(ctx, "Boxer.executeHooks hook error", "hook", hook.Name(), "error", err)
 			hookErrs = append(hookErrs, fmt.Errorf("%s: %w", hook.Name(), err))
 		}

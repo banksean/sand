@@ -107,7 +107,7 @@ func (c *OneshotCmd) Run(cctx *CLIContext) error {
 			Memory:         c.Memory,
 			Username:       c.Username,
 			Uid:            c.Uid,
-		})
+		}, os.Stdout)
 		if err != nil {
 			return fmt.Errorf("creating sandbox: %w", err)
 		}

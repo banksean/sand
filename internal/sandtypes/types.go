@@ -5,6 +5,7 @@ package sandtypes
 import (
 	"context"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/banksean/sand/internal/applecontainer/types"
@@ -32,26 +33,31 @@ func (m MountSpec) String() string {
 
 type HookFunc func(ctx context.Context, shellCmd string, args ...string) (string, error)
 
+type HookStreamer interface {
+	Exec(ctx context.Context, shellCmd string, args ...string) (string, error)
+	ExecStream(ctx context.Context, stdout, stderr io.Writer, shellCmd string, args ...string) error
+}
+
 // ContainerHook allows callers to inject container customisation step.
 type ContainerHook interface {
 	Name() string
-	Run(ctx context.Context, ctr *types.Container, exec HookFunc) error
+	Run(ctx context.Context, ctr *types.Container, exec HookStreamer) error
 }
 
 type containerHook struct {
 	name string
-	fn   func(ctx context.Context, ctr *types.Container, exec HookFunc) error
+	fn   func(ctx context.Context, ctr *types.Container, exec HookStreamer) error
 }
 
 func (h containerHook) Name() string {
 	return h.name
 }
 
-func (h containerHook) Run(ctx context.Context, ctr *types.Container, exec HookFunc) error {
+func (h containerHook) Run(ctx context.Context, ctr *types.Container, exec HookStreamer) error {
 	return h.fn(ctx, ctr, exec)
 }
 
 // NewContainerHook helps callers construct hook instances without exporting internals.
-func NewContainerHook(name string, fn func(ctx context.Context, ctr *types.Container, exec HookFunc) error) ContainerHook {
+func NewContainerHook(name string, fn func(ctx context.Context, ctr *types.Container, exec HookStreamer) error) ContainerHook {
 	return containerHook{name: name, fn: fn}
 }
