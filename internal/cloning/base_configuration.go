@@ -21,6 +21,7 @@ const (
 	miseCachePath    = "/opt/tool-cache/mise"
 	goModCachePath   = miseCachePath + "/go/mod"
 	goBuildCachePath = miseCachePath + "/go/build"
+	apkCachePath     = "/var/cache/apk"
 )
 
 // NewBaseContainerConfiguration creates a new base container configuration instance.
@@ -53,6 +54,12 @@ func (c *BaseContainerConfiguration) GetMounts(artifacts CloneArtifacts) []sandt
 		})
 	}
 
+	if artifacts.SharedCacheMounts.APKCacheHostDir != "" {
+		mounts = append(mounts, sandtypes.MountSpec{
+			Source: artifacts.SharedCacheMounts.APKCacheHostDir,
+			Target: apkCachePath,
+		})
+	}
 	return mounts
 }
 
@@ -139,6 +146,14 @@ func (c *BaseContainerConfiguration) defaultContainerHook(username, uid string, 
 		if err != nil {
 			slog.ErrorContext(ctx, "defaultContainerHook chown homedir", "error", err, "cOut", cOut, "username", username)
 			errs = append(errs, fmt.Errorf("chown: %w", err))
+		}
+
+		if sharedCaches.APKCacheHostDir != "" {
+			out, err := exec.Exec(ctx, "ln", "-s", "/var/cache/apk", "/etc/apk/cache")
+			if err != nil {
+				slog.ErrorContext(ctx, "defaultContainerHook linking apk cache", "error", err, "out", out)
+				errs = append(errs, fmt.Errorf("link apk cache: %w", err))
+			}
 		}
 
 		// entrypoint.sh exports GOMODCACHE/GOCACHE directly, and these symlinks keep

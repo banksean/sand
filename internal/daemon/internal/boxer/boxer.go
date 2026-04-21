@@ -611,6 +611,13 @@ func (sb *Boxer) ensureSharedCacheMounts(cfg sandtypes.SharedCacheConfig) (sandt
 		}
 	}
 
+	if cfg.APK {
+		mounts.APKCacheHostDir = filepath.Join(sb.appRoot, "caches", "apk")
+		if err := sb.FileOps.MkdirAll(mounts.APKCacheHostDir, 0o755); err != nil {
+			return sandtypes.SharedCacheMounts{}, fmt.Errorf("create shared apk cache dir: %w", err)
+		}
+	}
+
 	return mounts, nil
 }
 

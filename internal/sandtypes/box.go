@@ -65,10 +65,12 @@ type Box struct {
 
 type SharedCacheConfig struct {
 	Mise bool `json:"mise,omitempty"`
+	APK  bool `json:"apk,omitempty"`
 }
 
 type SharedCacheMounts struct {
 	MiseCacheHostDir string
+	APKCacheHostDir  string
 }
 
 type GitDetails struct {
