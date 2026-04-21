@@ -13,6 +13,8 @@ Requires apple container CLI: https://github.com/apple/container/releases/tag/0.
 - `--timeout` _`0s`_ - if set to anything other than 0s, overrides the default timeout for an operation (default: `0s`)
 - `--version` - Print version and exit.
 - `--dry-run` - just print out the operations instead of executing them (default: `false`)
+- `--caches-mise` - enable mise cache (default: `false`)
+- `--caches-apk` - enable apk cache (default: `false`)
 
 ## Subcommands
 
@@ -52,7 +54,7 @@ sand new [flags] [SANDBOX-NAME]
 - `--memory` _`1024`_ - how much memory in MiB to allocate to the container (default: `1024`)
 - `-s, --shell` _`<shell-command>`_ - shell command to exec in the container (default: `/bin/zsh`)
 - `-t, --tmux` - create or reconnect to a container-side tmux session
-- `-a, --agent` _`<claude|codex|opencode>`_ - name of coding agent to use
+- `-a, --agent` _`<claude|codex|gemini|opencode>`_ - name of coding agent to use
 - `-b, --branch` - create a new git branch inside the sandbox _container_ (not on your host workdir)
 - `--username` _`STRING`_ - name of default user to create (defaults to $USER)
 - `--uid` _`STRING`_ - id of default user to create (defaults to $UID)
@@ -77,7 +79,7 @@ sand oneshot [flags] <PROMPT>
 - `-v, --volume` _`<host-path:container-path>,...`_ - bind mount a volume (can be specified multiple times)
 - `--cpu` _`2`_ - number of CPUs to allocate to the container (default: `2`)
 - `--memory` _`1024`_ - how much memory in MiB to allocate to the container (default: `1024`)
-- `-a, --agent` _`<claude|opencode>`_ - coding agent to use
+- `-a, --agent` _`<claude|codex|gemini|opencode>`_ - coding agent to use
 - `--username` _`STRING`_ - name of default user to create (defaults to $USER)
 - `--uid` _`STRING`_ - id of default user to create (defaults to $UID)
 - `-n, --sandbox-name` _`<name>`_ - name of the sandbox to use (generated if omitted)
@@ -259,19 +261,19 @@ install the BPFFS-enabled kernel build
 sand install-ebpf-support
 ```
 
-## `sand export-image`
+## `sand export-fs`
 
-export a container image based on a stopped sandbox
+export a container's filesystem
 
 **Usage:**
 
 ```
-sand export-image [flags] <SANDBOX-NAME>
+sand export-fs [flags] <SANDBOX-NAME>
 ```
 
 **Flags:**
 
-- `-i, --image-name` _`<container-image-name>`_ - name of container image to export
+- `-o, --output-path` _`<host FS path>`_ - where to write the exported FS archive to
 
 ## `sand stats`
 
@@ -306,3 +308,4 @@ show effective configuration with sources
 ```
 sand config ls
 ```
+

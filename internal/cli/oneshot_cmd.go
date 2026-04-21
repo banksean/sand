@@ -21,7 +21,7 @@ import (
 // non-interactively with the given prompt, streaming output to stdout.
 type OneshotCmd struct {
 	SandboxCreationFlags
-	Agent       string `short:"a" required:"" placeholder:"<claude|gemini|opencode>" help:"coding agent to use"`
+	Agent       string `short:"a" required:"" placeholder:"<claude|codex|gemini|opencode>" help:"coding agent to use"`
 	Username    string `help:"name of default user to create (defaults to $USER)"`
 	Uid         string `help:"id of default user to create (defaults to $UID)"`
 	SandboxName string `short:"n" placeholder:"<name>" help:"name of the sandbox to use (generated if omitted)"`
