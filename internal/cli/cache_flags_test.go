@@ -18,79 +18,25 @@ func TestCacheFlagsSharedCacheConfig(t *testing.T) {
 		name  string
 		flags CacheFlags
 		want  struct {
-			enabled bool
-			module  bool
-			build   bool
-			mise    bool
+			mise bool
 		}
 	}{
-		{
-			name: "enabled turns on both caches",
-			flags: CacheFlags{
-				Go: GoCacheFlags{Enabled: boolPtr(true)},
-			},
-			want: struct {
-				enabled bool
-				module  bool
-				build   bool
-				mise    bool
-			}{enabled: true, module: true, build: true, mise: true},
-		},
-		{
-			name: "explicit module false overrides inherited enable",
-			flags: CacheFlags{
-				Go: GoCacheFlags{Enabled: boolPtr(true), ModuleCache: boolPtr(false)},
-			},
-			want: struct {
-				enabled bool
-				module  bool
-				build   bool
-				mise    bool
-			}{enabled: true, module: false, build: true, mise: true},
-		},
-		{
-			name: "explicit disable clears both caches",
-			flags: CacheFlags{
-				Go: GoCacheFlags{Enabled: boolPtr(false)},
-			},
-			want: struct {
-				enabled bool
-				module  bool
-				build   bool
-				mise    bool
-			}{enabled: false, module: false, build: false, mise: false},
-		},
-		{
-			name: "single cache enables overall config",
-			flags: CacheFlags{
-				Go: GoCacheFlags{BuildCache: boolPtr(true)},
-			},
-			want: struct {
-				enabled bool
-				module  bool
-				build   bool
-				mise    bool
-			}{enabled: true, module: false, build: true, mise: true},
-		},
 		{
 			name: "mise can be enabled directly",
 			flags: CacheFlags{
 				Mise: boolPtr(true),
 			},
 			want: struct {
-				enabled bool
-				module  bool
-				build   bool
-				mise    bool
-			}{enabled: false, module: false, build: false, mise: true},
+				mise bool
+			}{mise: true},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := tt.flags.SharedCacheConfig()
-			if got.Go.Enabled != tt.want.enabled || got.Go.ModuleCache != tt.want.module || got.Go.BuildCache != tt.want.build || got.Mise != tt.want.mise {
-				t.Fatalf("got %+v mise=%v, want enabled=%v module=%v build=%v mise=%v", got.Go, got.Mise, tt.want.enabled, tt.want.module, tt.want.build, tt.want.mise)
+			if got.Mise != tt.want.mise {
+				t.Fatalf("got mise=%v, want mise=%v", got.Mise, tt.want.mise)
 			}
 		})
 	}
@@ -105,10 +51,10 @@ func TestCacheFlagsLoadedByKongYAML(t *testing.T) {
 	homeDir := t.TempDir()
 	t.Setenv("HOME", homeDir)
 
-	if err := os.WriteFile(filepath.Join(homeDir, ".sand.yaml"), []byte("caches:\n  go:\n    enabled: true\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(homeDir, ".sand.yaml"), []byte("caches:\n  mise: false\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(projDir, ".sand.yaml"), []byte("caches:\n  go:\n    module-cache: false\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(projDir, ".sand.yaml"), []byte("caches:\n mise: true\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -122,7 +68,7 @@ func TestCacheFlagsLoadedByKongYAML(t *testing.T) {
 	}
 
 	got := parsed.Caches.SharedCacheConfig()
-	if !got.Go.Enabled || got.Go.ModuleCache || !got.Go.BuildCache || !got.Mise {
-		t.Fatalf("got %+v mise=%v, want enabled=true module=false build=true mise=true", got.Go, got.Mise)
+	if !got.Mise {
+		t.Fatalf("got mise=%v, want mise=true", got.Mise)
 	}
 }

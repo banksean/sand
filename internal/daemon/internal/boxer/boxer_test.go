@@ -23,13 +23,7 @@ func TestEnsureSharedCacheMounts_GoCachesUseMiseMount(t *testing.T) {
 		},
 	}
 
-	mounts, err := b.ensureSharedCacheMounts(sandtypes.SharedCacheConfig{
-		Go: sandtypes.GoSharedCacheConfig{
-			Enabled:     true,
-			ModuleCache: true,
-			BuildCache:  true,
-		},
-	})
+	mounts, err := b.ensureSharedCacheMounts(sandtypes.SharedCacheConfig{Mise: true})
 	if err != nil {
 		t.Fatalf("ensureSharedCacheMounts: %v", err)
 	}

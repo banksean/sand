@@ -64,14 +64,7 @@ type Box struct {
 }
 
 type SharedCacheConfig struct {
-	Go   GoSharedCacheConfig `json:"go,omitempty"`
-	Mise bool                `json:"mise,omitempty"`
-}
-
-type GoSharedCacheConfig struct {
-	Enabled     bool `json:"enabled,omitempty"`
-	ModuleCache bool `json:"moduleCache,omitempty"`
-	BuildCache  bool `json:"buildCache,omitempty"`
+	Mise bool `json:"mise,omitempty"`
 }
 
 type SharedCacheMounts struct {

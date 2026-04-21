@@ -544,7 +544,7 @@ func (b *Boxer) EffectiveMounts(sb *sandtypes.Box) []sandtypes.MountSpec {
 func (sb *Boxer) ensureSharedCacheMounts(cfg sandtypes.SharedCacheConfig) (sandtypes.SharedCacheMounts, error) {
 	var mounts sandtypes.SharedCacheMounts
 
-	if cfg.Mise || cfg.Go.ModuleCache || cfg.Go.BuildCache {
+	if cfg.Mise {
 		mounts.MiseCacheHostDir = filepath.Join(sb.appRoot, "caches", "mise")
 		if err := sb.FileOps.MkdirAll(mounts.MiseCacheHostDir, 0o755); err != nil {
 			return sandtypes.SharedCacheMounts{}, fmt.Errorf("create shared mise cache dir: %w", err)
