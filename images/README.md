@@ -1,24 +1,35 @@
 # Sandbox Container Images
 
-## Structure
-
-`base` contains the shared Alpine foundation used by all images except `opencode`:
+[`base`](./base) contains the shared Alpine foundation used by the default and agent-specific images.
 - common apk packages (zsh, git, ssh, iptables, etc.)
 - zsh + oh-my-posh shell setup
 - GitHub SSH known_hosts configuration
 - sshd_config
+- [mise](https://mise.jdx.dev/) auto-detection and initialization script (enables cross-container tool, dependency and build caching) 
+- a [cross-compiled `sand` linux cli](../cmd/sand/main_linux.go) binary for use from inside the container
 
-Images that extend `base` (`ghcr.io/banksean/sand/base:latest`):
-- **claude** — adds Claude Code
-- **codex** — adds OpenAI Codex
-- **default** — adds Claude Code, Go toolchain, github-cli, and sketch
+Images that extend `base` (you can use these with `sand new --image`):
+- **[claude](./claude/)** — Claude Code
+- **[codex](./codex/)** — OpenAI Codex
+- **[default](./default/)** — no coding agent
+- **[gemini](./gemini/)** - Google Gemini
+- **[opencode](./opencode/)** - OpenCode
 
-`opencode` is standalone (uses `frolvlad/alpine-glibc` instead of `alpine` due to glibc requirements) and maintains its own copy of the common setup.
+## Building and debugging images locally
 
-## Build order
+To build images locally:
+```sh
+# build all images
+make all
 
-Build and push `base` before any of the other images (except `opencode`):
+# or individual images
+make opencode
+```
+
+To use these locally-built images instead of images from ghcr.io, specify `-i` or `--image` with `:local` tags like so:
 
 ```sh
-docker buildx build --push -t ghcr.io/banksean/sand/base:latest images/base/
+sand new -i default:local
+sand new --image opencode:local
 ```
+
