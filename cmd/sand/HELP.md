@@ -144,6 +144,7 @@ sand rm [flags] [SANDBOX-NAME]
 **Flags:**
 
 - `-a, --all` - all sandboxes
+- `-f, --force` - remove without confirmation
 
 ## `sand stop`
 
@@ -305,4 +306,3 @@ show effective configuration with sources
 ```
 sand config ls
 ```
-

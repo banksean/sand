@@ -238,6 +238,26 @@ func TestRmCmdAll(t *testing.T) {
 	}
 }
 
+func TestRmCmdForceShort(t *testing.T) {
+	var cli struct {
+		Rm RmCmd `cmd:""`
+	}
+	kongParse(t, &cli, []string{"rm", "-f", "target-box"})
+	if !cli.Rm.Force {
+		t.Error("expected Force=true")
+	}
+}
+
+func TestRmCmdForceLong(t *testing.T) {
+	var cli struct {
+		Rm RmCmd `cmd:""`
+	}
+	kongParse(t, &cli, []string{"rm", "--force", "target-box"})
+	if !cli.Rm.Force {
+		t.Error("expected Force=true")
+	}
+}
+
 func TestSandboxCreationFlagsVolume(t *testing.T) {
 	var cli struct {
 		SandboxCreationFlags `embed:""`

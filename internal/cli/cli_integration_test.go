@@ -61,7 +61,10 @@ func TestRmCmd_Single(t *testing.T) {
 		s.SaveSandbox(ctx, testBox("keep"))
 	})
 
-	cmd := &cli.RmCmd{MultiSandboxNameFlags: cli.MultiSandboxNameFlags{SandboxName: "target"}}
+	cmd := &cli.RmCmd{
+		MultiSandboxNameFlags: cli.MultiSandboxNameFlags{SandboxName: "target"},
+		Force:                 true,
+	}
 	if err := cmd.Run(cctx); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
@@ -82,7 +85,10 @@ func TestRmCmd_All(t *testing.T) {
 		s.SaveSandbox(ctx, testBox("three"))
 	})
 
-	cmd := &cli.RmCmd{MultiSandboxNameFlags: cli.MultiSandboxNameFlags{All: true}}
+	cmd := &cli.RmCmd{
+		MultiSandboxNameFlags: cli.MultiSandboxNameFlags{All: true},
+		Force:                 true,
+	}
 	if err := cmd.Run(cctx); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
@@ -98,7 +104,10 @@ func TestRmCmd_All(t *testing.T) {
 
 func TestRmCmd_NotFound(t *testing.T) {
 	cctx := newCLIContext(t, daemontest.Deps{}, nil)
-	cmd := &cli.RmCmd{MultiSandboxNameFlags: cli.MultiSandboxNameFlags{SandboxName: "ghost"}}
+	cmd := &cli.RmCmd{
+		MultiSandboxNameFlags: cli.MultiSandboxNameFlags{SandboxName: "ghost"},
+		Force:                 true,
+	}
 	if err := cmd.Run(cctx); err == nil {
 		t.Fatal("expected error removing nonexistent sandbox, got nil")
 	}

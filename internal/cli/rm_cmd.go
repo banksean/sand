@@ -1,13 +1,24 @@
 package cli
 
 import (
+	"bufio"
+	"errors"
 	"fmt"
+	"io"
 	"log/slog"
+	"os"
+	"strings"
 	"sync"
+)
+
+var (
+	rmCmdStdin  io.Reader = os.Stdin
+	rmCmdStdout io.Writer = os.Stdout
 )
 
 type RmCmd struct {
 	MultiSandboxNameFlags
+	Force bool `short:"f" help:"remove without confirmation"`
 }
 
 func (c *RmCmd) Run(cctx *CLIContext) error {
@@ -27,6 +38,21 @@ func (c *RmCmd) Run(cctx *CLIContext) error {
 		for _, bx := range bxs {
 			ids = append(ids, bx.ID)
 		}
+	}
+
+	if !c.Force {
+		reader := bufio.NewReader(rmCmdStdin)
+		confirmed := make([]string, 0, len(ids))
+		for _, id := range ids {
+			ok, err := confirmSandboxRemoval(id, reader, rmCmdStdout)
+			if err != nil {
+				return err
+			}
+			if ok {
+				confirmed = append(confirmed, id)
+			}
+		}
+		ids = confirmed
 	}
 
 	var wg sync.WaitGroup
@@ -53,4 +79,20 @@ func (c *RmCmd) Run(cctx *CLIContext) error {
 	}
 
 	return nil
+}
+
+func confirmSandboxRemoval(id string, reader *bufio.Reader, stdout io.Writer) (bool, error) {
+	fmt.Fprintf(stdout, "remove %s [y/N]? ", id)
+
+	text, err := reader.ReadString('\n')
+	if err != nil && !errors.Is(err, io.EOF) {
+		return false, fmt.Errorf("couldn't read from stdin: %w", err)
+	}
+
+	switch strings.TrimSpace(strings.ToLower(text)) {
+	case "y", "yes":
+		return true, nil
+	default:
+		return false, nil
+	}
 }
