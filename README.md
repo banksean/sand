@@ -7,7 +7,7 @@ Lightweight, disposable Linux sandboxes for AI coding agents on Apple Silicon.
 
 ## Why sand?
 
-Running an AI coding agent like Claude Code or opencode directly on your workstation is risky: agents can delete files, install packages, or make sweeping changes you didn't intend. But setting up isolation manually with `docker` or `apple/container` requires configuring bind mounts, SSH keys, DNS, agent CLIs, and credentials from scratch every time.
+Running an AI coding agent like Claude Code, Codex, Gemini, or opencode directly on your workstation is risky: agents can delete files, install packages, or make sweeping changes you didn't intend. But setting up isolation manually with `docker` or `apple/container` requires configuring bind mounts, SSH keys, DNS, agent CLIs, and credentials from scratch every time.
 
 `sand` handles all of that in a single command.
 
@@ -18,23 +18,29 @@ Running an AI coding agent like Claude Code or opencode directly on your worksta
 | Isolated workspace (not your live dir) | manual bind mount setup | automatic CoW clone |
 | SSH key forwarding | manual | automatic |
 | DNS name for container | manual | automatic |
-| Agent CLI setup | manual | `--agent claude\|opencode` |
+| Agent CLI setup | manual | `--agent claude\|codex\|gemini\|opencode` |
 | Git-awareness | none | shows FROM GIT vs CURRENT GIT in `sand ls` |
 | Host files safe from `rm -rf` | risky with live bind mount | CoW clone, host unaffected |
 | Network access, exfil control | manual | kernel (eBPF) layer egress filtering with `--allowed-domains-file` |
 
 - **Isolated workspace**: your project is cloned into the container using APFS copy-on-write (`clonefile`), so it's instant, space-efficient, and changes inside the container cannot affect your real working directory.
-- **One-command agent launch**: `sand new -a claude` starts a sandboxed Claude Code session with your workspace, credentials, and agent CLI all wired up.
+- **One-command agent launch**: `sand new -a claude` starts a sandboxed agent session with your workspace, credentials, and agent CLI all wired up. Interactive agent support currently includes `claude`, `codex`, `gemini`, and `opencode`.
 - **Lightweight**: built on [Apple Containerization](https://github.com/apple/containerization) — hardware-isolated VMs via Apple Silicon with low memory overhead and fast start times.
 - **Git-aware**: `sand ls` shows which git commit each sandbox was created from vs. where it is now. SSH agent forwarding means `git push` just works inside the container without leaving credentials lying around.
 - **Familiar lifecycle**: treat sandboxes like git branches or tmux sessions — create, list, stop, delete.
 
 # TL;DR
 
+```sh
+brew install banksean/tap/sand
+sand new -a claude
+```
+
+For DNS egress filtering with `--allowed-domains-file`, run `sand install-ebpf-support` first.
 
 ## Installation
 
-Note: `sand` only runs on macOS, as it depends on `apple/containerization` and Apple silicon.
+Note: `sand` only runs on Apple Silicon Macs with macOS 26 or later, and depends on Apple's `container` CLI.
 
 Install via Homebrew (recommended):
 ```sh
@@ -55,7 +61,7 @@ container hostname: my-sandbox
 ⚡ ⌨️  # shell prompt, go crazy, rm -rf whatever
 ```
 
-Use with a coding agent, like claude or opencode:
+Use with a coding agent, like `claude`, `codex`, `gemini`, or `opencode`:
 ```sh
 > sand new -a claude
 container hostname: shy-snow
@@ -101,7 +107,8 @@ Under the hood, the `sand new` command:
   - hardware isolation via Apple Silicon
   - low memory overhead, fast start times
   - kernel based on [Kata](https://katacontainers.io/)
-  - supported in macOS 15 (Sonoma) and up
+  - used via Apple's [`container` CLI](https://github.com/apple/container), currently requiring version `0.11.0`
+  - supported on macOS 26 and up
 - Filesystem:
     - Base container image: Minimal, with some dynamic provisioning based on which agent you're using
     - Agent workspaces: `/app` is mounted from the APFS CoW clone, must be same APFS disk as the original project dir
@@ -198,6 +205,12 @@ shell:
 
 You can commit a `.sand.yaml` at the root of a project to share default flag values (image name, allowed-domains file, CPU/memory limits, etc.) with your team.
 
+If you plan to use `--allowed-domains-file`, install the custom init image and BPFFS-enabled kernel first:
+
+```sh
+sand install-ebpf-support
+```
+
 For shared runtime caches across sandboxes, including the Go module cache and Go build cache under the shared mise cache mount, add this to `~/.sand.yaml` or a project `.sand.yaml`:
 
 ```yaml
@@ -224,6 +237,6 @@ For more information about `sand`'s subcommands and other options, see [cmd/sand
 
 ## Requirements
 - Only works on Apple hardware (of course).
-- Apple Silicon Mac (M1/M2/M3/M4)
-- macOS 15 (Sonoma) or later
-- Install [`apple/container`](https://github.com/apple/container) first, since these helper functions just shell out to it. 
+- Apple Silicon Mac
+- macOS 26 or later
+- Install [`apple/container`](https://github.com/apple/container) CLI version `0.11.0` first
