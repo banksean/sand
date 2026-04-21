@@ -33,16 +33,16 @@ if command -v sand &> /dev/null; then
 fi
 
 rm -rf ~/.config/sand
-chmod -R u+w ~/Library/Application\ Support/Sand
-rm -rf ~/Library/Application\ Support/Sand
-
-if container image inspect ghcr.io/banksean/sand/default &>/dev/null; then 
-	echo "Removing ghcr.io/banksean/sand/default from local image registry"
-	container image rm ghcr.io/banksean/sand/default
+if [ -f "~/Library/Application\ Support/Sand" ]; then
+	chmod -R u+w ~/Library/Application\ Support/Sand
+	rm -rf ~/Library/Application\ Support/Sand
 fi
 
 # Install sand and sandd from source
 go install ./cmd/...
+
+# Build default:local image we'll use for testing
+pushd . && cd images && make default && popd
 
 # Re-evaluate where the sand binary is located in $PATH
 # Without this, the script will continue to try to use the
@@ -58,7 +58,7 @@ sand ls
 
 # Create a new sandox and exit back to this smoke test.
 # Use the `script` command here to avoid tty errors.
-echo "exit" | script -q /dev/null sand new -i default:local smoke
+echo "exit" | script -q /dev/null sand new -i default:local --tmux=false smoke
 sand ls
 
 # TODO: Automate verification for the output of these commands
@@ -66,8 +66,11 @@ sand exec smoke ls
 sand exec smoke whoami
 # Cold cache for both go toolchain and build artifacts
 time sand exec smoke zsh -c "go test ./..."
+
+# Create a new sandbox to test out shared go mod/build caching
+echo "exit" | script -q /dev/null sand new -i default:local --tmux=false smoke-2
 # Warm chache, should be much faster this time
-time sand exec smoke zsh -c "go test ./..."
+time sand exec smoke-2 zsh -c "go test ./..."
 
 # Try to use the packaged sand innie binary from the default image
 sand exec smoke sand --version
