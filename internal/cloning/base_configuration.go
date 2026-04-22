@@ -156,7 +156,7 @@ func (c *BaseContainerConfiguration) defaultContainerHook(username, uid string, 
 			}
 		}
 
-		// entrypoint.sh exports GOMODCACHE/GOCACHE directly, and these symlinks keep
+		// mise.sh exports GOMODCACHE/GOCACHE directly, and these symlinks keep
 		// direct process execs aligned with the same mise-backed cache paths.
 		if sharedCaches.MiseCacheHostDir != "" {
 			lnGoPkgOut, err := exec.Exec(ctx, "ln", "-sfn", goModCachePath, "/home/"+username+"/go/pkg/mod")
@@ -197,14 +197,15 @@ func (c *BaseContainerConfiguration) defaultContainerHook(username, uid string, 
 			errs = append(errs, fmt.Errorf("start sshd: %w", err))
 		}
 
-		var entryPointBuf bytes.Buffer
-		err = exec.ExecStream(ctx, &entryPointBuf, &entryPointBuf, "entrypoint.sh")
-		if err != nil {
-			entryPointOut := entryPointBuf.String()
-			slog.ErrorContext(ctx, "defaultContainerHook starting entrypoint.sh", "error", err, "entryPointOut", entryPointOut)
-			errs = append(errs, fmt.Errorf("entrypoint.sh: %w", err))
+		if sharedCaches.MiseCacheHostDir != "" {
+			var miseBuf bytes.Buffer
+			err = exec.ExecStream(ctx, &miseBuf, &miseBuf, "mise.sh")
+			if err != nil {
+				entryPointOut := miseBuf.String()
+				slog.ErrorContext(ctx, "defaultContainerHook starting mise.sh", "error", err, "entryPointOut", entryPointOut)
+				errs = append(errs, fmt.Errorf("mise.sh: %w", err))
+			}
 		}
-
 		if len(errs) > 0 {
 			return errors.Join(errs...)
 		}

@@ -695,7 +695,7 @@ func TestBoxer_ExecuteHooks_StreamsProgress(t *testing.T) {
 
 	hooks := []sandtypes.ContainerHook{
 		sandtypes.NewContainerHook("streamed hook", func(ctx context.Context, ctr *types.Container, exec sandtypes.HookStreamer) error {
-			return exec.ExecStream(ctx, io.Discard, io.Discard, "entrypoint.sh")
+			return exec.ExecStream(ctx, io.Discard, io.Discard, "mise.sh")
 		}),
 	}
 
@@ -708,8 +708,8 @@ func TestBoxer_ExecuteHooks_StreamsProgress(t *testing.T) {
 		t.Fatalf("executeHooks() error = %v", err)
 	}
 
-	if len(execStreamCalls) != 1 || execStreamCalls[0] != "entrypoint.sh" {
-		t.Fatalf("executeHooks() ExecStream calls = %v, want [entrypoint.sh]", execStreamCalls)
+	if len(execStreamCalls) != 1 || execStreamCalls[0] != "mise.sh" {
+		t.Fatalf("executeHooks() ExecStream calls = %v, want [mise.sh]", execStreamCalls)
 	}
 
 	got := progress.String()

@@ -85,8 +85,8 @@ RUN cp /root/.local/bin/mise /usr/local/bin/mise
 ENV PATH="/root/.local/share/mise/bin:$PATH"
 
 WORKDIR /app
-COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
+COPY mise.sh /usr/local/bin/mise.sh
+RUN chmod +x /usr/local/bin/mise.sh
 RUN echo "# Initializing..." > /etc/shared_env.sh
 RUN echo "source /etc/shared_env.sh" >> /etc/bash.bashrc
 
