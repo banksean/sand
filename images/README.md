@@ -19,8 +19,8 @@ Images that extend `base` (you can use these with `sand new --image`):
 
 To build images locally:
 ```sh
-# build all images
-make all
+# build all images (in parallel)
+make -j all
 
 # or individual images
 make opencode
