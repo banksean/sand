@@ -41,6 +41,13 @@ func InitializeGlobalRegistry(appRoot string, messenger hostops.UserMessenger, g
 			Configuration: NewBaseContainerConfiguration(),
 		})
 
+		// Register codex agent
+		globalRegistry.Register(&AgentConfig{
+			Name:          "codex",
+			Preparation:   NewBaseWorkspacePreparation(cloneRoot, messenger, gitOps, fileOps),
+			Configuration: NewBaseContainerConfiguration(),
+		})
+
 		// Register opencode agent
 		globalRegistry.Register(&AgentConfig{
 			Name:          "opencode",
