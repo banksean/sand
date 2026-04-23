@@ -51,6 +51,7 @@ func NewSandboxFanoutHandler(next slog.Handler, dir string, opts *slog.HandlerOp
 		handlers: map[string]slog.Handler{},
 		files:    map[string]*os.File{},
 	}
+
 	if opts != nil {
 		manager.opts = *opts
 	}

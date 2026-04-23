@@ -2,7 +2,6 @@ package sandtypes
 
 import (
 	"github.com/banksean/sand/internal/applecontainer/types"
-	"github.com/banksean/sand/internal/sshimmer"
 )
 
 // Box is a "sandbox" - it represents the connection between
@@ -60,7 +59,6 @@ type Box struct {
 	OriginalGitDetails *GitDetails
 	CurrentGitDetails  *GitDetails
 	Container          *types.Container
-	Keys               *sshimmer.Keys
 }
 
 type SharedCacheConfig struct {

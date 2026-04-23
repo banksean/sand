@@ -288,14 +288,14 @@ func (sb *Boxer) NewSandbox(ctx context.Context, opts NewSandboxOpts) (*sandtype
 		slog.ErrorContext(ctx, "Boxer.NewSanbox: sshim.Povision", "error", err)
 		return nil, err
 	}
-	// TODO: save the data in keys fields to sandboxWorkDir (or to the db)?
 
-	// TODO: write the data in keys fields to the container
 	sshKeysMountSpec := sandtypes.MountSpec{
 		Source:   filepath.Join(artifacts.SandboxWorkDir, "sshkeys"),
 		Target:   "/sshkeys",
 		ReadOnly: true,
 	}
+
+	// Write the data in keys fields to the container
 	if err := sb.saveSSHKeys(sshKeysMountSpec.Source, keys); err != nil {
 		return nil, fmt.Errorf("saveSSHKeys: %w", err)
 	}
@@ -327,7 +327,6 @@ func (sb *Boxer) NewSandbox(ctx context.Context, opts NewSandboxOpts) (*sandtype
 		Volumes:           opts.Volumes,
 		SharedCacheMounts: sharedCacheMounts,
 		Mounts:            append(mounts, sshKeysMountSpec),
-		Keys:              keys,
 		CPUs:              opts.CPUs,
 		MemoryMB:          opts.Memory,
 		Username:          opts.Username,
