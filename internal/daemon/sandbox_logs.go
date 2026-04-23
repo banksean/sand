@@ -10,9 +10,14 @@ import (
 	"path/filepath"
 	"slices"
 	"sync"
+
+	"github.com/banksean/sand/internal/daemon/internal/boxer"
 )
 
-const sandboxIDAttrKey = "sandbox_id"
+const sandboxIDAttrKey = boxer.SandboxIDAttrKey
+
+// TODO: clean up all the logging calls that include a sandbox ID, but
+// first ...just prune all the noisy calls in there now.
 const legacySandboxAttrKey = "sandbox"
 
 func SandboxLogsDir(logFile string) string {

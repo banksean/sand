@@ -7,6 +7,7 @@ import (
 
 type SandboxLogCmd struct {
 	SandboxNameFlag
+	// TODO: add -f for following a la slogtail.
 }
 
 func (c *SandboxLogCmd) Run(cctx *CLIContext) error {
