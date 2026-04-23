@@ -91,6 +91,39 @@ func TestDefaultClientCreateSandbox(t *testing.T) {
 	})
 }
 
+func TestDefaultClientStartSandbox(t *testing.T) {
+	var gotReq StartSandboxRequest
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/start" {
+			t.Fatalf("unexpected path %q", r.URL.Path)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&gotReq); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		_ = json.NewEncoder(w).Encode(StatusResponse{Status: "ok"})
+	}))
+	defer srv.Close()
+
+	client := &defaultClient{
+		base:       srv.URL,
+		httpClient: srv.Client(),
+	}
+
+	if err := client.StartSandbox(context.Background(), StartSandboxOpts{
+		ID:       "test-box",
+		SSHAgent: true,
+	}); err != nil {
+		t.Fatalf("StartSandbox() error = %v", err)
+	}
+
+	if gotReq.ID != "test-box" {
+		t.Fatalf("StartSandbox() request ID = %q, want %q", gotReq.ID, "test-box")
+	}
+	if !gotReq.SSHAgent {
+		t.Fatal("StartSandbox() request SSHAgent = false, want true")
+	}
+}
+
 var testSandboxBox = sandBox()
 
 func sandBox() sandtypes.Box {

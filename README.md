@@ -16,7 +16,7 @@ Running an AI coding agent like Claude Code, Codex, Gemini, or opencode directly
 | | docker / container | sand |
 |---|---|---|
 | Isolated workspace (not your live dir) | manual bind mount setup | automatic CoW clone |
-| SSH key forwarding | manual | automatic |
+| SSH key forwarding | manual | opt-in |
 | DNS name for container | manual | automatic |
 | Agent CLI setup | manual | `--agent claude\|codex\|gemini\|opencode` |
 | Git-awareness | none | shows FROM GIT vs CURRENT GIT in `sand ls` |
@@ -26,7 +26,7 @@ Running an AI coding agent like Claude Code, Codex, Gemini, or opencode directly
 - **Isolated workspace**: your project is cloned into the container using APFS copy-on-write (`clonefile`), so it's instant, space-efficient, and changes inside the container cannot affect your real working directory.
 - **One-command agent launch**: `sand new -a claude` starts a sandboxed agent session with your workspace, credentials, and agent CLI all wired up. Interactive agent support currently includes `claude`, `codex`, `gemini`, and `opencode`.
 - **Lightweight**: built on [Apple Containerization](https://github.com/apple/containerization) — hardware-isolated VMs via Apple Silicon with low memory overhead and fast start times.
-- **Git-aware**: `sand ls` shows which git commit each sandbox was created from vs. where it is now. SSH agent forwarding means `git push` just works inside the container without leaving credentials lying around.
+- **Git-aware**: `sand ls` shows which git commit each sandbox was created from vs. where it is now. When you use `sand shell` or pass `--ssh-agent`, git over SSH works inside the container without leaving credentials lying around.
 - **Familiar lifecycle**: treat sandboxes like git branches or tmux sessions — create, list, stop, delete.
 
 # TL;DR
@@ -137,7 +137,7 @@ Note: The original files on your MacOS host filesystem are not affected by chang
 
 You can use `git` commands to push changes from the container to github, or wherever your origin is. 
 
-Git ssh authentication passes from your MacOS host through `sand` containers, via `ssh-agent`. This means that if the git checkout on your MacOS host is authenticated with ssh (`git remote -v origin` prints something that starts with `git@github.com:...`), then you don't need to log in again inside the container to make git push/pull to work.  
+Git ssh authentication can pass from your MacOS host through `sand` containers via `ssh-agent`. `sand shell` enables this automatically, and other commands can opt in with `--ssh-agent`. That means if the git checkout on your MacOS host is authenticated with ssh (`git remote -v origin` prints something that starts with `git@github.com:...`), then you don't need to log in again inside the container to make git push/pull to work.  
 
 Using `ssh-agent` also means you don't have to leave copies of your github credentials scattered around in places where they shouldn't be.
 

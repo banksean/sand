@@ -4,10 +4,13 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+
+	"github.com/banksean/sand/internal/daemon"
 )
 
 type StartCmd struct {
 	MultiSandboxNameFlags
+	SSHAgentFlag
 }
 
 func (c *StartCmd) Run(cctx *CLIContext) error {
@@ -42,12 +45,20 @@ func (c *StartCmd) Run(cctx *CLIContext) error {
 			}
 			if sb.Container == nil {
 				fmt.Printf("%s has no container\n", id)
+				return
 			}
 			if sb.Container.Status == "running" {
+				if c.SSHAgent && !sb.Container.Configuration.SSH {
+					errChan <- fmt.Errorf("%s is already running without ssh-agent forwarding; stop it first and restart with --ssh-agent", id)
+					return
+				}
 				fmt.Printf("%s is already running\n", id)
 				return
 			}
-			if err := mc.StartSandbox(ctx, id); err != nil {
+			if err := mc.StartSandbox(ctx, daemon.StartSandboxOpts{
+				ID:       id,
+				SSHAgent: c.SSHAgent,
+			}); err != nil {
 				slog.ErrorContext(ctx, "StartSandbox", "error", err, "id", id)
 				errChan <- err
 				return

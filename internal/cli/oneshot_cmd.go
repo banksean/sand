@@ -100,6 +100,7 @@ func (c *OneshotCmd) Run(cctx *CLIContext) error {
 			ImageName:      c.ImageName,
 			EnvFile:        c.EnvFile,
 			Agent:          c.Agent,
+			SSHAgent:       c.SSHAgent,
 			AllowedDomains: allowedDomains,
 			Volumes:        c.Volume,
 			SharedCaches:   cctx.SharedCaches,

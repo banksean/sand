@@ -12,6 +12,13 @@ type IDRequest struct {
 	ID string `json:"id"`
 }
 
+type StartSandboxRequest struct {
+	ID string `json:"id"`
+	// SSHAgent recreates a stopped container with ssh-agent forwarding enabled
+	// before starting it, if needed.
+	SSHAgent bool `json:"sshAgent,omitempty"`
+}
+
 // ExportRequest is the request body for the /export endpoint.
 type ExportRequest struct {
 	ID              string `json:"id"`

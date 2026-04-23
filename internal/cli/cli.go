@@ -36,8 +36,13 @@ type ShellFlags struct {
 	Tmux  bool   `short:"t" help:"create or reconnect to a container-side tmux session"`
 }
 
+type SSHAgentFlag struct {
+	SSHAgent bool `help:"enable ssh-agent forwarding for the container"`
+}
+
 // SandboxCreationFlags are shared by commands that create a sandbox.
 type SandboxCreationFlags struct {
+	SSHAgentFlag
 	ImageName          string   `short:"i" placeholder:"<container-image-name>" help:"name of container image to use"`
 	CloneFromDir       string   `short:"d" placeholder:"<project-dir>" help:"directory to clone into the sandbox. Defaults to current working directory, if unset."`
 	EnvFile            string   `short:"e" default:".env" placholder:"<file-path>" help:"path to env file to use when creating a new shell"`

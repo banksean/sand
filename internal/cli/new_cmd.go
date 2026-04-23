@@ -127,6 +127,7 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 			ImageName:      c.ImageName,
 			EnvFile:        c.EnvFile,
 			Agent:          c.Agent,
+			SSHAgent:       c.SSHAgent,
 			AllowedDomains: allowedDomains,
 			Volumes:        c.Volume,
 			SharedCaches:   cctx.SharedCaches,
@@ -190,7 +191,7 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 		return err
 	}
 
-	if err := runShell(ctx, sbox, shell, args); err != nil {
+	if err := runShell(ctx, sbox, shell, args, c.Agent != ""); err != nil {
 		return err
 	}
 

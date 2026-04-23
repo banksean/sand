@@ -4,10 +4,13 @@ import (
 	"fmt"
 	"log/slog"
 	"os/user"
+
+	"github.com/banksean/sand/internal/daemon"
 )
 
 type ShellCmd struct {
 	ShellFlags
+	SSHAgent bool `default:"true" help:"enable ssh-agent forwarding for the container"`
 	SandboxNameFlag
 }
 
@@ -39,9 +42,20 @@ func (c *ShellCmd) Run(cctx *CLIContext) error {
 	// sbox.Container is populated by GetSandbox; its Status is fresh enough to
 	// decide whether to start the container without a redundant Inspect call.
 	if sbox.Container == nil || sbox.Container.Status != "running" {
-		if err := mc.StartSandbox(ctx, sbox.ID); err != nil {
+		if err := mc.StartSandbox(ctx, daemon.StartSandboxOpts{
+			ID:       sbox.ID,
+			SSHAgent: c.SSHAgent,
+		}); err != nil {
 			return fmt.Errorf("could not start container for %s: %w", sbox.ID, err)
 		}
+		sbox, err = mc.GetSandbox(ctx, c.SandboxName)
+		if err != nil {
+			return fmt.Errorf("error while refreshing sandbox %s after start: %w", c.SandboxName, err)
+		}
+	}
+
+	if c.SSHAgent && sbox.Container != nil && !sbox.Container.Configuration.SSH {
+		fmt.Printf("warning: %s is already running without ssh-agent forwarding; stop it and run `sand shell %s` again to recreate it with ssh-agent enabled\n", sbox.ID, sbox.ID)
 	}
 
 	shell := c.Shell
@@ -51,5 +65,5 @@ func (c *ShellCmd) Run(cctx *CLIContext) error {
 		args = []string{"new-session", "-A"}
 	}
 
-	return runShell(ctx, sbox, shell, args)
+	return runShell(ctx, sbox, shell, args, false)
 }

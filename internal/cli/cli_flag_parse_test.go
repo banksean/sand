@@ -38,6 +38,26 @@ func TestShellFlagsShortFlag(t *testing.T) {
 	}
 }
 
+func TestSSHAgentFlagDefaults(t *testing.T) {
+	var cli struct {
+		SSHAgentFlag `embed:""`
+	}
+	kongParse(t, &cli, []string{})
+	if cli.SSHAgent {
+		t.Error("expected SSHAgent=false by default")
+	}
+}
+
+func TestSSHAgentFlagLongFlag(t *testing.T) {
+	var cli struct {
+		SSHAgentFlag `embed:""`
+	}
+	kongParse(t, &cli, []string{"--ssh-agent"})
+	if !cli.SSHAgent {
+		t.Error("expected SSHAgent=true with --ssh-agent")
+	}
+}
+
 func TestSandboxCreationFlagsDefaults(t *testing.T) {
 	var cli struct {
 		SandboxCreationFlags `embed:""`
@@ -154,6 +174,9 @@ func TestNewCmdDefaults(t *testing.T) {
 	if cli.New.Branch {
 		t.Error("expected Branch=false by default")
 	}
+	if cli.New.SSHAgent {
+		t.Error("expected SSHAgent=false by default")
+	}
 }
 
 func TestNewCmdWithSandboxName(t *testing.T) {
@@ -173,6 +196,7 @@ func TestNewCmdFlags(t *testing.T) {
 	kongParse(t, &cli, []string{
 		"new",
 		"-i", "myimage:v2",
+		"--ssh-agent",
 		"-a", "claude",
 		"-b",
 		"-s", "/bin/sh",
@@ -184,6 +208,9 @@ func TestNewCmdFlags(t *testing.T) {
 	if cli.New.Agent != "claude" {
 		t.Errorf("expected Cloner claude, got %q", cli.New.Agent)
 	}
+	if !cli.New.SSHAgent {
+		t.Error("expected SSHAgent=true")
+	}
 	if !cli.New.Branch {
 		t.Error("expected Branch=true")
 	}
@@ -192,6 +219,16 @@ func TestNewCmdFlags(t *testing.T) {
 	}
 	if cli.New.SandboxName != "sandbox-42" {
 		t.Errorf("expected SandboxName sandbox-42, got %q", cli.New.SandboxName)
+	}
+}
+
+func TestShellCmdDefaults(t *testing.T) {
+	var cli struct {
+		Shell ShellCmd `cmd:""`
+	}
+	kongParse(t, &cli, []string{"shell", "my-box"})
+	if !cli.Shell.SSHAgent {
+		t.Error("expected sand shell to enable SSHAgent by default")
 	}
 }
 

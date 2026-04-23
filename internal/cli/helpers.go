@@ -36,21 +36,32 @@ func NewSandboxNamePredictor(mc daemon.Client) complete.Predictor {
 	return &sandboxNamePredictor{mc: mc}
 }
 
-// runShell executes an interactive shell or command in sbox's container,
-// connecting the current process's stdin/stdout/stderr. shell and args are
-// passed directly to ExecStream. Non-zero shell exit is logged but not
-// returned as an error — an interactive session ending with a non-zero code
-// is not a CLI failure.
-func runShell(ctx context.Context, sbox *sandtypes.Box, shell string, args []string) error {
-	if sbox.Container == nil {
-		return fmt.Errorf("sandbox %s has no container", sbox.ID)
-	}
-	hostname := types.GetContainerHostname(sbox.Container)
+func buildInteractiveEnv(hostname string, scrubSSHAgent bool) map[string]string {
 	env := map[string]string{
 		"HOSTNAME": hostname,
 		"LANG":     os.Getenv("LANG"),
 		"TERM":     os.Getenv("TERM"),
 	}
+	if scrubSSHAgent {
+		// Clear the standard ssh-agent variables for the initial agent process.
+		// The container may still have access to the forwarded socket, but the
+		// launched command does not receive it by default.
+		env["SSH_AUTH_SOCK"] = ""
+		env["SSH_AGENT_PID"] = ""
+	}
+	return env
+}
+
+// runShell executes an interactive shell or command in sbox's container,
+// connecting the current process's stdin/stdout/stderr. shell and args are
+// passed directly to ExecStream. Non-zero shell exit is logged but not
+// returned as an error — an interactive session ending with a non-zero code
+// is not a CLI failure.
+func runShell(ctx context.Context, sbox *sandtypes.Box, shell string, args []string, scrubSSHAgent bool) error {
+	if sbox.Container == nil {
+		return fmt.Errorf("sandbox %s has no container", sbox.ID)
+	}
+	hostname := types.GetContainerHostname(sbox.Container)
 	containerSvc := hostops.NewAppleContainerOps()
 	wait, err := containerSvc.ExecStream(ctx,
 		&options.ExecContainer{
@@ -58,7 +69,7 @@ func runShell(ctx context.Context, sbox *sandtypes.Box, shell string, args []str
 				Interactive: true,
 				TTY:         true,
 				WorkDir:     "/app",
-				Env:         env,
+				Env:         buildInteractiveEnv(hostname, scrubSSHAgent),
 				EnvFile:     sbox.EnvFile,
 				User:        sbox.Username,
 				UID:         sbox.Uid,

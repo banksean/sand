@@ -525,13 +525,16 @@ func (d *Daemon) handleStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sandboxID, err := sandboxIDOf(r)
-	if err != nil {
+	var req StartSandboxRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSONError(w, err, http.StatusBadRequest)
 		return
 	}
 
-	if err := d.StartSandbox(r.Context(), sandboxID); err != nil {
+	if err := d.StartSandbox(r.Context(), StartSandboxOpts{
+		ID:       req.ID,
+		SSHAgent: req.SSHAgent,
+	}); err != nil {
 		writeJSONError(w, err, http.StatusInternalServerError)
 		return
 	}
@@ -730,20 +733,42 @@ func (d *Daemon) createContainerSocket(ctx context.Context, id string) (net.List
 }
 
 // StartSandbox starts a single sandbox container.
-func (d *Daemon) StartSandbox(ctx context.Context, id string) error {
-	sbox, err := d.boxer.Get(ctx, id)
+func (d *Daemon) StartSandbox(ctx context.Context, opts StartSandboxOpts) error {
+	sbox, err := d.boxer.Get(ctx, opts.ID)
 	if err != nil {
 		return err
 	}
 	if sbox == nil {
-		return fmt.Errorf("sandbox not found: %s", id)
+		return fmt.Errorf("sandbox not found: %s", opts.ID)
 	}
-	unixListener, err := d.createContainerSocket(ctx, id)
+
+	recreated := false
+	if opts.SSHAgent {
+		ctr, err := d.boxer.GetContainer(ctx, sbox.ContainerID)
+		if err != nil {
+			return err
+		}
+		sbox.Container = ctr
+		if ctr != nil && !ctr.Configuration.SSH {
+			if ctr.Status == "running" {
+				return fmt.Errorf("sandbox %s is already running without ssh-agent forwarding", sbox.ID)
+			}
+			if err := d.boxer.RecreateContainer(ctx, sbox, true); err != nil {
+				return err
+			}
+			recreated = true
+		}
+	}
+
+	unixListener, err := d.createContainerSocket(ctx, opts.ID)
 	if err != nil {
 		return err
 	}
-	go d.serveInnieSocket(ctx, id, unixListener)
+	go d.serveInnieSocket(ctx, opts.ID, unixListener)
 
+	if recreated {
+		return d.boxer.StartNewContainer(ctx, sbox, nil)
+	}
 	return d.boxer.StartExistingContainer(ctx, sbox)
 }
 
@@ -753,6 +778,7 @@ type CreateSandboxOpts struct {
 	ImageName    string `json:"imageName,omitempty"`
 	EnvFile      string `json:"envFile,omitempty"`
 	Agent        string `json:"agent,omitempty"`
+	SSHAgent     bool   `json:"sshAgent,omitempty"`
 	Username     string `json:"username,omitempty"`
 	Uid          string `json:"uid,omitempty"`
 
@@ -761,6 +787,11 @@ type CreateSandboxOpts struct {
 	SharedCaches   sandtypes.SharedCacheConfig `json:"sharedCaches,omitempty"`
 	CPUs           int                         `json:"cpus"`
 	Memory         int                         `json:"memory"`
+}
+
+type StartSandboxOpts struct {
+	ID       string `json:"id,omitempty"`
+	SSHAgent bool   `json:"sshAgent,omitempty"`
 }
 
 // createSandbox creates a new sandbox and starts its container.
@@ -800,7 +831,7 @@ func (d *Daemon) createSandbox(ctx context.Context, opts CreateSandboxOpts, prog
 		}
 		go d.serveInnieSocket(ctx, opts.ID, unixListener)
 
-		err = d.boxer.CreateContainer(ctx, sbox)
+		err = d.boxer.CreateContainer(ctx, sbox, opts.SSHAgent)
 		if err != nil {
 			return nil, err
 		}

@@ -66,6 +66,7 @@ func (c *ExecCmd) Run(cctx *CLIContext) error {
 			CloneFromDir: c.CloneFromDir,
 			ImageName:    c.ImageName,
 			EnvFile:      c.EnvFile,
+			SSHAgent:     c.SSHAgent,
 			Volumes:      c.Volume,
 			SharedCaches: cctx.SharedCaches,
 			CPUs:         c.CPU,

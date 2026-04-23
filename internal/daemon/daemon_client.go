@@ -28,7 +28,7 @@ type Client interface {
 	GetSandbox(ctx context.Context, id string) (*sandtypes.Box, error)
 	RemoveSandbox(ctx context.Context, id string) error
 	StopSandbox(ctx context.Context, id string) error
-	StartSandbox(ctx context.Context, id string) error
+	StartSandbox(ctx context.Context, opts StartSandboxOpts) error
 	ExportImage(ctx context.Context, id, imageName string) error
 	Stats(ctx context.Context, id ...string) ([]types.ContainerStats, error)
 	VSC(ctx context.Context, id string) error
@@ -153,8 +153,11 @@ func (m *defaultClient) StopSandbox(ctx context.Context, id string) error {
 	return m.doRequest(ctx, http.MethodPost, "/stop", IDRequest{ID: id}, nil)
 }
 
-func (m *defaultClient) StartSandbox(ctx context.Context, id string) error {
-	return m.doRequest(ctx, http.MethodPost, "/start", IDRequest{ID: id}, nil)
+func (m *defaultClient) StartSandbox(ctx context.Context, opts StartSandboxOpts) error {
+	return m.doRequest(ctx, http.MethodPost, "/start", StartSandboxRequest{
+		ID:       opts.ID,
+		SSHAgent: opts.SSHAgent,
+	}, nil)
 }
 
 func (m *defaultClient) VSC(ctx context.Context, id string) error {

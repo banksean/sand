@@ -20,13 +20,17 @@ import (
 )
 
 type mockImageOps struct {
-	listFunc func(ctx context.Context) ([]types.ImageEntry, error)
-	pullFunc func(ctx context.Context, image string, w io.Writer) (func() error, error)
+	listFunc    func(ctx context.Context) ([]types.ImageEntry, error)
+	pullFunc    func(ctx context.Context, image string, w io.Writer) (func() error, error)
+	inspectFunc func(ctx context.Context, name string) ([]*types.ImageManifest, error)
 }
 
 // Inspect implements [hostops.ImageOps].
 func (m *mockImageOps) Inspect(ctx context.Context, name string) ([]*types.ImageManifest, error) {
-	panic("unimplemented")
+	if m.inspectFunc != nil {
+		return m.inspectFunc(ctx, name)
+	}
+	return nil, nil
 }
 
 func (m *mockImageOps) List(ctx context.Context) ([]types.ImageEntry, error) {
@@ -191,6 +195,65 @@ func TestBoxer_NewSandbox_EndToEnd(t *testing.T) {
 			t.Error("Expected sandbox not to be saved after preparation error")
 		}
 	})
+}
+
+func TestBoxer_CreateContainerSSHAgentOptIn(t *testing.T) {
+	ctx := context.Background()
+
+	var createCalls []*options.CreateContainer
+	mockContainer := &hostops.MockContainerOps{
+		CreateFunc: func(ctx context.Context, opts *options.CreateContainer, image string, args []string) (string, error) {
+			createCalls = append(createCalls, opts)
+			return "test-container-123", nil
+		},
+	}
+	mockImage := &mockImageOps{
+		inspectFunc: func(ctx context.Context, name string) ([]*types.ImageManifest, error) {
+			return []*types.ImageManifest{{
+				Variants: []types.ImageVariant{{
+					Config: types.ImageVariantConfig{
+						Config: types.ImageVariantContainerConfig{
+							Cmd: []string{"/bin/sh"},
+						},
+					},
+				}},
+			}}, nil
+		},
+	}
+
+	boxer := newTestBoxer(t, mockContainer, mockImage)
+	sbox := &sandtypes.Box{
+		ID:        "test-sandbox",
+		ImageName: "test-image:latest",
+		Volumes:   []string{"/host:/container"},
+		CPUs:      2,
+		MemoryMB:  1024,
+	}
+
+	if err := boxer.CreateContainer(ctx, sbox, false); err != nil {
+		t.Fatalf("CreateContainer(false) error = %v", err)
+	}
+	if err := boxer.CreateContainer(ctx, sbox, true); err != nil {
+		t.Fatalf("CreateContainer(true) error = %v", err)
+	}
+
+	if len(createCalls) != 2 {
+		t.Fatalf("expected 2 create calls, got %d", len(createCalls))
+	}
+	if createCalls[0].ManagementOptions.SSH {
+		t.Fatal("first create call unexpectedly enabled ssh-agent forwarding")
+	}
+	if !createCalls[1].ManagementOptions.SSH {
+		t.Fatal("second create call did not enable ssh-agent forwarding")
+	}
+	if got := len(sbox.Volumes); got != 1 {
+		t.Fatalf("CreateContainer mutated sandbox volumes, len = %d, want 1", got)
+	}
+	for i, call := range createCalls {
+		if got := len(call.ManagementOptions.Volume); got != 2 {
+			t.Fatalf("create call %d volume count = %d, want 2", i, got)
+		}
+	}
 }
 
 type mockWorkspacePreparation struct {

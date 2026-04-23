@@ -622,24 +622,25 @@ func (sb *Boxer) ensureSharedCacheMounts(cfg sandtypes.SharedCacheConfig) (sandt
 }
 
 // CreateContainer creates a new container instance. The container image must exist.
-func (sber *Boxer) CreateContainer(ctx context.Context, sb *sandtypes.Box) error {
+func (sber *Boxer) CreateContainer(ctx context.Context, sb *sandtypes.Box, enableSSHAgent bool) error {
 	mounts := sber.EffectiveMounts(sb)
 	mountOpts := make([]string, 0, len(mounts))
 	for _, m := range mounts {
 		mountOpts = append(mountOpts, m.String())
 	}
 
-	sb.Volumes = append(sb.Volumes, filepath.Join(sber.appRoot, "containersockets", sb.ID)+":/run/host-services/sandd.sock")
+	volumeOpts := append([]string(nil), sb.Volumes...)
+	volumeOpts = append(volumeOpts, filepath.Join(sber.appRoot, "containersockets", sb.ID)+":/run/host-services/sandd.sock")
 
 	mgmtOpts := options.ManagementOptions{
 		// TODO: Try to name the container after the sandbox, and handle collisions
 		// if the name is already in use (e.g. append random chars to sb.ID).
 		Name:      sb.ID,
-		SSH:       true,
+		SSH:       enableSSHAgent,
 		DNSDomain: sb.DNSDomain,
 		Remove:    false,
 		Mount:     mountOpts,
-		Volume:    sb.Volumes,
+		Volume:    volumeOpts,
 	}
 	resOpts := options.ResourceOptions{
 		CPUs:   sb.CPUs,
@@ -671,6 +672,28 @@ func (sber *Boxer) CreateContainer(ctx context.Context, sb *sandtypes.Box) error
 	}
 
 	sb.ContainerID = containerID
+	return nil
+}
+
+func (sber *Boxer) RecreateContainer(ctx context.Context, sb *sandtypes.Box, enableSSHAgent bool) error {
+	if sb.ContainerID != "" {
+		out, err := sber.ContainerService.Stop(ctx, nil, sb.ContainerID)
+		if err != nil {
+			slog.WarnContext(ctx, "Boxer.RecreateContainer stop old container", "sandbox", sb.ID, "containerID", sb.ContainerID, "error", err, "output", out)
+		}
+
+		out, err = sber.ContainerService.Delete(ctx, nil, sb.ContainerID)
+		if err != nil {
+			return fmt.Errorf("delete old container for sandbox %s: %w", sb.ID, err)
+		}
+	}
+
+	if err := sber.CreateContainer(ctx, sb, enableSSHAgent); err != nil {
+		return err
+	}
+	if err := sber.UpdateContainerID(ctx, sb, sb.ContainerID); err != nil {
+		return err
+	}
 	return nil
 }
 

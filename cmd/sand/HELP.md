@@ -46,6 +46,7 @@ sand new [flags] [SANDBOX-NAME]
 
 - `-i, --image-name` _`<container-image-name>`_ - name of container image to use
 - `-d, --clone-from-dir` _`<project-dir>`_ - directory to clone into the sandbox. Defaults to current working directory, if unset.
+- `--ssh-agent` - enable ssh-agent forwarding for the container
 - `-e, --env-file` _`".env"`_ - path to env file to use when creating a new shell (default: `.env`)
 - `--rm` - remove the sandbox after the command terminates
 - `--allowed-domains-file` _`<file-path>`_ - path to allowed-domains.txt file for DNS egress filtering (overrides the init image default)
@@ -73,6 +74,7 @@ sand oneshot [flags] <PROMPT>
 
 - `-i, --image-name` _`<container-image-name>`_ - name of container image to use
 - `-d, --clone-from-dir` _`<project-dir>`_ - directory to clone into the sandbox. Defaults to current working directory, if unset.
+- `--ssh-agent` - enable ssh-agent forwarding for the container
 - `-e, --env-file` _`".env"`_ - path to env file to use when creating a new shell (default: `.env`)
 - `--rm` - remove the sandbox after the command terminates
 - `--allowed-domains-file` _`<file-path>`_ - path to allowed-domains.txt file for DNS egress filtering (overrides the init image default)
@@ -99,6 +101,7 @@ sand shell [flags] <SANDBOX-NAME>
 
 - `-s, --shell` _`<shell-command>`_ - shell command to exec in the container (default: `/bin/zsh`)
 - `-t, --tmux` - create or reconnect to a container-side tmux session
+- `--ssh-agent` _`"true"`_ - enable ssh-agent forwarding for the container (default: `true`)
 
 ## `sand exec`
 
@@ -114,6 +117,7 @@ sand exec [flags] <SANDBOX-NAME> <ARG>...
 
 - `-i, --image-name` _`<container-image-name>`_ - name of container image to use
 - `-d, --clone-from-dir` _`<project-dir>`_ - directory to clone into the sandbox. Defaults to current working directory, if unset.
+- `--ssh-agent` - enable ssh-agent forwarding for the container
 - `-e, --env-file` _`".env"`_ - path to env file to use when creating a new shell (default: `.env`)
 - `--rm` - remove the sandbox after the command terminates
 - `--allowed-domains-file` _`<file-path>`_ - path to allowed-domains.txt file for DNS egress filtering (overrides the init image default)
@@ -146,6 +150,7 @@ sand rm [flags] [SANDBOX-NAME]
 **Flags:**
 
 - `-a, --all` - all sandboxes
+- `--ssh-agent` - enable ssh-agent forwarding for the container
 - `-f, --force` - remove without confirmation
 
 ## `sand stop`
@@ -308,4 +313,3 @@ show effective configuration with sources
 ```
 sand config ls
 ```
-
