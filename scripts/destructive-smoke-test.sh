@@ -38,6 +38,8 @@ if [ -f "~/Library/Application\ Support/Sand" ]; then
 	rm -rf ~/Library/Application\ Support/Sand
 fi
 
+rm -rf /tmp/sand
+
 # Install sand and sandd from source
 go install ./cmd/...
 
@@ -92,6 +94,10 @@ ssh smoke.test whoami
 
 # Clean everything up 
 sand rm -af
+
+sand log smoke
+sand log smoke-2
+
 sandd stop
 rm $(which sand)
 rm $(which sandd)
