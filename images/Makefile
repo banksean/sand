@@ -4,7 +4,7 @@ PUSH_CMD := container image push
 
 .PHONY: all base claude codex default opencode push push-base push-claude push-codex push-default push-opencode
 
-all: base claude codex default opencode
+all: claude codex default opencode
 
 base:
 	$(BUILD_CMD) $(REGISTRY)/base:latest -t base:local base/
@@ -21,7 +21,7 @@ default: base
 gemini: base
 	$(BUILD_CMD) $(REGISTRY)/gemini:latest -t gemini:local gemini/
 
-opencode:
+opencode: base
 	$(BUILD_CMD) $(REGISTRY)/opencode:latest -t opencode:local opencode/
 
 push: push-base push-claude push-codex push-default push-opencode
