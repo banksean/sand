@@ -14,6 +14,23 @@ export MISE_NODE_MIRROR_URL="https://unofficial-builds.nodejs.org/download/relea
 export MISE_NODE_FLAVOR="musl"
 export MISE_NODE_COMPILE="false"
 
+has_project_file() {
+    local filename="$1"
+
+    find /app \
+        \( -type d \( \
+            -name .git -o \
+            -name node_modules -o \
+            -name vendor -o \
+            -name .venv -o \
+            -name venv -o \
+            -name __pycache__ -o \
+            -name .mypy_cache -o \
+            -name .pytest_cache \
+        \) -prune \) \
+        -o \( -type f -name "$filename" -print -quit \) | grep -q .
+}
+
 # Automatically install runtimes defined in .tool-versions or mise.toml
 if [ -f ".tool-versions" ] || [ -f "mise.toml" ]; then
     echo "🛠 Detecting runtimes from config..."
@@ -21,9 +38,9 @@ if [ -f ".tool-versions" ] || [ -f "mise.toml" ]; then
     eval "$(mise activate zsh)"
 else
     # Fallback: if no config file, manually inject based on file detection
-    [ -f "package.json" ] && mise use --global node@latest
-    [ -f "go.mod" ] && mise use --global go@latest
-    [ -f "requirements.txt" ] && mise use --global python@3.11
+    has_project_file "package.json" && mise use --global node@latest
+    has_project_file "go.mod" && mise use --global go@latest
+    has_project_file "requirements.txt" && mise use --global python@3.11
     eval "$(mise activate zsh)"
 fi
 
