@@ -24,6 +24,7 @@ type Client interface {
 	Ping(ctx context.Context) error
 	Version(ctx context.Context) (version.Info, error)
 	Shutdown(ctx context.Context) error
+	LogSandbox(ctx context.Context, id string, w io.Writer) error
 	ListSandboxes(ctx context.Context) ([]sandtypes.Box, error)
 	GetSandbox(ctx context.Context, id string) (*sandtypes.Box, error)
 	RemoveSandbox(ctx context.Context, id string) error
@@ -124,6 +125,38 @@ func (m *defaultClient) Version(ctx context.Context) (version.Info, error) {
 
 func (m *defaultClient) Shutdown(ctx context.Context) error {
 	return m.doRequest(ctx, http.MethodPost, "/shutdown", nil, nil)
+}
+
+func (m *defaultClient) LogSandbox(ctx context.Context, id string, w io.Writer) error {
+	reqBody, err := json.Marshal(IDRequest{ID: id})
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, m.base+"/log", strings.NewReader(string(reqBody)))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := m.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("couldn't complete request to daemon: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		var errResp ErrorResponse
+		if json.NewDecoder(resp.Body).Decode(&errResp) == nil && errResp.Error != "" {
+			return fmt.Errorf("%s", errResp.Error)
+		}
+		return fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+
+	if w == nil {
+		w = io.Discard
+	}
+	_, err = io.Copy(w, resp.Body)
+	return err
 }
 
 func (m *defaultClient) ListSandboxes(ctx context.Context) ([]sandtypes.Box, error) {

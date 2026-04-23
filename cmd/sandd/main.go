@@ -58,6 +58,7 @@ func (c *DaemonCmd) Run(cctx *App) error {
 	}
 	slog.InfoContext(ctx, "DaemonCmd.Run", "localDomain", localDomain)
 	server := daemon.NewDaemon(cctx.AppBaseDir, localDomain)
+	server.LogFile = cctx.LogFile
 
 	switch c.Action {
 	case "start":
@@ -219,9 +220,13 @@ func (c *DaemonCmd) initSlog() {
 		Compress:   true,
 	}
 
-	logger := slog.New(slog.NewJSONHandler(w, &slog.HandlerOptions{
-		Level: level,
-	}))
+	handlerOpts := &slog.HandlerOptions{Level: level}
+	baseHandler := slog.NewJSONHandler(w, handlerOpts)
+	handler, err := daemon.NewSandboxFanoutHandler(baseHandler, daemon.SandboxLogsDir(c.LogFile), handlerOpts)
+	if err != nil {
+		panic(err)
+	}
+	logger := slog.New(handler)
 	slog.SetDefault(logger)
 	slog.Info("daemon slog initialized")
 }

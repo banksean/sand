@@ -35,13 +35,14 @@ type Innie struct {
 	Version    cli.VersionFlag           `name:"version" help:"Print version and exit."`
 	Caches     cli.CacheFlags            `embed:"" prefix:"caches-"`
 
-	New       cli.NewCmd       `cmd:"" help:"create a new sandbox and shell into its container"`
-	Ls        cli.LsCmd        `cmd:"" help:"list sandboxes"`
-	Rm        cli.RmCmd        `cmd:"" help:"remove sandbox container and its clone directory"`
-	Stop      cli.StopCmd      `cmd:"" help:"stop sandbox container"`
-	Git       cli.GitCmd       `cmd:"" help:"git operations with sandboxes"`
-	BuildInfo cli.BuildInfoCmd `cmd:"" help:"print version infomation about this command"`
-	Vsc       cli.VscCmd       `cmd:"" help:"launch a vscode window on your host OS desktop, connected to this sandbox's container via ssh"`
+	New       cli.NewCmd        `cmd:"" help:"create a new sandbox and shell into its container"`
+	Ls        cli.LsCmd         `cmd:"" help:"list sandboxes"`
+	Log       cli.SandboxLogCmd `cmd:"" help:"print sandbox lifecycle and daemon events"`
+	Rm        cli.RmCmd         `cmd:"" help:"remove sandbox container and its clone directory"`
+	Stop      cli.StopCmd       `cmd:"" help:"stop sandbox container"`
+	Git       cli.GitCmd        `cmd:"" help:"git operations with sandboxes"`
+	BuildInfo cli.BuildInfoCmd  `cmd:"" help:"print version infomation about this command"`
+	Vsc       cli.VscCmd        `cmd:"" help:"launch a vscode window on your host OS desktop, connected to this sandbox's container via ssh"`
 }
 
 func (c *Innie) initSlog() {

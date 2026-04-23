@@ -222,6 +222,16 @@ func TestNewCmdFlags(t *testing.T) {
 	}
 }
 
+func TestLogCmdWithSandboxName(t *testing.T) {
+	var cli struct {
+		Log SandboxLogCmd `cmd:""`
+	}
+	kongParse(t, &cli, []string{"log", "sandbox-42"})
+	if cli.Log.SandboxName != "sandbox-42" {
+		t.Errorf("expected SandboxName sandbox-42, got %q", cli.Log.SandboxName)
+	}
+}
+
 func TestShellCmdDefaults(t *testing.T) {
 	var cli struct {
 		Shell ShellCmd `cmd:""`

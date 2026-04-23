@@ -40,6 +40,7 @@ type Outie struct {
 	Shell              cli.ShellCmd              `cmd:"" help:"shell into a sandbox container (and start the container, if necessary)"`
 	Exec               cli.ExecCmd               `cmd:"" help:"execute a single command in a sanbox"`
 	Ls                 cli.LsCmd                 `cmd:"" help:"list sandboxes"`
+	Log                cli.SandboxLogCmd         `cmd:"" help:"print sandbox lifecycle and daemon events"`
 	Rm                 cli.RmCmd                 `cmd:"" help:"remove sandbox container and its clone directory"`
 	Stop               cli.StopCmd               `cmd:"" help:"stop sandbox container"`
 	Start              cli.StartCmd              `cmd:"" help:"start sandbox container"`

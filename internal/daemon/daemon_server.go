@@ -35,6 +35,7 @@ type Daemon struct {
 	AppBaseDir  string
 	SocketPath  string
 	LocalDomain string
+	LogFile     string
 
 	hostMCP *HostMCP
 	boxer   *boxer.Boxer
@@ -191,6 +192,7 @@ func (d *Daemon) serveOutieSocket(ctx context.Context) {
 	mux.HandleFunc("/shutdown", slogHandler(d.handleShutdown))
 	mux.HandleFunc("/ping", slogHandler(d.handlePing))
 	mux.HandleFunc("/version", slogHandler(d.handleVersion))
+	mux.HandleFunc("/log", slogHandler(d.handleLog))
 	mux.HandleFunc("/list", slogHandler(d.handleList))
 	mux.HandleFunc("/get", slogHandler(d.handleGet))
 	mux.HandleFunc("/remove", slogHandler(d.handleRemove))
@@ -223,7 +225,7 @@ func fromSandbox(sandboxID string, h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := context.WithValue(r.Context(), containerIDKey, sandboxID)
 		r = r.WithContext(ctx)
-		slog.InfoContext(ctx, "http request", "url", r.URL.String())
+		slog.InfoContext(ctx, "http request", sandboxIDAttrKey, sandboxID, "url", r.URL.String())
 		h(w, r)
 	}
 }
@@ -258,6 +260,7 @@ func (d *Daemon) serveInnieSocket(ctx context.Context, sandboxID string, unixLis
 	mux.HandleFunc("/shutdown", slogHandler(fromSandbox(sandboxID, d.handleShutdown)))
 	mux.HandleFunc("/ping", slogHandler(fromSandbox(sandboxID, d.handlePing)))
 	mux.HandleFunc("/version", slogHandler(fromSandbox(sandboxID, d.handleVersion)))
+	mux.HandleFunc("/log", slogHandler(fromSandbox(sandboxID, d.handleLog)))
 	mux.HandleFunc("/list", slogHandler(fromSandbox(sandboxID, d.handleList)))
 	mux.HandleFunc("/get", slogHandler(fromSandbox(sandboxID, d.handleGet)))
 	mux.HandleFunc("/remove", slogHandler(fromSandbox(sandboxID, d.handleRemove)))
@@ -281,10 +284,10 @@ func (d *Daemon) serveInnieSocket(ctx context.Context, sandboxID string, unixLis
 
 	defer unixListener.Close()
 
-	slog.InfoContext(ctx, "Daemon.serveInnieSocket starting up", "container ID", sandboxID)
+	slog.InfoContext(ctx, "Daemon.serveInnieSocket starting up", sandboxIDAttrKey, sandboxID)
 	err := server.Serve(unixListener)
 	if err != nil {
-		slog.ErrorContext(ctx, "Daemon.serveInnieSocket", "error", err)
+		slog.ErrorContext(ctx, "Daemon.serveInnieSocket", "error", err, sandboxIDAttrKey, sandboxID)
 	}
 }
 
@@ -402,6 +405,29 @@ func (d *Daemon) handleVersion(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, version.Get())
 }
 
+func (d *Daemon) handleLog(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	sandboxID, err := sandboxIDOf(r)
+	if err != nil {
+		writeJSONError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	var buf strings.Builder
+	if err := d.LogSandbox(r.Context(), sandboxID, &buf); err != nil {
+		writeJSONError(w, err, http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	fmt.Fprint(w, buf.String())
+}
+
 func (d *Daemon) handleList(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -429,12 +455,12 @@ func (d *Daemon) handleGet(w http.ResponseWriter, r *http.Request) {
 	}
 	sbox, err := d.GetSandbox(r.Context(), sandboxID)
 	if err != nil {
-		slog.ErrorContext(r.Context(), "Daemon.handleGet d.GetSandbox", "error", err)
+		slog.ErrorContext(r.Context(), "Daemon.handleGet d.GetSandbox", "error", err, sandboxIDAttrKey, sandboxID)
 		writeJSONError(w, fmt.Errorf("couldn't get sandbox ID %s", sandboxID), http.StatusInternalServerError)
 		return
 	}
 	if sbox == nil {
-		slog.ErrorContext(r.Context(), "Daemon.handleGet d.GetSandbox returned nil", "id", sandboxID)
+		slog.ErrorContext(r.Context(), "Daemon.handleGet d.GetSandbox returned nil", sandboxIDAttrKey, sandboxID)
 		writeJSONError(w, fmt.Errorf("got a nil sandbox for ID %s", sandboxID), http.StatusInternalServerError)
 		return
 	}
@@ -587,8 +613,9 @@ func (d *Daemon) handleCreateStream(w http.ResponseWriter, r *http.Request) {
 	stream := newCreateSandboxStreamWriter(w)
 	sbox, err := d.createSandbox(r.Context(), opts, stream)
 	if err != nil {
+		slog.ErrorContext(r.Context(), "handleCreateStream createSandbox", "error", err, sandboxIDAttrKey, opts.ID)
 		if writeErr := stream.Error(err); writeErr != nil {
-			slog.ErrorContext(r.Context(), "handleCreateStream stream error", "error", writeErr)
+			slog.ErrorContext(r.Context(), "handleCreateStream stream error", "error", writeErr, sandboxIDAttrKey, opts.ID)
 		}
 		return
 	}
@@ -607,7 +634,7 @@ func (d *Daemon) handleVSC(w http.ResponseWriter, r *http.Request) {
 	}
 	sbox, err := d.GetSandbox(ctx, sandboxID)
 	if err != nil {
-		slog.ErrorContext(ctx, "GetSandbox", "error", err, "id", sandboxID)
+		slog.ErrorContext(ctx, "GetSandbox", "error", err, sandboxIDAttrKey, sandboxID)
 		writeJSONError(w, err, http.StatusInternalServerError)
 		return
 	}
@@ -717,12 +744,12 @@ func (d *Daemon) StopSandbox(ctx context.Context, id string) error {
 
 func (d *Daemon) createContainerSocket(ctx context.Context, id string) (net.Listener, error) {
 	socketsDir := filepath.Join(d.AppBaseDir, "containersockets")
-	slog.InfoContext(ctx, "Daemon.createContainerSocket", "socketsDir", socketsDir)
+	slog.InfoContext(ctx, "Daemon.createContainerSocket", sandboxIDAttrKey, id, "socketsDir", socketsDir)
 	if err := os.MkdirAll(socketsDir, 0o777); err != nil {
 		return nil, err
 	}
 	socketPath := filepath.Join(socketsDir, id)
-	slog.InfoContext(ctx, "Daemon.createContainerSocket", "socketPath", socketPath)
+	slog.InfoContext(ctx, "Daemon.createContainerSocket", sandboxIDAttrKey, id, "socketPath", socketPath)
 	// Don't care about errors, e.g. socketPath already does not exist:
 	os.Remove(socketPath)
 	unixListener, err := net.Listen("unix", socketPath)
@@ -800,7 +827,7 @@ func (d *Daemon) createSandbox(ctx context.Context, opts CreateSandboxOpts, prog
 	if agentType == "" {
 		agentType = "default"
 	}
-	slog.InfoContext(ctx, "createSandbox", "agentType", agentType, "opts", opts)
+	slog.InfoContext(ctx, "createSandbox", sandboxIDAttrKey, opts.ID, "agentType", agentType, "opts", opts)
 
 	sbox, err := d.boxer.NewSandbox(ctx, boxer.NewSandboxOpts{
 		AgentType:      agentType,
@@ -819,7 +846,7 @@ func (d *Daemon) createSandbox(ctx context.Context, opts CreateSandboxOpts, prog
 	if err != nil {
 		return nil, err
 	}
-	slog.InfoContext(ctx, "createSandbox", "sbox", sbox)
+	slog.InfoContext(ctx, "createSandbox", sandboxIDAttrKey, sbox.ID, "sbox", sbox)
 
 	// TODO: move all this container creation logic into boxer.StartContainer.
 	ctr, err := d.boxer.GetContainer(ctx, sbox.ContainerID)
@@ -862,6 +889,10 @@ func (d *Daemon) ListSandboxes(ctx context.Context) ([]sandtypes.Box, error) {
 // GetSandbox retrieves a sandbox by ID.
 func (d *Daemon) GetSandbox(ctx context.Context, id string) (*sandtypes.Box, error) {
 	return d.boxer.Get(ctx, id)
+}
+
+func (d *Daemon) LogSandbox(ctx context.Context, id string, w io.Writer) error {
+	return copySandboxLog(d.LogFile, id, w)
 }
 
 // RemoveSandbox removes a single sandbox.

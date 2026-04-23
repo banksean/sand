@@ -251,7 +251,7 @@ type NewSandboxOpts struct {
 // TODO: clone envFile, if it exists, into the sandbox clone so every command exec'd in that sandbox container
 // uses the same env file, even if the original .env file has changed on the host machine.
 func (sb *Boxer) NewSandbox(ctx context.Context, opts NewSandboxOpts) (*sandtypes.Box, error) {
-	slog.InfoContext(ctx, "Boxer.NewSandbox", "hostWorkDir", opts.HostWorkDir, "id", opts.ID, "agentType", opts.AgentType)
+	slog.InfoContext(ctx, "Boxer.NewSandbox", "hostWorkDir", opts.HostWorkDir, "id", opts.ID, "agentType", opts.AgentType, "sandbox_id", opts.ID)
 
 	// Get agent configuration from registry
 	agentConfig := sb.AgentRegistry.Get(opts.AgentType)
@@ -304,7 +304,7 @@ func (sb *Boxer) NewSandbox(ctx context.Context, opts NewSandboxOpts) (*sandtype
 	gitTopLevel := sb.GitOps.TopLevel(ctx, hostWorkDir)
 	var gitRemote, gitBranch, gitCommit string
 	var gitIsDirty bool
-	slog.InfoContext(ctx, "NewSandbox", "gitTopLevel", gitTopLevel, "hostWorkDir", hostWorkDir)
+	slog.InfoContext(ctx, "NewSandbox", "gitTopLevel", gitTopLevel, "hostWorkDir", hostWorkDir, "sandbox_id", opts.ID)
 	if gitTopLevel != "" {
 		// Clone from git top level instead
 		hostWorkDir = gitTopLevel
@@ -441,7 +441,7 @@ func (sb *Boxer) Get(ctx context.Context, id string) (*sandtypes.Box, error) {
 }
 
 func (sb *Boxer) Cleanup(ctx context.Context, sbox *sandtypes.Box) error {
-	slog.InfoContext(ctx, "Boxer.Cleanup", "id", sbox.ID)
+	slog.InfoContext(ctx, "Boxer.Cleanup", "id", sbox.ID, "sandbox_id", sbox.ID)
 
 	out, err := sb.ContainerService.Stop(ctx, nil, sbox.ContainerID)
 	if err != nil {
@@ -732,8 +732,8 @@ func (sber *Boxer) StartNewContainer(ctx context.Context, sb *sandtypes.Box, pro
 	agentConfig := sber.AgentRegistry.Get(sb.AgentType)
 	hooks := agentConfig.Configuration.GetFirstStartHooks(artifacts)
 
-	slog.InfoContext(ctx, "Boxer.StartNewContainer", "box", *sb, "ContainerHooks", len(hooks))
-	if err := sber.startContainerProcess(ctx, sb.ContainerID); err != nil {
+	slog.InfoContext(ctx, "Boxer.StartNewContainer", "box", *sb, "ContainerHooks", len(hooks), "sandbox_id", sb.ID)
+	if err := sber.startContainerProcess(ctx, sb.ID, sb.ContainerID); err != nil {
 		return err
 	}
 
@@ -758,29 +758,29 @@ func (sber *Boxer) StartExistingContainer(ctx context.Context, sb *sandtypes.Box
 	agentConfig := sber.AgentRegistry.Get(sb.AgentType)
 	hooks := agentConfig.Configuration.GetStartHooks(artifacts)
 
-	slog.InfoContext(ctx, "Boxer.StartExistingContainer", "box", *sb, "ContainerHooks", len(hooks))
-	if err := sber.startContainerProcess(ctx, sb.ContainerID); err != nil {
+	slog.InfoContext(ctx, "Boxer.StartExistingContainer", "box", *sb, "ContainerHooks", len(hooks), "sandbox_id", sb.ID)
+	if err := sber.startContainerProcess(ctx, sb.ID, sb.ContainerID); err != nil {
 		return err
 	}
 
 	return sber.executeHooks(ctx, sb, hooks, nil)
 }
 
-func (sb *Boxer) startContainerProcess(ctx context.Context, containerID string) error {
-	slog.InfoContext(ctx, "Boxer.startContainerProcess", "containerID", containerID)
+func (sb *Boxer) startContainerProcess(ctx context.Context, sandboxID, containerID string) error {
+	slog.InfoContext(ctx, "Boxer.startContainerProcess", "containerID", containerID, "sandbox_id", sandboxID)
 	output, err := sb.ContainerService.Start(ctx, nil, containerID)
 	if err != nil {
-		slog.ErrorContext(ctx, "startContainerProcess", "containerID", containerID, "error", err, "output", output)
-		return fmt.Errorf("failed to start container for sandbox %s: %w", containerID, err)
+		slog.ErrorContext(ctx, "startContainerProcess", "containerID", containerID, "error", err, "output", output, "sandbox_id", sandboxID)
+		return fmt.Errorf("failed to start container for sandbox %s: %w", sandboxID, err)
 	}
-	slog.InfoContext(ctx, "Boxer.startContainerProcess succeeded", "sandbox", containerID, "output", output)
+	slog.InfoContext(ctx, "Boxer.startContainerProcess succeeded", "sandbox", sandboxID, "output", output, "sandbox_id", sandboxID)
 	return nil
 }
 
 func (sber *Boxer) executeHooks(ctx context.Context, sb *sandtypes.Box, hooks []sandtypes.ContainerHook, progress io.Writer) error {
 	var hookErrs []error
 	for _, hook := range hooks {
-		slog.InfoContext(ctx, "Boxer.executeHooks running hook", "hook", hook.Name())
+		slog.InfoContext(ctx, "Boxer.executeHooks running hook", "hook", hook.Name(), "sandbox_id", sb.ID)
 		if progress != nil {
 			fmt.Fprintf(progress, "[sand] %s\n", hook.Name())
 		}
@@ -798,7 +798,7 @@ func (sber *Boxer) executeHooks(ctx context.Context, sb *sandtypes.Box, hooks []
 			progress:    progress,
 		}
 		if err := hook.Run(ctx, ctr, exec); err != nil {
-			slog.ErrorContext(ctx, "Boxer.executeHooks hook error", "hook", hook.Name(), "error", err)
+			slog.ErrorContext(ctx, "Boxer.executeHooks hook error", "hook", hook.Name(), "error", err, "sandbox_id", sb.ID)
 			hookErrs = append(hookErrs, fmt.Errorf("%s: %w", hook.Name(), err))
 		}
 	}
@@ -877,7 +877,7 @@ func (sb *Boxer) pullImage(ctx context.Context, imageName string, w io.Writer) e
 
 // SaveSandbox persists the Sandbox to the database.
 func (sb *Boxer) SaveSandbox(ctx context.Context, sbox *sandtypes.Box) error {
-	slog.InfoContext(ctx, "Boxer.SaveSandbox", "id", sbox.ID)
+	slog.InfoContext(ctx, "Boxer.SaveSandbox", "id", sbox.ID, "sandbox_id", sbox.ID)
 
 	upsertParams := db.UpsertSandboxParams{
 		ID:              sbox.ID,
