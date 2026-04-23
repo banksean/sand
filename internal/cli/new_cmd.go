@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
@@ -17,6 +18,7 @@ import (
 	"github.com/banksean/sand/internal/daemon"
 	"github.com/banksean/sand/internal/hostops"
 	"github.com/banksean/sand/internal/runtimedeps"
+	"github.com/banksean/sand/internal/sandtypes"
 	"github.com/banksean/sand/internal/sshimmer"
 	"github.com/goombaio/namegenerator"
 )
@@ -25,7 +27,7 @@ type NewCmd struct {
 	SandboxCreationFlags
 	ShellFlags
 	Agent       string `short:"a" placeholder:"<claude|codex|gemini|opencode>" help:"name of coding agent to use"`
-	Branch      bool   `short:"b" help:"create a new git branch inside the sandbox _container_ (not on your host workdir)"`
+	Branch      bool   `short:"b" default:"false" help:"create a new git branch, with the same name as the sandbox, inside the sandbox _container_ (not on your host workdir)"`
 	Username    string `help:"name of default user to create (defaults to $USER)"`
 	Uid         string `help:"id of default user to create (defaults to $UID)"`
 	SandboxName string `arg:"" optional:"" help:"name of the sandbox to create"`
@@ -159,19 +161,7 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 
 	if c.Branch {
 		// Create and check out a git branch inside the container, named after the sandbox id
-		containerSvc := hostops.NewAppleContainerOps()
-		out, err := containerSvc.Exec(ctx,
-			&options.ExecContainer{
-				ProcessOptions: options.ProcessOptions{
-					WorkDir: "/app",
-					EnvFile: sbox.EnvFile,
-					User:    c.Username,
-					UID:     c.Uid,
-				},
-			}, sbox.ContainerID, "git", os.Environ(), "checkout", "-b", sbox.ID)
-		if err != nil {
-			slog.ErrorContext(ctx, "sbox.new git checkout", "error", err, "out", out)
-		}
+		checkoutSandboxBranch(ctx, hostops.NewAppleContainerOps(), sbox)
 	}
 
 	updateSSHConfFunc, err := sshimmer.CheckSSHReachability(ctx, hostname)
@@ -192,7 +182,6 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 		if err := updateSSHConfFunc(); err != nil {
 			return err
 		}
-
 	}
 
 	// TODO: Sort out how "new" and "shell" should work when invoked inside a container.
@@ -213,6 +202,29 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 		slog.InfoContext(ctx, "Cleanup complete. Exiting.")
 	}
 	return nil
+}
+
+func checkoutSandboxBranch(ctx context.Context, containerSvc hostops.ContainerOps, sbox *sandtypes.Box) {
+	execOpts := &options.ExecContainer{
+		ProcessOptions: options.ProcessOptions{
+			WorkDir: "/app",
+			EnvFile: sbox.EnvFile,
+			User:    sbox.Username,
+			UID:     sbox.Uid,
+		},
+	}
+
+	out, err := containerSvc.Exec(ctx, execOpts, sbox.ContainerID, "git", os.Environ(),
+		"config", "--global", "--add", "safe.directory", "/app")
+	if err != nil {
+		slog.ErrorContext(ctx, "sbox.new git checkout, config", "error", err, "out", out)
+	}
+
+	out, err = containerSvc.Exec(ctx, execOpts, sbox.ContainerID, "git", os.Environ(),
+		"checkout", "-b", sbox.ID)
+	if err != nil {
+		slog.ErrorContext(ctx, "sbox.new git checkout", "error", err, "out", out)
+	}
 }
 
 func loadDomainsFile(path string) ([]string, error) {
