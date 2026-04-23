@@ -59,7 +59,7 @@ sand config ls
 
 # Create a new sandox and exit back to this smoke test.
 # Use the `script` command here to avoid tty errors.
-echo "exit" | script -q /dev/null sand new -i default:local --tmux=false --caches-mise --caches-apk smoke
+echo "exit" | script -q /dev/null sand new -i default:local --tmux=false --caches-mise --caches-apk --ssh-agent smoke
 sand ls
 
 # TODO: Automate verification for the output of these commands
@@ -69,7 +69,7 @@ sand exec smoke whoami
 time sand exec smoke zsh -c "go test ./..."
 
 # Create a new sandbox to test out shared go mod/build caching
-echo "exit" | script -q /dev/null sand new -i default:local --tmux=false --caches-mise --caches-apk smoke-2
+echo "exit" | script -q /dev/null sand new -i default:local --tmux=false --caches-mise --caches-apk --ssh-agent smoke-2
 # Warm chache, should be much faster this time
 time sand exec smoke-2 zsh -c "go test ./..."
 
