@@ -230,16 +230,16 @@ func fromSandbox(sandboxID string, h http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func sandboxIDOf(r *http.Request) (string, error) {
+func sandboxIDOf(r *http.Request) (string, context.Context, error) {
 	ctx := r.Context()
 	if id, ok := sandboxlog.SandboxIDFromContext(ctx); ok {
-		return id, nil
+		return id, ctx, nil
 	}
 	var req IDRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return "", err
+		return "", ctx, err
 	}
-	return req.ID, nil
+	return req.ID, sandboxlog.WithSandboxID(r.Context(), req.ID), nil
 }
 
 func (d *Daemon) stopInnieServer(ctx context.Context, id string) error {
@@ -412,12 +412,12 @@ func (d *Daemon) handleLog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sandboxID, err := sandboxIDOf(r)
+	sandboxID, ctx, err := sandboxIDOf(r)
 	if err != nil {
 		writeJSONError(w, err, http.StatusBadRequest)
 		return
 	}
-
+	r = r.WithContext(ctx)
 	var buf strings.Builder
 	if err := d.LogSandbox(r.Context(), sandboxID, &buf); err != nil {
 		writeJSONError(w, err, http.StatusNotFound)
@@ -449,12 +449,12 @@ func (d *Daemon) handleGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sandboxID, err := sandboxIDOf(r)
+	sandboxID, ctx, err := sandboxIDOf(r)
 	if err != nil {
 		writeJSONError(w, err, http.StatusBadRequest)
 		return
 	}
-	ctx := sandboxlog.WithSandboxID(r.Context(), sandboxID)
+	r = r.WithContext(ctx)
 	sbox, err := d.GetSandbox(ctx, sandboxID)
 	if err != nil {
 		slog.ErrorContext(ctx, "Daemon.handleGet d.GetSandbox", "error", err)
@@ -515,12 +515,12 @@ func (d *Daemon) handleRemove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sandboxID, err := sandboxIDOf(r)
+	sandboxID, ctx, err := sandboxIDOf(r)
 	if err != nil {
 		writeJSONError(w, err, http.StatusBadRequest)
 		return
 	}
-
+	r = r.WithContext(ctx)
 	if err := d.RemoveSandbox(r.Context(), sandboxID); err != nil {
 		writeJSONError(w, err, http.StatusInternalServerError)
 		return
@@ -534,12 +534,12 @@ func (d *Daemon) handleStop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sandboxID, err := sandboxIDOf(r)
+	sandboxID, ctx, err := sandboxIDOf(r)
 	if err != nil {
 		writeJSONError(w, err, http.StatusBadRequest)
 		return
 	}
-
+	r = r.WithContext(ctx)
 	if err := d.StopSandbox(r.Context(), sandboxID); err != nil {
 		writeJSONError(w, err, http.StatusInternalServerError)
 		return
@@ -628,14 +628,12 @@ func (d *Daemon) handleCreateStream(w http.ResponseWriter, r *http.Request) {
 }
 
 func (d *Daemon) handleVSC(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	sandboxID, err := sandboxIDOf(r)
+	sandboxID, ctx, err := sandboxIDOf(r)
 	if err != nil {
 		writeJSONError(w, err, http.StatusBadRequest)
 		return
 	}
-	ctx = sandboxlog.WithSandboxID(ctx, sandboxID)
+	r = r.WithContext(ctx)
 	sbox, err := d.GetSandbox(ctx, sandboxID)
 	if err != nil {
 		slog.ErrorContext(ctx, "GetSandbox", "error", err)
