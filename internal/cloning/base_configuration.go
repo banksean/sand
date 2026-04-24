@@ -8,7 +8,6 @@ import (
 	"log/slog"
 
 	"github.com/banksean/sand/internal/applecontainer/types"
-	"github.com/banksean/sand/internal/sandboxlog"
 	"github.com/banksean/sand/internal/sandtypes"
 )
 
@@ -23,7 +22,6 @@ const (
 	goModCachePath   = miseCachePath + "/go/mod"
 	goBuildCachePath = miseCachePath + "/go/build"
 	apkCachePath     = "/var/cache/apk"
-	SandboxIDAttrKey = sandboxlog.SandboxIDAttrKey
 )
 
 // NewBaseContainerConfiguration creates a new base container configuration instance.
@@ -79,7 +77,6 @@ func (c *BaseContainerConfiguration) GetFirstStartHooks(artifacts CloneArtifacts
 func (c *BaseContainerConfiguration) defaultContainerHook(username, uid string, sharedCaches sandtypes.SharedCacheMounts) sandtypes.ContainerHook {
 	return sandtypes.NewContainerHook("default container bootstrap", func(ctx context.Context, ctr *types.Container, exec sandtypes.HookStreamer) error {
 		var errs []error
-		slog := slog.With(SandboxIDAttrKey, ctr.Configuration.ID)
 		// We create a group and a user with the same name and uid as the the host user.
 		// This avoids potential permissions issues with volumes mounted from host.
 		agOut, err := exec.Exec(ctx, "addgroup", "-g", uid, username)
