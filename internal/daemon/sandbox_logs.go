@@ -14,7 +14,7 @@ import (
 	"github.com/banksean/sand/internal/daemon/internal/boxer"
 )
 
-const sandboxIDAttrKey = boxer.SandboxIDAttrKey
+const SandboxIDAttrKey = boxer.SandboxIDAttrKey
 
 // TODO: clean up all the logging calls that include a sandbox ID, but
 // first ...just prune all the noisy calls in there now.
@@ -165,7 +165,7 @@ func applyGroups(groups []string, attrs []slog.Attr) []slog.Attr {
 
 func collectSandboxIDs(ids map[string]struct{}, attr slog.Attr) {
 	attr.Value = attr.Value.Resolve()
-	if attr.Key == sandboxIDAttrKey || attr.Key == legacySandboxAttrKey {
+	if attr.Key == SandboxIDAttrKey || attr.Key == legacySandboxAttrKey {
 		if sandboxID := attr.Value.String(); sandboxID != "" {
 			ids[sandboxID] = struct{}{}
 		}

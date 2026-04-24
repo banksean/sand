@@ -21,7 +21,7 @@ func TestSandboxFanoutHandlerWritesPerSandboxLogs(t *testing.T) {
 	}
 
 	logger := slog.New(handler)
-	logger.InfoContext(context.Background(), "created sandbox", sandboxIDAttrKey, "sand-1")
+	logger.InfoContext(context.Background(), "created sandbox", SandboxIDAttrKey, "sand-1")
 	logger.InfoContext(context.Background(), "stopped sandbox", "sandbox", "sand-2")
 
 	var sand1 bytes.Buffer

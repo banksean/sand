@@ -13,8 +13,8 @@ Requires apple container CLI: https://github.com/apple/container/releases/tag/0.
 - `--timeout` _`0s`_ - if set to anything other than 0s, overrides the default timeout for an operation (default: `0s`)
 - `--version` - Print version and exit.
 - `--dry-run` - just print out the operations instead of executing them (default: `false`)
-- `--caches-mise` - enable mise cache (default: `false`)
-- `--caches-apk` - enable apk cache (default: `false`)
+- `--caches-mise` - enable mise cache (default: `true`)
+- `--caches-apk` - enable apk cache (default: `true`)
 
 ## Subcommands
 
@@ -44,9 +44,9 @@ sand new [flags] [SANDBOX-NAME]
 
 **Flags:**
 
+- `--ssh-agent` - enable ssh-agent forwarding for the container
 - `-i, --image-name` _`<container-image-name>`_ - name of container image to use
 - `-d, --clone-from-dir` _`<project-dir>`_ - directory to clone into the sandbox. Defaults to current working directory, if unset.
-- `--ssh-agent` - enable ssh-agent forwarding for the container
 - `-e, --env-file` _`".env"`_ - path to env file to use when creating a new shell (default: `.env`)
 - `--rm` - remove the sandbox after the command terminates
 - `--allowed-domains-file` _`<file-path>`_ - path to allowed-domains.txt file for DNS egress filtering (overrides the init image default)
@@ -56,7 +56,7 @@ sand new [flags] [SANDBOX-NAME]
 - `-s, --shell` _`<shell-command>`_ - shell command to exec in the container (default: `/bin/zsh`)
 - `-t, --tmux` - create or reconnect to a container-side tmux session
 - `-a, --agent` _`<claude|codex|gemini|opencode>`_ - name of coding agent to use
-- `-b, --branch` - create a new git branch inside the sandbox _container_ (not on your host workdir)
+- `-b, --branch` - create a new git branch, with the same name as the sandbox, inside the sandbox _container_ (not on your host workdir) (default: `false`)
 - `--username` _`STRING`_ - name of default user to create (defaults to $USER)
 - `--uid` _`STRING`_ - id of default user to create (defaults to $UID)
 
@@ -72,9 +72,9 @@ sand oneshot [flags] <PROMPT>
 
 **Flags:**
 
+- `--ssh-agent` - enable ssh-agent forwarding for the container
 - `-i, --image-name` _`<container-image-name>`_ - name of container image to use
 - `-d, --clone-from-dir` _`<project-dir>`_ - directory to clone into the sandbox. Defaults to current working directory, if unset.
-- `--ssh-agent` - enable ssh-agent forwarding for the container
 - `-e, --env-file` _`".env"`_ - path to env file to use when creating a new shell (default: `.env`)
 - `--rm` - remove the sandbox after the command terminates
 - `--allowed-domains-file` _`<file-path>`_ - path to allowed-domains.txt file for DNS egress filtering (overrides the init image default)
@@ -101,7 +101,7 @@ sand shell [flags] <SANDBOX-NAME>
 
 - `-s, --shell` _`<shell-command>`_ - shell command to exec in the container (default: `/bin/zsh`)
 - `-t, --tmux` - create or reconnect to a container-side tmux session
-- `--ssh-agent` _`"true"`_ - enable ssh-agent forwarding for the container (default: `true`)
+- `--ssh-agent` - enable ssh-agent forwarding for the container (default: `true`)
 
 ## `sand exec`
 
@@ -115,9 +115,9 @@ sand exec [flags] <SANDBOX-NAME> <ARG>...
 
 **Flags:**
 
+- `--ssh-agent` - enable ssh-agent forwarding for the container
 - `-i, --image-name` _`<container-image-name>`_ - name of container image to use
 - `-d, --clone-from-dir` _`<project-dir>`_ - directory to clone into the sandbox. Defaults to current working directory, if unset.
-- `--ssh-agent` - enable ssh-agent forwarding for the container
 - `-e, --env-file` _`".env"`_ - path to env file to use when creating a new shell (default: `.env`)
 - `--rm` - remove the sandbox after the command terminates
 - `--allowed-domains-file` _`<file-path>`_ - path to allowed-domains.txt file for DNS egress filtering (overrides the init image default)
@@ -137,6 +137,16 @@ list sandboxes
 sand ls
 ```
 
+## `sand log`
+
+print sandbox lifecycle and daemon events
+
+**Usage:**
+
+```
+sand log <SANDBOX-NAME>
+```
+
 ## `sand rm`
 
 remove sandbox container and its clone directory
@@ -150,7 +160,6 @@ sand rm [flags] [SANDBOX-NAME]
 **Flags:**
 
 - `-a, --all` - all sandboxes
-- `--ssh-agent` - enable ssh-agent forwarding for the container
 - `-f, --force` - remove without confirmation
 
 ## `sand stop`
@@ -180,6 +189,7 @@ sand start [flags] [SANDBOX-NAME]
 **Flags:**
 
 - `-a, --all` - all sandboxes
+- `--ssh-agent` - enable ssh-agent forwarding for the container
 
 ## `sand git`
 
@@ -313,3 +323,4 @@ show effective configuration with sources
 ```
 sand config ls
 ```
+

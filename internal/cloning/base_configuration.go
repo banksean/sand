@@ -22,6 +22,7 @@ const (
 	goModCachePath   = miseCachePath + "/go/mod"
 	goBuildCachePath = miseCachePath + "/go/build"
 	apkCachePath     = "/var/cache/apk"
+	SandboxIDAttrKey = "sandbox_id"
 )
 
 // NewBaseContainerConfiguration creates a new base container configuration instance.
@@ -77,7 +78,7 @@ func (c *BaseContainerConfiguration) GetFirstStartHooks(artifacts CloneArtifacts
 func (c *BaseContainerConfiguration) defaultContainerHook(username, uid string, sharedCaches sandtypes.SharedCacheMounts) sandtypes.ContainerHook {
 	return sandtypes.NewContainerHook("default container bootstrap", func(ctx context.Context, ctr *types.Container, exec sandtypes.HookStreamer) error {
 		var errs []error
-
+		slog := slog.With(SandboxIDAttrKey, ctr.Configuration.ID)
 		// We create a group and a user with the same name and uid as the the host user.
 		// This avoids potential permissions issues with volumes mounted from host.
 		agOut, err := exec.Exec(ctx, "addgroup", "-g", uid, username)
@@ -199,18 +200,20 @@ func (c *BaseContainerConfiguration) defaultContainerHook(username, uid string, 
 
 		if sharedCaches.MiseCacheHostDir != "" {
 			var miseBuf bytes.Buffer
-			err = exec.ExecStream(ctx, &miseBuf, &miseBuf, "mise.sh")
+			whichMise, err := exec.Exec(ctx, "which", "mise.sh")
 			if err != nil {
+				slog.ErrorContext(ctx, "defaultContainerHook checking for mise.sh", "error", err, "whichMiseOut", whichMise)
+			} else if err = exec.ExecStream(ctx, &miseBuf, &miseBuf, "mise.sh"); err != nil {
 				entryPointOut := miseBuf.String()
 				slog.ErrorContext(ctx, "defaultContainerHook starting mise.sh", "error", err, "entryPointOut", entryPointOut)
 				errs = append(errs, fmt.Errorf("mise.sh: %w", err))
 			}
 		}
+
+		slog.InfoContext(ctx, "defaultContainerHook completed", "hook", "default container bootstrap")
 		if len(errs) > 0 {
 			return errors.Join(errs...)
 		}
-
-		slog.InfoContext(ctx, "defaultContainerHook completed", "hook", "default container bootstrap")
 		return nil
 	})
 }
