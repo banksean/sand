@@ -19,17 +19,14 @@ import (
 	"github.com/banksean/sand/internal/db"
 	"github.com/banksean/sand/internal/hostops"
 	"github.com/banksean/sand/internal/runtimedeps"
+	"github.com/banksean/sand/internal/sandboxlog"
 	"github.com/banksean/sand/internal/sandtypes"
 	"github.com/banksean/sand/internal/sshimmer"
 	_ "github.com/golang-migrate/migrate/v4/database/sqlite"
 	_ "modernc.org/sqlite"
 )
 
-const (
-	containerGetErrorMsg = "[error getting]"
-	// SandboxIDAttrKey is a slog attribute key.
-	SandboxIDAttrKey = "sandbox_id"
-)
+const containerGetErrorMsg = "[error getting]"
 
 // SSHimmer provisions SSH keys for a new sandbox.
 type SSHimmer interface {
@@ -224,9 +221,10 @@ func (sb *Boxer) Sync(ctx context.Context) error {
 }
 
 func (b *Boxer) SyncBox(ctx context.Context, sb *sandtypes.Box) error {
+	ctx = sandboxlog.WithSandboxID(ctx, sb.ID)
 	fi, err := os.Stat(sb.SandboxWorkDir)
 	if err != nil || !fi.IsDir() {
-		slog.ErrorContext(ctx, "Boxer.Sync SandboxWorkDir stat", "sandbox", sb.ID, "workdir", sb.SandboxWorkDir, "fi", fi, "error", err)
+		slog.ErrorContext(ctx, "Boxer.Sync SandboxWorkDir stat", "workdir", sb.SandboxWorkDir, "fi", fi, "error", err)
 		sb.SandboxWorkDirError = "NO CLONE DIR"
 	}
 
@@ -253,7 +251,8 @@ type NewSandboxOpts struct {
 // TODO: clone envFile, if it exists, into the sandbox clone so every command exec'd in that sandbox container
 // uses the same env file, even if the original .env file has changed on the host machine.
 func (sb *Boxer) NewSandbox(ctx context.Context, opts NewSandboxOpts) (*sandtypes.Box, error) {
-	slog.InfoContext(ctx, "Boxer.NewSandbox", "hostWorkDir", opts.HostWorkDir, "id", opts.ID, "agentType", opts.AgentType, SandboxIDAttrKey, opts.ID)
+	ctx = sandboxlog.WithSandboxID(ctx, opts.ID)
+	slog.InfoContext(ctx, "Boxer.NewSandbox", "hostWorkDir", opts.HostWorkDir, "id", opts.ID, "agentType", opts.AgentType)
 
 	// Get agent configuration from registry
 	agentConfig := sb.AgentRegistry.Get(opts.AgentType)
@@ -306,7 +305,7 @@ func (sb *Boxer) NewSandbox(ctx context.Context, opts NewSandboxOpts) (*sandtype
 	gitTopLevel := sb.GitOps.TopLevel(ctx, hostWorkDir)
 	var gitRemote, gitBranch, gitCommit string
 	var gitIsDirty bool
-	slog.InfoContext(ctx, "NewSandbox", "gitTopLevel", gitTopLevel, "hostWorkDir", hostWorkDir, SandboxIDAttrKey, opts.ID)
+	slog.InfoContext(ctx, "NewSandbox", "gitTopLevel", gitTopLevel, "hostWorkDir", hostWorkDir)
 	if gitTopLevel != "" {
 		// Clone from git top level instead
 		hostWorkDir = gitTopLevel
@@ -391,6 +390,7 @@ func (sb *Boxer) saveSSHKeys(keysDir string, keys *sshimmer.Keys) error {
 
 // AttachSandbox re-connects to an existing container and sandboxWorkDir instead of creating a new one.
 func (sb *Boxer) AttachSandbox(ctx context.Context, id string) (*sandtypes.Box, error) {
+	ctx = sandboxlog.WithSandboxID(ctx, id)
 	slog.InfoContext(ctx, "Boxer.AttachSandbox", "id", id)
 	ret, err := sb.loadSandbox(ctx, id)
 	if err != nil {
@@ -420,6 +420,7 @@ func (sb *Boxer) List(ctx context.Context) ([]sandtypes.Box, error) {
 }
 
 func (sb *Boxer) Get(ctx context.Context, id string) (*sandtypes.Box, error) {
+	ctx = sandboxlog.WithSandboxID(ctx, id)
 	slog.InfoContext(ctx, "Boxer.Get", "id", id)
 	sandbox, err := sb.queries.GetSandbox(ctx, id)
 	if err == sql.ErrNoRows {
@@ -442,24 +443,25 @@ func (sb *Boxer) Get(ctx context.Context, id string) (*sandtypes.Box, error) {
 }
 
 func (sb *Boxer) Cleanup(ctx context.Context, sbox *sandtypes.Box) error {
-	slog.InfoContext(ctx, "Boxer.Cleanup", "id", sbox.ID, SandboxIDAttrKey, sbox.ID)
+	ctx = sandboxlog.WithSandboxID(ctx, sbox.ID)
+	slog.InfoContext(ctx, "Boxer.Cleanup", "id", sbox.ID)
 
 	out, err := sb.ContainerService.Stop(ctx, nil, sbox.ContainerID)
 	if err != nil {
-		slog.ErrorContext(ctx, "Boxer Containers.Stop", "sandbox", sbox.ID, "error", err, "out", out)
+		slog.ErrorContext(ctx, "Boxer Containers.Stop", "error", err, "out", out)
 	}
 
 	out, err = sb.ContainerService.Delete(ctx, nil, sbox.ContainerID)
 	if err != nil {
-		slog.ErrorContext(ctx, "Boxer Containers.Delete", "sandbox", sbox.ID, "error", err, "out", out)
+		slog.ErrorContext(ctx, "Boxer Containers.Delete", "error", err, "out", out)
 	}
 
 	if err := sb.GitOps.RemoveRemote(ctx, sbox.HostOriginDir, cloning.ClonedWorkDirGitRemotePrefix+sbox.ID); err != nil {
-		slog.ErrorContext(ctx, "Boxer Containers.Delete failed to remove git remote", "sandbox", sbox.ID, "error", err)
+		slog.ErrorContext(ctx, "Boxer Containers.Delete failed to remove git remote", "error", err)
 	}
 
 	if err := sb.FileOps.RemoveAll(sbox.SandboxWorkDir); err != nil {
-		slog.ErrorContext(ctx, "Boxer Containers.Delete failed to remove workdir", "sandbox", sbox.ID, "error", err)
+		slog.ErrorContext(ctx, "Boxer Containers.Delete failed to remove workdir", "error", err)
 	}
 
 	// Finally, remove from database
@@ -624,6 +626,7 @@ func (sb *Boxer) ensureSharedCacheMounts(cfg sandtypes.SharedCacheConfig) (sandt
 
 // CreateContainer creates a new container instance. The container image must exist.
 func (sber *Boxer) CreateContainer(ctx context.Context, sb *sandtypes.Box, enableSSHAgent bool) error {
+	ctx = sandboxlog.WithSandboxID(ctx, sb.ID)
 	mounts := sber.EffectiveMounts(sb)
 	mountOpts := make([]string, 0, len(mounts))
 	for _, m := range mounts {
@@ -668,7 +671,7 @@ func (sber *Boxer) CreateContainer(ctx context.Context, sb *sandtypes.Box, enabl
 		},
 		sb.ImageName, nil)
 	if err != nil {
-		slog.ErrorContext(ctx, "createContainer", "sandbox", sb.ID, "imageName", sb.ImageName, "error", err, "output", containerID)
+		slog.ErrorContext(ctx, "createContainer", "imageName", sb.ImageName, "error", err, "output", containerID)
 		return fmt.Errorf("failed to create container for sandbox %s: %w", sb.ID, err)
 	}
 
@@ -677,10 +680,11 @@ func (sber *Boxer) CreateContainer(ctx context.Context, sb *sandtypes.Box, enabl
 }
 
 func (sber *Boxer) RecreateContainer(ctx context.Context, sb *sandtypes.Box, enableSSHAgent bool) error {
+	ctx = sandboxlog.WithSandboxID(ctx, sb.ID)
 	if sb.ContainerID != "" {
 		out, err := sber.ContainerService.Stop(ctx, nil, sb.ContainerID)
 		if err != nil {
-			slog.WarnContext(ctx, "Boxer.RecreateContainer stop old container", "sandbox", sb.ID, "containerID", sb.ContainerID, "error", err, "output", out)
+			slog.WarnContext(ctx, "Boxer.RecreateContainer stop old container", "containerID", sb.ContainerID, "error", err, "output", out)
 		}
 
 		out, err = sber.ContainerService.Delete(ctx, nil, sb.ContainerID)
@@ -718,6 +722,7 @@ func (sber *Boxer) checkImageHasEntrypoint(ctx context.Context, imageName string
 
 // StartNewContainer starts a new container instance. The container must exist, and it should not be in the "running" state.
 func (sber *Boxer) StartNewContainer(ctx context.Context, sb *sandtypes.Box, progress io.Writer) error {
+	ctx = sandboxlog.WithSandboxID(ctx, sb.ID)
 	// Reconstruct runtime configuration from agent type
 	pathRegistry := cloning.NewStandardPathRegistry(sb.SandboxWorkDir)
 
@@ -733,7 +738,7 @@ func (sber *Boxer) StartNewContainer(ctx context.Context, sb *sandtypes.Box, pro
 	agentConfig := sber.AgentRegistry.Get(sb.AgentType)
 	hooks := agentConfig.Configuration.GetFirstStartHooks(artifacts)
 
-	slog.InfoContext(ctx, "Boxer.StartNewContainer", "box", *sb, "ContainerHooks", len(hooks), SandboxIDAttrKey, sb.ID)
+	slog.InfoContext(ctx, "Boxer.StartNewContainer", "box", *sb, "ContainerHooks", len(hooks))
 	if err := sber.startContainerProcess(ctx, sb.ID, sb.ContainerID); err != nil {
 		return err
 	}
@@ -744,6 +749,7 @@ func (sber *Boxer) StartNewContainer(ctx context.Context, sb *sandtypes.Box, pro
 // StartExistingContainer starts an existing (previously-started) container instance.
 // The container must exist, and it should be in the "stopped" state.
 func (sber *Boxer) StartExistingContainer(ctx context.Context, sb *sandtypes.Box) error {
+	ctx = sandboxlog.WithSandboxID(ctx, sb.ID)
 	// Reconstruct runtime configuration from agent type
 	pathRegistry := cloning.NewStandardPathRegistry(sb.SandboxWorkDir)
 
@@ -759,7 +765,7 @@ func (sber *Boxer) StartExistingContainer(ctx context.Context, sb *sandtypes.Box
 	agentConfig := sber.AgentRegistry.Get(sb.AgentType)
 	hooks := agentConfig.Configuration.GetStartHooks(artifacts)
 
-	slog.InfoContext(ctx, "Boxer.StartExistingContainer", "box", *sb, "ContainerHooks", len(hooks), SandboxIDAttrKey, sb.ID)
+	slog.InfoContext(ctx, "Boxer.StartExistingContainer", "box", *sb, "ContainerHooks", len(hooks))
 	if err := sber.startContainerProcess(ctx, sb.ID, sb.ContainerID); err != nil {
 		return err
 	}
@@ -768,20 +774,22 @@ func (sber *Boxer) StartExistingContainer(ctx context.Context, sb *sandtypes.Box
 }
 
 func (sb *Boxer) startContainerProcess(ctx context.Context, sandboxID, containerID string) error {
-	slog.InfoContext(ctx, "Boxer.startContainerProcess", "containerID", containerID, SandboxIDAttrKey, sandboxID)
+	ctx = sandboxlog.WithSandboxID(ctx, sandboxID)
+	slog.InfoContext(ctx, "Boxer.startContainerProcess", "containerID", containerID)
 	output, err := sb.ContainerService.Start(ctx, nil, containerID)
 	if err != nil {
-		slog.ErrorContext(ctx, "startContainerProcess", "containerID", containerID, "error", err, "output", output, SandboxIDAttrKey, sandboxID)
+		slog.ErrorContext(ctx, "startContainerProcess", "containerID", containerID, "error", err, "output", output)
 		return fmt.Errorf("failed to start container for sandbox %s: %w", sandboxID, err)
 	}
-	slog.InfoContext(ctx, "Boxer.startContainerProcess succeeded", "sandbox", sandboxID, "output", output, SandboxIDAttrKey, sandboxID)
+	slog.InfoContext(ctx, "Boxer.startContainerProcess succeeded", "output", output)
 	return nil
 }
 
 func (sber *Boxer) executeHooks(ctx context.Context, sb *sandtypes.Box, hooks []sandtypes.ContainerHook, progress io.Writer) error {
+	ctx = sandboxlog.WithSandboxID(ctx, sb.ID)
 	var hookErrs []error
 	for _, hook := range hooks {
-		slog.InfoContext(ctx, "Boxer.executeHooks running hook", "hook", hook.Name(), SandboxIDAttrKey, sb.ID)
+		slog.InfoContext(ctx, "Boxer.executeHooks running hook", "hook", hook.Name())
 		if progress != nil {
 			fmt.Fprintf(progress, "[sand] %s\n", hook.Name())
 		}
@@ -799,7 +807,7 @@ func (sber *Boxer) executeHooks(ctx context.Context, sb *sandtypes.Box, hooks []
 			progress:    progress,
 		}
 		if err := hook.Run(ctx, ctr, exec); err != nil {
-			slog.ErrorContext(ctx, "Boxer.executeHooks hook error", "hook", hook.Name(), "error", err, SandboxIDAttrKey, sb.ID)
+			slog.ErrorContext(ctx, "Boxer.executeHooks hook error", "hook", hook.Name(), "error", err)
 			hookErrs = append(hookErrs, fmt.Errorf("%s: %w", hook.Name(), err))
 		}
 	}
@@ -878,7 +886,8 @@ func (sb *Boxer) pullImage(ctx context.Context, imageName string, w io.Writer) e
 
 // SaveSandbox persists the Sandbox to the database.
 func (sb *Boxer) SaveSandbox(ctx context.Context, sbox *sandtypes.Box) error {
-	slog.InfoContext(ctx, "Boxer.SaveSandbox", "id", sbox.ID, SandboxIDAttrKey, sbox.ID)
+	ctx = sandboxlog.WithSandboxID(ctx, sbox.ID)
+	slog.InfoContext(ctx, "Boxer.SaveSandbox", "id", sbox.ID)
 
 	upsertParams := db.UpsertSandboxParams{
 		ID:              sbox.ID,
@@ -923,21 +932,23 @@ func (sb *Boxer) UpdateContainerID(ctx context.Context, sbox *sandtypes.Box, con
 
 // StopContainer stops a sandbox's container without deleting it.
 func (sb *Boxer) StopContainer(ctx context.Context, sbox *sandtypes.Box) error {
+	ctx = sandboxlog.WithSandboxID(ctx, sbox.ID)
 	if sbox.ContainerID == "" {
 		return fmt.Errorf("sandbox %s has no container ID", sbox.ID)
 	}
 
 	out, err := sb.ContainerService.Stop(ctx, nil, sbox.ContainerID)
 	if err != nil {
-		slog.ErrorContext(ctx, "Boxer.StopContainer", "sandbox", sbox.ID, "containerID", sbox.ContainerID, "error", err, "out", out)
+		slog.ErrorContext(ctx, "Boxer.StopContainer", "containerID", sbox.ContainerID, "error", err, "out", out)
 		return fmt.Errorf("failed to stop container for sandbox %s: %w", sbox.ID, err)
 	}
-	slog.InfoContext(ctx, "Boxer.StopContainer", "sandbox", sbox.ID, "containerID", sbox.ContainerID, "out", out)
+	slog.InfoContext(ctx, "Boxer.StopContainer", "containerID", sbox.ContainerID, "out", out)
 	return nil
 }
 
 // loadSandbox reads a Sandbox from the database.
 func (sb *Boxer) loadSandbox(ctx context.Context, id string) (*sandtypes.Box, error) {
+	ctx = sandboxlog.WithSandboxID(ctx, id)
 	slog.InfoContext(ctx, "Boxer.loadSandbox", "id", id)
 
 	sandbox, err := sb.queries.GetSandbox(ctx, id)

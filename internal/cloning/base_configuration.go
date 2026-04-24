@@ -8,6 +8,7 @@ import (
 	"log/slog"
 
 	"github.com/banksean/sand/internal/applecontainer/types"
+	"github.com/banksean/sand/internal/sandboxlog"
 	"github.com/banksean/sand/internal/sandtypes"
 )
 
@@ -22,7 +23,7 @@ const (
 	goModCachePath   = miseCachePath + "/go/mod"
 	goBuildCachePath = miseCachePath + "/go/build"
 	apkCachePath     = "/var/cache/apk"
-	SandboxIDAttrKey = "sandbox_id"
+	SandboxIDAttrKey = sandboxlog.SandboxIDAttrKey
 )
 
 // NewBaseContainerConfiguration creates a new base container configuration instance.

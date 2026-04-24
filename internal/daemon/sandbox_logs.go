@@ -11,10 +11,10 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/banksean/sand/internal/daemon/internal/boxer"
+	"github.com/banksean/sand/internal/sandboxlog"
 )
 
-const SandboxIDAttrKey = boxer.SandboxIDAttrKey
+const SandboxIDAttrKey = sandboxlog.SandboxIDAttrKey
 
 // TODO: clean up all the logging calls that include a sandbox ID, but
 // first ...just prune all the noisy calls in there now.

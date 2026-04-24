@@ -17,6 +17,7 @@ import (
 	"github.com/banksean/sand/internal/applecontainer"
 	"github.com/banksean/sand/internal/cli"
 	"github.com/banksean/sand/internal/daemon"
+	"github.com/banksean/sand/internal/sandboxlog"
 	"github.com/banksean/sand/internal/version"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
@@ -226,6 +227,7 @@ func (c *DaemonCmd) initSlog() {
 	if err != nil {
 		panic(err)
 	}
+	handler = sandboxlog.NewContextHandler(handler)
 	logger := slog.New(handler)
 	slog.SetDefault(logger)
 	slog.Info("daemon slog initialized")
