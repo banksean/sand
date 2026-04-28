@@ -2,7 +2,7 @@ REGISTRY := ghcr.io/banksean/sand
 BUILD_CMD := container build -t
 PUSH_CMD := container image push
 
-.PHONY: all base claude codex default opencode push push-base push-claude push-codex push-default push-opencode sandless
+.PHONY: all base claude codex default opencode push push-base push-claude push-codex push-default push-opencode sandless ubuntu-sand
 
 all: claude codex default opencode
 
@@ -43,3 +43,6 @@ push-opencode:
 
 sandless:
 	$(BUILD_CMD) sandless sandless/
+
+ubuntu-sand:
+	$(BUILD_CMD) ubuntu-sand ubuntu-sand/
