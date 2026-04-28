@@ -111,7 +111,7 @@ var (
 					return fmt.Errorf("could not get container system properties: %w", err)
 				}
 				if domain == "" {
-					return fmt.Errorf("container system property dns.domain is not set")
+					return fmt.Errorf("container system property dns.domain is not set. Try running this command:\n\ncontainer system property set dns.domain <domain, e.g. test>\n")
 				}
 
 				return nil
