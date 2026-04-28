@@ -1,13 +1,15 @@
 REGISTRY := ghcr.io/banksean/sand
 BUILD_CMD := container build -t
 PUSH_CMD := container image push
+SAND_CLI_VERSION ?= v0.0.10
+SAND_CLI_BUILD_ARG := --build-arg SAND_CLI_VERSION=$(SAND_CLI_VERSION)
 
 .PHONY: all base claude codex default opencode push push-base push-claude push-codex push-default push-opencode sandless ubuntu-sand
 
 all: claude codex default opencode
 
 base:
-	$(BUILD_CMD) $(REGISTRY)/base:latest -t base:local base/
+	$(BUILD_CMD) $(SAND_CLI_BUILD_ARG) $(REGISTRY)/base:latest -t base:local base/
 
 claude: base
 	$(BUILD_CMD) $(REGISTRY)/claude:latest -t claude:local claude/
@@ -45,4 +47,4 @@ sandless:
 	$(BUILD_CMD) sandless sandless/
 
 ubuntu-sand:
-	$(BUILD_CMD) ubuntu-sand ubuntu-sand/
+	$(BUILD_CMD) $(SAND_CLI_BUILD_ARG) ubuntu-sand ubuntu-sand/
