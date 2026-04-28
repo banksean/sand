@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/alecthomas/kong"
+	kongyaml "github.com/alecthomas/kong-yaml"
 )
 
 // --- walkMerge ---
@@ -220,5 +221,67 @@ func TestLoadEffectiveConfigMaps_BothFiles(t *testing.T) {
 	}
 	if user["memory"] != 4096 {
 		t.Errorf("userCfg[memory]: want 4096, got %v", user["memory"])
+	}
+}
+
+func TestLoadEffectiveConfigMaps_NormalizesCacheFlags(t *testing.T) {
+	type target struct {
+		Caches CacheFlags `embed:"" prefix:"caches-"`
+	}
+
+	projDir := t.TempDir()
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+	t.Chdir(projDir)
+
+	if err := os.WriteFile(filepath.Join(projDir, ".sand.yaml"), []byte("caches:\n  apk: true\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(homeDir, ".sand.yaml"), []byte("caches:\n  mise: false\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var parsed target
+	parser := kong.Must(&parsed,
+		kong.Configuration(kongyaml.Loader, filepath.Join(homeDir, ".sand.yaml"), filepath.Join(projDir, ".sand.yaml")),
+	)
+	if _, err := parser.Parse([]string{}); err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+
+	proj, user, defs, _, _, err := loadEffectiveConfigMaps(parser)
+	if err != nil {
+		t.Fatalf("loadEffectiveConfigMaps: %v", err)
+	}
+
+	if _, ok := proj["caches-apk"]; ok {
+		t.Fatalf("project config leaked flat cache key: %v", proj)
+	}
+	if _, ok := user["caches-mise"]; ok {
+		t.Fatalf("user config leaked flat cache key: %v", user)
+	}
+	if _, ok := defs["caches-apk"]; ok {
+		t.Fatalf("defaults leaked flat cache key: %v", defs)
+	}
+	if _, ok := defs["caches-mise"]; ok {
+		t.Fatalf("defaults leaked flat cache key: %v", defs)
+	}
+
+	projCaches, ok := proj["caches"].(map[string]any)
+	if !ok || projCaches["apk"] != true {
+		t.Fatalf("project caches: got %v", proj["caches"])
+	}
+
+	userCaches, ok := user["caches"].(map[string]any)
+	if !ok || userCaches["mise"] != false {
+		t.Fatalf("user caches: got %v", user["caches"])
+	}
+
+	defCaches, ok := defs["caches"].(map[string]any)
+	if !ok {
+		t.Fatalf("defaults missing caches map: %v", defs)
+	}
+	if defCaches["apk"] != "true" || defCaches["mise"] != "true" {
+		t.Fatalf("default caches: got %v", defCaches)
 	}
 }

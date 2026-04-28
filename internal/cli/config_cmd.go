@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 
@@ -90,7 +91,7 @@ func loadEffectiveConfigMaps(k *kong.Kong) (projCfg, userCfg, defaultsCfg map[st
 		return nil, nil, nil, "", "", e
 	}
 
-	defaultsCfg = encodeNodeDetail(k.Model.Node)
+	defaultsCfg = normalizeConfigMap(encodeNodeDefaults(k.Model.Node))
 	return projCfg, userCfg, defaultsCfg, projCfgPath, userCfgPath, nil
 }
 
@@ -148,21 +149,68 @@ func decodeYAML(filename string, value any) error {
 	return yaml.NewDecoder(f).Decode(value)
 }
 
-func encodeNodeDetail(node *kong.Node) map[string]any {
+func encodeNodeDefaults(node *kong.Node) map[string]any {
 	ret := map[string]any{}
 	for _, flag := range node.Flags {
-		if flag.Value.Set {
-			ret[flag.Name] = flag.Value.Target.Interface()
-		} else if flag.Default != "" {
+		if flag.Default != "" {
 			ret[flag.Name] = flag.Default
 		}
 	}
 	for _, child := range node.Children {
 		if child.Type == kong.CommandNode {
-			if detail := encodeNodeDetail(child); len(detail) > 0 {
+			if detail := encodeNodeDefaults(child); len(detail) > 0 {
 				ret[child.Name] = detail
 			}
 		}
 	}
 	return ret
+}
+
+func normalizeConfigMap(cfg map[string]any) map[string]any {
+	if cfg == nil {
+		return nil
+	}
+
+	normalized := map[string]any{}
+	for key, value := range cfg {
+		switch {
+		case key == "caches":
+			if nested, ok := value.(map[string]any); ok {
+				normalized[key] = normalizeConfigMap(nested)
+			} else {
+				normalized[key] = derefValue(value)
+			}
+		case strings.HasPrefix(key, "caches-"):
+			cacheCfg, _ := normalized["caches"].(map[string]any)
+			if cacheCfg == nil {
+				cacheCfg = map[string]any{}
+				normalized["caches"] = cacheCfg
+			}
+			cacheCfg[strings.TrimPrefix(key, "caches-")] = derefValue(value)
+		default:
+			if nested, ok := value.(map[string]any); ok {
+				normalized[key] = normalizeConfigMap(nested)
+			} else {
+				normalized[key] = derefValue(value)
+			}
+		}
+	}
+
+	return normalized
+}
+
+func derefValue(value any) any {
+	if value == nil {
+		return nil
+	}
+
+	v := reflect.ValueOf(value)
+	for v.Kind() == reflect.Pointer {
+		if v.IsNil() {
+			return nil
+		}
+		v = v.Elem()
+	}
+
+	return v.Interface()
 }
