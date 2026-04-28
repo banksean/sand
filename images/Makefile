@@ -1,5 +1,5 @@
 REGISTRY := ghcr.io/banksean/sand
-BUILD_CMD := container build -t
+BUILD_CMD := container build
 PUSH_CMD := container image push
 SAND_CLI_VERSION ?= v0.0.10
 SAND_CLI_BUILD_ARG := --build-arg SAND_CLI_VERSION=$(SAND_CLI_VERSION)
@@ -9,22 +9,22 @@ SAND_CLI_BUILD_ARG := --build-arg SAND_CLI_VERSION=$(SAND_CLI_VERSION)
 all: claude codex default opencode
 
 base:
-	$(BUILD_CMD) $(SAND_CLI_BUILD_ARG) $(REGISTRY)/base:latest -t base:local base/
+	$(BUILD_CMD) $(SAND_CLI_BUILD_ARG) -t $(REGISTRY)/base:latest -t base:local base/
 
 claude: base
-	$(BUILD_CMD) $(REGISTRY)/claude:latest -t claude:local claude/
+	$(BUILD_CMD) -t $(REGISTRY)/claude:latest -t claude:local claude/
 
 codex: base
-	$(BUILD_CMD) $(REGISTRY)/codex:latest -t codex:local codex/
+	$(BUILD_CMD) -t $(REGISTRY)/codex:latest -t codex:local codex/
 
 default: base
-	$(BUILD_CMD) $(REGISTRY)/default:latest -t default:local default/
+	$(BUILD_CMD) -t $(REGISTRY)/default:latest -t default:local default/
 
 gemini: base
-	$(BUILD_CMD) $(REGISTRY)/gemini:latest -t gemini:local gemini/
+	$(BUILD_CMD) -t $(REGISTRY)/gemini:latest -t gemini:local gemini/
 
 opencode: base
-	$(BUILD_CMD) $(REGISTRY)/opencode:latest -t opencode:local opencode/
+	$(BUILD_CMD) -t $(REGISTRY)/opencode:latest -t opencode:local opencode/
 
 push: push-base push-claude push-codex push-default push-opencode
 
@@ -47,4 +47,4 @@ sandless:
 	$(BUILD_CMD) sandless sandless/
 
 ubuntu-sand:
-	$(BUILD_CMD) $(SAND_CLI_BUILD_ARG) ubuntu-sand ubuntu-sand/
+	$(BUILD_CMD) $(SAND_CLI_BUILD_ARG) -t ubuntu-sand ubuntu-sand/
