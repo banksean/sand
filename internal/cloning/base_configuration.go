@@ -86,38 +86,50 @@ func (r *containerHookRunner) err() error {
 }
 
 var alpineBootstrapFlavor = containerBootstrapFlavor{
-	name:     "alpine",
-	hookName: "defaultAlpineContainerHook",
-	createUser: func(r *containerHookRunner, username, uid string) {
-		r.run("adding group for user", "addgroup", "addgroup", "-g", uid, username)
-		r.run("creating user", "useradd", "adduser", "-u", uid, "-D", "-G", username, "-s", "/bin/zsh", username)
-		r.run("unlocking account", "passwd -u", "passwd", "-u", username)
-		r.run("adding user to wheel", "addgroup", "addgroup", username, "wheel")
-	},
-	linkPackageCache: func(r *containerHookRunner, sharedCaches sandtypes.SharedCacheMounts) {
-		if sharedCaches.APKCacheHostDir == "" {
-			return
-		}
-		if r.probe("checking for /etc/apk", "stat", "/etc/apk") {
-			r.run("linking apk cache", "link apk cache", "ln", "-s", "/var/cache/apk", "/etc/apk/cache")
-		}
-	},
-	prepareSSHD: func(r *containerHookRunner) {},
+	name:             "alpine",
+	hookName:         "defaultAlpineContainerHook",
+	createUser:       alpineCreateUser,
+	linkPackageCache: alpineLinkPackageCache,
+	prepareSSHD:      alpinePrepareSSHD,
 }
 
 var ubuntuBootstrapFlavor = containerBootstrapFlavor{
-	name:     "ubuntu",
-	hookName: "defaultUbuntuContainerHook",
-	createUser: func(r *containerHookRunner, username, uid string) {
-		r.run("adding group for user", "groupadd", "groupadd", "-g", uid, username)
-		r.run("creating user", "useradd", "useradd", "-u", uid, "-g", username, "-s", "/bin/zsh", username)
-		r.run("adding user to sudo", "usermod", "usermod", "-a", "-G", "sudo", username)
-		r.run("making user home dir", "making user home dir", "mkdir", "-p", "/home/"+username)
-	},
-	linkPackageCache: func(r *containerHookRunner, sharedCaches sandtypes.SharedCacheMounts) {},
-	prepareSSHD: func(r *containerHookRunner) {
-		r.run("creating /run/sshd", "creating /run/sshd", "mkdir", "-p", "/run/sshd")
-	},
+	name:             "ubuntu",
+	hookName:         "defaultUbuntuContainerHook",
+	createUser:       ubuntuCreateUser,
+	linkPackageCache: ubuntuLinkPackageCache,
+	prepareSSHD:      ubuntuPrepareSSHD,
+}
+
+func alpineCreateUser(r *containerHookRunner, username, uid string) {
+	r.run("adding group for user", "addgroup", "addgroup", "-g", uid, username)
+	r.run("creating user", "useradd", "adduser", "-u", uid, "-D", "-G", username, "-s", "/bin/zsh", username)
+	r.run("unlocking account", "passwd -u", "passwd", "-u", username)
+	r.run("adding user to wheel", "addgroup", "addgroup", username, "wheel")
+}
+
+func alpineLinkPackageCache(r *containerHookRunner, sharedCaches sandtypes.SharedCacheMounts) {
+	if sharedCaches.APKCacheHostDir == "" {
+		return
+	}
+	if r.probe("checking for /etc/apk", "stat", "/etc/apk") {
+		r.run("linking apk cache", "link apk cache", "ln", "-s", "/var/cache/apk", "/etc/apk/cache")
+	}
+}
+
+func alpinePrepareSSHD(r *containerHookRunner) {}
+
+func ubuntuCreateUser(r *containerHookRunner, username, uid string) {
+	r.run("adding group for user", "groupadd", "groupadd", "-g", uid, username)
+	r.run("creating user", "useradd", "useradd", "-u", uid, "-g", username, "-s", "/bin/zsh", username)
+	r.run("adding user to sudo", "usermod", "usermod", "-a", "-G", "sudo", username)
+	r.run("making user home dir", "making user home dir", "mkdir", "-p", "/home/"+username)
+}
+
+func ubuntuLinkPackageCache(r *containerHookRunner, sharedCaches sandtypes.SharedCacheMounts) {}
+
+func ubuntuPrepareSSHD(r *containerHookRunner) {
+	r.run("creating /run/sshd", "creating /run/sshd", "mkdir", "-p", "/run/sshd")
 }
 
 // NewBaseContainerConfiguration creates a new base container configuration instance.
