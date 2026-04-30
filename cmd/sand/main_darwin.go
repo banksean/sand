@@ -90,13 +90,13 @@ func (c *Outie) initSlog() {
 		}
 	}
 
-		handler := slog.NewJSONHandler(f, &slog.HandlerOptions{
-			Level: level,
-		})
-		logger := slog.New(sandboxlog.NewRedactionHandler(handler))
-		slog.SetDefault(logger)
-		slog.Info("outie slog initialized")
-	}
+	handler := slog.NewJSONHandler(f, &slog.HandlerOptions{
+		Level: level,
+	})
+	logger := slog.New(sandboxlog.NewRedactionHandler(handler))
+	slog.SetDefault(logger)
+	slog.Info("outie slog initialized")
+}
 
 const description = `Manage lightweight linux container sandboxes on MacOS.
 
