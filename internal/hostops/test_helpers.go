@@ -83,14 +83,15 @@ func (m *MockContainerOps) Stats(ctx context.Context, containerID ...string) ([]
 }
 
 type MockGitOps struct {
-	AddRemoteFunc    func(ctx context.Context, dir, name, url string) error
-	RemoveRemoteFunc func(ctx context.Context, dir, name string) error
-	FetchFunc        func(ctx context.Context, dir, remote string) error
-	TopLevelFunc     func(ctx context.Context, dir string) string
-	RemoteURLFunc    func(ctx context.Context, dir, name string) string
-	BranchFunc       func(ctx context.Context, dir string) string
-	CommitFunc       func(ctx context.Context, dir string) string
-	IsDirtyFunc      func(ctx context.Context, dir string) bool
+	AddRemoteFunc         func(ctx context.Context, dir, name, url string) error
+	RemoveRemoteFunc      func(ctx context.Context, dir, name string) error
+	FetchFunc             func(ctx context.Context, dir, remote string) error
+	TopLevelFunc          func(ctx context.Context, dir string) string
+	RemoteURLFunc         func(ctx context.Context, dir, name string) string
+	LocalBranchExistsFunc func(ctx context.Context, dir, branch string) bool
+	BranchFunc            func(ctx context.Context, dir string) string
+	CommitFunc            func(ctx context.Context, dir string) string
+	IsDirtyFunc           func(ctx context.Context, dir string) bool
 }
 
 func (m *MockGitOps) AddRemote(ctx context.Context, dir, name, url string) error {
@@ -126,6 +127,13 @@ func (m *MockGitOps) RemoteURL(ctx context.Context, dir, name string) string {
 		return m.RemoteURLFunc(ctx, dir, name)
 	}
 	return ""
+}
+
+func (m *MockGitOps) LocalBranchExists(ctx context.Context, dir, branch string) bool {
+	if m.LocalBranchExistsFunc != nil {
+		return m.LocalBranchExistsFunc(ctx, dir, branch)
+	}
+	return false
 }
 
 func (m *MockGitOps) Branch(ctx context.Context, dir string) string {

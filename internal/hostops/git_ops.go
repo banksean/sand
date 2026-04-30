@@ -15,6 +15,8 @@ type GitOps interface {
 	TopLevel(ctx context.Context, dir string) string
 	// RemoteURL returns the URL of the named remote (e.g. "origin"), or "" if not found.
 	RemoteURL(ctx context.Context, dir, name string) string
+	// LocalBranchExists reports whether refs/heads/branch exists in dir.
+	LocalBranchExists(ctx context.Context, dir, branch string) bool
 	// Branch returns the current branch name, or "" if detached/unavailable.
 	Branch(ctx context.Context, dir string) string
 	// Commit returns the current HEAD commit hash, or "" if unavailable.
@@ -88,6 +90,17 @@ func (g *defaultGitOps) RemoteURL(ctx context.Context, dir, name string) string 
 		return ""
 	}
 	return strings.TrimSpace(string(output))
+}
+
+func (g *defaultGitOps) LocalBranchExists(ctx context.Context, dir, branch string) bool {
+	cmd := exec.CommandContext(ctx, "git", "show-ref", "--verify", "--quiet", "refs/heads/"+branch)
+	cmd.Dir = dir
+	slog.InfoContext(ctx, "GitOps.LocalBranchExists", "cmd", strings.Join(cmd.Args, " "), "dir", dir)
+	if err := cmd.Run(); err != nil {
+		slog.InfoContext(ctx, "GitOps.LocalBranchExists", "error", err)
+		return false
+	}
+	return true
 }
 
 func (g *defaultGitOps) Branch(ctx context.Context, dir string) string {

@@ -98,6 +98,11 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 	if err := agentauth.ValidateSelection(c.Agent, c.EnvFile); err != nil {
 		return err
 	}
+	if c.Branch {
+		if err := validateNewSandboxBranch(ctx, hostops.NewDefaultGitOps(), c.CloneFromDir, c.SandboxName); err != nil {
+			return err
+		}
+	}
 
 	if c.ImageName == "" {
 		c.ImageName = agentlaunch.DefaultImage(c.Agent, DefaultImageName)
@@ -166,7 +171,9 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 
 	if c.Branch {
 		// Create and check out a git branch inside the container, named after the sandbox id
-		checkoutSandboxBranch(ctx, hostops.NewAppleContainerOps(), sbox)
+		if err := checkoutSandboxBranch(ctx, hostops.NewAppleContainerOps(), sbox); err != nil {
+			return err
+		}
 	}
 
 	updateSSHConfFunc, err := sshimmer.CheckSSHReachability(ctx, hostname)
@@ -209,7 +216,14 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 	return nil
 }
 
-func checkoutSandboxBranch(ctx context.Context, containerSvc hostops.ContainerOps, sbox *sandtypes.Box) {
+func validateNewSandboxBranch(ctx context.Context, gitOps hostops.GitOps, cloneFromDir, sandboxName string) error {
+	if !gitOps.LocalBranchExists(ctx, cloneFromDir, sandboxName) {
+		return nil
+	}
+	return fmt.Errorf("branch name %q is already taken in %q", sandboxName, cloneFromDir)
+}
+
+func checkoutSandboxBranch(ctx context.Context, containerSvc hostops.ContainerOps, sbox *sandtypes.Box) error {
 	execOpts := &options.ExecContainer{
 		ProcessOptions: options.ProcessOptions{
 			WorkDir: "/app",
@@ -223,13 +237,19 @@ func checkoutSandboxBranch(ctx context.Context, containerSvc hostops.ContainerOp
 		"config", "--global", "--add", "safe.directory", "/app")
 	if err != nil {
 		slog.ErrorContext(ctx, "sbox.new git checkout, config", "error", err, "out", out)
+		return fmt.Errorf("configuring git in sandbox %q: %w", sbox.ID, err)
 	}
 
 	out, err = containerSvc.Exec(ctx, execOpts, sbox.ContainerID, "git", os.Environ(),
 		"checkout", "-b", sbox.ID)
 	if err != nil {
 		slog.ErrorContext(ctx, "sbox.new git checkout", "error", err, "out", out)
+		if out != "" {
+			return fmt.Errorf("creating branch %q in sandbox %q: %w: %s", sbox.ID, sbox.ID, err, strings.TrimSpace(out))
+		}
+		return fmt.Errorf("creating branch %q in sandbox %q: %w", sbox.ID, sbox.ID, err)
 	}
+	return nil
 }
 
 func loadDomainsFile(path string) ([]string, error) {
