@@ -21,6 +21,7 @@ import (
 	"github.com/banksean/sand/internal/cli"
 	"github.com/banksean/sand/internal/daemon"
 	"github.com/banksean/sand/internal/runtimedeps"
+	"github.com/banksean/sand/internal/sandboxlog"
 	"github.com/banksean/sand/internal/version"
 	kongcompletion "github.com/jotaen/kong-completion"
 )
@@ -89,12 +90,13 @@ func (c *Outie) initSlog() {
 		}
 	}
 
-	logger := slog.New(slog.NewJSONHandler(f, &slog.HandlerOptions{
-		Level: level,
-	}))
-	slog.SetDefault(logger)
-	slog.Info("outie slog initialized")
-}
+		handler := slog.NewJSONHandler(f, &slog.HandlerOptions{
+			Level: level,
+		})
+		logger := slog.New(sandboxlog.NewRedactionHandler(handler))
+		slog.SetDefault(logger)
+		slog.Info("outie slog initialized")
+	}
 
 const description = `Manage lightweight linux container sandboxes on MacOS.
 
