@@ -1,49 +1,68 @@
-package agentauth
+package daemon
 
 import (
 	"bufio"
 	"fmt"
 	"os"
 	"strings"
-
-	"github.com/banksean/sand/internal/cli/agentlaunch"
 )
 
-func ValidateSelection(agent, envFile string) error {
-	if agent == "" {
-		return nil
+type resolvedAgentCapabilities struct {
+	AuthRequired  bool
+	AuthAvailable bool
+}
+
+func (d *Daemon) resolveCreateSandboxCapabilities(opts CreateSandboxOpts) (resolvedAgentCapabilities, error) {
+	if d.boxer == nil || d.boxer.AgentRegistry == nil {
+		return resolvedAgentCapabilities{}, fmt.Errorf("agent registry is not initialized")
 	}
 
-	if !agentlaunch.HasAgent(agent) {
-		return fmt.Errorf("unknown agent %q (supported: %s)", agent, strings.Join(agentlaunch.SupportedAgents(), ", "))
+	if opts.Agent == "" {
+		return resolvedAgentCapabilities{}, nil
 	}
 
-	requiredGroups := agentlaunch.AuthEnvAnyOf(agent)
-	if len(requiredGroups) == 0 {
-		return nil
+	agentConfig, ok := d.boxer.AgentRegistry.Lookup(opts.Agent)
+	if !ok || !agentConfig.Selectable {
+		return resolvedAgentCapabilities{}, fmt.Errorf("unknown agent %q (supported: %s)", opts.Agent, strings.Join(d.boxer.AgentRegistry.SelectableNames(), ", "))
 	}
 
-	fileEnv, err := loadEnvFileValues(envFile)
+	fileEnv, err := loadEnvFileValues(opts.EnvFile)
 	if err != nil {
-		return err
+		return resolvedAgentCapabilities{}, err
 	}
 
-	for _, group := range requiredGroups {
+	resolved := resolvedAgentCapabilities{}
+	authSpec := agentConfig.Capabilities.Auth
+	if authSpec == nil || len(authSpec.EnvAnyOf) == 0 {
+		return resolved, nil
+	}
+
+	resolved.AuthRequired = true
+	if hasAnyEnvGroup(authSpec.EnvAnyOf, fileEnv) {
+		resolved.AuthAvailable = true
+		return resolved, nil
+	}
+
+	return resolved, fmt.Errorf(
+		"agent %q requires authentication env vars before sandbox creation; set one of [%s] in the sandd environment or %s",
+		opts.Agent,
+		formatEnvGroups(authSpec.EnvAnyOf),
+		formatEnvFileForError(opts.EnvFile),
+	)
+}
+
+func hasAnyEnvGroup(groups [][]string, fileEnv map[string]string) bool {
+	for _, group := range groups {
 		if hasAllEnvVars(group, fileEnv) {
-			return nil
+			return true
 		}
 	}
-
-	return fmt.Errorf("agent %q requires authentication env vars before sandbox creation; set one of [%s] in the current environment or %s",
-		agent,
-		formatEnvGroups(requiredGroups),
-		formatEnvFileForError(envFile),
-	)
+	return false
 }
 
 func hasAllEnvVars(names []string, fileEnv map[string]string) bool {
 	for _, name := range names {
-		if value := strings.TrimSpace(os.Getenv(name)); value != "" {
+		if value, ok := os.LookupEnv(name); ok && strings.TrimSpace(value) != "" {
 			continue
 		}
 		if value := strings.TrimSpace(fileEnv[name]); value != "" {

@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/alecthomas/kong"
-	"github.com/banksean/sand/internal/agentauth"
 	"github.com/banksean/sand/internal/applecontainer/options"
 	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/cli/agentlaunch"
@@ -95,9 +94,7 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 	if c.EnvFile != "" && !filepath.IsAbs(c.EnvFile) {
 		c.EnvFile = filepath.Join(c.CloneFromDir, c.EnvFile)
 	}
-	if err := agentauth.ValidateSelection(c.Agent, c.EnvFile); err != nil {
-		return err
-	}
+
 	if c.Branch {
 		if err := validateNewSandboxBranch(ctx, hostops.NewDefaultGitOps(), c.CloneFromDir, c.SandboxName); err != nil {
 			return err

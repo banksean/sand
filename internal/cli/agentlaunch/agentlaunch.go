@@ -7,10 +7,9 @@ import (
 )
 
 type spec struct {
-	interactive  func(hostname string) string
-	oneshot      string
-	image        string
-	authEnvAnyOf [][]string
+	interactive func(hostname string) string
+	oneshot     string
+	image       string
 }
 
 var specs = map[string]spec{
@@ -20,20 +19,12 @@ var specs = map[string]spec{
 		},
 		oneshot: `claude --permission-mode=bypassPermissions --print "$SAND_ONESHOT_PROMPT"`,
 		image:   "ghcr.io/banksean/sand/claude:latest",
-		authEnvAnyOf: [][]string{
-			{"CLAUDE_CODE_OAUTH_TOKEN"},
-			{"ANTHROPIC_API_KEY"},
-			{"CLAUDE_CODE_OAUTH_REFRESH_TOKEN", "CLAUDE_CODE_OAUTH_SCOPES"},
-		},
 	},
 	"codex": {
 		interactive: func(_ string) string {
 			return "codex --dangerously-bypass-approvals-and-sandbox"
 		},
 		image: "ghcr.io/banksean/sand/codex:latest",
-		authEnvAnyOf: [][]string{
-			{"OPENAI_API_KEY"},
-		},
 	},
 	"gemini": {
 		interactive: func(_ string) string {
@@ -41,10 +32,6 @@ var specs = map[string]spec{
 		},
 		oneshot: `gemini --approval-mode=yolo -p "$SAND_ONESHOT_PROMPT"`,
 		image:   "ghcr.io/banksean/sand/gemini:latest",
-		authEnvAnyOf: [][]string{
-			{"GEMINI_API_KEY"},
-			{"GOOGLE_API_KEY"},
-		},
 	},
 	"opencode": {
 		interactive: func(hostname string) string {
@@ -115,17 +102,4 @@ func SupportedAgents() []string {
 	}
 	sort.Strings(names)
 	return names
-}
-
-func AuthEnvAnyOf(agent string) [][]string {
-	spec, ok := specs[agent]
-	if !ok {
-		return nil
-	}
-
-	groups := make([][]string, 0, len(spec.authEnvAnyOf))
-	for _, group := range spec.authEnvAnyOf {
-		groups = append(groups, append([]string(nil), group...))
-	}
-	return groups
 }

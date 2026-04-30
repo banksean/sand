@@ -835,6 +835,12 @@ func (d *Daemon) createSandbox(ctx context.Context, opts CreateSandboxOpts, prog
 	}
 	slog.InfoContext(ctx, "createSandbox", "agentType", agentType, "opts", opts)
 
+	resolvedCaps, err := d.resolveCreateSandboxCapabilities(opts)
+	if err != nil {
+		return nil, err
+	}
+	slog.InfoContext(ctx, "createSandbox resolved capabilities", "authRequired", resolvedCaps.AuthRequired, "authAvailable", resolvedCaps.AuthAvailable)
+
 	sbox, err := d.boxer.NewSandbox(ctx, boxer.NewSandboxOpts{
 		AgentType:      agentType,
 		ID:             opts.ID,

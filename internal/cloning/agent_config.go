@@ -2,16 +2,32 @@ package cloning
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 )
+
+// AgentCapabilities describes the optional capabilities an agent requires.
+// For now this only models authentication requirements, but it is intended to
+// grow as new daemon-side capability checks are added.
+type AgentCapabilities struct {
+	Auth *AuthCapabilitySpec
+}
+
+// AuthCapabilitySpec describes the env-var groups that satisfy agent auth.
+// Any one group in EnvAnyOf is sufficient.
+type AuthCapabilitySpec struct {
+	EnvAnyOf [][]string
+}
 
 // AgentConfig combines workspace preparation and container configuration for an agent type.
 // Each agent (default, claude, opencode) has its own configuration that defines how to
 // prepare the workspace and configure the container.
 type AgentConfig struct {
 	Name          string
+	Selectable    bool
 	Preparation   WorkspacePreparation
 	Configuration ContainerConfiguration
+	Capabilities  AgentCapabilities
 }
 
 // AgentRegistry manages the available agent configurations.
@@ -34,15 +50,24 @@ func (r *AgentRegistry) Register(config *AgentConfig) {
 	r.configs[config.Name] = config
 }
 
-// Get retrieves an agent configuration by name.
-// Returns the "default" agent if the requested name is not found.
-func (r *AgentRegistry) Get(name string) *AgentConfig {
+// Lookup retrieves an agent configuration by name without falling back.
+func (r *AgentRegistry) Lookup(name string) (*AgentConfig, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	if config, ok := r.configs[name]; ok {
+	config, ok := r.configs[name]
+	return config, ok
+}
+
+// Get retrieves an agent configuration by name.
+// Returns the "default" agent if the requested name is not found.
+func (r *AgentRegistry) Get(name string) *AgentConfig {
+	if config, ok := r.Lookup(name); ok {
 		return config
 	}
+
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 
 	// Fallback to default agent
 	if defaultConfig, ok := r.configs["default"]; ok {
@@ -54,9 +79,7 @@ func (r *AgentRegistry) Get(name string) *AgentConfig {
 
 // Has checks if an agent configuration exists in the registry.
 func (r *AgentRegistry) Has(name string) bool {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	_, ok := r.configs[name]
+	_, ok := r.Lookup(name)
 	return ok
 }
 
@@ -69,5 +92,21 @@ func (r *AgentRegistry) List() []string {
 	for name := range r.configs {
 		names = append(names, name)
 	}
+	sort.Strings(names)
+	return names
+}
+
+// SelectableNames returns the user-selectable agent names in sorted order.
+func (r *AgentRegistry) SelectableNames() []string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	names := make([]string, 0, len(r.configs))
+	for name, config := range r.configs {
+		if config.Selectable {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
 	return names
 }
