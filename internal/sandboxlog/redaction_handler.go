@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-const redactedValue = "<redacted>"
+const redactedValue = "__REDACTED__"
 
 var (
 	envFlagPattern     = regexp.MustCompile(`(?i)(--env(?:=|\s+))([A-Za-z_][A-Za-z0-9_]*)(=)([^\s]+)`)
