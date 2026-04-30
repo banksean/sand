@@ -227,7 +227,7 @@ func (c *DaemonCmd) initSlog() {
 	if err != nil {
 		panic(err)
 	}
-	handler = sandboxlog.NewContextHandler(handler)
+	handler = sandboxlog.NewRedactionHandler(sandboxlog.NewContextHandler(handler))
 	logger := slog.New(handler)
 	slog.SetDefault(logger)
 	slog.Info("daemon slog initialized")

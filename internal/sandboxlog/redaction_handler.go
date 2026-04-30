@@ -213,7 +213,7 @@ func isSensitiveName(name string) bool {
 	if n == "" {
 		return false
 	}
-	if n == "env" || n == "envfile" || n == "environment" || n == "authorization" {
+	if n == "envfile" || n == "authorization" {
 		return true
 	}
 	return strings.Contains(n, "token") ||
