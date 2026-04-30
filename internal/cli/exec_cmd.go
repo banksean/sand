@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"os/user"
+	"path/filepath"
 	"time"
 
 	"github.com/banksean/sand/internal/applecontainer/options"
@@ -16,6 +17,7 @@ import (
 
 type ExecCmd struct {
 	SandboxCreationFlags
+	ProjectEnvFlag
 	SandboxNameFlag
 	Username string   `help:"name of user to exec as (defaults to $USER)"`
 	Uid      string   `help:"id of user to exec as (defaults to $UID)"`
@@ -33,6 +35,9 @@ func (c *ExecCmd) Run(cctx *CLIContext) error {
 	}
 	if c.CloneFromDir == "" {
 		c.CloneFromDir = cwd
+	}
+	if c.EnvFile != "" && !filepath.IsAbs(c.EnvFile) {
+		c.EnvFile = filepath.Join(c.CloneFromDir, c.EnvFile)
 	}
 
 	// Generate ID if not provided
@@ -102,7 +107,7 @@ func (c *ExecCmd) Run(cctx *CLIContext) error {
 			ProcessOptions: options.ProcessOptions{
 				WorkDir: "/app",
 				Env:     env,
-				EnvFile: sbox.EnvFile,
+				EnvFile: plainCommandEnvFile(sbox, c.ProjectEnv),
 				User:    c.Username,
 				UID:     c.Uid,
 			},

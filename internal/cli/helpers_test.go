@@ -1,6 +1,10 @@
 package cli
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/banksean/sand/internal/sandtypes"
+)
 
 func TestBuildInteractiveEnv(t *testing.T) {
 	t.Run("default shell env", func(t *testing.T) {
@@ -25,4 +29,29 @@ func TestBuildInteractiveEnv(t *testing.T) {
 			t.Fatalf("SSH_AGENT_PID = %q, want empty string", env["SSH_AGENT_PID"])
 		}
 	})
+}
+
+func TestPlainCommandEnvFile(t *testing.T) {
+	sbox := &sandtypes.Box{EnvFile: "/tmp/project.env"}
+
+	if got := plainCommandEnvFile(sbox, false); got != "" {
+		t.Fatalf("plainCommandEnvFile(false) = %q, want empty", got)
+	}
+	if got := plainCommandEnvFile(sbox, true); got != sbox.EnvFile {
+		t.Fatalf("plainCommandEnvFile(true) = %q, want %q", got, sbox.EnvFile)
+	}
+}
+
+func TestInteractiveCommandEnvFile(t *testing.T) {
+	sbox := &sandtypes.Box{EnvFile: "/tmp/project.env"}
+
+	if got := interactiveCommandEnvFile(sbox, false, false); got != "" {
+		t.Fatalf("interactiveCommandEnvFile(non-agent, false) = %q, want empty", got)
+	}
+	if got := interactiveCommandEnvFile(sbox, false, true); got != sbox.EnvFile {
+		t.Fatalf("interactiveCommandEnvFile(non-agent, true) = %q, want %q", got, sbox.EnvFile)
+	}
+	if got := interactiveCommandEnvFile(sbox, true, false); got != sbox.EnvFile {
+		t.Fatalf("interactiveCommandEnvFile(agent, false) = %q, want %q", got, sbox.EnvFile)
+	}
 }

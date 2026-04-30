@@ -20,18 +20,6 @@ func TestCheckoutSandboxBranch(t *testing.T) {
 		opts        *options.ExecContainer
 	}
 
-	var calls []execCall
-	containerSvc := &hostops.MockContainerOps{
-		ExecFunc: func(_ context.Context, opts *options.ExecContainer, containerID, cmd string, _ []string, args ...string) (string, error) {
-			calls = append(calls, execCall{
-				containerID: containerID,
-				cmd:         cmd,
-				args:        append([]string(nil), args...),
-				opts:        opts,
-			})
-			return "", nil
-		},
-	}
 	sbox := &sandtypes.Box{
 		ID:          "sb-123",
 		ContainerID: "ctr-123",
@@ -40,44 +28,70 @@ func TestCheckoutSandboxBranch(t *testing.T) {
 		Uid:         "1001",
 	}
 
-	if err := checkoutSandboxBranch(context.Background(), containerSvc, sbox); err != nil {
+	if err := checkoutSandboxBranch(context.Background(), containerSvc, sbox, ""); err != nil {
 		t.Fatalf("checkoutSandboxBranch() error = %v", err)
 	}
-
-	if len(calls) != 2 {
-		t.Fatalf("expected 2 exec calls, got %d", len(calls))
+	tests := []struct {
+		name    string
+		envFile string
+	}{
+		{name: "without project env"},
+		{name: "with project env", envFile: sbox.EnvFile},
 	}
 
-	if calls[0].containerID != sbox.ContainerID {
-		t.Fatalf("config call container ID = %q, want %q", calls[0].containerID, sbox.ContainerID)
-	}
-	if calls[0].cmd != "git" {
-		t.Fatalf("config call cmd = %q, want git", calls[0].cmd)
-	}
-	if diff := reflect.DeepEqual(calls[0].args, []string{"config", "--global", "--add", "safe.directory", "/app"}); !diff {
-		t.Fatalf("config call args = %v", calls[0].args)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var calls []execCall
+			containerSvc := &hostops.MockContainerOps{
+				ExecFunc: func(_ context.Context, opts *options.ExecContainer, containerID, cmd string, _ []string, args ...string) (string, error) {
+					calls = append(calls, execCall{
+						containerID: containerID,
+						cmd:         cmd,
+						args:        append([]string(nil), args...),
+						opts:        opts,
+					})
+					return "", nil
+				},
+			}
 
-	if calls[1].cmd != "git" {
-		t.Fatalf("checkout call cmd = %q, want git", calls[1].cmd)
-	}
-	if diff := reflect.DeepEqual(calls[1].args, []string{"checkout", "-b", sbox.ID}); !diff {
-		t.Fatalf("checkout call args = %v", calls[1].args)
-	}
+			checkoutSandboxBranch(context.Background(), containerSvc, sbox, tt.envFile)
 
-	wantOpts := &options.ExecContainer{
-		ProcessOptions: options.ProcessOptions{
-			WorkDir: "/app",
-			EnvFile: sbox.EnvFile,
-			User:    sbox.Username,
-			UID:     sbox.Uid,
-		},
-	}
-	if !reflect.DeepEqual(calls[0].opts, wantOpts) {
-		t.Fatalf("config call opts = %+v, want %+v", calls[0].opts, wantOpts)
-	}
-	if !reflect.DeepEqual(calls[1].opts, wantOpts) {
-		t.Fatalf("checkout call opts = %+v, want %+v", calls[1].opts, wantOpts)
+			if len(calls) != 2 {
+				t.Fatalf("expected 2 exec calls, got %d", len(calls))
+			}
+
+			if calls[0].containerID != sbox.ContainerID {
+				t.Fatalf("config call container ID = %q, want %q", calls[0].containerID, sbox.ContainerID)
+			}
+			if calls[0].cmd != "git" {
+				t.Fatalf("config call cmd = %q, want git", calls[0].cmd)
+			}
+			if diff := reflect.DeepEqual(calls[0].args, []string{"config", "--global", "--add", "safe.directory", "/app"}); !diff {
+				t.Fatalf("config call args = %v", calls[0].args)
+			}
+
+			if calls[1].cmd != "git" {
+				t.Fatalf("checkout call cmd = %q, want git", calls[1].cmd)
+			}
+			if diff := reflect.DeepEqual(calls[1].args, []string{"checkout", "-b", sbox.ID}); !diff {
+				t.Fatalf("checkout call args = %v", calls[1].args)
+			}
+
+			wantOpts := &options.ExecContainer{
+				ProcessOptions: options.ProcessOptions{
+					WorkDir: "/app",
+					EnvFile: tt.envFile,
+					User:    sbox.Username,
+					UID:     sbox.Uid,
+				},
+			}
+			if !reflect.DeepEqual(calls[0].opts, wantOpts) {
+				t.Fatalf("config call opts = %+v, want %+v", calls[0].opts, wantOpts)
+			}
+			if !reflect.DeepEqual(calls[1].opts, wantOpts) {
+				t.Fatalf("checkout call opts = %+v, want %+v", calls[1].opts, wantOpts)
+			}
+		})
 	}
 }
 
@@ -95,7 +109,7 @@ func TestCheckoutSandboxBranch_ReturnsCheckoutError(t *testing.T) {
 		ContainerID: "ctr-123",
 	}
 
-	err := checkoutSandboxBranch(context.Background(), containerSvc, sbox)
+	err := checkoutSandboxBranch(context.Background(), containerSvc, sbox, "")
 	if err == nil {
 		t.Fatal("checkoutSandboxBranch() error = nil, want non-nil")
 	}

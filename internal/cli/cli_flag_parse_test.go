@@ -101,6 +101,26 @@ func TestSandboxCreationFlagsShortFlags(t *testing.T) {
 	}
 }
 
+func TestProjectEnvFlagDefaults(t *testing.T) {
+	var cli struct {
+		ProjectEnvFlag `embed:""`
+	}
+	kongParse(t, &cli, []string{})
+	if cli.ProjectEnv {
+		t.Error("expected ProjectEnv=false by default")
+	}
+}
+
+func TestProjectEnvFlagLongFlag(t *testing.T) {
+	var cli struct {
+		ProjectEnvFlag `embed:""`
+	}
+	kongParse(t, &cli, []string{"--project-env"})
+	if !cli.ProjectEnv {
+		t.Error("expected ProjectEnv=true with --project-env")
+	}
+}
+
 func TestSandboxNameFlagArg(t *testing.T) {
 	var cli struct {
 		SandboxNameFlag `embed:""`
@@ -239,6 +259,19 @@ func TestShellCmdDefaults(t *testing.T) {
 	kongParse(t, &cli, []string{"shell", "my-box"})
 	if !cli.Shell.SSHAgent {
 		t.Error("expected sand shell to enable SSHAgent by default")
+	}
+	if cli.Shell.ProjectEnv {
+		t.Error("expected sand shell to disable ProjectEnv by default")
+	}
+}
+
+func TestShellCmdProjectEnvFlag(t *testing.T) {
+	var cli struct {
+		Shell ShellCmd `cmd:""`
+	}
+	kongParse(t, &cli, []string{"shell", "--project-env", "my-box"})
+	if !cli.Shell.ProjectEnv {
+		t.Error("expected sand shell to set ProjectEnv with --project-env")
 	}
 }
 

@@ -47,7 +47,8 @@ sand new [flags] [SANDBOX-NAME]
 - `--ssh-agent` - enable ssh-agent forwarding for the container
 - `-i, --image-name` _`<container-image-name>`_ - name of container image to use
 - `-d, --clone-from-dir` _`<project-dir>`_ - directory to clone into the sandbox. Defaults to current working directory, if unset.
-- `-e, --env-file` _`".env"`_ - path to env file to use when creating a new shell (default: `.env`)
+- `-e, --env-file` _`".env"`_ - path to env file associated with the sandbox for agent auth and optional project env injection (default: `.env`)
+- `--project-env` - pass the sandbox env file to plain shell/exec/git commands as non-secret project env
 - `--rm` - remove the sandbox after the command terminates
 - `--allowed-domains-file` _`<file-path>`_ - path to allowed-domains.txt file for DNS egress filtering (overrides the init image default)
 - `-v, --volume` _`<host-path:container-path>,...`_ - bind mount a volume (can be specified multiple times)
@@ -75,7 +76,7 @@ sand oneshot [flags] <PROMPT>
 - `--ssh-agent` - enable ssh-agent forwarding for the container
 - `-i, --image-name` _`<container-image-name>`_ - name of container image to use
 - `-d, --clone-from-dir` _`<project-dir>`_ - directory to clone into the sandbox. Defaults to current working directory, if unset.
-- `-e, --env-file` _`".env"`_ - path to env file to use when creating a new shell (default: `.env`)
+- `-e, --env-file` _`".env"`_ - path to env file associated with the sandbox for agent auth and optional project env injection (default: `.env`)
 - `--rm` - remove the sandbox after the command terminates
 - `--allowed-domains-file` _`<file-path>`_ - path to allowed-domains.txt file for DNS egress filtering (overrides the init image default)
 - `-v, --volume` _`<host-path:container-path>,...`_ - bind mount a volume (can be specified multiple times)
@@ -101,6 +102,7 @@ sand shell [flags] <SANDBOX-NAME>
 
 - `-s, --shell` _`<shell-command>`_ - shell command to exec in the container (default: `/bin/zsh`)
 - `-t, --tmux` - create or reconnect to a container-side tmux session
+- `--project-env` - pass the sandbox env file to plain shell/exec/git commands as non-secret project env
 - `--ssh-agent` - enable ssh-agent forwarding for the container (default: `true`)
 
 ## `sand exec`
@@ -118,7 +120,8 @@ sand exec [flags] <SANDBOX-NAME> <ARG>...
 - `--ssh-agent` - enable ssh-agent forwarding for the container
 - `-i, --image-name` _`<container-image-name>`_ - name of container image to use
 - `-d, --clone-from-dir` _`<project-dir>`_ - directory to clone into the sandbox. Defaults to current working directory, if unset.
-- `-e, --env-file` _`".env"`_ - path to env file to use when creating a new shell (default: `.env`)
+- `-e, --env-file` _`".env"`_ - path to env file associated with the sandbox for agent auth and optional project env injection (default: `.env`)
+- `--project-env` - pass the sandbox env file to plain shell/exec/git commands as non-secret project env
 - `--rm` - remove the sandbox after the command terminates
 - `--allowed-domains-file` _`<file-path>`_ - path to allowed-domains.txt file for DNS egress filtering (overrides the init image default)
 - `-v, --volume` _`<host-path:container-path>,...`_ - bind mount a volume (can be specified multiple times)
@@ -323,4 +326,3 @@ show effective configuration with sources
 ```
 sand config ls
 ```
-

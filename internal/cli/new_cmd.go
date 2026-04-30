@@ -25,6 +25,7 @@ import (
 
 type NewCmd struct {
 	SandboxCreationFlags
+	ProjectEnvFlag
 	ShellFlags
 	Agent       string `short:"a" placeholder:"<claude|codex|gemini|opencode>" help:"name of coding agent to use"`
 	Branch      bool   `short:"b" default:"false" help:"create a new git branch, with the same name as the sandbox, inside the sandbox _container_ (not on your host workdir)"`
@@ -168,7 +169,7 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 
 	if c.Branch {
 		// Create and check out a git branch inside the container, named after the sandbox id
-		if err := checkoutSandboxBranch(ctx, hostops.NewAppleContainerOps(), sbox); err != nil {
+		if err := checkoutSandboxBranch(ctx, hostops.NewAppleContainerOps(), sbox, plainCommandEnvFile(sbox, c.ProjectEnv)); err != nil {
 			return err
 		}
 	}
@@ -199,7 +200,7 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 		return err
 	}
 
-	if err := runShell(ctx, sbox, shell, args, c.Agent != ""); err != nil {
+	if err := runShell(ctx, sbox, shell, args, c.Agent != "", interactiveCommandEnvFile(sbox, c.Agent != "", c.ProjectEnv)); err != nil {
 		return err
 	}
 
@@ -220,11 +221,11 @@ func validateNewSandboxBranch(ctx context.Context, gitOps hostops.GitOps, cloneF
 	return fmt.Errorf("branch name %q is already taken in %q", sandboxName, cloneFromDir)
 }
 
-func checkoutSandboxBranch(ctx context.Context, containerSvc hostops.ContainerOps, sbox *sandtypes.Box) error {
+func checkoutSandboxBranch(ctx context.Context, containerSvc hostops.ContainerOps, sbox *sandtypes.Box, envFile string) error {
 	execOpts := &options.ExecContainer{
 		ProcessOptions: options.ProcessOptions{
 			WorkDir: "/app",
-			EnvFile: sbox.EnvFile,
+			EnvFile: envFile,
 			User:    sbox.Username,
 			UID:     sbox.Uid,
 		},

@@ -10,6 +10,7 @@ import (
 
 type ShellCmd struct {
 	ShellFlags
+	ProjectEnvFlag
 	SSHAgent bool `default:"true" help:"enable ssh-agent forwarding for the container"`
 	SandboxNameFlag
 }
@@ -65,5 +66,5 @@ func (c *ShellCmd) Run(cctx *CLIContext) error {
 		args = []string{"new-session", "-A"}
 	}
 
-	return runShell(ctx, sbox, shell, args, false)
+	return runShell(ctx, sbox, shell, args, false, plainCommandEnvFile(sbox, c.ProjectEnv))
 }

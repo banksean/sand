@@ -245,8 +245,8 @@ type NewSandboxOpts struct {
 }
 
 // NewSandbox creates a new sandbox based on a clone of hostWorkDir.
-// TODO: clone envFile, if it exists, into the sandbox clone so every command exec'd in that sandbox container
-// uses the same env file, even if the original .env file has changed on the host machine.
+// TODO: clone envFile, if it exists, into the sandbox clone so agent-facing
+// commands can keep using a stable copy even if the original file changes.
 func (sb *Boxer) NewSandbox(ctx context.Context, opts NewSandboxOpts) (*sandtypes.Box, error) {
 	ctx = sandboxlog.WithSandboxID(ctx, opts.ID)
 	slog.InfoContext(ctx, "Boxer.NewSandbox", "hostWorkDir", opts.HostWorkDir, "id", opts.ID, "agentType", opts.AgentType)
