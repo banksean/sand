@@ -225,6 +225,7 @@ func TestBoxer_CreateContainerSSHAgentOptIn(t *testing.T) {
 	sbox := &sandtypes.Box{
 		ID:        "test-sandbox",
 		ImageName: "test-image:latest",
+		EnvFile:   "/tmp/test.env",
 		Volumes:   []string{"/host:/container"},
 		CPUs:      2,
 		MemoryMB:  1024,
@@ -252,6 +253,9 @@ func TestBoxer_CreateContainerSSHAgentOptIn(t *testing.T) {
 	for i, call := range createCalls {
 		if got := len(call.ManagementOptions.Volume); got != 2 {
 			t.Fatalf("create call %d volume count = %d, want 2", i, got)
+		}
+		if got := call.ProcessOptions.EnvFile; got != "" {
+			t.Fatalf("create call %d unexpectedly passed env file %q", i, got)
 		}
 	}
 }
@@ -741,12 +745,14 @@ func TestBoxer_ExecuteHooks_StreamsProgress(t *testing.T) {
 	ctx := context.Background()
 
 	var execStreamCalls []string
+	var execStreamEnvFiles []string
 	mockContainer := &hostops.MockContainerOps{
 		InspectFunc: func(ctx context.Context, containerID string) ([]types.Container, error) {
 			return []types.Container{{Status: "running"}}, nil
 		},
 		ExecStreamFunc: func(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, stdin io.Reader, stdout, stderr io.Writer, cmdArgs ...string) (func() error, error) {
 			execStreamCalls = append(execStreamCalls, cmd)
+			execStreamEnvFiles = append(execStreamEnvFiles, opts.ProcessOptions.EnvFile)
 			if _, err := io.WriteString(stdout, "warming cache\n"); err != nil {
 				return nil, err
 			}
@@ -766,6 +772,7 @@ func TestBoxer_ExecuteHooks_StreamsProgress(t *testing.T) {
 	err := boxer.executeHooks(ctx, &sandtypes.Box{
 		ID:          "test-sandbox",
 		ContainerID: "test-container",
+		EnvFile:     "/tmp/test.env",
 	}, hooks, &progress)
 	if err != nil {
 		t.Fatalf("executeHooks() error = %v", err)
@@ -774,6 +781,9 @@ func TestBoxer_ExecuteHooks_StreamsProgress(t *testing.T) {
 	if len(execStreamCalls) != 1 || execStreamCalls[0] != "mise.sh" {
 		t.Fatalf("executeHooks() ExecStream calls = %v, want [mise.sh]", execStreamCalls)
 	}
+	if len(execStreamEnvFiles) != 1 || execStreamEnvFiles[0] != "" {
+		t.Fatalf("executeHooks() ExecStream env files = %v, want [\"\"]", execStreamEnvFiles)
+	}
 
 	got := progress.String()
 	if !strings.Contains(got, "[sand] streamed hook\n") {
@@ -781,6 +791,42 @@ func TestBoxer_ExecuteHooks_StreamsProgress(t *testing.T) {
 	}
 	if !strings.Contains(got, "warming cache\n") {
 		t.Fatalf("executeHooks() progress missing streamed output: %q", got)
+	}
+}
+
+func TestBoxer_ExecuteHooks_DoesNotPassEnvFileToExec(t *testing.T) {
+	ctx := context.Background()
+
+	var execEnvFiles []string
+	mockContainer := &hostops.MockContainerOps{
+		InspectFunc: func(ctx context.Context, containerID string) ([]types.Container, error) {
+			return []types.Container{{Status: "running"}}, nil
+		},
+		ExecFunc: func(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, args ...string) (string, error) {
+			execEnvFiles = append(execEnvFiles, opts.ProcessOptions.EnvFile)
+			return "", nil
+		},
+	}
+	boxer := newTestBoxer(t, mockContainer, &mockImageOps{})
+
+	hooks := []sandtypes.ContainerHook{
+		sandtypes.NewContainerHook("plain hook", func(ctx context.Context, ctr *types.Container, exec sandtypes.HookStreamer) error {
+			_, err := exec.Exec(ctx, "setup.sh")
+			return err
+		}),
+	}
+
+	err := boxer.executeHooks(ctx, &sandtypes.Box{
+		ID:          "test-sandbox",
+		ContainerID: "test-container",
+		EnvFile:     "/tmp/test.env",
+	}, hooks, nil)
+	if err != nil {
+		t.Fatalf("executeHooks() error = %v", err)
+	}
+
+	if len(execEnvFiles) != 1 || execEnvFiles[0] != "" {
+		t.Fatalf("executeHooks() Exec env files = %v, want [\"\"]", execEnvFiles)
 	}
 }
 

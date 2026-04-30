@@ -51,7 +51,6 @@ type hookExecutor struct {
 	ctx         context.Context
 	sandboxID   string
 	containerID string
-	envFile     string
 	container   hostops.ContainerOps
 	progress    io.Writer
 }
@@ -63,7 +62,6 @@ func (h hookExecutor) Exec(ctx context.Context, shellCmd string, args ...string)
 				Interactive: false,
 				TTY:         true,
 				WorkDir:     "/app",
-				EnvFile:     h.envFile,
 			},
 		}, h.containerID, shellCmd, os.Environ(), args...)
 	if err != nil {
@@ -92,7 +90,6 @@ func (h hookExecutor) ExecStream(ctx context.Context, stdout, stderr io.Writer, 
 				Interactive: false,
 				TTY:         true,
 				WorkDir:     "/app",
-				EnvFile:     h.envFile,
 			},
 		}, h.containerID, shellCmd, os.Environ(),
 		nil, stdout, stderr, args...)
@@ -664,7 +661,6 @@ func (sber *Boxer) CreateContainer(ctx context.Context, sb *sandtypes.Box, enabl
 			ProcessOptions: options.ProcessOptions{
 				Interactive: true,
 				TTY:         true,
-				EnvFile:     sb.EnvFile,
 			},
 			ManagementOptions: mgmtOpts,
 			ResourceOptions:   resOpts,
@@ -802,7 +798,6 @@ func (sber *Boxer) executeHooks(ctx context.Context, sb *sandtypes.Box, hooks []
 			ctx:         ctx,
 			sandboxID:   sb.ID,
 			containerID: sb.ContainerID,
-			envFile:     sb.EnvFile,
 			container:   sber.ContainerService,
 			progress:    progress,
 		}
