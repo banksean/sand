@@ -12,22 +12,7 @@ import (
 
 const opencodeJSON = `
 {
-  "$schema": "https://opencode.ai/config.json",
-  "mcp": {
-    "chrome-devtools": {
-      "type": "local",
-      "command": [
-        "npx",
-        "-y",
-        "chrome-devtools-mcp@latest",
-        "--browserUrl",
-        "http://127.0.0.1:9222"
-      ],
-      "enabled": true,
-      "environment": {
-      }
-    }
-  }
+  "$schema": "https://opencode.ai/config.json"
 }`
 
 // OpenCodeWorkspacePreparation extends base preparation with OpenCode-specific files.
