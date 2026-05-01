@@ -70,5 +70,8 @@ func gitSummary(details *sandtypes.GitDetails) string {
 	} else {
 		ret = " " + ret
 	}
+	if details.HasRelative {
+		ret += fmt.Sprintf(" (%d ahead, %d behind)", details.Ahead, details.Behind)
+	}
 	return ret
 }

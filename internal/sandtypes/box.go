@@ -78,4 +78,7 @@ type GitDetails struct {
 	Branch       string
 	Commit       string
 	IsDirty      bool
+	HasRelative  bool
+	Ahead        int
+	Behind       int
 }

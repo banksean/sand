@@ -46,6 +46,50 @@ func TestEnsureSharedCacheMounts_GoCachesUseMiseMount(t *testing.T) {
 	}
 }
 
+func TestGetCurrentGitDetailsSetsRelativeCounts(t *testing.T) {
+	const (
+		originalCommit = "1111111111111111111111111111111111111111"
+		currentCommit  = "2222222222222222222222222222222222222222"
+	)
+
+	var gotDir, gotBase, gotHead string
+	b := &Boxer{
+		GitOps: &hostops.MockGitOps{
+			BranchFunc: func(ctx context.Context, dir string) string {
+				return "sandbox-branch"
+			},
+			CommitFunc: func(ctx context.Context, dir string) string {
+				return currentCommit
+			},
+			CommitDivergenceFunc: func(ctx context.Context, dir, base, head string) (ahead, behind int, ok bool) {
+				gotDir = dir
+				gotBase = base
+				gotHead = head
+				return 2, 1, true
+			},
+		},
+	}
+	box := &sandtypes.Box{
+		SandboxWorkDir: "/tmp/sandbox",
+		OriginalGitDetails: &sandtypes.GitDetails{
+			Commit: originalCommit,
+		},
+	}
+
+	current := b.getCurrentGitDetails(context.Background(), box)
+
+	if gotDir != "/tmp/sandbox/app" || gotBase != originalCommit || gotHead != currentCommit {
+		t.Fatalf("CommitDivergence called with dir=%q base=%q head=%q", gotDir, gotBase, gotHead)
+	}
+	if !current.HasRelative || current.Ahead != 2 || current.Behind != 1 {
+		t.Fatalf("current relative = has:%v ahead:%d behind:%d", current.HasRelative, current.Ahead, current.Behind)
+	}
+	original := box.OriginalGitDetails
+	if !original.HasRelative || original.Ahead != 1 || original.Behind != 2 {
+		t.Fatalf("original relative = has:%v ahead:%d behind:%d", original.HasRelative, original.Ahead, original.Behind)
+	}
+}
+
 // newDBBoxer creates a Boxer backed by a real SQLite DB, with minimal no-op mocks
 // for all platform-specific dependencies. Suitable for testing DB-level operations.
 func newDBBoxer(t *testing.T, appRoot string) *Boxer {

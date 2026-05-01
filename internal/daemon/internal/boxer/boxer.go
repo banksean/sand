@@ -475,6 +475,18 @@ func (sb *Boxer) getCurrentGitDetails(ctx context.Context, box *sandtypes.Box) *
 	currentGit.Branch = sb.GitOps.Branch(ctx, appDir)
 	currentGit.Commit = sb.GitOps.Commit(ctx, appDir)
 	currentGit.IsDirty = sb.GitOps.IsDirty(ctx, appDir)
+	if box.OriginalGitDetails != nil {
+		ahead, behind, ok := sb.GitOps.CommitDivergence(ctx, appDir, box.OriginalGitDetails.Commit, currentGit.Commit)
+		if ok {
+			currentGit.HasRelative = true
+			currentGit.Ahead = ahead
+			currentGit.Behind = behind
+
+			box.OriginalGitDetails.HasRelative = true
+			box.OriginalGitDetails.Ahead = behind
+			box.OriginalGitDetails.Behind = ahead
+		}
+	}
 
 	return currentGit
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os/exec"
+	"strconv"
 	"strings"
 )
 
@@ -23,6 +24,8 @@ type GitOps interface {
 	Commit(ctx context.Context, dir string) string
 	// IsDirty returns true if the working tree has uncommitted changes.
 	IsDirty(ctx context.Context, dir string) bool
+	// CommitDivergence returns head's ahead/behind counts relative to base.
+	CommitDivergence(ctx context.Context, dir, base, head string) (ahead, behind int, ok bool)
 }
 
 type defaultGitOps struct{}
@@ -142,4 +145,34 @@ func (g *defaultGitOps) IsDirty(ctx context.Context, dir string) bool {
 		return false
 	}
 	return strings.TrimSpace(string(output)) != ""
+}
+
+func (g *defaultGitOps) CommitDivergence(ctx context.Context, dir, base, head string) (ahead, behind int, ok bool) {
+	if base == "" || head == "" {
+		return 0, 0, false
+	}
+	cmd := exec.CommandContext(ctx, "git", "rev-list", "--left-right", "--count", base+"..."+head)
+	cmd.Dir = dir
+	slog.InfoContext(ctx, "GitOps.CommitDivergence", "cmd", strings.Join(cmd.Args, " "), "dir", dir)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		slog.InfoContext(ctx, "GitOps.CommitDivergence", "error", err, "output", string(output))
+		return 0, 0, false
+	}
+	fields := strings.Fields(string(output))
+	if len(fields) != 2 {
+		slog.InfoContext(ctx, "GitOps.CommitDivergence unexpected output", "output", string(output))
+		return 0, 0, false
+	}
+	behind, err = strconv.Atoi(fields[0])
+	if err != nil {
+		slog.InfoContext(ctx, "GitOps.CommitDivergence parse behind", "error", err, "output", string(output))
+		return 0, 0, false
+	}
+	ahead, err = strconv.Atoi(fields[1])
+	if err != nil {
+		slog.InfoContext(ctx, "GitOps.CommitDivergence parse ahead", "error", err, "output", string(output))
+		return 0, 0, false
+	}
+	return ahead, behind, true
 }

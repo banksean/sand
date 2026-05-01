@@ -92,6 +92,7 @@ type MockGitOps struct {
 	BranchFunc            func(ctx context.Context, dir string) string
 	CommitFunc            func(ctx context.Context, dir string) string
 	IsDirtyFunc           func(ctx context.Context, dir string) bool
+	CommitDivergenceFunc  func(ctx context.Context, dir, base, head string) (ahead, behind int, ok bool)
 }
 
 func (m *MockGitOps) AddRemote(ctx context.Context, dir, name, url string) error {
@@ -155,6 +156,13 @@ func (m *MockGitOps) IsDirty(ctx context.Context, dir string) bool {
 		return m.IsDirtyFunc(ctx, dir)
 	}
 	return false
+}
+
+func (m *MockGitOps) CommitDivergence(ctx context.Context, dir, base, head string) (ahead, behind int, ok bool) {
+	if m.CommitDivergenceFunc != nil {
+		return m.CommitDivergenceFunc(ctx, dir, base, head)
+	}
+	return 0, 0, false
 }
 
 type MockFileOps struct {
