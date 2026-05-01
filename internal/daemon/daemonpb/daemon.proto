@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package sand.daemon.v1;
+
+option go_package = "github.com/banksean/sand/internal/daemon/daemonpb";
+
+service DaemonService {
+  rpc Ping(PingRequest) returns (PingResponse);
+  rpc Version(VersionRequest) returns (VersionResponse);
+}
+
+message PingRequest {}
+
+message PingResponse {
+  string status = 1;
+}
+
+message VersionRequest {}
+
+message VersionResponse {
+  string git_repo = 1;
+  string git_branch = 2;
+  string git_commit = 3;
+  string build_time = 4;
+}

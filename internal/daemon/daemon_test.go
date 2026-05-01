@@ -81,6 +81,68 @@ func TestDaemonHTTPPing(t *testing.T) {
 	}
 }
 
+func TestDaemonStartsHTTPAndGRPCSockets(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "dmn-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	dmn := newDaemonForTest(t, tmpDir)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	go func() {
+		if err := dmn.ServeUnixSocket(ctx); err != nil {
+			t.Logf("Mux serve error: %v", err)
+		}
+	}()
+
+	waitForSocket(t, filepath.Join(tmpDir, DefaultSocketFile))
+	waitForSocket(t, filepath.Join(tmpDir, DefaultGRPCSocketFile))
+
+	client, err := NewUnixSocketGRPCClient(ctx, tmpDir)
+	if err != nil {
+		t.Fatalf("Failed to create gRPC client: %v", err)
+	}
+	defer client.Close()
+
+	if err := client.Ping(ctx); err != nil {
+		t.Fatalf("gRPC Ping() failed: %v", err)
+	}
+
+	versionInfo, err := client.Version(ctx)
+	if err != nil {
+		t.Fatalf("gRPC Version() failed: %v", err)
+	}
+	t.Logf("gRPC version info: %+v", versionInfo)
+
+	dmn.Shutdown(ctx)
+}
+
+func TestDaemonCreatesContainerHTTPAndGRPCSockets(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "dmn-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	dmn := newDaemonForTest(t, tmpDir)
+	httpListener, grpcListener, err := dmn.createContainerSockets(context.Background(), "test-sandbox")
+	if err != nil {
+		t.Fatalf("createContainerSockets() error = %v", err)
+	}
+	defer httpListener.Close()
+	defer grpcListener.Close()
+
+	if _, err := os.Stat(filepath.Join(tmpDir, "containersockets", "test-sandbox")); err != nil {
+		t.Fatalf("HTTP container socket was not created: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(tmpDir, "containergrpc", "test-sandbox")); err != nil {
+		t.Fatalf("gRPC container socket was not created: %v", err)
+	}
+}
+
 func TestDaemonHTTPList(t *testing.T) {
 	// Create a temporary directory for the dmn
 	tmpDir, err := os.MkdirTemp("", "dmn-test-*")
@@ -129,6 +191,17 @@ func TestDaemonHTTPList(t *testing.T) {
 	if err := client.Shutdown(ctx); err != nil {
 		t.Fatalf("Shutdown failed: %v", err)
 	}
+}
+
+func waitForSocket(t *testing.T, socketPath string) {
+	t.Helper()
+	for i := 0; i < 20; i++ {
+		if _, err := os.Stat(socketPath); err == nil {
+			return
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	t.Fatalf("socket %s was not created", socketPath)
 }
 
 func TestDaemonHTTPVersion(t *testing.T) {

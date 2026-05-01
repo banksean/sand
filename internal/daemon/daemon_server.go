@@ -19,28 +19,33 @@ import (
 
 	"github.com/banksean/sand/internal/applecontainer/options"
 	"github.com/banksean/sand/internal/applecontainer/types"
+	"github.com/banksean/sand/internal/daemon/daemonpb"
 	"github.com/banksean/sand/internal/daemon/internal/boxer"
 	"github.com/banksean/sand/internal/sandboxlog"
 	"github.com/banksean/sand/internal/sandtypes"
 	"github.com/banksean/sand/internal/version"
+	"google.golang.org/grpc"
 )
 
 const (
-	DefaultSocketFile = "sandd.sock"
-	defaultLockFile   = "sandd.lock"
-	envMCPEnable      = "SAND_MCP"
+	DefaultSocketFile     = "sandd.sock"
+	DefaultGRPCSocketFile = "sandd.grpc.sock"
+	defaultLockFile       = "sandd.lock"
+	envMCPEnable          = "SAND_MCP"
 )
 
 type Daemon struct {
-	AppBaseDir  string
-	SocketPath  string
-	LocalDomain string
-	LogFile     string
+	AppBaseDir     string
+	SocketPath     string
+	GRPCSocketPath string
+	LocalDomain    string
+	LogFile        string
 
 	hostMCP *HostMCP
 	boxer   *boxer.Boxer
 
-	outieListener net.Listener
+	outieListener     net.Listener
+	outieGRPCListener net.Listener
 
 	innieServersMu sync.Mutex
 	// TODO: sync with container lifecycle for cases like restarting sandd with sandboxes running.
@@ -51,11 +56,13 @@ type Daemon struct {
 	// For now, just be aware that restarting the daemon means that any running sandbox containers
 	// won't be able to talk to sandd on the host machine any more (unless they restart the sandbox
 	// manually, after the daemon restart).
-	innieServers map[string]*http.Server
+	innieServers     map[string]*http.Server
+	innieGRPCServers map[string]*grpc.Server
 
 	lockFile *os.File
 	shutdown chan any
 	httpSrv  http.Server
+	grpcSrv  *grpc.Server
 }
 
 // NewDaemonWithBoxer creates a Daemon with a pre-built Boxer injected.
@@ -70,14 +77,16 @@ func NewDaemonWithBoxer(appBaseDir, localDomain string, b *boxer.Boxer) *Daemon 
 
 func NewDaemon(appBaseDir, localDomain string) *Daemon {
 	return &Daemon{
-		AppBaseDir:  appBaseDir,
-		SocketPath:  filepath.Join(appBaseDir, DefaultSocketFile),
-		LocalDomain: localDomain,
+		AppBaseDir:     appBaseDir,
+		SocketPath:     filepath.Join(appBaseDir, DefaultSocketFile),
+		GRPCSocketPath: filepath.Join(appBaseDir, DefaultGRPCSocketFile),
+		LocalDomain:    localDomain,
 		hostMCP: &HostMCP{
 			ChromeDevToolsPort: 9222,
 			ChromeUserDataDir:  "/tmp/chrome-profile-stable",
 		},
-		innieServers: map[string]*http.Server{},
+		innieServers:     map[string]*http.Server{},
+		innieGRPCServers: map[string]*grpc.Server{},
 	}
 }
 
@@ -103,12 +112,19 @@ func (d *Daemon) startDaemonServer(ctx context.Context) error {
 	slog.InfoContext(ctx, "Daemon.startDaemonServer", "socketPath", d.SocketPath)
 	// Remove old socket if it exists
 	os.Remove(d.SocketPath)
+	os.Remove(d.GRPCSocketPath)
 
 	unixListener, err := net.Listen("unix", d.SocketPath)
 	if err != nil {
 		return err
 	}
 	d.outieListener = unixListener
+	grpcListener, err := net.Listen("unix", d.GRPCSocketPath)
+	if err != nil {
+		_ = unixListener.Close()
+		return err
+	}
+	d.outieGRPCListener = grpcListener
 
 	d.shutdown = make(chan any)
 	if d.boxer == nil {
@@ -126,6 +142,7 @@ func (d *Daemon) startDaemonServer(ctx context.Context) error {
 
 	// Start unix domain socket HTTP server
 	go d.serveOutieSocket(ctx)
+	go d.serveOutieGRPCSocket(ctx)
 
 	if os.Getenv(envMCPEnable) != "" {
 		go func() {
@@ -161,6 +178,12 @@ func (d *Daemon) Shutdown(ctx context.Context) {
 	if d.outieListener != nil {
 		d.outieListener.Close()
 	}
+	if d.outieGRPCListener != nil {
+		d.outieGRPCListener.Close()
+	}
+	if d.grpcSrv != nil {
+		d.grpcSrv.Stop()
+	}
 
 	if d.hostMCP != nil {
 		if err := d.hostMCP.Cleanup(ctx); err != nil {
@@ -171,6 +194,7 @@ func (d *Daemon) Shutdown(ctx context.Context) {
 	// Remove socket file. This mail fail in many cases since closing the listener appears
 	// to remove the file automatically on MacOS. Therefore we ignore the err return value.
 	os.Remove(d.SocketPath)
+	os.Remove(d.GRPCSocketPath)
 
 	// Release and remove lock file
 	if d.lockFile != nil {
@@ -215,6 +239,40 @@ func (d *Daemon) serveOutieSocket(ctx context.Context) {
 	}
 }
 
+func (d *Daemon) serveOutieGRPCSocket(ctx context.Context) {
+	server := grpc.NewServer()
+	daemonpb.RegisterDaemonServiceServer(server, &daemonGRPCServer{daemon: d})
+	d.grpcSrv = server
+
+	slog.InfoContext(ctx, "Daemon.serveUnixSocketGRPC starting up", "socketPath", d.GRPCSocketPath)
+	if err := server.Serve(d.outieGRPCListener); err != nil {
+		slog.ErrorContext(ctx, "Daemon.serveUnixSocketGRPC", "error", err)
+	}
+}
+
+type daemonGRPCServer struct {
+	daemonpb.UnimplementedDaemonServiceServer
+	daemon *Daemon
+}
+
+func (s *daemonGRPCServer) Ping(context.Context, *daemonpb.PingRequest) (*daemonpb.PingResponse, error) {
+	return &daemonpb.PingResponse{Status: "pong"}, nil
+}
+
+func (s *daemonGRPCServer) Version(context.Context, *daemonpb.VersionRequest) (*daemonpb.VersionResponse, error) {
+	info := version.Get()
+	return versionInfoToProto(info), nil
+}
+
+func versionInfoToProto(info version.Info) *daemonpb.VersionResponse {
+	return &daemonpb.VersionResponse{
+		GitRepo:   info.GitRepo,
+		GitBranch: info.GitBranch,
+		GitCommit: info.GitCommit,
+		BuildTime: info.BuildTime,
+	}
+}
+
 func slogHandler(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		slog.InfoContext(r.Context(), "http request", "url", r.URL.String())
@@ -250,6 +308,11 @@ func (d *Daemon) stopInnieServer(ctx context.Context, id string) error {
 		if err := srv.Shutdown(ctx); err != nil {
 			return fmt.Errorf("StopSandbox could not shut down sandbox's http server: %w", err)
 		}
+		delete(d.innieServers, id)
+	}
+	if srv, ok := d.innieGRPCServers[id]; ok {
+		srv.Stop()
+		delete(d.innieGRPCServers, id)
 	}
 	return nil
 }
@@ -290,6 +353,25 @@ func (d *Daemon) serveInnieSocket(ctx context.Context, sandboxID string, unixLis
 	err := server.Serve(unixListener)
 	if err != nil {
 		slog.ErrorContext(ctx, "Daemon.serveInnieSocket", "error", err)
+	}
+}
+
+func (d *Daemon) serveInnieGRPCSocket(ctx context.Context, sandboxID string, unixListener net.Listener) {
+	ctx = sandboxlog.WithSandboxID(ctx, sandboxID)
+	server := grpc.NewServer(grpc.UnaryInterceptor(func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		return handler(sandboxlog.WithSandboxID(ctx, sandboxID), req)
+	}))
+	daemonpb.RegisterDaemonServiceServer(server, &daemonGRPCServer{daemon: d})
+
+	d.innieServersMu.Lock()
+	d.innieGRPCServers[sandboxID] = server
+	d.innieServersMu.Unlock()
+
+	defer unixListener.Close()
+
+	slog.InfoContext(ctx, "Daemon.serveInnieGRPCSocket starting up")
+	if err := server.Serve(unixListener); err != nil {
+		slog.ErrorContext(ctx, "Daemon.serveInnieGRPCSocket", "error", err)
 	}
 }
 
@@ -787,6 +869,37 @@ func (d *Daemon) createContainerSocket(ctx context.Context, id string) (net.List
 	return unixListener, nil
 }
 
+func (d *Daemon) createContainerGRPCSocket(ctx context.Context, id string) (net.Listener, error) {
+	ctx = sandboxlog.WithSandboxID(ctx, id)
+	socketsDir := filepath.Join(d.AppBaseDir, "containergrpc")
+	slog.InfoContext(ctx, "Daemon.createContainerGRPCSocket", "socketsDir", socketsDir)
+	if err := os.MkdirAll(socketsDir, 0o777); err != nil {
+		return nil, err
+	}
+	socketPath := filepath.Join(socketsDir, id)
+	slog.InfoContext(ctx, "Daemon.createContainerGRPCSocket", "socketPath", socketPath)
+	// Don't care about errors, e.g. socketPath already does not exist:
+	os.Remove(socketPath)
+	unixListener, err := net.Listen("unix", socketPath)
+	if err != nil {
+		return nil, fmt.Errorf("createSandbox couldn't open container grpc socket %s: %w", socketPath, err)
+	}
+	return unixListener, nil
+}
+
+func (d *Daemon) createContainerSockets(ctx context.Context, id string) (httpListener net.Listener, grpcListener net.Listener, err error) {
+	httpListener, err = d.createContainerSocket(ctx, id)
+	if err != nil {
+		return nil, nil, err
+	}
+	grpcListener, err = d.createContainerGRPCSocket(ctx, id)
+	if err != nil {
+		_ = httpListener.Close()
+		return nil, nil, err
+	}
+	return httpListener, grpcListener, nil
+}
+
 // StartSandbox starts a single sandbox container.
 func (d *Daemon) StartSandbox(ctx context.Context, opts StartSandboxOpts) error {
 	ctx = sandboxlog.WithSandboxID(ctx, opts.ID)
@@ -816,11 +929,12 @@ func (d *Daemon) StartSandbox(ctx context.Context, opts StartSandboxOpts) error 
 		}
 	}
 
-	unixListener, err := d.createContainerSocket(ctx, opts.ID)
+	unixListener, grpcListener, err := d.createContainerSockets(ctx, opts.ID)
 	if err != nil {
 		return err
 	}
 	go d.serveInnieSocket(ctx, opts.ID, unixListener)
+	go d.serveInnieGRPCSocket(ctx, opts.ID, grpcListener)
 
 	if recreated {
 		return d.boxer.StartNewContainer(ctx, sbox, nil)
@@ -886,11 +1000,12 @@ func (d *Daemon) createSandbox(ctx context.Context, opts CreateSandboxOpts, prog
 	ctr, err := d.boxer.GetContainer(ctx, sbox.ContainerID)
 
 	if ctr == nil {
-		unixListener, err := d.createContainerSocket(ctx, opts.ID)
+		unixListener, grpcListener, err := d.createContainerSockets(ctx, opts.ID)
 		if err != nil {
 			return nil, err
 		}
 		go d.serveInnieSocket(ctx, opts.ID, unixListener)
+		go d.serveInnieGRPCSocket(ctx, opts.ID, grpcListener)
 
 		err = d.boxer.CreateContainer(ctx, sbox, opts.SSHAgent)
 		if err != nil {
@@ -948,6 +1063,12 @@ func (d *Daemon) RemoveSandbox(ctx context.Context, id string) error {
 	socketPath := filepath.Join(d.AppBaseDir, "containersockets", id)
 	if _, err := os.Stat(socketPath); err == nil {
 		if err := os.Remove(socketPath); err != nil {
+			return err
+		}
+	}
+	grpcSocketPath := filepath.Join(d.AppBaseDir, "containergrpc", id)
+	if _, err := os.Stat(grpcSocketPath); err == nil {
+		if err := os.Remove(grpcSocketPath); err != nil {
 			return err
 		}
 	}

@@ -5,6 +5,7 @@ go 1.25.7
 require (
 	github.com/alecthomas/kong v1.15.0
 	github.com/alecthomas/kong-yaml v0.2.0
+	github.com/creack/pty v1.1.24
 	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/google/go-containerregistry v0.21.3
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
@@ -14,6 +15,8 @@ require (
 	golang.org/x/crypto v0.45.0
 	golang.org/x/sync v0.20.0
 	golang.org/x/term v0.37.0
+	google.golang.org/grpc v1.74.2
+	google.golang.org/protobuf v1.36.7
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.39.0
@@ -21,7 +24,6 @@ require (
 
 require (
 	github.com/containerd/stargz-snapshotter/estargz v0.18.2 // indirect
-	github.com/creack/pty v1.1.24 // indirect
 	github.com/docker/cli v29.3.0+incompatible // indirect
 	github.com/docker/distribution v2.8.3+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.9.3 // indirect
@@ -41,7 +43,10 @@ require (
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/vbatts/tar-split v0.12.2 // indirect
 	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b // indirect
+	golang.org/x/net v0.47.0 // indirect
 	golang.org/x/sys v0.42.0 // indirect
+	golang.org/x/text v0.33.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250818200422-3122310a409c // indirect
 	gotest.tools/v3 v3.5.2 // indirect
 	modernc.org/libc v1.66.3 // indirect
 	modernc.org/mathutil v1.7.1 // indirect

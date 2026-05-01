@@ -656,6 +656,7 @@ func (sber *Boxer) CreateContainer(ctx context.Context, sb *sandtypes.Box, enabl
 
 	volumeOpts := append([]string(nil), sb.Volumes...)
 	volumeOpts = append(volumeOpts, filepath.Join(sber.appRoot, "containersockets", sb.ID)+":/run/host-services/sandd.sock")
+	volumeOpts = append(volumeOpts, filepath.Join(sber.appRoot, "containergrpc", sb.ID)+":/run/host-services/sandd.grpc.sock")
 
 	mgmtOpts := options.ManagementOptions{
 		// TODO: Try to name the container after the sandbox, and handle collisions

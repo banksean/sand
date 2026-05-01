@@ -251,8 +251,14 @@ func TestBoxer_CreateContainerSSHAgentOptIn(t *testing.T) {
 		t.Fatalf("CreateContainer mutated sandbox volumes, len = %d, want 1", got)
 	}
 	for i, call := range createCalls {
-		if got := len(call.ManagementOptions.Volume); got != 2 {
-			t.Fatalf("create call %d volume count = %d, want 2", i, got)
+		if got := len(call.ManagementOptions.Volume); got != 3 {
+			t.Fatalf("create call %d volume count = %d, want 3", i, got)
+		}
+		if got := call.ManagementOptions.Volume[1]; !strings.HasSuffix(got, "/containersockets/test-sandbox:/run/host-services/sandd.sock") {
+			t.Fatalf("create call %d HTTP socket volume = %q", i, got)
+		}
+		if got := call.ManagementOptions.Volume[2]; !strings.HasSuffix(got, "/containergrpc/test-sandbox:/run/host-services/sandd.grpc.sock") {
+			t.Fatalf("create call %d gRPC socket volume = %q", i, got)
 		}
 		if got := call.ProcessOptions.EnvFile; got != "" {
 			t.Fatalf("create call %d unexpectedly passed env file %q", i, got)
