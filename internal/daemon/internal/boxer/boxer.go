@@ -475,20 +475,32 @@ func (sb *Boxer) getCurrentGitDetails(ctx context.Context, box *sandtypes.Box) *
 	currentGit.Branch = sb.GitOps.Branch(ctx, appDir)
 	currentGit.Commit = sb.GitOps.Commit(ctx, appDir)
 	currentGit.IsDirty = sb.GitOps.IsDirty(ctx, appDir)
-	if box.OriginalGitDetails != nil {
-		ahead, behind, ok := sb.GitOps.CommitDivergence(ctx, appDir, box.OriginalGitDetails.Commit, currentGit.Commit)
-		if ok {
-			currentGit.HasRelative = true
-			currentGit.Ahead = ahead
-			currentGit.Behind = behind
-
-			box.OriginalGitDetails.HasRelative = true
-			box.OriginalGitDetails.Ahead = behind
-			box.OriginalGitDetails.Behind = ahead
-		}
-	}
+	sb.addHostBranchRelativeGitDetails(ctx, box, currentGit)
 
 	return currentGit
+}
+
+func (sb *Boxer) addHostBranchRelativeGitDetails(ctx context.Context, box *sandtypes.Box, currentGit *sandtypes.GitDetails) {
+	if box.HostOriginDir == "" || currentGit.Branch == "" || currentGit.Commit == "" {
+		return
+	}
+	hostGitTopLevel := sb.GitOps.TopLevel(ctx, box.HostOriginDir)
+	if hostGitTopLevel == "" {
+		return
+	}
+	if !sb.GitOps.LocalBranchExists(ctx, hostGitTopLevel, currentGit.Branch) {
+		return
+	}
+	sandboxRemote := cloning.ClonedWorkDirGitRemotePrefix + box.ID
+	if err := sb.GitOps.Fetch(ctx, hostGitTopLevel, sandboxRemote); err != nil {
+		slog.InfoContext(ctx, "Boxer.addHostBranchRelativeGitDetails fetch sandbox remote", "remote", sandboxRemote, "error", err)
+	}
+	ahead, behind, ok := sb.GitOps.CommitDivergence(ctx, hostGitTopLevel, "refs/heads/"+currentGit.Branch, currentGit.Commit)
+	if ok {
+		currentGit.HasRelative = true
+		currentGit.Ahead = ahead
+		currentGit.Behind = behind
+	}
 }
 
 // Helper functions for converting between Box and db.Sandbox

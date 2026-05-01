@@ -46,13 +46,13 @@ func TestEnsureSharedCacheMounts_GoCachesUseMiseMount(t *testing.T) {
 	}
 }
 
-func TestGetCurrentGitDetailsSetsRelativeCounts(t *testing.T) {
+func TestGetCurrentGitDetailsSetsRelativeCountsFromHostBranch(t *testing.T) {
 	const (
-		originalCommit = "1111111111111111111111111111111111111111"
-		currentCommit  = "2222222222222222222222222222222222222222"
+		currentCommit = "2222222222222222222222222222222222222222"
 	)
 
 	var gotDir, gotBase, gotHead string
+	var fetchedDir, fetchedRemote string
 	b := &Boxer{
 		GitOps: &hostops.MockGitOps{
 			BranchFunc: func(ctx context.Context, dir string) string {
@@ -60,6 +60,20 @@ func TestGetCurrentGitDetailsSetsRelativeCounts(t *testing.T) {
 			},
 			CommitFunc: func(ctx context.Context, dir string) string {
 				return currentCommit
+			},
+			TopLevelFunc: func(ctx context.Context, dir string) string {
+				if dir != "/host/repo" {
+					t.Fatalf("TopLevel called with dir=%q", dir)
+				}
+				return "/host/repo"
+			},
+			LocalBranchExistsFunc: func(ctx context.Context, dir, branch string) bool {
+				return dir == "/host/repo" && branch == "sandbox-branch"
+			},
+			FetchFunc: func(ctx context.Context, dir, remote string) error {
+				fetchedDir = dir
+				fetchedRemote = remote
+				return nil
 			},
 			CommitDivergenceFunc: func(ctx context.Context, dir, base, head string) (ahead, behind int, ok bool) {
 				gotDir = dir
@@ -70,23 +84,21 @@ func TestGetCurrentGitDetailsSetsRelativeCounts(t *testing.T) {
 		},
 	}
 	box := &sandtypes.Box{
+		ID:             "box-id",
+		HostOriginDir:  "/host/repo",
 		SandboxWorkDir: "/tmp/sandbox",
-		OriginalGitDetails: &sandtypes.GitDetails{
-			Commit: originalCommit,
-		},
 	}
 
 	current := b.getCurrentGitDetails(context.Background(), box)
 
-	if gotDir != "/tmp/sandbox/app" || gotBase != originalCommit || gotHead != currentCommit {
+	if fetchedDir != "/host/repo" || fetchedRemote != "sand/box-id" {
+		t.Fatalf("Fetch called with dir=%q remote=%q", fetchedDir, fetchedRemote)
+	}
+	if gotDir != "/host/repo" || gotBase != "refs/heads/sandbox-branch" || gotHead != currentCommit {
 		t.Fatalf("CommitDivergence called with dir=%q base=%q head=%q", gotDir, gotBase, gotHead)
 	}
 	if !current.HasRelative || current.Ahead != 2 || current.Behind != 1 {
 		t.Fatalf("current relative = has:%v ahead:%d behind:%d", current.HasRelative, current.Ahead, current.Behind)
-	}
-	original := box.OriginalGitDetails
-	if !original.HasRelative || original.Ahead != 1 || original.Behind != 2 {
-		t.Fatalf("original relative = has:%v ahead:%d behind:%d", original.HasRelative, original.Ahead, original.Behind)
 	}
 }
 
