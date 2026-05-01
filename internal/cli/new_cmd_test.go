@@ -27,10 +27,34 @@ func TestCheckoutSandboxBranch(t *testing.T) {
 		Username:    "alice",
 		Uid:         "1001",
 	}
-
+	var calls []execCall
+	containerSvc := &hostops.MockContainerOps{
+		ExecFunc: func(_ context.Context, opts *options.ExecContainer, containerID, cmd string, _ []string, args ...string) (string, error) {
+			calls = append(calls, execCall{
+				containerID: containerID,
+				cmd:         cmd,
+				args:        append([]string(nil), args...),
+				opts:        opts,
+			})
+			return "", nil
+		},
+	}
 	if err := checkoutSandboxBranch(context.Background(), containerSvc, sbox, ""); err != nil {
 		t.Fatalf("checkoutSandboxBranch() error = %v", err)
 	}
+	if len(calls) != 2 {
+		t.Fatalf("expected 2 exec calls, got %d", len(calls))
+	}
+	if calls[0].containerID != sbox.ContainerID {
+		t.Fatalf("config call container ID = %q, want %q", calls[0].containerID, sbox.ContainerID)
+	}
+	if calls[0].cmd != "git" {
+		t.Fatalf("config call cmd = %q, want git", calls[0].cmd)
+	}
+	if diff := reflect.DeepEqual(calls[0].args, []string{"config", "--global", "--add", "safe.directory", "/app"}); !diff {
+		t.Fatalf("config call args = %v", calls[0].args)
+	}
+
 	tests := []struct {
 		name    string
 		envFile string
