@@ -209,7 +209,14 @@ func TestCreateSandboxRejectsUnknownAgentBeforeSandboxCreation(t *testing.T) {
 func newCapabilityTestDaemon(t *testing.T, registry *cloning.AgentRegistry, containerSvc *hostops.MockContainerOps) *Daemon {
 	t.Helper()
 
-	appDir := t.TempDir()
+	// Keep the app dir prefix short so the derived unix socket path
+	// (<appDir>/containersockets/<sandbox-id>) stays within macOS sun_path limits.
+	appDir, err := os.MkdirTemp("", "sdt-*")
+	if err != nil {
+		t.Fatalf("MkdirTemp: %v", err)
+	}
+	t.Cleanup(func() { os.RemoveAll(appDir) })
+
 	b, err := boxer.NewBoxerWithDeps(appDir, boxer.BoxerDeps{
 		ContainerService: containerSvc,
 		GitOps:           &hostops.MockGitOps{},
