@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/banksean/sand/internal/agentdefs"
 	"github.com/banksean/sand/internal/applecontainer/options"
 	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/cloning"
@@ -256,73 +257,27 @@ func capabilityTestRegistry() *cloning.AgentRegistry {
 	prep := &capabilityTestPreparation{cloneRoot: filepath.Join(os.TempDir(), "sand-capability-test")}
 	config := cloning.NewBaseContainerConfiguration()
 	r := cloning.NewAgentRegistry()
-	r.Register(&cloning.AgentConfig{
-		Name:          "default",
-		Preparation:   prep,
-		Configuration: config,
-	})
-	r.Register(&cloning.AgentConfig{
-		Name:          "claude",
-		Selectable:    true,
-		Preparation:   prep,
-		Configuration: config,
-		Capabilities: cloning.AgentCapabilities{
-			Auth: &cloning.AuthCapabilitySpec{
-				EnvAnyOf: [][]string{
-					{"CLAUDE_CODE_OAUTH_TOKEN"},
-					{"ANTHROPIC_API_KEY"},
-					{"CLAUDE_CODE_OAUTH_REFRESH_TOKEN", "CLAUDE_CODE_OAUTH_SCOPES"},
-				},
-			},
-		},
-	})
-	r.Register(&cloning.AgentConfig{
-		Name:          "codex",
-		Selectable:    true,
-		Preparation:   prep,
-		Configuration: config,
-		Capabilities: cloning.AgentCapabilities{
-			Auth: &cloning.AuthCapabilitySpec{
-				EnvAnyOf: [][]string{
-					{"OPENAI_API_KEY"},
-				},
-			},
-		},
-	})
-	r.Register(&cloning.AgentConfig{
-		Name:          "gemini",
-		Selectable:    true,
-		Preparation:   prep,
-		Configuration: config,
-		Capabilities: cloning.AgentCapabilities{
-			Auth: &cloning.AuthCapabilitySpec{
-				EnvAnyOf: [][]string{
-					{"GEMINI_API_KEY"},
-					{"GOOGLE_API_KEY"},
-				},
-			},
-		},
-	})
-	r.Register(&cloning.AgentConfig{
-		Name:          "opencode",
-		Selectable:    true,
-		Preparation:   prep,
-		Configuration: config,
-		Capabilities: cloning.AgentCapabilities{
-			Auth: &cloning.AuthCapabilitySpec{
-				EnvAnyOf: [][]string{
-					{"ANTHROPIC_API_KEY"},
-					{"OPENAI_API_KEY"},
-					{"GEMINI_API_KEY"},
-					{"GOOGLE_API_KEY"},
-					{"AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"},
-					{"AWS_PROFILE"},
-					{"AWS_BEARER_TOKEN_BEDROCK"},
-				},
-			},
-		},
-	})
+	for _, definition := range agentdefs.All() {
+		r.Register(&cloning.AgentConfig{
+			Name:          definition.Name,
+			Selectable:    definition.Selectable,
+			Preparation:   prep,
+			Configuration: config,
+			Capabilities:  capabilityTestCapabilities(definition),
+		})
+	}
 	return r
+}
+
+func capabilityTestCapabilities(definition agentdefs.Definition) cloning.AgentCapabilities {
+	if len(definition.AuthEnvAnyOf) == 0 {
+		return cloning.AgentCapabilities{}
+	}
+	return cloning.AgentCapabilities{
+		Auth: &cloning.AuthCapabilitySpec{
+			EnvAnyOf: definition.AuthEnvAnyOf,
+		},
+	}
 }
 
 type capabilityTestPreparation struct {

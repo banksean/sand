@@ -2,44 +2,9 @@ package agentlaunch
 
 import (
 	"fmt"
-	"sort"
+
+	"github.com/banksean/sand/internal/agentdefs"
 )
-
-type spec struct {
-	interactive func(hostname string) string
-	oneshot     string
-	image       string
-}
-
-var specs = map[string]spec{
-	"claude": {
-		interactive: func(_ string) string {
-			return "claude --permission-mode=bypassPermissions"
-		},
-		oneshot: `claude --permission-mode=bypassPermissions --print "$SAND_ONESHOT_PROMPT"`,
-		image:   "ghcr.io/banksean/sand/claude:latest",
-	},
-	"codex": {
-		interactive: func(_ string) string {
-			return "codex --dangerously-bypass-approvals-and-sandbox"
-		},
-		image: "ghcr.io/banksean/sand/codex:latest",
-	},
-	"gemini": {
-		interactive: func(_ string) string {
-			return "gemini --approval-mode=yolo"
-		},
-		oneshot: `gemini --approval-mode=yolo -p "$SAND_ONESHOT_PROMPT"`,
-		image:   "ghcr.io/banksean/sand/gemini:latest",
-	},
-	"opencode": {
-		interactive: func(_ string) string {
-			return "opencode"
-		},
-		oneshot: `opencode run "$SAND_ONESHOT_PROMPT"`,
-		image:   "ghcr.io/banksean/sand/opencode:latest",
-	},
-}
 
 func BuildInteractiveExec(agent, shell, sandboxID, hostname string, tmux bool) (string, []string, error) {
 	if tmux {
@@ -47,8 +12,8 @@ func BuildInteractiveExec(agent, shell, sandboxID, hostname string, tmux bool) (
 			return "/usr/bin/tmux", []string{"new-session", "-A", "-s", sandboxID}, nil
 		}
 
-		spec, ok := specs[agent]
-		if !ok {
+		definition, ok := agentdefs.Lookup(agent)
+		if !ok || definition.InteractiveCommand == "" {
 			return "", nil, fmt.Errorf("interactive mode not supported for agent %q", agent)
 		}
 
@@ -57,7 +22,7 @@ func BuildInteractiveExec(agent, shell, sandboxID, hostname string, tmux bool) (
 			"-A",
 			"-s",
 			agent + "-" + sandboxID,
-			spec.interactive(hostname),
+			definition.InteractiveCommand,
 		}, nil
 	}
 
@@ -65,40 +30,35 @@ func BuildInteractiveExec(agent, shell, sandboxID, hostname string, tmux bool) (
 		return shell, nil, nil
 	}
 
-	spec, ok := specs[agent]
-	if !ok {
+	definition, ok := agentdefs.Lookup(agent)
+	if !ok || definition.InteractiveCommand == "" {
 		return "", nil, fmt.Errorf("interactive mode not supported for agent %q", agent)
 	}
 
-	return shell, []string{"-c", spec.interactive(hostname)}, nil
+	return shell, []string{"-c", definition.InteractiveCommand}, nil
 }
 
 func BuildOneShotExec(agent string) (string, error) {
-	spec, ok := specs[agent]
-	if !ok || spec.oneshot == "" {
+	definition, ok := agentdefs.Lookup(agent)
+	if !ok || definition.OneShotCommand == "" {
 		return "", fmt.Errorf("one-shot mode not supported for agent %q", agent)
 	}
-	return spec.oneshot, nil
+	return definition.OneShotCommand, nil
 }
 
 func DefaultImage(agent, fallback string) string {
-	spec, ok := specs[agent]
-	if !ok || spec.image == "" {
+	definition, ok := agentdefs.Lookup(agent)
+	if !ok || definition.DefaultImage == "" {
 		return fallback
 	}
-	return spec.image
+	return definition.DefaultImage
 }
 
 func HasAgent(agent string) bool {
-	_, ok := specs[agent]
-	return ok
+	definition, ok := agentdefs.Lookup(agent)
+	return ok && definition.InteractiveCommand != ""
 }
 
 func SupportedAgents() []string {
-	names := make([]string, 0, len(specs))
-	for name := range specs {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	return names
+	return agentdefs.LaunchableNames()
 }

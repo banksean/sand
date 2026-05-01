@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/banksean/sand/internal/agentdefs"
 	"github.com/banksean/sand/internal/hostops"
 )
 
@@ -16,89 +17,68 @@ var (
 // This should be called once at application startup.
 func InitializeGlobalRegistry(appRoot string, messenger hostops.UserMessenger, gitOps hostops.GitOps, fileOps hostops.FileOps) *AgentRegistry {
 	globalRegistryOnce.Do(func() {
-		globalRegistry = NewAgentRegistry()
-
 		cloneRoot := filepath.Join(appRoot, "clones")
-
-		// Register default agent
-		globalRegistry.Register(&AgentConfig{
-			Name:          "default",
-			Selectable:    false,
-			Preparation:   NewBaseWorkspacePreparation(cloneRoot, messenger, gitOps, fileOps),
-			Configuration: NewBaseContainerConfiguration(),
-		})
-
-		// Register claude agent
-		globalRegistry.Register(&AgentConfig{
-			Name:          "claude",
-			Selectable:    true,
-			Preparation:   NewClaudeWorkspacePreparation(cloneRoot, messenger, gitOps, fileOps),
-			Configuration: NewClaudeContainerConfiguration(),
-			Capabilities: AgentCapabilities{
-				Auth: &AuthCapabilitySpec{
-					EnvAnyOf: [][]string{
-						{"CLAUDE_CODE_OAUTH_TOKEN"},
-						{"ANTHROPIC_API_KEY"},
-						{"CLAUDE_CODE_OAUTH_REFRESH_TOKEN", "CLAUDE_CODE_OAUTH_SCOPES"},
-					},
-				},
-			},
-		})
-
-		// Register gemini agent
-		globalRegistry.Register(&AgentConfig{
-			Name:          "gemini",
-			Selectable:    true,
-			Preparation:   NewBaseWorkspacePreparation(cloneRoot, messenger, gitOps, fileOps),
-			Configuration: NewBaseContainerConfiguration(),
-			Capabilities: AgentCapabilities{
-				Auth: &AuthCapabilitySpec{
-					EnvAnyOf: [][]string{
-						{"GEMINI_API_KEY"},
-						{"GOOGLE_API_KEY"},
-					},
-				},
-			},
-		})
-
-		// Register codex agent
-		globalRegistry.Register(&AgentConfig{
-			Name:          "codex",
-			Selectable:    true,
-			Preparation:   NewBaseWorkspacePreparation(cloneRoot, messenger, gitOps, fileOps),
-			Configuration: NewBaseContainerConfiguration(),
-			Capabilities: AgentCapabilities{
-				Auth: &AuthCapabilitySpec{
-					EnvAnyOf: [][]string{
-						{"OPENAI_API_KEY"},
-					},
-				},
-			},
-		})
-
-		// Register opencode agent
-		globalRegistry.Register(&AgentConfig{
-			Name:          "opencode",
-			Selectable:    true,
-			Preparation:   NewOpenCodeWorkspacePreparation(cloneRoot, messenger, gitOps, fileOps),
-			Configuration: NewOpenCodeContainerConfiguration(),
-			Capabilities: AgentCapabilities{
-				Auth: &AuthCapabilitySpec{
-					EnvAnyOf: [][]string{
-						{"ANTHROPIC_API_KEY"},
-						{"OPENAI_API_KEY"},
-						{"GEMINI_API_KEY"},
-						{"GOOGLE_API_KEY"},
-						{"AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"},
-						{"AWS_PROFILE"},
-						{"AWS_BEARER_TOKEN_BEDROCK"},
-					},
-				},
-			},
-		})
+		globalRegistry = NewAgentRegistryFromDefinitions(cloneRoot, messenger, gitOps, fileOps)
 	})
 
 	return globalRegistry
+}
+
+// NewAgentRegistryFromDefinitions builds a registry from the central built-in
+// agent declaration table.
+func NewAgentRegistryFromDefinitions(cloneRoot string, messenger hostops.UserMessenger, gitOps hostops.GitOps, fileOps hostops.FileOps) *AgentRegistry {
+	registry := NewAgentRegistry()
+	for _, definition := range agentdefs.All() {
+		registry.Register(newAgentConfigFromDefinition(definition, cloneRoot, messenger, gitOps, fileOps))
+	}
+	return registry
+}
+
+func newAgentConfigFromDefinition(definition agentdefs.Definition, cloneRoot string, messenger hostops.UserMessenger, gitOps hostops.GitOps, fileOps hostops.FileOps) *AgentConfig {
+	return &AgentConfig{
+		Name:          definition.Name,
+		Selectable:    definition.Selectable,
+		Preparation:   workspacePreparationForDefinition(definition, cloneRoot, messenger, gitOps, fileOps),
+		Configuration: containerConfigurationForDefinition(definition),
+		Capabilities:  capabilitiesForDefinition(definition),
+	}
+}
+
+func workspacePreparationForDefinition(definition agentdefs.Definition, cloneRoot string, messenger hostops.UserMessenger, gitOps hostops.GitOps, fileOps hostops.FileOps) WorkspacePreparation {
+	switch definition.Preparation {
+	case agentdefs.PreparationBase:
+		return NewBaseWorkspacePreparation(cloneRoot, messenger, gitOps, fileOps)
+	case agentdefs.PreparationClaude:
+		return NewClaudeWorkspacePreparation(cloneRoot, messenger, gitOps, fileOps)
+	case agentdefs.PreparationOpenCode:
+		return NewOpenCodeWorkspacePreparation(cloneRoot, messenger, gitOps, fileOps)
+	default:
+		panic("unknown agent preparation kind " + string(definition.Preparation))
+	}
+}
+
+func containerConfigurationForDefinition(definition agentdefs.Definition) ContainerConfiguration {
+	switch definition.Container {
+	case agentdefs.ContainerBase:
+		return NewBaseContainerConfiguration()
+	case agentdefs.ContainerClaude:
+		return NewClaudeContainerConfiguration()
+	case agentdefs.ContainerOpenCode:
+		return NewOpenCodeContainerConfiguration()
+	default:
+		panic("unknown agent container kind " + string(definition.Container))
+	}
+}
+
+func capabilitiesForDefinition(definition agentdefs.Definition) AgentCapabilities {
+	if len(definition.AuthEnvAnyOf) == 0 {
+		return AgentCapabilities{}
+	}
+	return AgentCapabilities{
+		Auth: &AuthCapabilitySpec{
+			EnvAnyOf: definition.AuthEnvAnyOf,
+		},
+	}
 }
 
 // GetGlobalRegistry returns the global agent registry.
