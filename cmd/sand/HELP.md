@@ -2,7 +2,7 @@
 
 Manage lightweight linux container sandboxes on MacOS.
 
-Requires apple container CLI: https://github.com/apple/container/releases/tag/0.11.0
+Requires apple container CLI: https://github.com/apple/container/releases/tag/0.12.0
 
 ## Global Flags
 
@@ -48,12 +48,12 @@ sand new [flags] [SANDBOX-NAME]
 - `-i, --image-name` _`<container-image-name>`_ - name of container image to use
 - `-d, --clone-from-dir` _`<project-dir>`_ - directory to clone into the sandbox. Defaults to current working directory, if unset.
 - `-e, --env-file` _`".env"`_ - path to env file associated with the sandbox for agent auth and optional project env injection (default: `.env`)
-- `--project-env` - pass the sandbox env file to plain shell/exec/git commands as non-secret project env
 - `--rm` - remove the sandbox after the command terminates
 - `--allowed-domains-file` _`<file-path>`_ - path to allowed-domains.txt file for DNS egress filtering (overrides the init image default)
 - `-v, --volume` _`<host-path:container-path>,...`_ - bind mount a volume (can be specified multiple times)
 - `--cpu` _`2`_ - number of CPUs to allocate to the container (default: `2`)
 - `--memory` _`1024`_ - how much memory in MiB to allocate to the container (default: `1024`)
+- `--project-env` - pass the sandbox env file to plain shell/exec/git commands as non-secret project env
 - `-s, --shell` _`<shell-command>`_ - shell command to exec in the container (default: `/bin/zsh`)
 - `-t, --tmux` - create or reconnect to a container-side tmux session
 - `-a, --agent` _`<claude|codex|gemini|opencode>`_ - name of coding agent to use
@@ -121,12 +121,12 @@ sand exec [flags] <SANDBOX-NAME> <ARG>...
 - `-i, --image-name` _`<container-image-name>`_ - name of container image to use
 - `-d, --clone-from-dir` _`<project-dir>`_ - directory to clone into the sandbox. Defaults to current working directory, if unset.
 - `-e, --env-file` _`".env"`_ - path to env file associated with the sandbox for agent auth and optional project env injection (default: `.env`)
-- `--project-env` - pass the sandbox env file to plain shell/exec/git commands as non-secret project env
 - `--rm` - remove the sandbox after the command terminates
 - `--allowed-domains-file` _`<file-path>`_ - path to allowed-domains.txt file for DNS egress filtering (overrides the init image default)
 - `-v, --volume` _`<host-path:container-path>,...`_ - bind mount a volume (can be specified multiple times)
 - `--cpu` _`2`_ - number of CPUs to allocate to the container (default: `2`)
 - `--memory` _`1024`_ - how much memory in MiB to allocate to the container (default: `1024`)
+- `--project-env` - pass the sandbox env file to plain shell/exec/git commands as non-secret project env
 - `--username` _`STRING`_ - name of user to exec as (defaults to $USER)
 - `--uid` _`STRING`_ - id of user to exec as (defaults to $UID)
 
@@ -326,3 +326,4 @@ show effective configuration with sources
 ```
 sand config ls
 ```
+
