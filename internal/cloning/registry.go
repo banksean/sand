@@ -32,7 +32,7 @@ func InitializeGlobalRegistry(appRoot string, messenger hostops.UserMessenger, g
 		globalRegistry.Register(&AgentConfig{
 			Name:          "claude",
 			Selectable:    true,
-			Preparation:   NewBaseWorkspacePreparation(cloneRoot, messenger, gitOps, fileOps),
+			Preparation:   NewClaudeWorkspacePreparation(cloneRoot, messenger, gitOps, fileOps),
 			Configuration: NewClaudeContainerConfiguration(),
 			Capabilities: AgentCapabilities{
 				Auth: &AuthCapabilitySpec{
