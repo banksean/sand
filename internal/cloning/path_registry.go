@@ -18,12 +18,6 @@ type PathRegistry interface {
 
 	// SSHKeysDir returns the path to the SSH keys directory
 	SSHKeysDir() string
-
-	// ClaudeDir returns the path to Claude-specific configuration
-	ClaudeDir() string
-
-	// OpenCodeDir returns the path to OpenCode-specific files
-	OpenCodeDir() string
 }
 
 // StandardPathRegistry implements PathRegistry with the standard sandbox directory layout:
@@ -55,12 +49,4 @@ func (p *StandardPathRegistry) DotfilesDir() string {
 
 func (p *StandardPathRegistry) SSHKeysDir() string {
 	return filepath.Join(p.root, "sshkeys")
-}
-
-func (p *StandardPathRegistry) ClaudeDir() string {
-	return filepath.Join(p.DotfilesDir(), ".claude")
-}
-
-func (p *StandardPathRegistry) OpenCodeDir() string {
-	return filepath.Join(p.DotfilesDir(), ".local", "share", "opencode")
 }

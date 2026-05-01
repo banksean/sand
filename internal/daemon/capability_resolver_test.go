@@ -31,10 +31,10 @@ func TestResolveCreateSandboxCapabilitiesRejectsUnknownAgent(t *testing.T) {
 	}
 }
 
-func TestResolveCreateSandboxCapabilitiesAllowsKnownAgentWithoutAuthRequirements(t *testing.T) {
+func TestResolveCreateSandboxCapabilitiesAllowsNoAgentWithoutAuthRequirements(t *testing.T) {
 	d := newCapabilityTestDaemon(t, capabilityTestRegistry(), &hostops.MockContainerOps{})
 
-	caps, err := d.resolveCreateSandboxCapabilities(CreateSandboxOpts{Agent: "opencode"})
+	caps, err := d.resolveCreateSandboxCapabilities(CreateSandboxOpts{})
 	if err != nil {
 		t.Fatalf("resolveCreateSandboxCapabilities returned error: %v", err)
 	}
@@ -43,6 +43,23 @@ func TestResolveCreateSandboxCapabilitiesAllowsKnownAgentWithoutAuthRequirements
 	}
 	if caps.AuthAvailable {
 		t.Fatal("AuthAvailable = true, want false")
+	}
+}
+
+func TestResolveCreateSandboxCapabilitiesSupportsOpenCodeProviderEnv(t *testing.T) {
+	t.Setenv("ANTHROPIC_API_KEY", "")
+	t.Setenv("OPENAI_API_KEY", "opencode-key")
+	d := newCapabilityTestDaemon(t, capabilityTestRegistry(), &hostops.MockContainerOps{})
+
+	caps, err := d.resolveCreateSandboxCapabilities(CreateSandboxOpts{Agent: "opencode"})
+	if err != nil {
+		t.Fatalf("resolveCreateSandboxCapabilities returned error: %v", err)
+	}
+	if !caps.AuthRequired || !caps.AuthAvailable {
+		t.Fatalf("resolved capabilities = %+v, want auth required and available", caps)
+	}
+	if got := caps.AuthEnv["OPENAI_API_KEY"]; got != "opencode-key" {
+		t.Fatalf("resolved OPENAI_API_KEY = %q, want %q", got, "opencode-key")
 	}
 }
 
@@ -291,6 +308,19 @@ func capabilityTestRegistry() *cloning.AgentRegistry {
 		Selectable:    true,
 		Preparation:   prep,
 		Configuration: config,
+		Capabilities: cloning.AgentCapabilities{
+			Auth: &cloning.AuthCapabilitySpec{
+				EnvAnyOf: [][]string{
+					{"ANTHROPIC_API_KEY"},
+					{"OPENAI_API_KEY"},
+					{"GEMINI_API_KEY"},
+					{"GOOGLE_API_KEY"},
+					{"AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"},
+					{"AWS_PROFILE"},
+					{"AWS_BEARER_TOKEN_BEDROCK"},
+				},
+			},
+		},
 	})
 	return r
 }

@@ -32,7 +32,7 @@ func InitializeGlobalRegistry(appRoot string, messenger hostops.UserMessenger, g
 		globalRegistry.Register(&AgentConfig{
 			Name:          "claude",
 			Selectable:    true,
-			Preparation:   NewClaudeWorkspacePreparation(cloneRoot, messenger, gitOps, fileOps),
+			Preparation:   NewBaseWorkspacePreparation(cloneRoot, messenger, gitOps, fileOps),
 			Configuration: NewClaudeContainerConfiguration(),
 			Capabilities: AgentCapabilities{
 				Auth: &AuthCapabilitySpec{
@@ -82,6 +82,19 @@ func InitializeGlobalRegistry(appRoot string, messenger hostops.UserMessenger, g
 			Selectable:    true,
 			Preparation:   NewOpenCodeWorkspacePreparation(cloneRoot, messenger, gitOps, fileOps),
 			Configuration: NewOpenCodeContainerConfiguration(),
+			Capabilities: AgentCapabilities{
+				Auth: &AuthCapabilitySpec{
+					EnvAnyOf: [][]string{
+						{"ANTHROPIC_API_KEY"},
+						{"OPENAI_API_KEY"},
+						{"GEMINI_API_KEY"},
+						{"GOOGLE_API_KEY"},
+						{"AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"},
+						{"AWS_PROFILE"},
+						{"AWS_BEARER_TOKEN_BEDROCK"},
+					},
+				},
+			},
 		})
 	})
 
