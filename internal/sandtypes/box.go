@@ -28,8 +28,8 @@ type Box struct {
 	// DNSDomain is the dns domain for the sandbox's network
 	DNSDomain string
 	// EnvFile is the host filesystem path to the sandbox-associated env file.
-	// Agent capability resolution and agent launches may use it directly; plain
-	// shell/exec paths only use it when explicitly requested as project env.
+	// Agent capability resolution may read it at launch time; plain shell/exec
+	// paths only use it when explicitly requested as project env.
 	EnvFile string
 	// AllowedDomains is the list of domains the sandbox container is permitted to contact.
 	// When non-empty, this overrides the default allowlist baked into the init image.

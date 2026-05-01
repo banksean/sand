@@ -19,6 +19,15 @@ type StartSandboxRequest struct {
 	SSHAgent bool `json:"sshAgent,omitempty"`
 }
 
+type ResolveAgentLaunchEnvRequest struct {
+	Agent   string `json:"agent"`
+	EnvFile string `json:"envFile,omitempty"`
+}
+
+type ResolveAgentLaunchEnvResponse struct {
+	Env map[string]string `json:"env,omitempty"`
+}
+
 // ExportRequest is the request body for the /export endpoint.
 type ExportRequest struct {
 	ID              string `json:"id"`

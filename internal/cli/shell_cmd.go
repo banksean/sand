@@ -66,5 +66,5 @@ func (c *ShellCmd) Run(cctx *CLIContext) error {
 		args = []string{"new-session", "-A"}
 	}
 
-	return runShell(ctx, sbox, shell, args, false, plainCommandEnvFile(sbox, c.ProjectEnv))
+	return runShell(ctx, sbox, shell, args, false, plainCommandEnvFile(sbox, c.ProjectEnv), nil)
 }

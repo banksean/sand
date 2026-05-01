@@ -200,7 +200,20 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 		return err
 	}
 
-	if err := runShell(ctx, sbox, shell, args, c.Agent != "", interactiveCommandEnvFile(sbox, c.Agent != "", c.ProjectEnv)); err != nil {
+	var agentEnv map[string]string
+	if c.Agent != "" {
+		agentEnv, err = mc.ResolveAgentLaunchEnv(ctx, c.Agent, sbox.EnvFile)
+		if err != nil {
+			return err
+		}
+	}
+
+	envFile := ""
+	if c.Agent == "" {
+		envFile = plainCommandEnvFile(sbox, c.ProjectEnv)
+	}
+
+	if err := runShell(ctx, sbox, shell, args, c.Agent != "", envFile, agentEnv); err != nil {
 		return err
 	}
 

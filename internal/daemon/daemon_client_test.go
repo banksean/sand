@@ -124,6 +124,41 @@ func TestDefaultClientStartSandbox(t *testing.T) {
 	}
 }
 
+func TestDefaultClientResolveAgentLaunchEnv(t *testing.T) {
+	var gotReq ResolveAgentLaunchEnvRequest
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/resolve-agent-env" {
+			t.Fatalf("unexpected path %q", r.URL.Path)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&gotReq); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		_ = json.NewEncoder(w).Encode(ResolveAgentLaunchEnvResponse{
+			Env: map[string]string{"OPENAI_API_KEY": "sk-test"},
+		})
+	}))
+	defer srv.Close()
+
+	client := &defaultClient{
+		base:       srv.URL,
+		httpClient: srv.Client(),
+	}
+
+	env, err := client.ResolveAgentLaunchEnv(context.Background(), "codex", "/tmp/test.env")
+	if err != nil {
+		t.Fatalf("ResolveAgentLaunchEnv() error = %v", err)
+	}
+	if gotReq.Agent != "codex" {
+		t.Fatalf("ResolveAgentLaunchEnv() request agent = %q, want %q", gotReq.Agent, "codex")
+	}
+	if gotReq.EnvFile != "/tmp/test.env" {
+		t.Fatalf("ResolveAgentLaunchEnv() request envFile = %q, want %q", gotReq.EnvFile, "/tmp/test.env")
+	}
+	if env["OPENAI_API_KEY"] != "sk-test" {
+		t.Fatalf("ResolveAgentLaunchEnv() env = %+v, want OPENAI_API_KEY", env)
+	}
+}
+
 var testSandboxBox = sandBox()
 
 func sandBox() sandtypes.Box {

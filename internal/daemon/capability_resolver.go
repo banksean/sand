@@ -5,25 +5,44 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/banksean/sand/internal/cloning"
 )
 
 type resolvedAgentCapabilities struct {
 	AuthRequired  bool
 	AuthAvailable bool
+	AuthEnv       map[string]string
+}
+
+func (d *Daemon) validateSelectableAgent(agent string) error {
+	if agent == "" {
+		return nil
+	}
+	_, err := d.lookupSelectableAgent(agent)
+	return err
+}
+
+func (d *Daemon) lookupSelectableAgent(agent string) (*cloning.AgentConfig, error) {
+	if d.boxer == nil || d.boxer.AgentRegistry == nil {
+		return nil, fmt.Errorf("agent registry is not initialized")
+	}
+
+	agentConfig, ok := d.boxer.AgentRegistry.Lookup(agent)
+	if !ok || !agentConfig.Selectable {
+		return nil, fmt.Errorf("unknown agent %q (supported: %s)", agent, strings.Join(d.boxer.AgentRegistry.SelectableNames(), ", "))
+	}
+	return agentConfig, nil
 }
 
 func (d *Daemon) resolveCreateSandboxCapabilities(opts CreateSandboxOpts) (resolvedAgentCapabilities, error) {
-	if d.boxer == nil || d.boxer.AgentRegistry == nil {
-		return resolvedAgentCapabilities{}, fmt.Errorf("agent registry is not initialized")
-	}
-
 	if opts.Agent == "" {
 		return resolvedAgentCapabilities{}, nil
 	}
 
-	agentConfig, ok := d.boxer.AgentRegistry.Lookup(opts.Agent)
-	if !ok || !agentConfig.Selectable {
-		return resolvedAgentCapabilities{}, fmt.Errorf("unknown agent %q (supported: %s)", opts.Agent, strings.Join(d.boxer.AgentRegistry.SelectableNames(), ", "))
+	agentConfig, err := d.lookupSelectableAgent(opts.Agent)
+	if err != nil {
+		return resolvedAgentCapabilities{}, err
 	}
 
 	fileEnv, err := loadEnvFileValues(opts.EnvFile)
@@ -38,39 +57,49 @@ func (d *Daemon) resolveCreateSandboxCapabilities(opts CreateSandboxOpts) (resol
 	}
 
 	resolved.AuthRequired = true
-	if hasAnyEnvGroup(authSpec.EnvAnyOf, fileEnv) {
+	if authEnv, ok := resolveAnyEnvGroup(authSpec.EnvAnyOf, fileEnv); ok {
 		resolved.AuthAvailable = true
+		resolved.AuthEnv = authEnv
 		return resolved, nil
 	}
 
 	return resolved, fmt.Errorf(
-		"agent %q requires authentication env vars before sandbox creation; set one of [%s] in the sandd environment or %s",
+		"agent %q requires authentication env vars before launch; set one of [%s] in the sandd environment or %s",
 		opts.Agent,
 		formatEnvGroups(authSpec.EnvAnyOf),
 		formatEnvFileForError(opts.EnvFile),
 	)
 }
 
-func hasAnyEnvGroup(groups [][]string, fileEnv map[string]string) bool {
+func resolveAnyEnvGroup(groups [][]string, fileEnv map[string]string) (map[string]string, bool) {
 	for _, group := range groups {
-		if hasAllEnvVars(group, fileEnv) {
-			return true
+		if values, ok := resolveAllEnvVars(group, fileEnv); ok {
+			return values, true
 		}
 	}
-	return false
+	return nil, false
 }
 
-func hasAllEnvVars(names []string, fileEnv map[string]string) bool {
+func resolveAllEnvVars(names []string, fileEnv map[string]string) (map[string]string, bool) {
+	values := make(map[string]string, len(names))
 	for _, name := range names {
-		if value, ok := os.LookupEnv(name); ok && strings.TrimSpace(value) != "" {
-			continue
+		value, ok := resolveEnvValue(name, fileEnv)
+		if !ok {
+			return nil, false
 		}
-		if value := strings.TrimSpace(fileEnv[name]); value != "" {
-			continue
-		}
-		return false
+		values[name] = value
 	}
-	return true
+	return values, true
+}
+
+func resolveEnvValue(name string, fileEnv map[string]string) (string, bool) {
+	if value, ok := os.LookupEnv(name); ok && strings.TrimSpace(value) != "" {
+		return value, true
+	}
+	if value := strings.TrimSpace(fileEnv[name]); value != "" {
+		return value, true
+	}
+	return "", false
 }
 
 func loadEnvFileValues(path string) (map[string]string, error) {

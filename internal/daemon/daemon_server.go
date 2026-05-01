@@ -198,6 +198,7 @@ func (d *Daemon) serveOutieSocket(ctx context.Context) {
 	mux.HandleFunc("/remove", slogHandler(d.handleRemove))
 	mux.HandleFunc("/stop", slogHandler(d.handleStop))
 	mux.HandleFunc("/start", slogHandler(d.handleStart))
+	mux.HandleFunc("/resolve-agent-env", slogHandler(d.handleResolveAgentLaunchEnv))
 	mux.HandleFunc("/create-stream", slogHandler(d.handleCreateStream))
 	mux.HandleFunc("/ensure-image", slogHandler(d.handleEnsureImage))
 	mux.HandleFunc("/export", slogHandler(d.handleExport))
@@ -569,6 +570,29 @@ func (d *Daemon) handleStart(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, StatusResponse{Status: "ok"})
 }
 
+func (d *Daemon) handleResolveAgentLaunchEnv(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req ResolveAgentLaunchEnvRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	resolved, err := d.resolveCreateSandboxCapabilities(CreateSandboxOpts{
+		Agent:   req.Agent,
+		EnvFile: req.EnvFile,
+	})
+	if err != nil {
+		writeJSONError(w, err, http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, ResolveAgentLaunchEnvResponse{Env: resolved.AuthEnv})
+}
+
 // handleEnsureImage pulls the requested image if it is absent or stale, streaming
 // progress lines to the client as plain text. The final line is "OK\n" on success
 // or "ERR <message>\n" on failure.
@@ -835,11 +859,9 @@ func (d *Daemon) createSandbox(ctx context.Context, opts CreateSandboxOpts, prog
 	}
 	slog.InfoContext(ctx, "createSandbox", "agentType", agentType, "opts", opts)
 
-	resolvedCaps, err := d.resolveCreateSandboxCapabilities(opts)
-	if err != nil {
+	if err := d.validateSelectableAgent(opts.Agent); err != nil {
 		return nil, err
 	}
-	slog.InfoContext(ctx, "createSandbox resolved capabilities", "authRequired", resolvedCaps.AuthRequired, "authAvailable", resolvedCaps.AuthAvailable)
 
 	sbox, err := d.boxer.NewSandbox(ctx, boxer.NewSandboxOpts{
 		AgentType:      agentType,

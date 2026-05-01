@@ -117,19 +117,18 @@ func (c *OneshotCmd) Run(cctx *CLIContext) error {
 
 	containerSvc := hostops.NewAppleContainerOps()
 	hostname := types.GetContainerHostname(sbox.Container)
-	env := map[string]string{
-		"HOSTNAME":            hostname,
-		"LANG":                os.Getenv("LANG"),
-		"TERM":                os.Getenv("TERM"),
-		"SAND_ONESHOT_PROMPT": c.Prompt,
+	authEnv, err := mc.ResolveAgentLaunchEnv(ctx, c.Agent, sbox.EnvFile)
+	if err != nil {
+		return err
 	}
+	env := buildInteractiveEnv(hostname, true, authEnv)
+	env["SAND_ONESHOT_PROMPT"] = c.Prompt
 	wait, err := containerSvc.ExecStream(ctx,
 		&options.ExecContainer{
 			ProcessOptions: options.ProcessOptions{
 				Interactive: true,
 				TTY:         true,
 				WorkDir:     "/app",
-				EnvFile:     sbox.EnvFile,
 				Env:         env,
 				User:        c.Username,
 				UID:         c.Uid,

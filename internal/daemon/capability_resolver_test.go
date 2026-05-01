@@ -9,9 +9,11 @@ import (
 	"testing"
 
 	"github.com/banksean/sand/internal/applecontainer/options"
+	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/cloning"
 	"github.com/banksean/sand/internal/daemon/internal/boxer"
 	"github.com/banksean/sand/internal/hostops"
+	"github.com/banksean/sand/internal/sshimmer"
 )
 
 func TestResolveCreateSandboxCapabilitiesRejectsUnknownAgent(t *testing.T) {
@@ -55,6 +57,9 @@ func TestResolveCreateSandboxCapabilitiesUsesProcessEnv(t *testing.T) {
 	if !caps.AuthRequired || !caps.AuthAvailable {
 		t.Fatalf("resolved capabilities = %+v, want auth required and available", caps)
 	}
+	if got := caps.AuthEnv["OPENAI_API_KEY"]; got != "test-key" {
+		t.Fatalf("resolved OPENAI_API_KEY = %q, want %q", got, "test-key")
+	}
 }
 
 func TestResolveCreateSandboxCapabilitiesUsesEnvFile(t *testing.T) {
@@ -72,6 +77,9 @@ func TestResolveCreateSandboxCapabilitiesUsesEnvFile(t *testing.T) {
 	}
 	if !caps.AuthRequired || !caps.AuthAvailable {
 		t.Fatalf("resolved capabilities = %+v, want auth required and available", caps)
+	}
+	if got := caps.AuthEnv["OPENAI_API_KEY"]; got != "from-file" {
+		t.Fatalf("resolved OPENAI_API_KEY = %q, want %q", got, "from-file")
 	}
 }
 
@@ -93,6 +101,12 @@ func TestResolveCreateSandboxCapabilitiesSupportsMultiVarRequirementGroup(t *tes
 	}
 	if !caps.AuthRequired || !caps.AuthAvailable {
 		t.Fatalf("resolved capabilities = %+v, want auth required and available", caps)
+	}
+	if got := caps.AuthEnv["CLAUDE_CODE_OAUTH_REFRESH_TOKEN"]; got != "refresh" {
+		t.Fatalf("resolved refresh token = %q, want %q", got, "refresh")
+	}
+	if got := caps.AuthEnv["CLAUDE_CODE_OAUTH_SCOPES"]; got != "user:profile" {
+		t.Fatalf("resolved scopes = %q, want %q", got, "user:profile")
 	}
 }
 
@@ -138,13 +152,21 @@ func TestLoadEnvFileValuesParsesExportAndQuotedValues(t *testing.T) {
 	}
 }
 
-func TestCreateSandboxRejectsMissingAuthBeforeSandboxCreation(t *testing.T) {
+func TestCreateSandboxAllowsMissingAuthBeforeAgentLaunch(t *testing.T) {
 	t.Setenv("OPENAI_API_KEY", "")
 	var createCalls int
+	var inspectCalls int
 	d := newCapabilityTestDaemon(t, capabilityTestRegistry(), &hostops.MockContainerOps{
 		CreateFunc: func(ctx context.Context, _ *options.CreateContainer, image string, args []string) (string, error) {
 			createCalls++
 			return "mock-container-id", nil
+		},
+		InspectFunc: func(ctx context.Context, containerID string) ([]types.Container, error) {
+			inspectCalls++
+			if inspectCalls == 1 {
+				return nil, nil
+			}
+			return []types.Container{{Status: "running"}}, nil
 		},
 	})
 
@@ -152,8 +174,32 @@ func TestCreateSandboxRejectsMissingAuthBeforeSandboxCreation(t *testing.T) {
 		ID:    "test-box",
 		Agent: "codex",
 	}, io.Discard)
+	if err != nil {
+		t.Fatalf("createSandbox() error = %v, want nil", err)
+	}
+	if createCalls != 1 {
+		t.Fatalf("container Create called %d times, want 1", createCalls)
+	}
+}
+
+func TestCreateSandboxRejectsUnknownAgentBeforeSandboxCreation(t *testing.T) {
+	var createCalls int
+	d := newCapabilityTestDaemon(t, capabilityTestRegistry(), &hostops.MockContainerOps{
+		CreateFunc: func(ctx context.Context, _ *options.CreateContainer, image string, args []string) (string, error) {
+			createCalls++
+			return "mock-container-id", nil
+		},
+		InspectFunc: func(ctx context.Context, containerID string) ([]types.Container, error) {
+			return nil, nil
+		},
+	})
+
+	_, err := d.createSandbox(context.Background(), CreateSandboxOpts{
+		ID:    "test-box",
+		Agent: "not-real",
+	}, io.Discard)
 	if err == nil {
-		t.Fatal("expected error for missing auth env")
+		t.Fatal("expected error for unknown agent")
 	}
 	if createCalls != 0 {
 		t.Fatalf("container Create called %d times, want 0", createCalls)
@@ -166,7 +212,13 @@ func newCapabilityTestDaemon(t *testing.T, registry *cloning.AgentRegistry, cont
 	appDir := t.TempDir()
 	b, err := boxer.NewBoxerWithDeps(appDir, boxer.BoxerDeps{
 		ContainerService: containerSvc,
-		AgentRegistry:    registry,
+		GitOps:           &hostops.MockGitOps{},
+		FileOps: &hostops.MockFileOps{
+			MkdirAllFunc: os.MkdirAll,
+			CreateFunc:   os.Create,
+		},
+		SSHim:         &capabilityTestSSHimmer{},
+		AgentRegistry: registry,
 	})
 	if err != nil {
 		t.Fatalf("NewBoxerWithDeps: %v", err)
@@ -177,11 +229,19 @@ func newCapabilityTestDaemon(t *testing.T, registry *cloning.AgentRegistry, cont
 }
 
 func capabilityTestRegistry() *cloning.AgentRegistry {
+	prep := &capabilityTestPreparation{cloneRoot: filepath.Join(os.TempDir(), "sand-capability-test")}
+	config := cloning.NewBaseContainerConfiguration()
 	r := cloning.NewAgentRegistry()
-	r.Register(&cloning.AgentConfig{Name: "default"})
 	r.Register(&cloning.AgentConfig{
-		Name:       "claude",
-		Selectable: true,
+		Name:          "default",
+		Preparation:   prep,
+		Configuration: config,
+	})
+	r.Register(&cloning.AgentConfig{
+		Name:          "claude",
+		Selectable:    true,
+		Preparation:   prep,
+		Configuration: config,
 		Capabilities: cloning.AgentCapabilities{
 			Auth: &cloning.AuthCapabilitySpec{
 				EnvAnyOf: [][]string{
@@ -193,8 +253,10 @@ func capabilityTestRegistry() *cloning.AgentRegistry {
 		},
 	})
 	r.Register(&cloning.AgentConfig{
-		Name:       "codex",
-		Selectable: true,
+		Name:          "codex",
+		Selectable:    true,
+		Preparation:   prep,
+		Configuration: config,
 		Capabilities: cloning.AgentCapabilities{
 			Auth: &cloning.AuthCapabilitySpec{
 				EnvAnyOf: [][]string{
@@ -204,8 +266,10 @@ func capabilityTestRegistry() *cloning.AgentRegistry {
 		},
 	})
 	r.Register(&cloning.AgentConfig{
-		Name:       "gemini",
-		Selectable: true,
+		Name:          "gemini",
+		Selectable:    true,
+		Preparation:   prep,
+		Configuration: config,
 		Capabilities: cloning.AgentCapabilities{
 			Auth: &cloning.AuthCapabilitySpec{
 				EnvAnyOf: [][]string{
@@ -216,8 +280,36 @@ func capabilityTestRegistry() *cloning.AgentRegistry {
 		},
 	})
 	r.Register(&cloning.AgentConfig{
-		Name:       "opencode",
-		Selectable: true,
+		Name:          "opencode",
+		Selectable:    true,
+		Preparation:   prep,
+		Configuration: config,
 	})
 	return r
+}
+
+type capabilityTestPreparation struct {
+	cloneRoot string
+}
+
+func (p *capabilityTestPreparation) Prepare(_ context.Context, req cloning.CloneRequest) (*cloning.CloneArtifacts, error) {
+	sandboxRoot := filepath.Join(p.cloneRoot, req.ID)
+	return &cloning.CloneArtifacts{
+		SandboxWorkDir:    sandboxRoot,
+		PathRegistry:      cloning.NewStandardPathRegistry(sandboxRoot),
+		Username:          req.Username,
+		Uid:               req.Uid,
+		SharedCacheMounts: req.SharedCacheMounts,
+	}, nil
+}
+
+type capabilityTestSSHimmer struct{}
+
+func (s *capabilityTestSSHimmer) NewKeys(_ context.Context, _, _ string) (*sshimmer.Keys, error) {
+	return &sshimmer.Keys{
+		HostKey:     []byte("fake-host-key"),
+		HostKeyPub:  []byte("fake-host-key-pub"),
+		HostKeyCert: []byte("fake-host-key-cert"),
+		UserCAPub:   []byte("fake-user-ca-pub"),
+	}, nil
 }

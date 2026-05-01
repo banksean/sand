@@ -30,6 +30,7 @@ type Client interface {
 	RemoveSandbox(ctx context.Context, id string) error
 	StopSandbox(ctx context.Context, id string) error
 	StartSandbox(ctx context.Context, opts StartSandboxOpts) error
+	ResolveAgentLaunchEnv(ctx context.Context, agent, envFile string) (map[string]string, error)
 	ExportImage(ctx context.Context, id, imageName string) error
 	Stats(ctx context.Context, id ...string) ([]types.ContainerStats, error)
 	VSC(ctx context.Context, id string) error
@@ -191,6 +192,20 @@ func (m *defaultClient) StartSandbox(ctx context.Context, opts StartSandboxOpts)
 		ID:       opts.ID,
 		SSHAgent: opts.SSHAgent,
 	}, nil)
+}
+
+func (m *defaultClient) ResolveAgentLaunchEnv(ctx context.Context, agent, envFile string) (map[string]string, error) {
+	var resp ResolveAgentLaunchEnvResponse
+	if err := m.doRequest(ctx, http.MethodPost, "/resolve-agent-env", ResolveAgentLaunchEnvRequest{
+		Agent:   agent,
+		EnvFile: envFile,
+	}, &resp); err != nil {
+		return nil, err
+	}
+	if resp.Env == nil {
+		return map[string]string{}, nil
+	}
+	return resp.Env, nil
 }
 
 func (m *defaultClient) VSC(ctx context.Context, id string) error {

@@ -36,11 +36,14 @@ func NewSandboxNamePredictor(mc daemon.Client) complete.Predictor {
 	return &sandboxNamePredictor{mc: mc}
 }
 
-func buildInteractiveEnv(hostname string, scrubSSHAgent bool) map[string]string {
+func buildInteractiveEnv(hostname string, scrubSSHAgent bool, extraEnv map[string]string) map[string]string {
 	env := map[string]string{
 		"HOSTNAME": hostname,
 		"LANG":     os.Getenv("LANG"),
 		"TERM":     os.Getenv("TERM"),
+	}
+	for key, value := range extraEnv {
+		env[key] = value
 	}
 	if scrubSSHAgent {
 		// Clear the standard ssh-agent variables for the initial agent process.
@@ -59,19 +62,12 @@ func plainCommandEnvFile(sbox *sandtypes.Box, includeProjectEnv bool) string {
 	return sbox.EnvFile
 }
 
-func interactiveCommandEnvFile(sbox *sandtypes.Box, agentMode, includeProjectEnv bool) string {
-	if agentMode && sbox != nil {
-		return sbox.EnvFile
-	}
-	return plainCommandEnvFile(sbox, includeProjectEnv)
-}
-
 // runShell executes an interactive shell or command in sbox's container,
 // connecting the current process's stdin/stdout/stderr. shell and args are
 // passed directly to ExecStream. Non-zero shell exit is logged but not
 // returned as an error — an interactive session ending with a non-zero code
 // is not a CLI failure.
-func runShell(ctx context.Context, sbox *sandtypes.Box, shell string, args []string, scrubSSHAgent bool, envFile string) error {
+func runShell(ctx context.Context, sbox *sandtypes.Box, shell string, args []string, scrubSSHAgent bool, envFile string, extraEnv map[string]string) error {
 	if sbox.Container == nil {
 		return fmt.Errorf("sandbox %s has no container", sbox.ID)
 	}
@@ -83,7 +79,7 @@ func runShell(ctx context.Context, sbox *sandtypes.Box, shell string, args []str
 				Interactive: true,
 				TTY:         true,
 				WorkDir:     "/app",
-				Env:         buildInteractiveEnv(hostname, scrubSSHAgent),
+				Env:         buildInteractiveEnv(hostname, scrubSSHAgent, extraEnv),
 				EnvFile:     envFile,
 				User:        sbox.Username,
 				UID:         sbox.Uid,

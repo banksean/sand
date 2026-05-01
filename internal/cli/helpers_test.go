@@ -8,7 +8,7 @@ import (
 
 func TestBuildInteractiveEnv(t *testing.T) {
 	t.Run("default shell env", func(t *testing.T) {
-		env := buildInteractiveEnv("sandbox.local", false)
+		env := buildInteractiveEnv("sandbox.local", false, nil)
 		if env["HOSTNAME"] != "sandbox.local" {
 			t.Fatalf("HOSTNAME = %q, want sandbox.local", env["HOSTNAME"])
 		}
@@ -21,12 +21,15 @@ func TestBuildInteractiveEnv(t *testing.T) {
 	})
 
 	t.Run("agent shell scrubs ssh agent vars", func(t *testing.T) {
-		env := buildInteractiveEnv("sandbox.local", true)
+		env := buildInteractiveEnv("sandbox.local", true, map[string]string{"OPENAI_API_KEY": "sk-test"})
 		if env["SSH_AUTH_SOCK"] != "" {
 			t.Fatalf("SSH_AUTH_SOCK = %q, want empty string", env["SSH_AUTH_SOCK"])
 		}
 		if env["SSH_AGENT_PID"] != "" {
 			t.Fatalf("SSH_AGENT_PID = %q, want empty string", env["SSH_AGENT_PID"])
+		}
+		if env["OPENAI_API_KEY"] != "sk-test" {
+			t.Fatalf("OPENAI_API_KEY = %q, want %q", env["OPENAI_API_KEY"], "sk-test")
 		}
 	})
 }
@@ -39,19 +42,5 @@ func TestPlainCommandEnvFile(t *testing.T) {
 	}
 	if got := plainCommandEnvFile(sbox, true); got != sbox.EnvFile {
 		t.Fatalf("plainCommandEnvFile(true) = %q, want %q", got, sbox.EnvFile)
-	}
-}
-
-func TestInteractiveCommandEnvFile(t *testing.T) {
-	sbox := &sandtypes.Box{EnvFile: "/tmp/project.env"}
-
-	if got := interactiveCommandEnvFile(sbox, false, false); got != "" {
-		t.Fatalf("interactiveCommandEnvFile(non-agent, false) = %q, want empty", got)
-	}
-	if got := interactiveCommandEnvFile(sbox, false, true); got != sbox.EnvFile {
-		t.Fatalf("interactiveCommandEnvFile(non-agent, true) = %q, want %q", got, sbox.EnvFile)
-	}
-	if got := interactiveCommandEnvFile(sbox, true, false); got != sbox.EnvFile {
-		t.Fatalf("interactiveCommandEnvFile(agent, false) = %q, want %q", got, sbox.EnvFile)
 	}
 }
