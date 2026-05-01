@@ -3,7 +3,6 @@ package agentlaunch
 import (
 	"fmt"
 	"sort"
-	"strings"
 )
 
 type spec struct {
@@ -34,8 +33,8 @@ var specs = map[string]spec{
 		image:   "ghcr.io/banksean/sand/gemini:latest",
 	},
 	"opencode": {
-		interactive: func(hostname string) string {
-			return "opencode --port 80 --hostname " + strings.TrimSuffix(hostname, ".")
+		interactive: func(_ string) string {
+			return "opencode"
 		},
 		oneshot: `opencode run "$SAND_ONESHOT_PROMPT"`,
 		image:   "ghcr.io/banksean/sand/opencode:latest",

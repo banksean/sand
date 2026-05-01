@@ -45,7 +45,7 @@ func TestBuildInteractiveExec(t *testing.T) {
 			wantArgs:  []string{"new-session", "-A", "-s", "sand-1"},
 		},
 		{
-			name:      "tmux wraps opencode command",
+			name:      "tmux wraps opencode tui command",
 			agent:     "opencode",
 			shell:     "/bin/zsh",
 			sandboxID: "sand-1",
@@ -57,7 +57,7 @@ func TestBuildInteractiveExec(t *testing.T) {
 				"-A",
 				"-s",
 				"opencode-sand-1",
-				"opencode --port 80 --hostname sand-1.test",
+				"opencode",
 			},
 		},
 		{
