@@ -2,11 +2,14 @@ package daemon
 
 import (
 	"context"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/daemon/internal/boxer"
 	"github.com/banksean/sand/internal/hostops"
 )
@@ -17,12 +20,44 @@ func newDaemonForTest(t *testing.T, appDir string) *Daemon {
 	t.Helper()
 	b, err := boxer.NewBoxerWithDeps(appDir, boxer.BoxerDeps{
 		ContainerService: &hostops.MockContainerOps{},
+		ImageService: &testImageOps{
+			ListFunc: func(context.Context) ([]types.ImageEntry, error) {
+				return []types.ImageEntry{{Reference: "test-image:latest"}}, nil
+			},
+		},
 	})
 	if err != nil {
 		t.Fatalf("NewBoxerWithDeps: %v", err)
 	}
 	t.Cleanup(func() { b.Close() })
 	return NewDaemonWithBoxer(appDir, "test", b)
+}
+
+type testImageOps struct {
+	ListFunc    func(context.Context) ([]types.ImageEntry, error)
+	PullFunc    func(context.Context, string, io.Writer) (func() error, error)
+	InspectFunc func(context.Context, string) ([]*types.ImageManifest, error)
+}
+
+func (m *testImageOps) List(ctx context.Context) ([]types.ImageEntry, error) {
+	if m.ListFunc != nil {
+		return m.ListFunc(ctx)
+	}
+	return nil, nil
+}
+
+func (m *testImageOps) Pull(ctx context.Context, image string, w io.Writer) (func() error, error) {
+	if m.PullFunc != nil {
+		return m.PullFunc(ctx, image, w)
+	}
+	return func() error { return nil }, nil
+}
+
+func (m *testImageOps) Inspect(ctx context.Context, name string) ([]*types.ImageManifest, error) {
+	if m.InspectFunc != nil {
+		return m.InspectFunc(ctx, name)
+	}
+	return nil, nil
 }
 
 func TestDaemonHTTPPing(t *testing.T) {
@@ -116,6 +151,78 @@ func TestDaemonStartsHTTPAndGRPCSockets(t *testing.T) {
 		t.Fatalf("gRPC Version() failed: %v", err)
 	}
 	t.Logf("gRPC version info: %+v", versionInfo)
+
+	dmn.Shutdown(ctx)
+}
+
+func TestDaemonGRPCEnsureImage(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "dmn-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	dmn := newDaemonForTest(t, tmpDir)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	go func() {
+		if err := dmn.ServeUnixSocket(ctx); err != nil {
+			t.Logf("Mux serve error: %v", err)
+		}
+	}()
+	waitForSocket(t, filepath.Join(tmpDir, DefaultGRPCSocketFile))
+
+	client, err := NewUnixSocketGRPCClient(ctx, tmpDir)
+	if err != nil {
+		t.Fatalf("Failed to create gRPC client: %v", err)
+	}
+	defer client.Close()
+
+	if err := client.EnsureImage(ctx, "test-image:latest", io.Discard); err != nil {
+		t.Fatalf("gRPC EnsureImage() failed: %v", err)
+	}
+
+	dmn.Shutdown(ctx)
+}
+
+func TestDaemonGRPCCreateSandboxStreamsError(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "dmn-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	dmn := newDaemonForTest(t, tmpDir)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	go func() {
+		if err := dmn.ServeUnixSocket(ctx); err != nil {
+			t.Logf("Mux serve error: %v", err)
+		}
+	}()
+	waitForSocket(t, filepath.Join(tmpDir, DefaultGRPCSocketFile))
+
+	client, err := NewUnixSocketGRPCClient(ctx, tmpDir)
+	if err != nil {
+		t.Fatalf("Failed to create gRPC client: %v", err)
+	}
+	defer client.Close()
+
+	box, err := client.CreateSandbox(ctx, CreateSandboxOpts{
+		ID:    "test-sandbox",
+		Agent: "missing-agent",
+	}, io.Discard)
+	if err == nil {
+		t.Fatal("gRPC CreateSandbox() error = nil, want error")
+	}
+	if box != nil {
+		t.Fatalf("gRPC CreateSandbox() box = %#v, want nil", box)
+	}
+	if !strings.Contains(err.Error(), "unknown agent") {
+		t.Fatalf("gRPC CreateSandbox() error = %q, want unknown agent", err)
+	}
 
 	dmn.Shutdown(ctx)
 }

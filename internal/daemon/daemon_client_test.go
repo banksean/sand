@@ -4,12 +4,17 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/banksean/sand/internal/daemon/daemonpb"
 	"github.com/banksean/sand/internal/sandtypes"
+	"google.golang.org/grpc"
 )
 
 func TestDefaultClientCreateSandbox(t *testing.T) {
@@ -91,6 +96,172 @@ func TestDefaultClientCreateSandbox(t *testing.T) {
 	})
 }
 
+func TestGRPCClientCreateSandbox(t *testing.T) {
+	t.Run("streams progress and returns sandbox", func(t *testing.T) {
+		appDir := t.TempDir()
+		srv := startTestGRPCDaemon(t, appDir, &testGRPCDaemonService{
+			CreateSandboxFunc: func(req *daemonpb.CreateSandboxRequest, stream daemonpb.DaemonService_CreateSandboxServer) error {
+				if req.GetId() != "test-box" {
+					t.Fatalf("CreateSandbox request ID = %q, want test-box", req.GetId())
+				}
+				if err := stream.Send(&daemonpb.CreateSandboxResponse{
+					Event: &daemonpb.CreateSandboxResponse_Progress{Progress: "step 1\n"},
+				}); err != nil {
+					return err
+				}
+				if err := stream.Send(&daemonpb.CreateSandboxResponse{
+					Event: &daemonpb.CreateSandboxResponse_Progress{Progress: "step 2\n"},
+				}); err != nil {
+					return err
+				}
+				boxJSON, err := json.Marshal(testSandboxBox)
+				if err != nil {
+					return err
+				}
+				return stream.Send(&daemonpb.CreateSandboxResponse{
+					Event: &daemonpb.CreateSandboxResponse_BoxJson{BoxJson: boxJSON},
+				})
+			},
+		})
+		defer srv.Stop()
+
+		client, err := NewUnixSocketGRPCClient(context.Background(), appDir)
+		if err != nil {
+			t.Fatalf("NewUnixSocketGRPCClient() error = %v", err)
+		}
+		defer client.Close()
+
+		var progress bytes.Buffer
+		box, err := client.CreateSandbox(context.Background(), CreateSandboxOpts{ID: "test-box"}, &progress)
+		if err != nil {
+			t.Fatalf("CreateSandbox() error = %v", err)
+		}
+		if box == nil {
+			t.Fatal("CreateSandbox() returned nil box")
+		}
+		if box.ID != testSandboxBox.ID {
+			t.Fatalf("CreateSandbox() box ID = %q, want %q", box.ID, testSandboxBox.ID)
+		}
+		if got := progress.String(); got != "step 1\nstep 2\n" {
+			t.Fatalf("CreateSandbox() progress = %q, want %q", got, "step 1\nstep 2\n")
+		}
+	})
+
+	t.Run("returns streamed error", func(t *testing.T) {
+		appDir := t.TempDir()
+		srv := startTestGRPCDaemon(t, appDir, &testGRPCDaemonService{
+			CreateSandboxFunc: func(req *daemonpb.CreateSandboxRequest, stream daemonpb.DaemonService_CreateSandboxServer) error {
+				if err := stream.Send(&daemonpb.CreateSandboxResponse{
+					Event: &daemonpb.CreateSandboxResponse_Progress{Progress: "starting\n"},
+				}); err != nil {
+					return err
+				}
+				return stream.Send(&daemonpb.CreateSandboxResponse{
+					Event: &daemonpb.CreateSandboxResponse_Error{Error: "bootstrap failed"},
+				})
+			},
+		})
+		defer srv.Stop()
+
+		client, err := NewUnixSocketGRPCClient(context.Background(), appDir)
+		if err != nil {
+			t.Fatalf("NewUnixSocketGRPCClient() error = %v", err)
+		}
+		defer client.Close()
+
+		var progress bytes.Buffer
+		box, err := client.CreateSandbox(context.Background(), CreateSandboxOpts{ID: "test-box"}, &progress)
+		if err == nil {
+			t.Fatal("CreateSandbox() error = nil, want error")
+		}
+		if box != nil {
+			t.Fatalf("CreateSandbox() box = %#v, want nil", box)
+		}
+		if !strings.Contains(err.Error(), "bootstrap failed") {
+			t.Fatalf("CreateSandbox() error = %q, want streamed error", err)
+		}
+		if got := progress.String(); got != "starting\n" {
+			t.Fatalf("CreateSandbox() progress = %q, want %q", got, "starting\n")
+		}
+	})
+}
+
+func TestGRPCClientEnsureImage(t *testing.T) {
+	t.Run("streams progress and returns ok", func(t *testing.T) {
+		appDir := t.TempDir()
+		srv := startTestGRPCDaemon(t, appDir, &testGRPCDaemonService{
+			EnsureImageFunc: func(req *daemonpb.EnsureImageRequest, stream daemonpb.DaemonService_EnsureImageServer) error {
+				if req.GetImageName() != "test-image:latest" {
+					t.Fatalf("EnsureImage request image = %q, want test-image:latest", req.GetImageName())
+				}
+				if err := stream.Send(&daemonpb.EnsureImageResponse{
+					Event: &daemonpb.EnsureImageResponse_Progress{Progress: []byte("pulling\r")},
+				}); err != nil {
+					return err
+				}
+				if err := stream.Send(&daemonpb.EnsureImageResponse{
+					Event: &daemonpb.EnsureImageResponse_Progress{Progress: []byte("done\n")},
+				}); err != nil {
+					return err
+				}
+				return stream.Send(&daemonpb.EnsureImageResponse{
+					Event: &daemonpb.EnsureImageResponse_Ok{Ok: true},
+				})
+			},
+		})
+		defer srv.Stop()
+
+		client, err := NewUnixSocketGRPCClient(context.Background(), appDir)
+		if err != nil {
+			t.Fatalf("NewUnixSocketGRPCClient() error = %v", err)
+		}
+		defer client.Close()
+
+		var progress bytes.Buffer
+		if err := client.EnsureImage(context.Background(), "test-image:latest", &progress); err != nil {
+			t.Fatalf("EnsureImage() error = %v", err)
+		}
+		if got := progress.String(); got != "pulling\rdone\n" {
+			t.Fatalf("EnsureImage() progress = %q, want %q", got, "pulling\rdone\n")
+		}
+	})
+
+	t.Run("returns streamed error", func(t *testing.T) {
+		appDir := t.TempDir()
+		srv := startTestGRPCDaemon(t, appDir, &testGRPCDaemonService{
+			EnsureImageFunc: func(req *daemonpb.EnsureImageRequest, stream daemonpb.DaemonService_EnsureImageServer) error {
+				if err := stream.Send(&daemonpb.EnsureImageResponse{
+					Event: &daemonpb.EnsureImageResponse_Progress{Progress: []byte("pulling\n")},
+				}); err != nil {
+					return err
+				}
+				return stream.Send(&daemonpb.EnsureImageResponse{
+					Event: &daemonpb.EnsureImageResponse_Error{Error: "pull failed"},
+				})
+			},
+		})
+		defer srv.Stop()
+
+		client, err := NewUnixSocketGRPCClient(context.Background(), appDir)
+		if err != nil {
+			t.Fatalf("NewUnixSocketGRPCClient() error = %v", err)
+		}
+		defer client.Close()
+
+		var progress bytes.Buffer
+		err = client.EnsureImage(context.Background(), "test-image:latest", &progress)
+		if err == nil {
+			t.Fatal("EnsureImage() error = nil, want error")
+		}
+		if !strings.Contains(err.Error(), "pull failed") {
+			t.Fatalf("EnsureImage() error = %q, want streamed error", err)
+		}
+		if got := progress.String(); got != "pulling\n" {
+			t.Fatalf("EnsureImage() progress = %q, want %q", got, "pulling\n")
+		}
+	})
+}
+
 func TestDefaultClientStartSandbox(t *testing.T) {
 	var gotReq StartSandboxRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -167,4 +338,44 @@ func sandBox() sandtypes.Box {
 		ContainerID: "ctr-test-box",
 		ImageName:   "test-image:latest",
 	}
+}
+
+type testGRPCDaemonService struct {
+	daemonpb.UnimplementedDaemonServiceServer
+	CreateSandboxFunc func(*daemonpb.CreateSandboxRequest, daemonpb.DaemonService_CreateSandboxServer) error
+	EnsureImageFunc   func(*daemonpb.EnsureImageRequest, daemonpb.DaemonService_EnsureImageServer) error
+}
+
+func (s *testGRPCDaemonService) CreateSandbox(req *daemonpb.CreateSandboxRequest, stream daemonpb.DaemonService_CreateSandboxServer) error {
+	return s.CreateSandboxFunc(req, stream)
+}
+
+func (s *testGRPCDaemonService) EnsureImage(req *daemonpb.EnsureImageRequest, stream daemonpb.DaemonService_EnsureImageServer) error {
+	return s.EnsureImageFunc(req, stream)
+}
+
+func startTestGRPCDaemon(t *testing.T, appDir string, service daemonpb.DaemonServiceServer) *grpc.Server {
+	t.Helper()
+	socketPath := filepath.Join(appDir, DefaultGRPCSocketFile)
+	if err := os.Remove(socketPath); err != nil && !os.IsNotExist(err) {
+		t.Fatalf("remove socket: %v", err)
+	}
+	listener, err := net.Listen("unix", socketPath)
+	if err != nil {
+		t.Fatalf("listen unix socket: %v", err)
+	}
+
+	server := grpc.NewServer()
+	daemonpb.RegisterDaemonServiceServer(server, service)
+	go func() {
+		if err := server.Serve(listener); err != nil {
+			t.Logf("test gRPC server stopped: %v", err)
+		}
+	}()
+	t.Cleanup(func() {
+		server.Stop()
+		_ = listener.Close()
+		_ = os.Remove(socketPath)
+	})
+	return server
 }

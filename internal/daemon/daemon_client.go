@@ -45,6 +45,7 @@ type Client interface {
 type defaultClient struct {
 	base       string
 	httpClient *http.Client
+	grpcClient *GRPCClient
 }
 
 func NewUnixSocketClient(ctx context.Context, appBaseDir string) (Client, error) {
@@ -55,9 +56,14 @@ func NewUnixSocketClient(ctx context.Context, appBaseDir string) (Client, error)
 			},
 		},
 	}
+	grpcClient, err := NewUnixSocketGRPCClient(ctx, appBaseDir)
+	if err != nil {
+		return nil, err
+	}
 	return &defaultClient{
 		base:       "http://unix",
 		httpClient: httpClient,
+		grpcClient: grpcClient,
 	}, nil
 }
 
@@ -213,6 +219,9 @@ func (m *defaultClient) VSC(ctx context.Context, id string) error {
 }
 
 func (m *defaultClient) CreateSandbox(ctx context.Context, opts CreateSandboxOpts, w io.Writer) (*sandtypes.Box, error) {
+	if m.grpcClient != nil {
+		return m.grpcClient.CreateSandbox(ctx, opts, w)
+	}
 	slog.InfoContext(ctx, "defaultClient.CreateSandbox", "opts", opts)
 
 	body, err := json.Marshal(opts)
@@ -275,6 +284,9 @@ func (m *defaultClient) CreateSandbox(ctx context.Context, opts CreateSandboxOpt
 // The daemon uses "OK\n" as the success sentinel and "ERR <msg>\n" for failures,
 // allowing the method to distinguish terminal state from progress text.
 func (m *defaultClient) EnsureImage(ctx context.Context, imageName string, w io.Writer) error {
+	if m.grpcClient != nil {
+		return m.grpcClient.EnsureImage(ctx, imageName, w)
+	}
 	slog.InfoContext(ctx, "defaultClient.EnsureImage", "imageName", imageName)
 
 	body, err := json.Marshal(EnsureImageRequest{ImageName: imageName})

@@ -7,6 +7,8 @@ option go_package = "github.com/banksean/sand/internal/daemon/daemonpb";
 service DaemonService {
   rpc Ping(PingRequest) returns (PingResponse);
   rpc Version(VersionRequest) returns (VersionResponse);
+  rpc CreateSandbox(CreateSandboxRequest) returns (stream CreateSandboxResponse);
+  rpc EnsureImage(EnsureImageRequest) returns (stream EnsureImageResponse);
 }
 
 message PingRequest {}
@@ -22,4 +24,45 @@ message VersionResponse {
   string git_branch = 2;
   string git_commit = 3;
   string build_time = 4;
+}
+
+message SharedCacheConfig {
+  bool mise = 1;
+  bool apk = 2;
+}
+
+message CreateSandboxRequest {
+  string id = 1;
+  string clone_from_dir = 2;
+  string image_name = 3;
+  string env_file = 4;
+  string agent = 5;
+  bool ssh_agent = 6;
+  string username = 7;
+  string uid = 8;
+  repeated string allowed_domains = 9;
+  repeated string volumes = 10;
+  SharedCacheConfig shared_caches = 11;
+  int32 cpus = 12;
+  int32 memory = 13;
+}
+
+message CreateSandboxResponse {
+  oneof event {
+    string progress = 1;
+    bytes box_json = 2;
+    string error = 3;
+  }
+}
+
+message EnsureImageRequest {
+  string image_name = 1;
+}
+
+message EnsureImageResponse {
+  oneof event {
+    bytes progress = 1;
+    string error = 2;
+    bool ok = 3;
+  }
 }

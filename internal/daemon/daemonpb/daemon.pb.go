@@ -205,6 +205,438 @@ func (x *VersionResponse) GetBuildTime() string {
 	return ""
 }
 
+type SharedCacheConfig struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Mise          bool                   `protobuf:"varint,1,opt,name=mise,proto3" json:"mise,omitempty"`
+	Apk           bool                   `protobuf:"varint,2,opt,name=apk,proto3" json:"apk,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SharedCacheConfig) Reset() {
+	*x = SharedCacheConfig{}
+	mi := &file_internal_daemon_daemonpb_daemon_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SharedCacheConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SharedCacheConfig) ProtoMessage() {}
+
+func (x *SharedCacheConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_daemon_daemonpb_daemon_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SharedCacheConfig.ProtoReflect.Descriptor instead.
+func (*SharedCacheConfig) Descriptor() ([]byte, []int) {
+	return file_internal_daemon_daemonpb_daemon_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *SharedCacheConfig) GetMise() bool {
+	if x != nil {
+		return x.Mise
+	}
+	return false
+}
+
+func (x *SharedCacheConfig) GetApk() bool {
+	if x != nil {
+		return x.Apk
+	}
+	return false
+}
+
+type CreateSandboxRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	CloneFromDir   string                 `protobuf:"bytes,2,opt,name=clone_from_dir,json=cloneFromDir,proto3" json:"clone_from_dir,omitempty"`
+	ImageName      string                 `protobuf:"bytes,3,opt,name=image_name,json=imageName,proto3" json:"image_name,omitempty"`
+	EnvFile        string                 `protobuf:"bytes,4,opt,name=env_file,json=envFile,proto3" json:"env_file,omitempty"`
+	Agent          string                 `protobuf:"bytes,5,opt,name=agent,proto3" json:"agent,omitempty"`
+	SshAgent       bool                   `protobuf:"varint,6,opt,name=ssh_agent,json=sshAgent,proto3" json:"ssh_agent,omitempty"`
+	Username       string                 `protobuf:"bytes,7,opt,name=username,proto3" json:"username,omitempty"`
+	Uid            string                 `protobuf:"bytes,8,opt,name=uid,proto3" json:"uid,omitempty"`
+	AllowedDomains []string               `protobuf:"bytes,9,rep,name=allowed_domains,json=allowedDomains,proto3" json:"allowed_domains,omitempty"`
+	Volumes        []string               `protobuf:"bytes,10,rep,name=volumes,proto3" json:"volumes,omitempty"`
+	SharedCaches   *SharedCacheConfig     `protobuf:"bytes,11,opt,name=shared_caches,json=sharedCaches,proto3" json:"shared_caches,omitempty"`
+	Cpus           int32                  `protobuf:"varint,12,opt,name=cpus,proto3" json:"cpus,omitempty"`
+	Memory         int32                  `protobuf:"varint,13,opt,name=memory,proto3" json:"memory,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *CreateSandboxRequest) Reset() {
+	*x = CreateSandboxRequest{}
+	mi := &file_internal_daemon_daemonpb_daemon_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateSandboxRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateSandboxRequest) ProtoMessage() {}
+
+func (x *CreateSandboxRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_daemon_daemonpb_daemon_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateSandboxRequest.ProtoReflect.Descriptor instead.
+func (*CreateSandboxRequest) Descriptor() ([]byte, []int) {
+	return file_internal_daemon_daemonpb_daemon_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *CreateSandboxRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *CreateSandboxRequest) GetCloneFromDir() string {
+	if x != nil {
+		return x.CloneFromDir
+	}
+	return ""
+}
+
+func (x *CreateSandboxRequest) GetImageName() string {
+	if x != nil {
+		return x.ImageName
+	}
+	return ""
+}
+
+func (x *CreateSandboxRequest) GetEnvFile() string {
+	if x != nil {
+		return x.EnvFile
+	}
+	return ""
+}
+
+func (x *CreateSandboxRequest) GetAgent() string {
+	if x != nil {
+		return x.Agent
+	}
+	return ""
+}
+
+func (x *CreateSandboxRequest) GetSshAgent() bool {
+	if x != nil {
+		return x.SshAgent
+	}
+	return false
+}
+
+func (x *CreateSandboxRequest) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
+func (x *CreateSandboxRequest) GetUid() string {
+	if x != nil {
+		return x.Uid
+	}
+	return ""
+}
+
+func (x *CreateSandboxRequest) GetAllowedDomains() []string {
+	if x != nil {
+		return x.AllowedDomains
+	}
+	return nil
+}
+
+func (x *CreateSandboxRequest) GetVolumes() []string {
+	if x != nil {
+		return x.Volumes
+	}
+	return nil
+}
+
+func (x *CreateSandboxRequest) GetSharedCaches() *SharedCacheConfig {
+	if x != nil {
+		return x.SharedCaches
+	}
+	return nil
+}
+
+func (x *CreateSandboxRequest) GetCpus() int32 {
+	if x != nil {
+		return x.Cpus
+	}
+	return 0
+}
+
+func (x *CreateSandboxRequest) GetMemory() int32 {
+	if x != nil {
+		return x.Memory
+	}
+	return 0
+}
+
+type CreateSandboxResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Event:
+	//
+	//	*CreateSandboxResponse_Progress
+	//	*CreateSandboxResponse_BoxJson
+	//	*CreateSandboxResponse_Error
+	Event         isCreateSandboxResponse_Event `protobuf_oneof:"event"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateSandboxResponse) Reset() {
+	*x = CreateSandboxResponse{}
+	mi := &file_internal_daemon_daemonpb_daemon_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateSandboxResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateSandboxResponse) ProtoMessage() {}
+
+func (x *CreateSandboxResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_daemon_daemonpb_daemon_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateSandboxResponse.ProtoReflect.Descriptor instead.
+func (*CreateSandboxResponse) Descriptor() ([]byte, []int) {
+	return file_internal_daemon_daemonpb_daemon_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *CreateSandboxResponse) GetEvent() isCreateSandboxResponse_Event {
+	if x != nil {
+		return x.Event
+	}
+	return nil
+}
+
+func (x *CreateSandboxResponse) GetProgress() string {
+	if x != nil {
+		if x, ok := x.Event.(*CreateSandboxResponse_Progress); ok {
+			return x.Progress
+		}
+	}
+	return ""
+}
+
+func (x *CreateSandboxResponse) GetBoxJson() []byte {
+	if x != nil {
+		if x, ok := x.Event.(*CreateSandboxResponse_BoxJson); ok {
+			return x.BoxJson
+		}
+	}
+	return nil
+}
+
+func (x *CreateSandboxResponse) GetError() string {
+	if x != nil {
+		if x, ok := x.Event.(*CreateSandboxResponse_Error); ok {
+			return x.Error
+		}
+	}
+	return ""
+}
+
+type isCreateSandboxResponse_Event interface {
+	isCreateSandboxResponse_Event()
+}
+
+type CreateSandboxResponse_Progress struct {
+	Progress string `protobuf:"bytes,1,opt,name=progress,proto3,oneof"`
+}
+
+type CreateSandboxResponse_BoxJson struct {
+	BoxJson []byte `protobuf:"bytes,2,opt,name=box_json,json=boxJson,proto3,oneof"`
+}
+
+type CreateSandboxResponse_Error struct {
+	Error string `protobuf:"bytes,3,opt,name=error,proto3,oneof"`
+}
+
+func (*CreateSandboxResponse_Progress) isCreateSandboxResponse_Event() {}
+
+func (*CreateSandboxResponse_BoxJson) isCreateSandboxResponse_Event() {}
+
+func (*CreateSandboxResponse_Error) isCreateSandboxResponse_Event() {}
+
+type EnsureImageRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ImageName     string                 `protobuf:"bytes,1,opt,name=image_name,json=imageName,proto3" json:"image_name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EnsureImageRequest) Reset() {
+	*x = EnsureImageRequest{}
+	mi := &file_internal_daemon_daemonpb_daemon_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EnsureImageRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EnsureImageRequest) ProtoMessage() {}
+
+func (x *EnsureImageRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_daemon_daemonpb_daemon_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EnsureImageRequest.ProtoReflect.Descriptor instead.
+func (*EnsureImageRequest) Descriptor() ([]byte, []int) {
+	return file_internal_daemon_daemonpb_daemon_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *EnsureImageRequest) GetImageName() string {
+	if x != nil {
+		return x.ImageName
+	}
+	return ""
+}
+
+type EnsureImageResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Event:
+	//
+	//	*EnsureImageResponse_Progress
+	//	*EnsureImageResponse_Error
+	//	*EnsureImageResponse_Ok
+	Event         isEnsureImageResponse_Event `protobuf_oneof:"event"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EnsureImageResponse) Reset() {
+	*x = EnsureImageResponse{}
+	mi := &file_internal_daemon_daemonpb_daemon_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EnsureImageResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EnsureImageResponse) ProtoMessage() {}
+
+func (x *EnsureImageResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_daemon_daemonpb_daemon_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EnsureImageResponse.ProtoReflect.Descriptor instead.
+func (*EnsureImageResponse) Descriptor() ([]byte, []int) {
+	return file_internal_daemon_daemonpb_daemon_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *EnsureImageResponse) GetEvent() isEnsureImageResponse_Event {
+	if x != nil {
+		return x.Event
+	}
+	return nil
+}
+
+func (x *EnsureImageResponse) GetProgress() []byte {
+	if x != nil {
+		if x, ok := x.Event.(*EnsureImageResponse_Progress); ok {
+			return x.Progress
+		}
+	}
+	return nil
+}
+
+func (x *EnsureImageResponse) GetError() string {
+	if x != nil {
+		if x, ok := x.Event.(*EnsureImageResponse_Error); ok {
+			return x.Error
+		}
+	}
+	return ""
+}
+
+func (x *EnsureImageResponse) GetOk() bool {
+	if x != nil {
+		if x, ok := x.Event.(*EnsureImageResponse_Ok); ok {
+			return x.Ok
+		}
+	}
+	return false
+}
+
+type isEnsureImageResponse_Event interface {
+	isEnsureImageResponse_Event()
+}
+
+type EnsureImageResponse_Progress struct {
+	Progress []byte `protobuf:"bytes,1,opt,name=progress,proto3,oneof"`
+}
+
+type EnsureImageResponse_Error struct {
+	Error string `protobuf:"bytes,2,opt,name=error,proto3,oneof"`
+}
+
+type EnsureImageResponse_Ok struct {
+	Ok bool `protobuf:"varint,3,opt,name=ok,proto3,oneof"`
+}
+
+func (*EnsureImageResponse_Progress) isEnsureImageResponse_Event() {}
+
+func (*EnsureImageResponse_Error) isEnsureImageResponse_Event() {}
+
+func (*EnsureImageResponse_Ok) isEnsureImageResponse_Event() {}
+
 var File_internal_daemon_daemonpb_daemon_proto protoreflect.FileDescriptor
 
 const file_internal_daemon_daemonpb_daemon_proto_rawDesc = "" +
@@ -221,10 +653,44 @@ const file_internal_daemon_daemonpb_daemon_proto_rawDesc = "" +
 	"\n" +
 	"git_commit\x18\x03 \x01(\tR\tgitCommit\x12\x1d\n" +
 	"\n" +
-	"build_time\x18\x04 \x01(\tR\tbuildTime2\x9e\x01\n" +
+	"build_time\x18\x04 \x01(\tR\tbuildTime\"9\n" +
+	"\x11SharedCacheConfig\x12\x12\n" +
+	"\x04mise\x18\x01 \x01(\bR\x04mise\x12\x10\n" +
+	"\x03apk\x18\x02 \x01(\bR\x03apk\"\x9e\x03\n" +
+	"\x14CreateSandboxRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12$\n" +
+	"\x0eclone_from_dir\x18\x02 \x01(\tR\fcloneFromDir\x12\x1d\n" +
+	"\n" +
+	"image_name\x18\x03 \x01(\tR\timageName\x12\x19\n" +
+	"\benv_file\x18\x04 \x01(\tR\aenvFile\x12\x14\n" +
+	"\x05agent\x18\x05 \x01(\tR\x05agent\x12\x1b\n" +
+	"\tssh_agent\x18\x06 \x01(\bR\bsshAgent\x12\x1a\n" +
+	"\busername\x18\a \x01(\tR\busername\x12\x10\n" +
+	"\x03uid\x18\b \x01(\tR\x03uid\x12'\n" +
+	"\x0fallowed_domains\x18\t \x03(\tR\x0eallowedDomains\x12\x18\n" +
+	"\avolumes\x18\n" +
+	" \x03(\tR\avolumes\x12F\n" +
+	"\rshared_caches\x18\v \x01(\v2!.sand.daemon.v1.SharedCacheConfigR\fsharedCaches\x12\x12\n" +
+	"\x04cpus\x18\f \x01(\x05R\x04cpus\x12\x16\n" +
+	"\x06memory\x18\r \x01(\x05R\x06memory\"s\n" +
+	"\x15CreateSandboxResponse\x12\x1c\n" +
+	"\bprogress\x18\x01 \x01(\tH\x00R\bprogress\x12\x1b\n" +
+	"\bbox_json\x18\x02 \x01(\fH\x00R\aboxJson\x12\x16\n" +
+	"\x05error\x18\x03 \x01(\tH\x00R\x05errorB\a\n" +
+	"\x05event\"3\n" +
+	"\x12EnsureImageRequest\x12\x1d\n" +
+	"\n" +
+	"image_name\x18\x01 \x01(\tR\timageName\"f\n" +
+	"\x13EnsureImageResponse\x12\x1c\n" +
+	"\bprogress\x18\x01 \x01(\fH\x00R\bprogress\x12\x16\n" +
+	"\x05error\x18\x02 \x01(\tH\x00R\x05error\x12\x10\n" +
+	"\x02ok\x18\x03 \x01(\bH\x00R\x02okB\a\n" +
+	"\x05event2\xd8\x02\n" +
 	"\rDaemonService\x12A\n" +
 	"\x04Ping\x12\x1b.sand.daemon.v1.PingRequest\x1a\x1c.sand.daemon.v1.PingResponse\x12J\n" +
-	"\aVersion\x12\x1e.sand.daemon.v1.VersionRequest\x1a\x1f.sand.daemon.v1.VersionResponseB3Z1github.com/banksean/sand/internal/daemon/daemonpbb\x06proto3"
+	"\aVersion\x12\x1e.sand.daemon.v1.VersionRequest\x1a\x1f.sand.daemon.v1.VersionResponse\x12^\n" +
+	"\rCreateSandbox\x12$.sand.daemon.v1.CreateSandboxRequest\x1a%.sand.daemon.v1.CreateSandboxResponse0\x01\x12X\n" +
+	"\vEnsureImage\x12\".sand.daemon.v1.EnsureImageRequest\x1a#.sand.daemon.v1.EnsureImageResponse0\x01B3Z1github.com/banksean/sand/internal/daemon/daemonpbb\x06proto3"
 
 var (
 	file_internal_daemon_daemonpb_daemon_proto_rawDescOnce sync.Once
@@ -238,23 +704,33 @@ func file_internal_daemon_daemonpb_daemon_proto_rawDescGZIP() []byte {
 	return file_internal_daemon_daemonpb_daemon_proto_rawDescData
 }
 
-var file_internal_daemon_daemonpb_daemon_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_internal_daemon_daemonpb_daemon_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_internal_daemon_daemonpb_daemon_proto_goTypes = []any{
-	(*PingRequest)(nil),     // 0: sand.daemon.v1.PingRequest
-	(*PingResponse)(nil),    // 1: sand.daemon.v1.PingResponse
-	(*VersionRequest)(nil),  // 2: sand.daemon.v1.VersionRequest
-	(*VersionResponse)(nil), // 3: sand.daemon.v1.VersionResponse
+	(*PingRequest)(nil),           // 0: sand.daemon.v1.PingRequest
+	(*PingResponse)(nil),          // 1: sand.daemon.v1.PingResponse
+	(*VersionRequest)(nil),        // 2: sand.daemon.v1.VersionRequest
+	(*VersionResponse)(nil),       // 3: sand.daemon.v1.VersionResponse
+	(*SharedCacheConfig)(nil),     // 4: sand.daemon.v1.SharedCacheConfig
+	(*CreateSandboxRequest)(nil),  // 5: sand.daemon.v1.CreateSandboxRequest
+	(*CreateSandboxResponse)(nil), // 6: sand.daemon.v1.CreateSandboxResponse
+	(*EnsureImageRequest)(nil),    // 7: sand.daemon.v1.EnsureImageRequest
+	(*EnsureImageResponse)(nil),   // 8: sand.daemon.v1.EnsureImageResponse
 }
 var file_internal_daemon_daemonpb_daemon_proto_depIdxs = []int32{
-	0, // 0: sand.daemon.v1.DaemonService.Ping:input_type -> sand.daemon.v1.PingRequest
-	2, // 1: sand.daemon.v1.DaemonService.Version:input_type -> sand.daemon.v1.VersionRequest
-	1, // 2: sand.daemon.v1.DaemonService.Ping:output_type -> sand.daemon.v1.PingResponse
-	3, // 3: sand.daemon.v1.DaemonService.Version:output_type -> sand.daemon.v1.VersionResponse
-	2, // [2:4] is the sub-list for method output_type
-	0, // [0:2] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	4, // 0: sand.daemon.v1.CreateSandboxRequest.shared_caches:type_name -> sand.daemon.v1.SharedCacheConfig
+	0, // 1: sand.daemon.v1.DaemonService.Ping:input_type -> sand.daemon.v1.PingRequest
+	2, // 2: sand.daemon.v1.DaemonService.Version:input_type -> sand.daemon.v1.VersionRequest
+	5, // 3: sand.daemon.v1.DaemonService.CreateSandbox:input_type -> sand.daemon.v1.CreateSandboxRequest
+	7, // 4: sand.daemon.v1.DaemonService.EnsureImage:input_type -> sand.daemon.v1.EnsureImageRequest
+	1, // 5: sand.daemon.v1.DaemonService.Ping:output_type -> sand.daemon.v1.PingResponse
+	3, // 6: sand.daemon.v1.DaemonService.Version:output_type -> sand.daemon.v1.VersionResponse
+	6, // 7: sand.daemon.v1.DaemonService.CreateSandbox:output_type -> sand.daemon.v1.CreateSandboxResponse
+	8, // 8: sand.daemon.v1.DaemonService.EnsureImage:output_type -> sand.daemon.v1.EnsureImageResponse
+	5, // [5:9] is the sub-list for method output_type
+	1, // [1:5] is the sub-list for method input_type
+	1, // [1:1] is the sub-list for extension type_name
+	1, // [1:1] is the sub-list for extension extendee
+	0, // [0:1] is the sub-list for field type_name
 }
 
 func init() { file_internal_daemon_daemonpb_daemon_proto_init() }
@@ -262,13 +738,23 @@ func file_internal_daemon_daemonpb_daemon_proto_init() {
 	if File_internal_daemon_daemonpb_daemon_proto != nil {
 		return
 	}
+	file_internal_daemon_daemonpb_daemon_proto_msgTypes[6].OneofWrappers = []any{
+		(*CreateSandboxResponse_Progress)(nil),
+		(*CreateSandboxResponse_BoxJson)(nil),
+		(*CreateSandboxResponse_Error)(nil),
+	}
+	file_internal_daemon_daemonpb_daemon_proto_msgTypes[8].OneofWrappers = []any{
+		(*EnsureImageResponse_Progress)(nil),
+		(*EnsureImageResponse_Error)(nil),
+		(*EnsureImageResponse_Ok)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_daemon_daemonpb_daemon_proto_rawDesc), len(file_internal_daemon_daemonpb_daemon_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

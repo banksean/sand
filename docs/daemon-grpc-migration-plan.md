@@ -3,6 +3,37 @@
 This document records the implementation plan for migrating the save daemon
 protocol from HTTP-only endpoints to a staged gRPC interface.
 
+## Current Status
+
+The transport, socket wiring, and streaming slices have landed.
+
+Completed:
+
+- Added `internal/daemon/daemonpb/daemon.proto`.
+- Generated and committed `daemon.pb.go` and `daemon_grpc.pb.go`.
+- Added host-side gRPC listener support on `sandd.grpc.sock` while keeping
+  host HTTP on `sandd.sock`.
+- Added initial gRPC `Ping` and `Version` methods.
+- Added a temporary Unix-socket gRPC client for the migration period.
+- Added per-sandbox gRPC socket creation under `containergrpc/<id>`.
+- Mounted per-sandbox gRPC sockets into containers at
+  `/run/host-services/sandd.grpc.sock` while keeping HTTP mounted at
+  `/run/host-services/sandd.sock`.
+- Added tests for host HTTP+gRPC socket startup, per-sandbox HTTP+gRPC socket
+  creation, and container socket mount wiring.
+- Added gRPC streaming RPCs for `CreateSandbox` and `EnsureImage`.
+- Migrated the default Unix-socket client to use gRPC for `CreateSandbox` and
+  `EnsureImage`, with HTTP fallback retained for direct test clients.
+- Added gRPC streaming client tests for progress, success, and streamed errors.
+- Added daemon gRPC streaming integration coverage for `EnsureImage` and
+  `CreateSandbox` streamed errors.
+
+Remaining:
+
+- Migrate remaining non-bootstrap unary methods.
+- Remove migrated HTTP endpoints and temporary migration-only client code.
+- Add developer documentation for regenerating protobuf output.
+
 ## Socket Strategy
 
 Run HTTP and gRPC on separate Unix sockets. Do not add `cmux` or another
@@ -40,7 +71,7 @@ should not need them.
 
 ## Implementation Stages
 
-1. Transport proof
+1. Transport proof (done)
    - Add protobuf service definitions for the save daemon protocol.
    - Generate and commit the Go gRPC/protobuf files.
    - Start a host-side gRPC listener on `sandd.grpc.sock` beside the existing
@@ -48,14 +79,14 @@ should not need them.
    - Add a minimal unary method to prove request/response plumbing and error
      handling.
 
-2. Container-side socket
+2. Container-side socket (done)
    - Expose the host gRPC socket into the container at
      `/run/host-services/sandd.grpc.sock`.
    - Keep the existing HTTP socket mounted at `/run/host-services/sandd.sock`.
    - Use a per-sandbox host-side gRPC socket path under `containergrpc/<id>`.
    - Verify bootstrap still uses HTTP `/sandbox-config`.
 
-3. Streaming methods
+3. Streaming methods (done)
    - Migrate streaming operations first, because they benefit most from gRPC.
    - Preserve the existing behavior and ordering guarantees at the API
      boundary.
