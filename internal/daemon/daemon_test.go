@@ -61,63 +61,7 @@ func (m *testImageOps) Inspect(ctx context.Context, name string) ([]*types.Image
 	return nil, nil
 }
 
-func TestDaemonHTTPPing(t *testing.T) {
-	// Create a temporary directory for the dmn
-	tmpDir, err := os.MkdirTemp("", "dmn-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
-
-	// Create and start dmn
-	dmn := newDaemonForTest(t, tmpDir)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	// Start the dmn server in a goroutine
-	go func() {
-		if err := dmn.ServeUnixSocket(ctx); err != nil {
-			t.Logf("Mux serve error: %v", err)
-		}
-	}()
-
-	// Wait for the socket to be ready
-	socketPath := filepath.Join(tmpDir, DefaultSocketFile)
-	for i := 0; i < 20; i++ {
-		if _, err := os.Stat(socketPath); err == nil {
-			break
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
-
-	// Create a client
-	client, err := NewUnixSocketClient(ctx, tmpDir)
-	if err != nil {
-		t.Fatalf("Failed to create client: %v", err)
-	}
-
-	// Test ping via HTTP
-	var resp map[string]string
-	if err := client.(*defaultClient).doRequest(ctx, "GET", "/ping", nil, &resp); err != nil {
-		t.Fatalf("Ping request failed: %v", err)
-	}
-
-	if resp["status"] != "pong" {
-		t.Errorf("Expected pong response, got: %v", resp)
-	}
-
-	// Test Ping() client method
-	if err := client.Ping(ctx); err != nil {
-		t.Fatalf("Ping() method failed: %v", err)
-	}
-
-	// Test shutdown
-	if err := client.Shutdown(ctx); err != nil {
-		t.Fatalf("Shutdown failed: %v", err)
-	}
-}
-
-func TestDaemonStartsHTTPAndGRPCSockets(t *testing.T) {
+func TestDaemonStartsGRPCSocketOnlyForHostIPC(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "dmn-test-*")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
@@ -134,10 +78,11 @@ func TestDaemonStartsHTTPAndGRPCSockets(t *testing.T) {
 		}
 	}()
 
-	waitForSocket(t, filepath.Join(tmpDir, DefaultSocketFile))
 	waitForSocket(t, filepath.Join(tmpDir, DefaultGRPCSocketFile))
-	assertSocketMode(t, filepath.Join(tmpDir, DefaultSocketFile), socketFileMode)
 	assertSocketMode(t, filepath.Join(tmpDir, DefaultGRPCSocketFile), socketFileMode)
+	if _, err := os.Stat(filepath.Join(tmpDir, defaultHTTPSocketFile)); !os.IsNotExist(err) {
+		t.Fatalf("host HTTP socket exists after startup, stat err = %v", err)
+	}
 
 	client, err := NewUnixSocketGRPCClient(ctx, tmpDir)
 	if err != nil {
@@ -260,7 +205,7 @@ func TestDaemonCreatesContainerHTTPAndGRPCSockets(t *testing.T) {
 	assertSocketMode(t, grpcSocketPath, socketFileMode)
 }
 
-func TestDaemonHTTPList(t *testing.T) {
+func TestDaemonGRPCList(t *testing.T) {
 	// Create a temporary directory for the dmn
 	tmpDir, err := os.MkdirTemp("", "dmn-test-*")
 	if err != nil {
@@ -280,13 +225,7 @@ func TestDaemonHTTPList(t *testing.T) {
 		}
 	}()
 
-	// Wait for the socket to be ready
-	for i := 0; i < 20; i++ {
-		if _, err := os.Stat(dmn.SocketPath); err == nil {
-			break
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
+	waitForSocket(t, filepath.Join(tmpDir, DefaultGRPCSocketFile))
 
 	// Create a client
 	client, err := NewUnixSocketClient(ctx, tmpDir)
@@ -332,7 +271,7 @@ func assertSocketMode(t *testing.T, socketPath string, want os.FileMode) {
 	}
 }
 
-func TestDaemonHTTPVersion(t *testing.T) {
+func TestDaemonGRPCVersion(t *testing.T) {
 	// Create a temporary directory for the dmn
 	tmpDir, err := os.MkdirTemp("", "dmn-test-*")
 	if err != nil {
@@ -352,14 +291,7 @@ func TestDaemonHTTPVersion(t *testing.T) {
 		}
 	}()
 
-	// Wait for the socket to be ready
-	socketPath := filepath.Join(tmpDir, DefaultSocketFile)
-	for i := 0; i < 20; i++ {
-		if _, err := os.Stat(socketPath); err == nil {
-			break
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
+	waitForSocket(t, filepath.Join(tmpDir, DefaultGRPCSocketFile))
 
 	// Create a client
 	client, err := NewUnixSocketClient(ctx, tmpDir)

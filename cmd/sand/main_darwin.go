@@ -123,7 +123,7 @@ func appHomeDir() (string, error) {
 // ensureDaemon attempts to verify that the sandd daemon is running, and if not,
 // starts a new instance of it.
 func ensureDaemon(ctx context.Context, appBaseDir string) error {
-	socketPath := filepath.Join(appBaseDir, daemon.DefaultSocketFile)
+	socketPath := filepath.Join(appBaseDir, daemon.DefaultGRPCSocketFile)
 	slog.Info("EnsureDaemon", "socketPath", socketPath)
 
 	// Try to connect to existing daemon

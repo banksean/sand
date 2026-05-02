@@ -29,8 +29,8 @@ import (
 //
 // At startup, it will:
 // - acquire a lock file at $AppBaseDir/sandd.lock
-// - open a unix domain socket at $AppBaseDir/sandd.sock to accept IPC from the sand cli on the host OS
-// - start an http server listening at :4242 to accept IPC from the sand cli running inside containers
+// - open a gRPC unix domain socket at $AppBaseDir/sandd.grpc.sock to accept IPC from the sand cli
+// - keep per-sandbox HTTP sockets only for bootstrap-only endpoints such as /sandbox-config
 
 type App struct {
 	AppBaseDir string

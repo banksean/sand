@@ -101,7 +101,7 @@ func main() {
 	defer stop()
 
 	// connect to the sandd process running on the host via unix domain socket.
-	// The sand.sock file in this directory should have been created by sandd
+	// The sandd.grpc.sock file in this directory should have been created by sandd
 	// and attached to this container via --volume flag.
 	appBaseDir := "/run/host-services"
 

@@ -18,8 +18,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-// GRPCClient is the initial gRPC client used while the daemon protocol is
-// migrated incrementally from HTTP.
+// GRPCClient communicates with sandd over the daemon gRPC Unix socket.
 type GRPCClient struct {
 	conn   *grpc.ClientConn
 	client daemonpb.DaemonServiceClient

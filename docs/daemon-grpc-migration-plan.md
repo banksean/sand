@@ -5,25 +5,24 @@ protocol from HTTP-only endpoints to a staged gRPC interface.
 
 ## Current Status
 
-The transport, socket wiring, streaming, and unary migration slices have landed.
+The gRPC migration and cleanup slices have landed.
 
 Completed:
 
 - Added `internal/daemon/daemonpb/daemon.proto`.
 - Generated and committed `daemon.pb.go` and `daemon_grpc.pb.go`.
-- Added host-side gRPC listener support on `sandd.grpc.sock` while keeping
-  host HTTP on `sandd.sock`.
+- Added host-side gRPC listener support on `sandd.grpc.sock`.
 - Added initial gRPC `Ping` and `Version` methods.
 - Added a temporary Unix-socket gRPC client for the migration period.
 - Added per-sandbox gRPC socket creation under `containergrpc/<id>`.
 - Mounted per-sandbox gRPC sockets into containers at
   `/run/host-services/sandd.grpc.sock` while keeping HTTP mounted at
   `/run/host-services/sandd.sock`.
-- Added tests for host HTTP+gRPC socket startup, per-sandbox HTTP+gRPC socket
+- Added tests for host gRPC socket startup, per-sandbox HTTP+gRPC socket
   creation, and container socket mount wiring.
 - Added gRPC streaming RPCs for `CreateSandbox` and `EnsureImage`.
 - Migrated the default Unix-socket client to use gRPC for `CreateSandbox` and
-  `EnsureImage`, with HTTP fallback retained for direct test clients.
+  `EnsureImage`.
 - Added gRPC streaming client tests for progress, success, and streamed errors.
 - Added daemon gRPC streaming integration coverage for `EnsureImage` and
   `CreateSandbox` streamed errors.
@@ -35,33 +34,38 @@ Completed:
 - Added unary gRPC client coverage for request mapping and JSON response
   decoding.
 - Added protobuf conversion coverage for `CreateSandboxOpts`.
+- Removed migrated HTTP handlers and the HTTP client fallback path.
+- Removed the host-side HTTP socket for daemon IPC; host clients now use
+  `sandd.grpc.sock`.
+- Kept the per-sandbox HTTP socket only for `/sandbox-config`.
+- Added developer documentation for regenerating protobuf output.
 
 Remaining:
 
-- Remove migrated HTTP endpoints and temporary migration-only client code.
-- Add developer documentation for regenerating protobuf output.
+- None.
 
 ## Socket Strategy
 
-Run HTTP and gRPC on separate Unix sockets. Do not add `cmux` or another
-multiplexing dependency.
+Run bootstrap HTTP and daemon gRPC on separate Unix sockets. Do not add `cmux`
+or another multiplexing dependency.
 
 Host-side sockets:
 
-- HTTP remains `sandd.sock`.
 - gRPC uses `sandd.grpc.sock`.
+- There is no host-side HTTP daemon IPC socket.
 
 Container-side sockets:
 
-- HTTP remains `/run/host-services/sandd.sock`.
-- gRPC uses `/run/host-services/sandd.grpc.sock`.
+- HTTP remains `/run/host-services/sandd.sock` for `/sandbox-config` only.
+- gRPC uses `/run/host-services/sandd.grpc.sock` for daemon IPC.
 
 For per-sandbox host-side gRPC sockets, use a short directory name such as
 `containergrpc/<id>`. Keep this path short enough to stay comfortably under
 Unix socket path length limits.
 
 Keep `/sandbox-config` HTTP-only. It is part of the container bootstrap path
-and does not need to move to gRPC.
+and does not need to move to gRPC. Do not register migrated daemon methods on
+the HTTP socket.
 
 Existing running sandboxes do not need upgrade compatibility. The migration
 may assume sandboxes are restarted onto the new socket layout.
@@ -75,6 +79,24 @@ must be committed to the repository so normal builds and tests do not require
 Developers who edit protobuf definitions need `protoc` and the Go protobuf
 plugins installed locally. Developers who only build, test, or run the project
 should not need them.
+
+Install the generator plugins:
+
+```sh
+go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.1
+```
+
+Regenerate after editing `internal/daemon/daemonpb/daemon.proto`:
+
+```sh
+protoc \
+  --go_out=. --go_opt=paths=source_relative \
+  --go-grpc_out=. --go-grpc_opt=paths=source_relative \
+  internal/daemon/daemonpb/daemon.proto
+```
+
+Commit `daemon.proto`, `daemon.pb.go`, and `daemon_grpc.pb.go` together.
 
 ## Implementation Stages
 
@@ -107,7 +129,7 @@ should not need them.
    - Preserve old HTTP handlers only as long as they are still used by
      unmigrated call sites.
 
-5. Cleanup
+5. Cleanup (done)
    - Remove migrated HTTP endpoints and unused client code.
    - Keep `/sandbox-config` on HTTP.
    - Remove obsolete socket wiring and temporary transport proof code.
@@ -116,8 +138,8 @@ should not need them.
 
 ## Test Plan
 
-- Add socket integration tests proving the host listens on both `sandd.sock`
-  and `sandd.grpc.sock`.
+- Add socket integration tests proving the host listens on `sandd.grpc.sock`
+  for daemon IPC.
 - Add container socket tests proving `/run/host-services/sandd.sock` and
   `/run/host-services/sandd.grpc.sock` are wired independently.
 - Add gRPC streaming tests for normal completion, cancellation, server-side

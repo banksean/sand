@@ -10,16 +10,12 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
-	"time"
 
-	"github.com/banksean/sand/internal/applecontainer/options"
-	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/daemon/daemonpb"
 	"github.com/banksean/sand/internal/daemon/internal/boxer"
 	"github.com/banksean/sand/internal/sandboxlog"
@@ -29,8 +25,8 @@ import (
 )
 
 const (
-	DefaultSocketFile     = "sandd.sock"
 	DefaultGRPCSocketFile = "sandd.grpc.sock"
+	defaultHTTPSocketFile = "sandd.sock"
 	defaultLockFile       = "sandd.lock"
 	envMCPEnable          = "SAND_MCP"
 	socketFileMode        = 0o666
@@ -38,7 +34,6 @@ const (
 
 type Daemon struct {
 	AppBaseDir     string
-	SocketPath     string
 	GRPCSocketPath string
 	LocalDomain    string
 	LogFile        string
@@ -46,7 +41,6 @@ type Daemon struct {
 	hostMCP *HostMCP
 	boxer   *boxer.Boxer
 
-	outieListener     net.Listener
 	outieGRPCListener net.Listener
 
 	innieServersMu sync.Mutex
@@ -63,7 +57,6 @@ type Daemon struct {
 
 	lockFile *os.File
 	shutdown chan any
-	httpSrv  http.Server
 	grpcSrv  *grpc.Server
 }
 
@@ -80,7 +73,6 @@ func NewDaemonWithBoxer(appBaseDir, localDomain string, b *boxer.Boxer) *Daemon 
 func NewDaemon(appBaseDir, localDomain string) *Daemon {
 	return &Daemon{
 		AppBaseDir:     appBaseDir,
-		SocketPath:     filepath.Join(appBaseDir, DefaultSocketFile),
 		GRPCSocketPath: filepath.Join(appBaseDir, DefaultGRPCSocketFile),
 		LocalDomain:    localDomain,
 		hostMCP: &HostMCP{
@@ -111,19 +103,13 @@ func (d *Daemon) ServeUnixSocket(ctx context.Context) error {
 }
 
 func (d *Daemon) startDaemonServer(ctx context.Context) error {
-	slog.InfoContext(ctx, "Daemon.startDaemonServer", "socketPath", d.SocketPath)
+	slog.InfoContext(ctx, "Daemon.startDaemonServer", "grpcSocketPath", d.GRPCSocketPath)
 	// Remove old socket if it exists
-	os.Remove(d.SocketPath)
+	os.Remove(filepath.Join(d.AppBaseDir, defaultHTTPSocketFile))
 	os.Remove(d.GRPCSocketPath)
 
-	unixListener, err := listenUnixSocket(d.SocketPath)
-	if err != nil {
-		return err
-	}
-	d.outieListener = unixListener
 	grpcListener, err := listenUnixSocket(d.GRPCSocketPath)
 	if err != nil {
-		_ = unixListener.Close()
 		return err
 	}
 	d.outieGRPCListener = grpcListener
@@ -142,8 +128,6 @@ func (d *Daemon) startDaemonServer(ctx context.Context) error {
 	// Handle cleanup on shutdown
 	go d.waitForShutdown(ctx)
 
-	// Start unix domain socket HTTP server
-	go d.serveOutieSocket(ctx)
 	go d.serveOutieGRPCSocket(ctx)
 
 	if os.Getenv(envMCPEnable) != "" {
@@ -177,9 +161,6 @@ func (d *Daemon) Shutdown(ctx context.Context) {
 
 	slog.InfoContext(ctx, "Daemon.Shutdown", "pid", os.Getpid())
 	// Close listener (stops accepting new connections)
-	if d.outieListener != nil {
-		d.outieListener.Close()
-	}
 	if d.outieGRPCListener != nil {
 		d.outieGRPCListener.Close()
 	}
@@ -195,7 +176,7 @@ func (d *Daemon) Shutdown(ctx context.Context) {
 
 	// Remove socket file. This mail fail in many cases since closing the listener appears
 	// to remove the file automatically on MacOS. Therefore we ignore the err return value.
-	os.Remove(d.SocketPath)
+	os.Remove(filepath.Join(d.AppBaseDir, defaultHTTPSocketFile))
 	os.Remove(d.GRPCSocketPath)
 
 	// Release and remove lock file
@@ -209,36 +190,6 @@ func (d *Daemon) Shutdown(ctx context.Context) {
 
 	// Signal shutdown complete
 	close(d.shutdown)
-}
-
-func (d *Daemon) serveOutieSocket(ctx context.Context) {
-	mux := http.NewServeMux()
-
-	// Register handlers
-	mux.HandleFunc("/shutdown", slogHandler(d.handleShutdown))
-	mux.HandleFunc("/ping", slogHandler(d.handlePing))
-	mux.HandleFunc("/version", slogHandler(d.handleVersion))
-	mux.HandleFunc("/log", slogHandler(d.handleLog))
-	mux.HandleFunc("/list", slogHandler(d.handleList))
-	mux.HandleFunc("/get", slogHandler(d.handleGet))
-	mux.HandleFunc("/remove", slogHandler(d.handleRemove))
-	mux.HandleFunc("/stop", slogHandler(d.handleStop))
-	mux.HandleFunc("/start", slogHandler(d.handleStart))
-	mux.HandleFunc("/resolve-agent-env", slogHandler(d.handleResolveAgentLaunchEnv))
-	mux.HandleFunc("/create-stream", slogHandler(d.handleCreateStream))
-	mux.HandleFunc("/ensure-image", slogHandler(d.handleEnsureImage))
-	mux.HandleFunc("/export", slogHandler(d.handleExport))
-	mux.HandleFunc("/stats", slogHandler(d.handleStats))
-
-	server := &http.Server{
-		Handler: mux,
-	}
-	slog.InfoContext(ctx, "Daemon.serveUnixSocketHTTP starting up")
-
-	err := server.Serve(d.outieListener)
-	if err != nil && !isExpectedServeClose(err) {
-		slog.ErrorContext(ctx, "Daemon.serveUnixSocketHTTP", "error", err)
-	}
 }
 
 func (d *Daemon) serveOutieGRPCSocket(ctx context.Context) {
@@ -298,18 +249,6 @@ func fromSandbox(sandboxID string, h http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func sandboxIDOf(r *http.Request) (string, context.Context, error) {
-	ctx := r.Context()
-	if id, ok := sandboxlog.SandboxIDFromContext(ctx); ok {
-		return id, ctx, nil
-	}
-	var req IDRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return "", ctx, err
-	}
-	return req.ID, sandboxlog.WithSandboxID(r.Context(), req.ID), nil
-}
-
 func (d *Daemon) stopInnieServer(ctx context.Context, id string) error {
 	d.innieServersMu.Lock()
 	defer d.innieServersMu.Unlock()
@@ -330,20 +269,7 @@ func (d *Daemon) serveInnieSocket(ctx context.Context, sandboxID string, unixLis
 	ctx = sandboxlog.WithSandboxID(ctx, sandboxID)
 	mux := http.NewServeMux()
 
-	// Register handlers
-	mux.HandleFunc("/shutdown", slogHandler(fromSandbox(sandboxID, d.handleShutdown)))
-	mux.HandleFunc("/ping", slogHandler(fromSandbox(sandboxID, d.handlePing)))
-	mux.HandleFunc("/version", slogHandler(fromSandbox(sandboxID, d.handleVersion)))
-	mux.HandleFunc("/log", slogHandler(fromSandbox(sandboxID, d.handleLog)))
-	mux.HandleFunc("/list", slogHandler(fromSandbox(sandboxID, d.handleList)))
-	mux.HandleFunc("/get", slogHandler(fromSandbox(sandboxID, d.handleGet)))
-	mux.HandleFunc("/remove", slogHandler(fromSandbox(sandboxID, d.handleRemove)))
-	mux.HandleFunc("/stop", slogHandler(fromSandbox(sandboxID, d.handleStop)))
-	mux.HandleFunc("/create-stream", slogHandler(fromSandbox(sandboxID, d.handleCreateStream)))
-	mux.HandleFunc("/vsc", slogHandler(fromSandbox(sandboxID, d.handleVSC)))
 	mux.HandleFunc("/sandbox-config", slogHandler(fromSandbox(sandboxID, d.handleSandboxConfig)))
-	mux.HandleFunc("/export", slogHandler(fromSandbox(sandboxID, d.handleExport)))
-	mux.HandleFunc("/stats", slogHandler(fromSandbox(sandboxID, d.handleStats)))
 
 	mux.HandleFunc("/", slogHandler(fromSandbox(sandboxID, func(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
@@ -402,61 +328,6 @@ func listenUnixSocket(socketPath string) (net.Listener, error) {
 	return listener, nil
 }
 
-// flushWriter wraps an http.ResponseWriter and flushes after every write so
-// streaming responses reach the client incrementally.
-type flushWriter struct {
-	w http.ResponseWriter
-	f http.Flusher
-}
-
-func newFlushWriter(w http.ResponseWriter) *flushWriter {
-	f, _ := w.(http.Flusher)
-	return &flushWriter{w: w, f: f}
-}
-
-func (fw *flushWriter) Write(p []byte) (int, error) {
-	n, err := fw.w.Write(p)
-	if fw.f != nil {
-		fw.f.Flush()
-	}
-	return n, err
-}
-
-type createSandboxStreamWriter struct {
-	fw  *flushWriter
-	enc *json.Encoder
-	mu  sync.Mutex
-}
-
-func newCreateSandboxStreamWriter(w http.ResponseWriter) *createSandboxStreamWriter {
-	fw := newFlushWriter(w)
-	return &createSandboxStreamWriter{
-		fw:  fw,
-		enc: json.NewEncoder(fw),
-	}
-}
-
-func (sw *createSandboxStreamWriter) Write(p []byte) (int, error) {
-	sw.mu.Lock()
-	defer sw.mu.Unlock()
-	if err := sw.enc.Encode(CreateSandboxEvent{Type: "progress", Data: string(p)}); err != nil {
-		return 0, err
-	}
-	return len(p), nil
-}
-
-func (sw *createSandboxStreamWriter) Result(box *sandtypes.Box) error {
-	sw.mu.Lock()
-	defer sw.mu.Unlock()
-	return sw.enc.Encode(CreateSandboxEvent{Type: "result", Box: box})
-}
-
-func (sw *createSandboxStreamWriter) Error(err error) error {
-	sw.mu.Lock()
-	defer sw.mu.Unlock()
-	return sw.enc.Encode(CreateSandboxEvent{Type: "error", Error: err.Error()})
-}
-
 // HTTP handler helpers
 func writeJSONError(w http.ResponseWriter, err error, code int) {
 	w.Header().Set("Content-Type", "application/json")
@@ -467,328 +338,6 @@ func writeJSONError(w http.ResponseWriter, err error, code int) {
 func writeJSON(w http.ResponseWriter, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(data)
-}
-
-// HTTP handlers
-func (d *Daemon) handleShutdown(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	writeJSON(w, StatusResponse{Status: "ok"})
-
-	// Shutdown daemon after response is sent
-	go func() {
-		time.Sleep(100 * time.Millisecond)
-		d.Shutdown(r.Context())
-	}()
-}
-
-func (d *Daemon) handleExport(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	var args ExportRequest
-	if err := json.NewDecoder(r.Body).Decode(&args); err != nil {
-		writeJSONError(w, err, http.StatusBadRequest)
-		return
-	}
-	ctxID, ok := sandboxlog.SandboxIDFromContext(ctx)
-	if ok {
-		args.ID = ctxID
-	}
-
-	d.boxer.ContainerService.Export(ctx, &options.ExportContainer{Output: args.DestinationPath}, args.ID)
-}
-
-func (d *Daemon) handlePing(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet && r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	writeJSON(w, StatusResponse{Status: "pong"})
-}
-
-func (d *Daemon) handleVersion(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet && r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	writeJSON(w, version.Get())
-}
-
-func (d *Daemon) handleLog(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	sandboxID, ctx, err := sandboxIDOf(r)
-	if err != nil {
-		writeJSONError(w, err, http.StatusBadRequest)
-		return
-	}
-	r = r.WithContext(ctx)
-	var buf strings.Builder
-	if err := d.LogSandbox(r.Context(), sandboxID, &buf); err != nil {
-		writeJSONError(w, err, http.StatusNotFound)
-		return
-	}
-
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	fmt.Fprint(w, buf.String())
-}
-
-func (d *Daemon) handleList(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet && r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	boxes, err := d.ListSandboxes(r.Context())
-	if err != nil {
-		writeJSONError(w, err, http.StatusInternalServerError)
-		return
-	}
-	writeJSON(w, boxes)
-}
-
-func (d *Daemon) handleGet(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	sandboxID, ctx, err := sandboxIDOf(r)
-	if err != nil {
-		writeJSONError(w, err, http.StatusBadRequest)
-		return
-	}
-	r = r.WithContext(ctx)
-	sbox, err := d.GetSandbox(ctx, sandboxID)
-	if err != nil {
-		slog.ErrorContext(ctx, "Daemon.handleGet d.GetSandbox", "error", err)
-		writeJSONError(w, fmt.Errorf("couldn't get sandbox ID %s", sandboxID), http.StatusInternalServerError)
-		return
-	}
-	if sbox == nil {
-		slog.ErrorContext(ctx, "Daemon.handleGet d.GetSandbox returned nil")
-		writeJSONError(w, fmt.Errorf("got a nil sandbox for ID %s", sandboxID), http.StatusInternalServerError)
-		return
-	}
-
-	if err := d.boxer.SyncBox(ctx, sbox); err != nil {
-		slog.ErrorContext(ctx, "Daemon.handleGet boxer.SyncBox", "error", err)
-		writeJSONError(w, fmt.Errorf("failed to sync sandbox for ID %s", sandboxID), http.StatusInternalServerError)
-	}
-
-	if sbox == nil {
-		http.Error(w, "Not found", http.StatusNotFound)
-		return
-	}
-
-	ctr, err := d.boxer.GetContainer(ctx, sbox.ContainerID)
-	if err != nil {
-		slog.ErrorContext(ctx, "Daemon.handleGet boxer.GetContainer", "error", err)
-		http.Error(w, "couldn't get container", http.StatusInternalServerError)
-		return
-	}
-	sbox.Container = ctr
-	writeJSON(w, sbox)
-}
-
-func (d *Daemon) handleStats(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	var args StatsRequest
-	slog.InfoContext(r.Context(), "Daemon.handleStats json decode request", "args", args)
-
-	if err := json.NewDecoder(r.Body).Decode(&args); err != nil {
-		slog.ErrorContext(r.Context(), "Daemon.handleStats json decode request", "error", err)
-		http.Error(w, "bad request", http.StatusBadRequest)
-		return
-	}
-
-	stats, err := d.boxer.GetContainerStats(r.Context(), args.IDs...)
-	if err != nil {
-		slog.ErrorContext(r.Context(), "Daemon.handleStats ContainerService.Stats", "error", err)
-		http.Error(w, "couldn't get container stats", http.StatusInternalServerError)
-	}
-	writeJSON(w, stats)
-}
-
-func (d *Daemon) handleRemove(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	sandboxID, ctx, err := sandboxIDOf(r)
-	if err != nil {
-		writeJSONError(w, err, http.StatusBadRequest)
-		return
-	}
-	r = r.WithContext(ctx)
-	if err := d.RemoveSandbox(r.Context(), sandboxID); err != nil {
-		writeJSONError(w, err, http.StatusInternalServerError)
-		return
-	}
-	writeJSON(w, StatusResponse{Status: "ok"})
-}
-
-func (d *Daemon) handleStop(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	sandboxID, ctx, err := sandboxIDOf(r)
-	if err != nil {
-		writeJSONError(w, err, http.StatusBadRequest)
-		return
-	}
-	r = r.WithContext(ctx)
-	if err := d.StopSandbox(r.Context(), sandboxID); err != nil {
-		writeJSONError(w, err, http.StatusInternalServerError)
-		return
-	}
-	writeJSON(w, StatusResponse{Status: "ok"})
-}
-
-func (d *Daemon) handleStart(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var req StartSandboxRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSONError(w, err, http.StatusBadRequest)
-		return
-	}
-
-	if err := d.StartSandbox(r.Context(), StartSandboxOpts{
-		ID:       req.ID,
-		SSHAgent: req.SSHAgent,
-	}); err != nil {
-		writeJSONError(w, err, http.StatusInternalServerError)
-		return
-	}
-	writeJSON(w, StatusResponse{Status: "ok"})
-}
-
-func (d *Daemon) handleResolveAgentLaunchEnv(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var req ResolveAgentLaunchEnvRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSONError(w, err, http.StatusBadRequest)
-		return
-	}
-
-	resolved, err := d.resolveCreateSandboxCapabilities(CreateSandboxOpts{
-		Agent:   req.Agent,
-		EnvFile: req.EnvFile,
-	})
-	if err != nil {
-		writeJSONError(w, err, http.StatusBadRequest)
-		return
-	}
-	writeJSON(w, ResolveAgentLaunchEnvResponse{Env: resolved.AuthEnv})
-}
-
-// handleEnsureImage pulls the requested image if it is absent or stale, streaming
-// progress lines to the client as plain text. The final line is "OK\n" on success
-// or "ERR <message>\n" on failure.
-func (d *Daemon) handleEnsureImage(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var req EnsureImageRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSONError(w, err, http.StatusBadRequest)
-		return
-	}
-
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.WriteHeader(http.StatusOK)
-
-	fw := newFlushWriter(w)
-	if err := d.boxer.EnsureImage(r.Context(), req.ImageName, fw); err != nil {
-		fmt.Fprintf(fw, "ERR %s\n", err.Error())
-		return
-	}
-	fmt.Fprintln(fw, "OK")
-}
-
-func (d *Daemon) handleCreateStream(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var opts CreateSandboxOpts
-	if err := json.NewDecoder(r.Body).Decode(&opts); err != nil {
-		writeJSONError(w, err, http.StatusBadRequest)
-		return
-	}
-	ctx := sandboxlog.WithSandboxID(r.Context(), opts.ID)
-
-	w.Header().Set("Content-Type", "application/x-ndjson")
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.WriteHeader(http.StatusOK)
-
-	stream := newCreateSandboxStreamWriter(w)
-	sbox, err := d.createSandbox(ctx, opts, stream)
-	if err != nil {
-		slog.ErrorContext(ctx, "handleCreateStream createSandbox", "error", err)
-		if writeErr := stream.Error(err); writeErr != nil {
-			slog.ErrorContext(ctx, "handleCreateStream stream error", "error", writeErr)
-		}
-		return
-	}
-	if err := stream.Result(sbox); err != nil {
-		slog.ErrorContext(r.Context(), "handleCreateStream stream result", "error", err)
-	}
-}
-
-func (d *Daemon) handleVSC(w http.ResponseWriter, r *http.Request) {
-	sandboxID, ctx, err := sandboxIDOf(r)
-	if err != nil {
-		writeJSONError(w, err, http.StatusBadRequest)
-		return
-	}
-	r = r.WithContext(ctx)
-	sbox, err := d.GetSandbox(ctx, sandboxID)
-	if err != nil {
-		slog.ErrorContext(ctx, "GetSandbox", "error", err)
-		writeJSONError(w, err, http.StatusInternalServerError)
-		return
-	}
-
-	ctr := sbox.Container
-
-	if ctr == nil || ctr.Status != "running" {
-		writeJSONError(w, fmt.Errorf("cannot connect to sandbox %q becacuse it is not currently running", sandboxID), http.StatusInternalServerError)
-		return
-	}
-
-	hostname := types.GetContainerHostname(ctr)
-	vscCmd := exec.Command("code", "--remote", fmt.Sprintf("ssh-remote+%s", hostname), "/app", "-n")
-	slog.InfoContext(ctx, "main: running vsc with", "cmd", strings.Join(vscCmd.Args, " "))
-	out, err := vscCmd.CombinedOutput()
-	if err != nil {
-		writeJSONError(w, fmt.Errorf("failed to start vsc for %q: %w", sandboxID, err), http.StatusInternalServerError)
-		slog.ErrorContext(ctx, "VscCmd.Run cmd", "out", out, "error", err)
-	}
 }
 
 // handleSandboxConfig is called by the dnsproxy sidecar running in the VM to fetch

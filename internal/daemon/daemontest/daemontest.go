@@ -83,7 +83,7 @@ func StartDaemon(t testing.TB, deps Deps, configure func(context.Context, Sandbo
 
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
-		if _, err := os.Stat(d.SocketPath); err == nil {
+		if _, err := os.Stat(d.GRPCSocketPath); err == nil {
 			break
 		}
 		time.Sleep(5 * time.Millisecond)
