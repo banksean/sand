@@ -1,0 +1,54 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+version: '3'
+
+vars:
+  DAEMON_PROTO: internal/daemon/daemonpb/daemon.proto
+  DAEMON_PROTO_OUT_DIR: .
+
+tasks:
+  default:
+    desc: List available tasks
+    cmds:
+      - task --list
+
+  proto:generate:
+    aliases:
+      - generate:proto
+      - gen:proto
+    desc: Generate Go protobuf and gRPC bindings for the daemon API
+    cmds:
+      - >-
+        protoc
+        --go_out={{.DAEMON_PROTO_OUT_DIR}}
+        --go_opt=paths=source_relative
+        --go-grpc_out={{.DAEMON_PROTO_OUT_DIR}}
+        --go-grpc_opt=paths=source_relative
+        {{.DAEMON_PROTO}}
+
+  build:
+    desc: Build all Go packages
+    deps:
+      - proto:generate
+    cmds:
+      - go build -v ./...
+
+  test:
+    desc: Run Go tests
+    deps:
+      - proto:generate
+    cmds:
+      - GOEXPERIMENT=synctest gotestsum ./...
+
+  install:
+    desc: Install Go commands
+    deps:
+      - stopdaemon
+    cmds:
+      - go install ./cmd/...
+
+  stopdaemon:
+    ignore_error: true
+    cmds:
+      - echo "Stopping sandd (if it's running)..."
+      - sandd stop

@@ -1,0 +1,7 @@
+[tools]
+go = "1.25.7"
+"aqua:go-task/task" = "3.50.0"
+"aqua:protocolbuffers/protobuf/protoc" = "33.1"
+"aqua:protocolbuffers/protobuf-go/protoc-gen-go" = "1.36.11"
+"aqua:grpc/grpc-go/protoc-gen-go-grpc" = "1.6.1"
+"aqua:gotestsum" = "1.13.0"
