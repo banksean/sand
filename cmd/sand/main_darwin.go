@@ -20,6 +20,7 @@ import (
 	kongyaml "github.com/alecthomas/kong-yaml"
 	"github.com/banksean/sand/internal/cli"
 	"github.com/banksean/sand/internal/daemon"
+	"github.com/banksean/sand/internal/observability"
 	"github.com/banksean/sand/internal/runtimedeps"
 	"github.com/banksean/sand/internal/sandboxlog"
 	"github.com/banksean/sand/internal/version"
@@ -221,6 +222,18 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "unable to get application home directory: %v\n", err.Error())
 		os.Exit(1)
+	}
+
+	shutdownTracing, tracingEnabled, err := observability.InitTracing(ctx, "sand-cli")
+	if err != nil {
+		slog.WarnContext(ctx, "failed to initialize tracing", "error", err)
+	}
+	if tracingEnabled {
+		defer func() {
+			if err := observability.Shutdown(ctx, shutdownTracing); err != nil {
+				slog.WarnContext(ctx, "failed to shutdown tracing", "error", err)
+			}
+		}()
 	}
 
 	predictorMC, err := daemon.NewUnixSocketClient(ctx, appBaseDir)

@@ -21,6 +21,8 @@ import (
 	"github.com/banksean/sand/internal/sandboxlog"
 	"github.com/banksean/sand/internal/sandtypes"
 	"github.com/banksean/sand/internal/version"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.opentelemetry.io/otel/attribute"
 	"google.golang.org/grpc"
 )
 
@@ -193,7 +195,7 @@ func (d *Daemon) Shutdown(ctx context.Context) {
 }
 
 func (d *Daemon) serveOutieGRPCSocket(ctx context.Context) {
-	server := grpc.NewServer()
+	server := grpc.NewServer(grpc.StatsHandler(otelgrpc.NewServerHandler()))
 	daemonpb.RegisterDaemonServiceServer(server, &daemonGRPCServer{daemon: d})
 	d.grpcSrv = server
 
@@ -293,9 +295,14 @@ func (d *Daemon) serveInnieHttpSocket(ctx context.Context, sandboxID string, uni
 
 func (d *Daemon) serveInnieGRPCSocket(ctx context.Context, sandboxID string, unixListener net.Listener) {
 	ctx = sandboxlog.WithSandboxID(ctx, sandboxID)
-	server := grpc.NewServer(grpc.UnaryInterceptor(func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-		return handler(sandboxlog.WithSandboxID(ctx, sandboxID), req)
-	}))
+	server := grpc.NewServer(
+		grpc.StatsHandler(otelgrpc.NewServerHandler(
+			otelgrpc.WithSpanAttributes(attribute.String("sand.sandbox_id", sandboxID)),
+		)),
+		grpc.UnaryInterceptor(func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+			return handler(sandboxlog.WithSandboxID(ctx, sandboxID), req)
+		}),
+	)
 	daemonpb.RegisterDaemonServiceServer(server, &daemonGRPCServer{daemon: d})
 
 	d.innieServersMu.Lock()

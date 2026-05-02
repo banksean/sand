@@ -50,5 +50,47 @@ tasks:
   stopdaemon:
     ignore_error: true
     cmds:
-      - echo "Stopping sandd (if it's running)..."
+      - echo "Stopping sandd..."
       - sandd stop
+
+  grafana:
+    deps:
+      - tempo
+    cmds:
+      - mkdir -p ~/grafana-data
+      - echo "Starting grafana"
+      - >-
+        container run
+        --name grafana
+        --detach
+        --cpus 2
+        --memory 512M
+        -p 3000:3000/tcp
+        --volume ~/grafana-data:/var/lib/grafana
+        --volume {{.TASKFILE_DIR}}/observability/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/sand.yaml:ro
+        -e GF_USERS_ALLOW_SIGN_UP=false
+        grafana/grafana:latest
+
+  tempo:
+    cmds:
+      - mkdir -p ~/sand-observability/tempo-data
+      - echo "Starting tempo"
+      - >-
+        container run
+        --name tempo
+        --detach
+        --cpus 2
+        --memory 512M
+        -p 3200:3200/tcp
+        -p 4317:4317/tcp
+        -p 4318:4318/tcp
+        --volume {{.TASKFILE_DIR}}/observability/tempo.yaml:/etc/tempo.yaml:ro
+        --volume ~/sand-observability/tempo-data:/var/tempo
+        grafana/tempo:latest
+        -config.file=/etc/tempo.yaml
+
+  stopgrafana:
+    cmds:
+      - echo "Stopping grafana and tempo..."
+      - container rm -f grafana
+      - container rm -f tempo

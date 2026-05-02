@@ -15,6 +15,7 @@ import (
 	kongyaml "github.com/alecthomas/kong-yaml"
 	"github.com/banksean/sand/internal/cli"
 	"github.com/banksean/sand/internal/daemon"
+	"github.com/banksean/sand/internal/observability"
 	kongcompletion "github.com/jotaen/kong-completion"
 )
 
@@ -104,6 +105,18 @@ func main() {
 	// The sandd.grpc.sock file in this directory should have been created by sandd
 	// and attached to this container via --volume flag.
 	appBaseDir := "/run/host-services"
+
+	shutdownTracing, tracingEnabled, err := observability.InitTracing(ctx, "sand-innie")
+	if err != nil {
+		slog.WarnContext(ctx, "failed to initialize tracing", "error", err)
+	}
+	if tracingEnabled {
+		defer func() {
+			if err := observability.Shutdown(ctx, shutdownTracing); err != nil {
+				slog.WarnContext(ctx, "failed to shutdown tracing", "error", err)
+			}
+		}()
+	}
 
 	kongApp := kong.Must(&app)
 

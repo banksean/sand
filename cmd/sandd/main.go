@@ -17,6 +17,7 @@ import (
 	"github.com/banksean/sand/internal/applecontainer"
 	"github.com/banksean/sand/internal/cli"
 	"github.com/banksean/sand/internal/daemon"
+	"github.com/banksean/sand/internal/observability"
 	"github.com/banksean/sand/internal/sandboxlog"
 	"github.com/banksean/sand/internal/version"
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -269,6 +270,18 @@ func main() {
 
 	cli.initSlog()
 	versionInfo := version.Get()
+
+	shutdownTracing, tracingEnabled, err := observability.InitTracing(ctx, "sandd")
+	if err != nil {
+		slog.WarnContext(ctx, "failed to initialize tracing", "error", err)
+	}
+	if tracingEnabled {
+		defer func() {
+			if err := observability.Shutdown(ctx, shutdownTracing); err != nil {
+				slog.WarnContext(ctx, "failed to shutdown tracing", "error", err)
+			}
+		}()
+	}
 
 	cwd, err := os.Getwd()
 	slog.InfoContext(ctx, "sandd main", "version", versionInfo, "cwd", cwd, "error", err)
