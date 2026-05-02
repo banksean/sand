@@ -19,10 +19,21 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	DaemonService_Ping_FullMethodName          = "/sand.daemon.v1.DaemonService/Ping"
-	DaemonService_Version_FullMethodName       = "/sand.daemon.v1.DaemonService/Version"
-	DaemonService_CreateSandbox_FullMethodName = "/sand.daemon.v1.DaemonService/CreateSandbox"
-	DaemonService_EnsureImage_FullMethodName   = "/sand.daemon.v1.DaemonService/EnsureImage"
+	DaemonService_Ping_FullMethodName                  = "/sand.daemon.v1.DaemonService/Ping"
+	DaemonService_Version_FullMethodName               = "/sand.daemon.v1.DaemonService/Version"
+	DaemonService_Shutdown_FullMethodName              = "/sand.daemon.v1.DaemonService/Shutdown"
+	DaemonService_LogSandbox_FullMethodName            = "/sand.daemon.v1.DaemonService/LogSandbox"
+	DaemonService_ListSandboxes_FullMethodName         = "/sand.daemon.v1.DaemonService/ListSandboxes"
+	DaemonService_GetSandbox_FullMethodName            = "/sand.daemon.v1.DaemonService/GetSandbox"
+	DaemonService_RemoveSandbox_FullMethodName         = "/sand.daemon.v1.DaemonService/RemoveSandbox"
+	DaemonService_StopSandbox_FullMethodName           = "/sand.daemon.v1.DaemonService/StopSandbox"
+	DaemonService_StartSandbox_FullMethodName          = "/sand.daemon.v1.DaemonService/StartSandbox"
+	DaemonService_ResolveAgentLaunchEnv_FullMethodName = "/sand.daemon.v1.DaemonService/ResolveAgentLaunchEnv"
+	DaemonService_ExportImage_FullMethodName           = "/sand.daemon.v1.DaemonService/ExportImage"
+	DaemonService_Stats_FullMethodName                 = "/sand.daemon.v1.DaemonService/Stats"
+	DaemonService_VSC_FullMethodName                   = "/sand.daemon.v1.DaemonService/VSC"
+	DaemonService_CreateSandbox_FullMethodName         = "/sand.daemon.v1.DaemonService/CreateSandbox"
+	DaemonService_EnsureImage_FullMethodName           = "/sand.daemon.v1.DaemonService/EnsureImage"
 )
 
 // DaemonServiceClient is the client API for DaemonService service.
@@ -31,6 +42,17 @@ const (
 type DaemonServiceClient interface {
 	Ping(ctx context.Context, in *PingRequest, opts ...grpc.CallOption) (*PingResponse, error)
 	Version(ctx context.Context, in *VersionRequest, opts ...grpc.CallOption) (*VersionResponse, error)
+	Shutdown(ctx context.Context, in *ShutdownRequest, opts ...grpc.CallOption) (*StatusResponse, error)
+	LogSandbox(ctx context.Context, in *IDRequest, opts ...grpc.CallOption) (*LogSandboxResponse, error)
+	ListSandboxes(ctx context.Context, in *ListSandboxesRequest, opts ...grpc.CallOption) (*ListSandboxesResponse, error)
+	GetSandbox(ctx context.Context, in *IDRequest, opts ...grpc.CallOption) (*GetSandboxResponse, error)
+	RemoveSandbox(ctx context.Context, in *IDRequest, opts ...grpc.CallOption) (*StatusResponse, error)
+	StopSandbox(ctx context.Context, in *IDRequest, opts ...grpc.CallOption) (*StatusResponse, error)
+	StartSandbox(ctx context.Context, in *StartSandboxRequest, opts ...grpc.CallOption) (*StatusResponse, error)
+	ResolveAgentLaunchEnv(ctx context.Context, in *ResolveAgentLaunchEnvRequest, opts ...grpc.CallOption) (*ResolveAgentLaunchEnvResponse, error)
+	ExportImage(ctx context.Context, in *ExportImageRequest, opts ...grpc.CallOption) (*StatusResponse, error)
+	Stats(ctx context.Context, in *StatsRequest, opts ...grpc.CallOption) (*StatsResponse, error)
+	VSC(ctx context.Context, in *IDRequest, opts ...grpc.CallOption) (*StatusResponse, error)
 	CreateSandbox(ctx context.Context, in *CreateSandboxRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CreateSandboxResponse], error)
 	EnsureImage(ctx context.Context, in *EnsureImageRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[EnsureImageResponse], error)
 }
@@ -57,6 +79,116 @@ func (c *daemonServiceClient) Version(ctx context.Context, in *VersionRequest, o
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(VersionResponse)
 	err := c.cc.Invoke(ctx, DaemonService_Version_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *daemonServiceClient) Shutdown(ctx context.Context, in *ShutdownRequest, opts ...grpc.CallOption) (*StatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StatusResponse)
+	err := c.cc.Invoke(ctx, DaemonService_Shutdown_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *daemonServiceClient) LogSandbox(ctx context.Context, in *IDRequest, opts ...grpc.CallOption) (*LogSandboxResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(LogSandboxResponse)
+	err := c.cc.Invoke(ctx, DaemonService_LogSandbox_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *daemonServiceClient) ListSandboxes(ctx context.Context, in *ListSandboxesRequest, opts ...grpc.CallOption) (*ListSandboxesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListSandboxesResponse)
+	err := c.cc.Invoke(ctx, DaemonService_ListSandboxes_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *daemonServiceClient) GetSandbox(ctx context.Context, in *IDRequest, opts ...grpc.CallOption) (*GetSandboxResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetSandboxResponse)
+	err := c.cc.Invoke(ctx, DaemonService_GetSandbox_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *daemonServiceClient) RemoveSandbox(ctx context.Context, in *IDRequest, opts ...grpc.CallOption) (*StatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StatusResponse)
+	err := c.cc.Invoke(ctx, DaemonService_RemoveSandbox_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *daemonServiceClient) StopSandbox(ctx context.Context, in *IDRequest, opts ...grpc.CallOption) (*StatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StatusResponse)
+	err := c.cc.Invoke(ctx, DaemonService_StopSandbox_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *daemonServiceClient) StartSandbox(ctx context.Context, in *StartSandboxRequest, opts ...grpc.CallOption) (*StatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StatusResponse)
+	err := c.cc.Invoke(ctx, DaemonService_StartSandbox_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *daemonServiceClient) ResolveAgentLaunchEnv(ctx context.Context, in *ResolveAgentLaunchEnvRequest, opts ...grpc.CallOption) (*ResolveAgentLaunchEnvResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResolveAgentLaunchEnvResponse)
+	err := c.cc.Invoke(ctx, DaemonService_ResolveAgentLaunchEnv_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *daemonServiceClient) ExportImage(ctx context.Context, in *ExportImageRequest, opts ...grpc.CallOption) (*StatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StatusResponse)
+	err := c.cc.Invoke(ctx, DaemonService_ExportImage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *daemonServiceClient) Stats(ctx context.Context, in *StatsRequest, opts ...grpc.CallOption) (*StatsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StatsResponse)
+	err := c.cc.Invoke(ctx, DaemonService_Stats_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *daemonServiceClient) VSC(ctx context.Context, in *IDRequest, opts ...grpc.CallOption) (*StatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StatusResponse)
+	err := c.cc.Invoke(ctx, DaemonService_VSC_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -107,6 +239,17 @@ type DaemonService_EnsureImageClient = grpc.ServerStreamingClient[EnsureImageRes
 type DaemonServiceServer interface {
 	Ping(context.Context, *PingRequest) (*PingResponse, error)
 	Version(context.Context, *VersionRequest) (*VersionResponse, error)
+	Shutdown(context.Context, *ShutdownRequest) (*StatusResponse, error)
+	LogSandbox(context.Context, *IDRequest) (*LogSandboxResponse, error)
+	ListSandboxes(context.Context, *ListSandboxesRequest) (*ListSandboxesResponse, error)
+	GetSandbox(context.Context, *IDRequest) (*GetSandboxResponse, error)
+	RemoveSandbox(context.Context, *IDRequest) (*StatusResponse, error)
+	StopSandbox(context.Context, *IDRequest) (*StatusResponse, error)
+	StartSandbox(context.Context, *StartSandboxRequest) (*StatusResponse, error)
+	ResolveAgentLaunchEnv(context.Context, *ResolveAgentLaunchEnvRequest) (*ResolveAgentLaunchEnvResponse, error)
+	ExportImage(context.Context, *ExportImageRequest) (*StatusResponse, error)
+	Stats(context.Context, *StatsRequest) (*StatsResponse, error)
+	VSC(context.Context, *IDRequest) (*StatusResponse, error)
 	CreateSandbox(*CreateSandboxRequest, grpc.ServerStreamingServer[CreateSandboxResponse]) error
 	EnsureImage(*EnsureImageRequest, grpc.ServerStreamingServer[EnsureImageResponse]) error
 	mustEmbedUnimplementedDaemonServiceServer()
@@ -124,6 +267,39 @@ func (UnimplementedDaemonServiceServer) Ping(context.Context, *PingRequest) (*Pi
 }
 func (UnimplementedDaemonServiceServer) Version(context.Context, *VersionRequest) (*VersionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Version not implemented")
+}
+func (UnimplementedDaemonServiceServer) Shutdown(context.Context, *ShutdownRequest) (*StatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Shutdown not implemented")
+}
+func (UnimplementedDaemonServiceServer) LogSandbox(context.Context, *IDRequest) (*LogSandboxResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method LogSandbox not implemented")
+}
+func (UnimplementedDaemonServiceServer) ListSandboxes(context.Context, *ListSandboxesRequest) (*ListSandboxesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListSandboxes not implemented")
+}
+func (UnimplementedDaemonServiceServer) GetSandbox(context.Context, *IDRequest) (*GetSandboxResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetSandbox not implemented")
+}
+func (UnimplementedDaemonServiceServer) RemoveSandbox(context.Context, *IDRequest) (*StatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RemoveSandbox not implemented")
+}
+func (UnimplementedDaemonServiceServer) StopSandbox(context.Context, *IDRequest) (*StatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method StopSandbox not implemented")
+}
+func (UnimplementedDaemonServiceServer) StartSandbox(context.Context, *StartSandboxRequest) (*StatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method StartSandbox not implemented")
+}
+func (UnimplementedDaemonServiceServer) ResolveAgentLaunchEnv(context.Context, *ResolveAgentLaunchEnvRequest) (*ResolveAgentLaunchEnvResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResolveAgentLaunchEnv not implemented")
+}
+func (UnimplementedDaemonServiceServer) ExportImage(context.Context, *ExportImageRequest) (*StatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ExportImage not implemented")
+}
+func (UnimplementedDaemonServiceServer) Stats(context.Context, *StatsRequest) (*StatsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Stats not implemented")
+}
+func (UnimplementedDaemonServiceServer) VSC(context.Context, *IDRequest) (*StatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method VSC not implemented")
 }
 func (UnimplementedDaemonServiceServer) CreateSandbox(*CreateSandboxRequest, grpc.ServerStreamingServer[CreateSandboxResponse]) error {
 	return status.Error(codes.Unimplemented, "method CreateSandbox not implemented")
@@ -188,6 +364,204 @@ func _DaemonService_Version_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DaemonService_Shutdown_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ShutdownRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DaemonServiceServer).Shutdown(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DaemonService_Shutdown_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DaemonServiceServer).Shutdown(ctx, req.(*ShutdownRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DaemonService_LogSandbox_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(IDRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DaemonServiceServer).LogSandbox(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DaemonService_LogSandbox_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DaemonServiceServer).LogSandbox(ctx, req.(*IDRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DaemonService_ListSandboxes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListSandboxesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DaemonServiceServer).ListSandboxes(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DaemonService_ListSandboxes_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DaemonServiceServer).ListSandboxes(ctx, req.(*ListSandboxesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DaemonService_GetSandbox_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(IDRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DaemonServiceServer).GetSandbox(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DaemonService_GetSandbox_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DaemonServiceServer).GetSandbox(ctx, req.(*IDRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DaemonService_RemoveSandbox_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(IDRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DaemonServiceServer).RemoveSandbox(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DaemonService_RemoveSandbox_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DaemonServiceServer).RemoveSandbox(ctx, req.(*IDRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DaemonService_StopSandbox_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(IDRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DaemonServiceServer).StopSandbox(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DaemonService_StopSandbox_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DaemonServiceServer).StopSandbox(ctx, req.(*IDRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DaemonService_StartSandbox_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StartSandboxRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DaemonServiceServer).StartSandbox(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DaemonService_StartSandbox_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DaemonServiceServer).StartSandbox(ctx, req.(*StartSandboxRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DaemonService_ResolveAgentLaunchEnv_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResolveAgentLaunchEnvRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DaemonServiceServer).ResolveAgentLaunchEnv(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DaemonService_ResolveAgentLaunchEnv_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DaemonServiceServer).ResolveAgentLaunchEnv(ctx, req.(*ResolveAgentLaunchEnvRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DaemonService_ExportImage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ExportImageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DaemonServiceServer).ExportImage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DaemonService_ExportImage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DaemonServiceServer).ExportImage(ctx, req.(*ExportImageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DaemonService_Stats_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StatsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DaemonServiceServer).Stats(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DaemonService_Stats_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DaemonServiceServer).Stats(ctx, req.(*StatsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DaemonService_VSC_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(IDRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DaemonServiceServer).VSC(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DaemonService_VSC_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DaemonServiceServer).VSC(ctx, req.(*IDRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _DaemonService_CreateSandbox_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(CreateSandboxRequest)
 	if err := stream.RecvMsg(m); err != nil {
@@ -224,6 +598,50 @@ var DaemonService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Version",
 			Handler:    _DaemonService_Version_Handler,
+		},
+		{
+			MethodName: "Shutdown",
+			Handler:    _DaemonService_Shutdown_Handler,
+		},
+		{
+			MethodName: "LogSandbox",
+			Handler:    _DaemonService_LogSandbox_Handler,
+		},
+		{
+			MethodName: "ListSandboxes",
+			Handler:    _DaemonService_ListSandboxes_Handler,
+		},
+		{
+			MethodName: "GetSandbox",
+			Handler:    _DaemonService_GetSandbox_Handler,
+		},
+		{
+			MethodName: "RemoveSandbox",
+			Handler:    _DaemonService_RemoveSandbox_Handler,
+		},
+		{
+			MethodName: "StopSandbox",
+			Handler:    _DaemonService_StopSandbox_Handler,
+		},
+		{
+			MethodName: "StartSandbox",
+			Handler:    _DaemonService_StartSandbox_Handler,
+		},
+		{
+			MethodName: "ResolveAgentLaunchEnv",
+			Handler:    _DaemonService_ResolveAgentLaunchEnv_Handler,
+		},
+		{
+			MethodName: "ExportImage",
+			Handler:    _DaemonService_ExportImage_Handler,
+		},
+		{
+			MethodName: "Stats",
+			Handler:    _DaemonService_Stats_Handler,
+		},
+		{
+			MethodName: "VSC",
+			Handler:    _DaemonService_VSC_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

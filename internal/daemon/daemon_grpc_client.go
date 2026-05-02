@@ -9,6 +9,7 @@ import (
 	"net"
 	"path/filepath"
 
+	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/daemon/daemonpb"
 	"github.com/banksean/sand/internal/sandtypes"
 	"github.com/banksean/sand/internal/version"
@@ -63,6 +64,104 @@ func (c *GRPCClient) Version(ctx context.Context) (version.Info, error) {
 		GitCommit: resp.GetGitCommit(),
 		BuildTime: resp.GetBuildTime(),
 	}, nil
+}
+
+func (c *GRPCClient) Shutdown(ctx context.Context) error {
+	_, err := c.client.Shutdown(ctx, &daemonpb.ShutdownRequest{})
+	return err
+}
+
+func (c *GRPCClient) LogSandbox(ctx context.Context, id string, w io.Writer) error {
+	resp, err := c.client.LogSandbox(ctx, &daemonpb.IDRequest{Id: id})
+	if err != nil {
+		return err
+	}
+	if w == nil {
+		w = io.Discard
+	}
+	_, err = w.Write(resp.GetData())
+	return err
+}
+
+func (c *GRPCClient) ListSandboxes(ctx context.Context) ([]sandtypes.Box, error) {
+	resp, err := c.client.ListSandboxes(ctx, &daemonpb.ListSandboxesRequest{})
+	if err != nil {
+		return nil, err
+	}
+	var boxes []sandtypes.Box
+	if err := json.Unmarshal(resp.GetBoxesJson(), &boxes); err != nil {
+		return nil, fmt.Errorf("decode sandbox list: %w", err)
+	}
+	return boxes, nil
+}
+
+func (c *GRPCClient) GetSandbox(ctx context.Context, id string) (*sandtypes.Box, error) {
+	resp, err := c.client.GetSandbox(ctx, &daemonpb.IDRequest{Id: id})
+	if err != nil {
+		return nil, err
+	}
+	var box sandtypes.Box
+	if err := json.Unmarshal(resp.GetBoxJson(), &box); err != nil {
+		return nil, fmt.Errorf("decode sandbox: %w", err)
+	}
+	return &box, nil
+}
+
+func (c *GRPCClient) RemoveSandbox(ctx context.Context, id string) error {
+	_, err := c.client.RemoveSandbox(ctx, &daemonpb.IDRequest{Id: id})
+	return err
+}
+
+func (c *GRPCClient) StopSandbox(ctx context.Context, id string) error {
+	_, err := c.client.StopSandbox(ctx, &daemonpb.IDRequest{Id: id})
+	return err
+}
+
+func (c *GRPCClient) StartSandbox(ctx context.Context, opts StartSandboxOpts) error {
+	_, err := c.client.StartSandbox(ctx, &daemonpb.StartSandboxRequest{
+		Id:       opts.ID,
+		SshAgent: opts.SSHAgent,
+	})
+	return err
+}
+
+func (c *GRPCClient) ResolveAgentLaunchEnv(ctx context.Context, agent, envFile string) (map[string]string, error) {
+	resp, err := c.client.ResolveAgentLaunchEnv(ctx, &daemonpb.ResolveAgentLaunchEnvRequest{
+		Agent:   agent,
+		EnvFile: envFile,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if resp.GetEnv() == nil {
+		return map[string]string{}, nil
+	}
+	return resp.GetEnv(), nil
+}
+
+func (c *GRPCClient) ExportImage(ctx context.Context, id, destinationPath string) error {
+	_, err := c.client.ExportImage(ctx, &daemonpb.ExportImageRequest{
+		Id:              id,
+		DestinationPath: destinationPath,
+	})
+	return err
+}
+
+func (c *GRPCClient) Stats(ctx context.Context, ids ...string) ([]types.ContainerStats, error) {
+	resp, err := c.client.Stats(ctx, &daemonpb.StatsRequest{Ids: ids})
+	if err != nil {
+		return nil, err
+	}
+	var stats []types.ContainerStats
+	if err := json.Unmarshal(resp.GetStatsJson(), &stats); err != nil {
+		return nil, fmt.Errorf("decode container stats: %w", err)
+	}
+	return stats, nil
+}
+
+func (c *GRPCClient) VSC(ctx context.Context, id string) error {
+	_, err := c.client.VSC(ctx, &daemonpb.IDRequest{Id: id})
+	return err
 }
 
 func (c *GRPCClient) CreateSandbox(ctx context.Context, opts CreateSandboxOpts, w io.Writer) (*sandtypes.Box, error) {

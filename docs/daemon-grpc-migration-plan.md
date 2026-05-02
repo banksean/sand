@@ -5,7 +5,7 @@ protocol from HTTP-only endpoints to a staged gRPC interface.
 
 ## Current Status
 
-The transport, socket wiring, and streaming slices have landed.
+The transport, socket wiring, streaming, and unary migration slices have landed.
 
 Completed:
 
@@ -27,10 +27,17 @@ Completed:
 - Added gRPC streaming client tests for progress, success, and streamed errors.
 - Added daemon gRPC streaming integration coverage for `EnsureImage` and
   `CreateSandbox` streamed errors.
+- Added unary gRPC RPCs for `Shutdown`, `LogSandbox`, `ListSandboxes`,
+  `GetSandbox`, `RemoveSandbox`, `StopSandbox`, `StartSandbox`,
+  `ResolveAgentLaunchEnv`, `ExportImage`, `Stats`, and `VSC`.
+- Migrated the default Unix-socket client to use gRPC for all non-bootstrap
+  daemon methods.
+- Added unary gRPC client coverage for request mapping and JSON response
+  decoding.
+- Added protobuf conversion coverage for `CreateSandboxOpts`.
 
 Remaining:
 
-- Migrate remaining non-bootstrap unary methods.
 - Remove migrated HTTP endpoints and temporary migration-only client code.
 - Add developer documentation for regenerating protobuf output.
 
@@ -93,7 +100,7 @@ should not need them.
    - Add integration coverage for stream lifecycle, cancellation, EOF, and
      error propagation.
 
-4. Unary methods
+4. Unary methods (done)
    - Move remaining non-bootstrap HTTP calls to unary gRPC methods.
    - Keep conversions between existing domain types and protobuf messages
      explicit and covered by tests.

@@ -119,10 +119,16 @@ func (m *defaultClient) doRequest(ctx context.Context, method, path string, body
 }
 
 func (m *defaultClient) Ping(ctx context.Context) error {
+	if m.grpcClient != nil {
+		return m.grpcClient.Ping(ctx)
+	}
 	return m.doRequest(ctx, http.MethodGet, "/ping", nil, nil)
 }
 
 func (m *defaultClient) Version(ctx context.Context) (version.Info, error) {
+	if m.grpcClient != nil {
+		return m.grpcClient.Version(ctx)
+	}
 	var info version.Info
 	if err := m.doRequest(ctx, http.MethodGet, "/version", nil, &info); err != nil {
 		return version.Info{}, err
@@ -131,10 +137,16 @@ func (m *defaultClient) Version(ctx context.Context) (version.Info, error) {
 }
 
 func (m *defaultClient) Shutdown(ctx context.Context) error {
+	if m.grpcClient != nil {
+		return m.grpcClient.Shutdown(ctx)
+	}
 	return m.doRequest(ctx, http.MethodPost, "/shutdown", nil, nil)
 }
 
 func (m *defaultClient) LogSandbox(ctx context.Context, id string, w io.Writer) error {
+	if m.grpcClient != nil {
+		return m.grpcClient.LogSandbox(ctx, id, w)
+	}
 	reqBody, err := json.Marshal(IDRequest{ID: id})
 	if err != nil {
 		return err
@@ -167,6 +179,9 @@ func (m *defaultClient) LogSandbox(ctx context.Context, id string, w io.Writer) 
 }
 
 func (m *defaultClient) ListSandboxes(ctx context.Context) ([]sandtypes.Box, error) {
+	if m.grpcClient != nil {
+		return m.grpcClient.ListSandboxes(ctx)
+	}
 	var boxes []sandtypes.Box
 	if err := m.doRequest(ctx, http.MethodGet, "/list", nil, &boxes); err != nil {
 		return nil, err
@@ -175,6 +190,9 @@ func (m *defaultClient) ListSandboxes(ctx context.Context) ([]sandtypes.Box, err
 }
 
 func (m *defaultClient) GetSandbox(ctx context.Context, id string) (*sandtypes.Box, error) {
+	if m.grpcClient != nil {
+		return m.grpcClient.GetSandbox(ctx, id)
+	}
 	var box sandtypes.Box
 	if err := m.doRequest(ctx, http.MethodPost, "/get", IDRequest{ID: id}, &box); err != nil {
 		if strings.Contains(err.Error(), "404") {
@@ -186,14 +204,23 @@ func (m *defaultClient) GetSandbox(ctx context.Context, id string) (*sandtypes.B
 }
 
 func (m *defaultClient) RemoveSandbox(ctx context.Context, id string) error {
+	if m.grpcClient != nil {
+		return m.grpcClient.RemoveSandbox(ctx, id)
+	}
 	return m.doRequest(ctx, http.MethodPost, "/remove", IDRequest{ID: id}, nil)
 }
 
 func (m *defaultClient) StopSandbox(ctx context.Context, id string) error {
+	if m.grpcClient != nil {
+		return m.grpcClient.StopSandbox(ctx, id)
+	}
 	return m.doRequest(ctx, http.MethodPost, "/stop", IDRequest{ID: id}, nil)
 }
 
 func (m *defaultClient) StartSandbox(ctx context.Context, opts StartSandboxOpts) error {
+	if m.grpcClient != nil {
+		return m.grpcClient.StartSandbox(ctx, opts)
+	}
 	return m.doRequest(ctx, http.MethodPost, "/start", StartSandboxRequest{
 		ID:       opts.ID,
 		SSHAgent: opts.SSHAgent,
@@ -201,6 +228,9 @@ func (m *defaultClient) StartSandbox(ctx context.Context, opts StartSandboxOpts)
 }
 
 func (m *defaultClient) ResolveAgentLaunchEnv(ctx context.Context, agent, envFile string) (map[string]string, error) {
+	if m.grpcClient != nil {
+		return m.grpcClient.ResolveAgentLaunchEnv(ctx, agent, envFile)
+	}
 	var resp ResolveAgentLaunchEnvResponse
 	if err := m.doRequest(ctx, http.MethodPost, "/resolve-agent-env", ResolveAgentLaunchEnvRequest{
 		Agent:   agent,
@@ -215,6 +245,9 @@ func (m *defaultClient) ResolveAgentLaunchEnv(ctx context.Context, agent, envFil
 }
 
 func (m *defaultClient) VSC(ctx context.Context, id string) error {
+	if m.grpcClient != nil {
+		return m.grpcClient.VSC(ctx, id)
+	}
 	return m.doRequest(ctx, http.MethodPost, "/vsc", IDRequest{ID: id}, nil)
 }
 
@@ -370,11 +403,17 @@ func scanLinesOrCR(data []byte, atEOF bool) (advance int, token []byte, err erro
 }
 
 func (m *defaultClient) ExportImage(ctx context.Context, id string, destinationPath string) error {
+	if m.grpcClient != nil {
+		return m.grpcClient.ExportImage(ctx, id, destinationPath)
+	}
 	return m.doRequest(ctx, http.MethodPost, "/export", ExportRequest{ID: id, DestinationPath: destinationPath}, nil)
 }
 
 // Stats implements [Client].
 func (m *defaultClient) Stats(ctx context.Context, ids ...string) ([]types.ContainerStats, error) {
+	if m.grpcClient != nil {
+		return m.grpcClient.Stats(ctx, ids...)
+	}
 	var stats []types.ContainerStats
 	if err := m.doRequest(ctx, http.MethodPost, "/stats", StatsRequest{IDs: ids}, &stats); err != nil {
 		return nil, err

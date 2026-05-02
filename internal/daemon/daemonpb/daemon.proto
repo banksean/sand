@@ -7,6 +7,17 @@ option go_package = "github.com/banksean/sand/internal/daemon/daemonpb";
 service DaemonService {
   rpc Ping(PingRequest) returns (PingResponse);
   rpc Version(VersionRequest) returns (VersionResponse);
+  rpc Shutdown(ShutdownRequest) returns (StatusResponse);
+  rpc LogSandbox(IDRequest) returns (LogSandboxResponse);
+  rpc ListSandboxes(ListSandboxesRequest) returns (ListSandboxesResponse);
+  rpc GetSandbox(IDRequest) returns (GetSandboxResponse);
+  rpc RemoveSandbox(IDRequest) returns (StatusResponse);
+  rpc StopSandbox(IDRequest) returns (StatusResponse);
+  rpc StartSandbox(StartSandboxRequest) returns (StatusResponse);
+  rpc ResolveAgentLaunchEnv(ResolveAgentLaunchEnvRequest) returns (ResolveAgentLaunchEnvResponse);
+  rpc ExportImage(ExportImageRequest) returns (StatusResponse);
+  rpc Stats(StatsRequest) returns (StatsResponse);
+  rpc VSC(IDRequest) returns (StatusResponse);
   rpc CreateSandbox(CreateSandboxRequest) returns (stream CreateSandboxResponse);
   rpc EnsureImage(EnsureImageRequest) returns (stream EnsureImageResponse);
 }
@@ -24,6 +35,57 @@ message VersionResponse {
   string git_branch = 2;
   string git_commit = 3;
   string build_time = 4;
+}
+
+message StatusResponse {
+  string status = 1;
+}
+
+message ShutdownRequest {}
+
+message IDRequest {
+  string id = 1;
+}
+
+message LogSandboxResponse {
+  bytes data = 1;
+}
+
+message ListSandboxesRequest {}
+
+message ListSandboxesResponse {
+  bytes boxes_json = 1;
+}
+
+message GetSandboxResponse {
+  bytes box_json = 1;
+}
+
+message StartSandboxRequest {
+  string id = 1;
+  bool ssh_agent = 2;
+}
+
+message ResolveAgentLaunchEnvRequest {
+  string agent = 1;
+  string env_file = 2;
+}
+
+message ResolveAgentLaunchEnvResponse {
+  map<string, string> env = 1;
+}
+
+message ExportImageRequest {
+  string id = 1;
+  string destination_path = 2;
+}
+
+message StatsRequest {
+  repeated string ids = 1;
+}
+
+message StatsResponse {
+  bytes stats_json = 1;
 }
 
 message SharedCacheConfig {
