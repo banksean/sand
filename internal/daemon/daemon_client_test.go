@@ -96,8 +96,8 @@ func TestDefaultClientCreateSandbox(t *testing.T) {
 	})
 }
 
-func TestGRPCClientCreateSandbox(t *testing.T) {
-	t.Run("streams progress and returns sandbox", func(t *testing.T) {
+func TestGRPCSB(t *testing.T) {
+	t.Run("stream", func(t *testing.T) {
 		appDir := t.TempDir()
 		srv := startTestGRPCDaemon(t, appDir, &testGRPCDaemonService{
 			CreateSandboxFunc: func(req *daemonpb.CreateSandboxRequest, stream daemonpb.DaemonService_CreateSandboxServer) error {
@@ -147,7 +147,7 @@ func TestGRPCClientCreateSandbox(t *testing.T) {
 		}
 	})
 
-	t.Run("returns streamed error", func(t *testing.T) {
+	t.Run("stream err", func(t *testing.T) {
 		appDir := t.TempDir()
 		srv := startTestGRPCDaemon(t, appDir, &testGRPCDaemonService{
 			CreateSandboxFunc: func(req *daemonpb.CreateSandboxRequest, stream daemonpb.DaemonService_CreateSandboxServer) error {
@@ -186,8 +186,8 @@ func TestGRPCClientCreateSandbox(t *testing.T) {
 	})
 }
 
-func TestGRPCClientEnsureImage(t *testing.T) {
-	t.Run("streams progress and returns ok", func(t *testing.T) {
+func TestGRPCImage(t *testing.T) {
+	t.Run("stream", func(t *testing.T) {
 		appDir := t.TempDir()
 		srv := startTestGRPCDaemon(t, appDir, &testGRPCDaemonService{
 			EnsureImageFunc: func(req *daemonpb.EnsureImageRequest, stream daemonpb.DaemonService_EnsureImageServer) error {
@@ -226,7 +226,7 @@ func TestGRPCClientEnsureImage(t *testing.T) {
 		}
 	})
 
-	t.Run("returns streamed error", func(t *testing.T) {
+	t.Run("stream err", func(t *testing.T) {
 		appDir := t.TempDir()
 		srv := startTestGRPCDaemon(t, appDir, &testGRPCDaemonService{
 			EnsureImageFunc: func(req *daemonpb.EnsureImageRequest, stream daemonpb.DaemonService_EnsureImageServer) error {
