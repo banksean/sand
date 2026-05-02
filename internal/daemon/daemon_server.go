@@ -33,6 +33,7 @@ const (
 	DefaultGRPCSocketFile = "sandd.grpc.sock"
 	defaultLockFile       = "sandd.lock"
 	envMCPEnable          = "SAND_MCP"
+	socketFileMode        = 0o666
 )
 
 type Daemon struct {
@@ -115,12 +116,12 @@ func (d *Daemon) startDaemonServer(ctx context.Context) error {
 	os.Remove(d.SocketPath)
 	os.Remove(d.GRPCSocketPath)
 
-	unixListener, err := net.Listen("unix", d.SocketPath)
+	unixListener, err := listenUnixSocket(d.SocketPath)
 	if err != nil {
 		return err
 	}
 	d.outieListener = unixListener
-	grpcListener, err := net.Listen("unix", d.GRPCSocketPath)
+	grpcListener, err := listenUnixSocket(d.GRPCSocketPath)
 	if err != nil {
 		_ = unixListener.Close()
 		return err
@@ -387,6 +388,18 @@ func isExpectedServeClose(err error) bool {
 	return errors.Is(err, net.ErrClosed) ||
 		errors.Is(err, http.ErrServerClosed) ||
 		errors.Is(err, grpc.ErrServerStopped)
+}
+
+func listenUnixSocket(socketPath string) (net.Listener, error) {
+	listener, err := net.Listen("unix", socketPath)
+	if err != nil {
+		return nil, err
+	}
+	if err := os.Chmod(socketPath, socketFileMode); err != nil {
+		_ = listener.Close()
+		return nil, err
+	}
+	return listener, nil
 }
 
 // flushWriter wraps an http.ResponseWriter and flushes after every write so
@@ -876,7 +889,7 @@ func (d *Daemon) createContainerSocket(ctx context.Context, id string) (net.List
 	slog.InfoContext(ctx, "Daemon.createContainerSocket", "socketPath", socketPath)
 	// Don't care about errors, e.g. socketPath already does not exist:
 	os.Remove(socketPath)
-	unixListener, err := net.Listen("unix", socketPath)
+	unixListener, err := listenUnixSocket(socketPath)
 	if err != nil {
 		return nil, fmt.Errorf("createSandbox couldn't open container socket %s: %w", socketPath, err)
 	}
@@ -894,7 +907,7 @@ func (d *Daemon) createContainerGRPCSocket(ctx context.Context, id string) (net.
 	slog.InfoContext(ctx, "Daemon.createContainerGRPCSocket", "socketPath", socketPath)
 	// Don't care about errors, e.g. socketPath already does not exist:
 	os.Remove(socketPath)
-	unixListener, err := net.Listen("unix", socketPath)
+	unixListener, err := listenUnixSocket(socketPath)
 	if err != nil {
 		return nil, fmt.Errorf("createSandbox couldn't open container grpc socket %s: %w", socketPath, err)
 	}

@@ -136,6 +136,8 @@ func TestDaemonStartsHTTPAndGRPCSockets(t *testing.T) {
 
 	waitForSocket(t, filepath.Join(tmpDir, DefaultSocketFile))
 	waitForSocket(t, filepath.Join(tmpDir, DefaultGRPCSocketFile))
+	assertSocketMode(t, filepath.Join(tmpDir, DefaultSocketFile), socketFileMode)
+	assertSocketMode(t, filepath.Join(tmpDir, DefaultGRPCSocketFile), socketFileMode)
 
 	client, err := NewUnixSocketGRPCClient(ctx, tmpDir)
 	if err != nil {
@@ -246,12 +248,16 @@ func TestDaemonCreatesContainerHTTPAndGRPCSockets(t *testing.T) {
 	defer httpListener.Close()
 	defer grpcListener.Close()
 
-	if _, err := os.Stat(filepath.Join(tmpDir, "containersockets", "test-sandbox")); err != nil {
+	httpSocketPath := filepath.Join(tmpDir, "containersockets", "test-sandbox")
+	grpcSocketPath := filepath.Join(tmpDir, "containergrpc", "test-sandbox")
+	if _, err := os.Stat(httpSocketPath); err != nil {
 		t.Fatalf("HTTP container socket was not created: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(tmpDir, "containergrpc", "test-sandbox")); err != nil {
+	if _, err := os.Stat(grpcSocketPath); err != nil {
 		t.Fatalf("gRPC container socket was not created: %v", err)
 	}
+	assertSocketMode(t, httpSocketPath, socketFileMode)
+	assertSocketMode(t, grpcSocketPath, socketFileMode)
 }
 
 func TestDaemonHTTPList(t *testing.T) {
@@ -313,6 +319,17 @@ func waitForSocket(t *testing.T, socketPath string) {
 		time.Sleep(100 * time.Millisecond)
 	}
 	t.Fatalf("socket %s was not created", socketPath)
+}
+
+func assertSocketMode(t *testing.T, socketPath string, want os.FileMode) {
+	t.Helper()
+	info, err := os.Stat(socketPath)
+	if err != nil {
+		t.Fatalf("stat socket %s: %v", socketPath, err)
+	}
+	if got := info.Mode().Perm(); got != want {
+		t.Fatalf("socket %s mode = %o, want %o", socketPath, got, want)
+	}
 }
 
 func TestDaemonHTTPVersion(t *testing.T) {
