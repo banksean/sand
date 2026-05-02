@@ -302,7 +302,7 @@ func TestCreateSandboxOptsProtoRoundTrip(t *testing.T) {
 	}
 }
 
-func TestGRPCClientUnaryMethods(t *testing.T) {
+func TestGRPCUnary(t *testing.T) {
 	appDir := t.TempDir()
 	service := &testGRPCDaemonService{
 		LogSandboxFunc: func(ctx context.Context, req *daemonpb.IDRequest) (*daemonpb.LogSandboxResponse, error) {
