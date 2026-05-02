@@ -265,7 +265,7 @@ func (d *Daemon) stopInnieServer(ctx context.Context, id string) error {
 	return nil
 }
 
-func (d *Daemon) serveInnieSocket(ctx context.Context, sandboxID string, unixListener net.Listener) {
+func (d *Daemon) serveInnieHttpSocket(ctx context.Context, sandboxID string, unixListener net.Listener) {
 	ctx = sandboxlog.WithSandboxID(ctx, sandboxID)
 	mux := http.NewServeMux()
 
@@ -505,11 +505,11 @@ func (d *Daemon) StartSandbox(ctx context.Context, opts StartSandboxOpts) error 
 		}
 	}
 
-	unixListener, grpcListener, err := d.createContainerSockets(ctx, opts.ID)
+	httpListener, grpcListener, err := d.createContainerSockets(ctx, opts.ID)
 	if err != nil {
 		return err
 	}
-	go d.serveInnieSocket(ctx, opts.ID, unixListener)
+	go d.serveInnieHttpSocket(ctx, opts.ID, httpListener)
 	go d.serveInnieGRPCSocket(ctx, opts.ID, grpcListener)
 
 	if recreated {
@@ -580,7 +580,7 @@ func (d *Daemon) createSandbox(ctx context.Context, opts CreateSandboxOpts, prog
 		if err != nil {
 			return nil, err
 		}
-		go d.serveInnieSocket(ctx, opts.ID, unixListener)
+		go d.serveInnieHttpSocket(ctx, opts.ID, unixListener)
 		go d.serveInnieGRPCSocket(ctx, opts.ID, grpcListener)
 
 		err = d.boxer.CreateContainer(ctx, sbox, opts.SSHAgent)
