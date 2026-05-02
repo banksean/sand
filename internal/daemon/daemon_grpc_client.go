@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"path/filepath"
+	"runtime/debug"
 
 	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/daemon/daemonpb"
@@ -58,12 +59,20 @@ func (c *GRPCClient) Version(ctx context.Context) (version.Info, error) {
 	if err != nil {
 		return version.Info{}, err
 	}
-	return version.Info{
+	info := version.Info{
 		GitRepo:   resp.GetGitRepo(),
 		GitBranch: resp.GetGitBranch(),
 		GitCommit: resp.GetGitCommit(),
 		BuildTime: resp.GetBuildTime(),
-	}, nil
+	}
+	if len(resp.GetBuildInfoJson()) > 0 {
+		var buildInfo debug.BuildInfo
+		if err := json.Unmarshal(resp.GetBuildInfoJson(), &buildInfo); err != nil {
+			return version.Info{}, fmt.Errorf("decode build info: %w", err)
+		}
+		info.BuildInfo = &buildInfo
+	}
+	return info, nil
 }
 
 func (c *GRPCClient) Shutdown(ctx context.Context) error {

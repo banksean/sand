@@ -3,6 +3,7 @@ package daemon
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -234,7 +235,7 @@ func (d *Daemon) serveOutieSocket(ctx context.Context) {
 	slog.InfoContext(ctx, "Daemon.serveUnixSocketHTTP starting up")
 
 	err := server.Serve(d.outieListener)
-	if err != nil {
+	if err != nil && !isExpectedServeClose(err) {
 		slog.ErrorContext(ctx, "Daemon.serveUnixSocketHTTP", "error", err)
 	}
 }
@@ -245,7 +246,7 @@ func (d *Daemon) serveOutieGRPCSocket(ctx context.Context) {
 	d.grpcSrv = server
 
 	slog.InfoContext(ctx, "Daemon.serveUnixSocketGRPC starting up", "socketPath", d.GRPCSocketPath)
-	if err := server.Serve(d.outieGRPCListener); err != nil {
+	if err := server.Serve(d.outieGRPCListener); err != nil && !isExpectedServeClose(err) {
 		slog.ErrorContext(ctx, "Daemon.serveUnixSocketGRPC", "error", err)
 	}
 }
@@ -265,12 +266,19 @@ func (s *daemonGRPCServer) Version(context.Context, *daemonpb.VersionRequest) (*
 }
 
 func versionInfoToProto(info version.Info) *daemonpb.VersionResponse {
-	return &daemonpb.VersionResponse{
+	resp := &daemonpb.VersionResponse{
 		GitRepo:   info.GitRepo,
 		GitBranch: info.GitBranch,
 		GitCommit: info.GitCommit,
 		BuildTime: info.BuildTime,
 	}
+	if info.BuildInfo != nil {
+		buildInfoJSON, err := json.Marshal(info.BuildInfo)
+		if err == nil {
+			resp.BuildInfoJson = buildInfoJSON
+		}
+	}
+	return resp
 }
 
 func slogHandler(h http.HandlerFunc) http.HandlerFunc {
@@ -351,7 +359,7 @@ func (d *Daemon) serveInnieSocket(ctx context.Context, sandboxID string, unixLis
 
 	slog.InfoContext(ctx, "Daemon.serveInnieSocket starting up")
 	err := server.Serve(unixListener)
-	if err != nil {
+	if err != nil && !isExpectedServeClose(err) {
 		slog.ErrorContext(ctx, "Daemon.serveInnieSocket", "error", err)
 	}
 }
@@ -370,9 +378,15 @@ func (d *Daemon) serveInnieGRPCSocket(ctx context.Context, sandboxID string, uni
 	defer unixListener.Close()
 
 	slog.InfoContext(ctx, "Daemon.serveInnieGRPCSocket starting up")
-	if err := server.Serve(unixListener); err != nil {
+	if err := server.Serve(unixListener); err != nil && !isExpectedServeClose(err) {
 		slog.ErrorContext(ctx, "Daemon.serveInnieGRPCSocket", "error", err)
 	}
+}
+
+func isExpectedServeClose(err error) bool {
+	return errors.Is(err, net.ErrClosed) ||
+		errors.Is(err, http.ErrServerClosed) ||
+		errors.Is(err, grpc.ErrServerStopped)
 }
 
 // flushWriter wraps an http.ResponseWriter and flushes after every write so

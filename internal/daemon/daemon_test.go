@@ -12,6 +12,7 @@ import (
 	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/daemon/internal/boxer"
 	"github.com/banksean/sand/internal/hostops"
+	"github.com/banksean/sand/internal/version"
 )
 
 // newDaemonForTest creates a Daemon with a cross-platform test Boxer pre-injected,
@@ -149,6 +150,9 @@ func TestDaemonStartsHTTPAndGRPCSockets(t *testing.T) {
 	versionInfo, err := client.Version(ctx)
 	if err != nil {
 		t.Fatalf("gRPC Version() failed: %v", err)
+	}
+	if !versionInfo.Equal(version.Get()) {
+		t.Fatalf("gRPC Version() = %+v, want current version info", versionInfo)
 	}
 	t.Logf("gRPC version info: %+v", versionInfo)
 
