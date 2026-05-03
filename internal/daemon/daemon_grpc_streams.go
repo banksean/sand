@@ -9,7 +9,10 @@ import (
 	"github.com/banksean/sand/internal/daemon/daemonpb"
 	"github.com/banksean/sand/internal/sandboxlog"
 	"github.com/banksean/sand/internal/sandtypes"
+	"go.opentelemetry.io/otel"
 )
+
+var tracer = otel.Tracer("daemon.GRPC")
 
 type grpcCreateSandboxProgressWriter struct {
 	stream daemonpb.DaemonService_CreateSandboxServer
@@ -46,6 +49,8 @@ func (w *grpcEnsureImageProgressWriter) Write(p []byte) (int, error) {
 func (s *daemonGRPCServer) CreateSandbox(req *daemonpb.CreateSandboxRequest, stream daemonpb.DaemonService_CreateSandboxServer) error {
 	opts := createSandboxOptsFromProto(req)
 	ctx := sandboxlog.WithSandboxID(stream.Context(), opts.ID)
+	ctx, span := tracer.Start(ctx, "sand.daemon.v1.DaemonService/CreateSandbox")
+	defer span.End()
 	writer := &grpcCreateSandboxProgressWriter{stream: stream}
 
 	sbox, err := s.daemon.createSandbox(ctx, opts, writer)
@@ -71,7 +76,8 @@ func (s *daemonGRPCServer) CreateSandbox(req *daemonpb.CreateSandboxRequest, str
 func (s *daemonGRPCServer) EnsureImage(req *daemonpb.EnsureImageRequest, stream daemonpb.DaemonService_EnsureImageServer) error {
 	ctx := stream.Context()
 	writer := &grpcEnsureImageProgressWriter{stream: stream}
-
+	ctx, span := tracer.Start(ctx, "sand.daemon.v1.DaemonService/EnsureImage")
+	defer span.End()
 	if err := s.daemon.boxer.EnsureImage(ctx, req.GetImageName(), writer); err != nil {
 		return stream.Send(&daemonpb.EnsureImageResponse{
 			Event: &daemonpb.EnsureImageResponse_Error{Error: err.Error()},
