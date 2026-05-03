@@ -201,8 +201,14 @@ func (c *GRPCClient) CreateSandbox(ctx context.Context, opts CreateSandboxOpts, 
 			if err := json.Unmarshal(e.BoxJson, &box); err != nil {
 				return nil, fmt.Errorf("decode created sandbox: %w", err)
 			}
+			if err := drainCreateSandboxStream(stream); err != nil {
+				return nil, err
+			}
 			return &box, nil
 		case *daemonpb.CreateSandboxResponse_Error:
+			if err := drainCreateSandboxStream(stream); err != nil {
+				return nil, err
+			}
 			if e.Error == "" {
 				return nil, fmt.Errorf("sandbox creation failed")
 			}
@@ -236,14 +242,52 @@ func (c *GRPCClient) EnsureImage(ctx context.Context, imageName string, w io.Wri
 				return err
 			}
 		case *daemonpb.EnsureImageResponse_Error:
+			if err := drainEnsureImageStream(stream); err != nil {
+				return err
+			}
 			if e.Error == "" {
 				return fmt.Errorf("image ensure failed")
 			}
 			return errors.New(e.Error)
 		case *daemonpb.EnsureImageResponse_Ok:
+			if err := drainEnsureImageStream(stream); err != nil {
+				return err
+			}
 			return nil
 		default:
 			return fmt.Errorf("unknown ensure image stream event %T", e)
+		}
+	}
+}
+
+func drainCreateSandboxStream(stream daemonpb.DaemonService_CreateSandboxClient) error {
+	var unexpected error
+	for {
+		event, err := stream.Recv()
+		if errors.Is(err, io.EOF) {
+			return unexpected
+		}
+		if err != nil {
+			return err
+		}
+		if event.GetEvent() != nil && unexpected == nil {
+			unexpected = fmt.Errorf("unexpected create sandbox stream event after terminal event %T", event.GetEvent())
+		}
+	}
+}
+
+func drainEnsureImageStream(stream daemonpb.DaemonService_EnsureImageClient) error {
+	var unexpected error
+	for {
+		event, err := stream.Recv()
+		if errors.Is(err, io.EOF) {
+			return unexpected
+		}
+		if err != nil {
+			return err
+		}
+		if event.GetEvent() != nil && unexpected == nil {
+			unexpected = fmt.Errorf("unexpected ensure image stream event after terminal event %T", event.GetEvent())
 		}
 	}
 }

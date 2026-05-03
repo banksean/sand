@@ -13,6 +13,10 @@ import (
 	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/daemon/daemonpb"
 	"github.com/banksean/sand/internal/sandtypes"
+	"go.opentelemetry.io/otel"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 )
 
@@ -182,6 +186,51 @@ func TestGRPCImage(t *testing.T) {
 	})
 }
 
+func TestGRPCStreamingClientSpansEnd(t *testing.T) {
+	spanRecorder := tracetest.NewSpanRecorder()
+	tracerProvider := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(spanRecorder))
+	otel.SetTracerProvider(tracerProvider)
+	t.Cleanup(func() {
+		_ = tracerProvider.Shutdown(context.Background())
+		otel.SetTracerProvider(trace.NewNoopTracerProvider())
+	})
+
+	appDir := t.TempDir()
+	srv := startTestGRPCDaemon(t, appDir, &testGRPCDaemonService{
+		CreateSandboxFunc: func(req *daemonpb.CreateSandboxRequest, stream daemonpb.DaemonService_CreateSandboxServer) error {
+			boxJSON, err := json.Marshal(testSandboxBox)
+			if err != nil {
+				return err
+			}
+			return stream.Send(&daemonpb.CreateSandboxResponse{
+				Event: &daemonpb.CreateSandboxResponse_BoxJson{BoxJson: boxJSON},
+			})
+		},
+		EnsureImageFunc: func(req *daemonpb.EnsureImageRequest, stream daemonpb.DaemonService_EnsureImageServer) error {
+			return stream.Send(&daemonpb.EnsureImageResponse{
+				Event: &daemonpb.EnsureImageResponse_Ok{Ok: true},
+			})
+		},
+	})
+	defer srv.Stop()
+
+	client, err := NewUnixSocketGRPCClient(context.Background(), appDir)
+	if err != nil {
+		t.Fatalf("NewUnixSocketGRPCClient() error = %v", err)
+	}
+	defer client.Close()
+
+	if _, err := client.CreateSandbox(context.Background(), CreateSandboxOpts{ID: "test-box"}, nil); err != nil {
+		t.Fatalf("CreateSandbox() error = %v", err)
+	}
+	if err := client.EnsureImage(context.Background(), "test-image:latest", nil); err != nil {
+		t.Fatalf("EnsureImage() error = %v", err)
+	}
+
+	assertEndedSpan(t, spanRecorder, "sand.daemon.v1.DaemonService/CreateSandbox")
+	assertEndedSpan(t, spanRecorder, "sand.daemon.v1.DaemonService/EnsureImage")
+}
+
 func TestCreateSandboxOptsProtoRoundTrip(t *testing.T) {
 	opts := CreateSandboxOpts{
 		ID:             "test-box",
@@ -219,6 +268,24 @@ func TestCreateSandboxOptsProtoRoundTrip(t *testing.T) {
 	if strings.Join(got.Volumes, ",") != strings.Join(opts.Volumes, ",") {
 		t.Fatalf("round trip volumes = %+v, want %+v", got.Volumes, opts.Volumes)
 	}
+}
+
+func assertEndedSpan(t *testing.T, spanRecorder *tracetest.SpanRecorder, name string) {
+	t.Helper()
+	for _, span := range spanRecorder.Ended() {
+		if span.Name() == name {
+			return
+		}
+	}
+	t.Fatalf("ended spans do not include %q: %v", name, spanNames(spanRecorder.Ended()))
+}
+
+func spanNames(spans []sdktrace.ReadOnlySpan) []string {
+	names := make([]string, 0, len(spans))
+	for _, span := range spans {
+		names = append(names, span.Name())
+	}
+	return names
 }
 
 func TestGRPCUnary(t *testing.T) {
