@@ -6,4 +6,5 @@ testbin
 .claude
 .claude.json
 .sand.*
+.observability-data
 coverage.out

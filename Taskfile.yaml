@@ -5,6 +5,8 @@ version: '3'
 vars:
   DAEMON_PROTO: internal/daemon/daemonpb/daemon.proto
   DAEMON_PROTO_OUT_DIR: .
+  OBSERVABILITY_DATA_DIR: '{{.OBSERVABILITY_DATA_DIR | default "{{.TASKFILE_DIR}}/.observability-data"}}'
+  CONTAINER_DNS_DOMAIN: '{{.CONTAINER_DNS_DOMAIN | default "dev.local"}}'
 
 tasks:
   default:
@@ -53,12 +55,12 @@ tasks:
       - echo "Stopping sandd..."
       - sandd stop
 
-  grafana:
+  start-observability:
     deps:
       - tempo
     cmds:
-      - mkdir -p ~/grafana-data
-      - echo "Starting grafana"
+      - mkdir -p {{.OBSERVABILITY_DATA_DIR}}/grafana
+      - echo "Starting grafana.{{.CONTAINER_DNS_DOMAIN}}"
       - >-
         container run
         --name grafana
@@ -66,15 +68,31 @@ tasks:
         --cpus 2
         --memory 512M
         -p 3000:3000/tcp
-        --volume ~/grafana-data:/var/lib/grafana
-        --volume {{.TASKFILE_DIR}}/observability/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/sand.yaml:ro
+        --volume {{.OBSERVABILITY_DATA_DIR}}/grafana:/var/lib/grafana
         -e GF_USERS_ALLOW_SIGN_UP=false
         grafana/grafana:latest
+      - echo "Waiting a bit for grafana to start, before POSTing the tempo datasource..."
+      - sleep 1
+      - >-
+        curl -H "Content-Type: application/json"
+        -d '{
+          "name":"Tempo",
+          "uid":"tempo",
+          "type":"tempo",
+          "url":"http://tempo.{{.CONTAINER_DNS_DOMAIN}}:3200",
+          "access":"proxy",
+          "isDefault":true,
+          "editable":true,
+          "jsonData": {
+            "httpMethod": "GET"
+          }
+        }'
+        http://admin:admin@grafana.{{.CONTAINER_DNS_DOMAIN}}:3000/api/datasources
 
   tempo:
     cmds:
-      - mkdir -p ~/sand-observability/tempo-data
-      - echo "Starting tempo"
+      - mkdir -p {{.OBSERVABILITY_DATA_DIR}}/tempo
+      - echo "Starting tempo.{{.CONTAINER_DNS_DOMAIN}}"
       - >-
         container run
         --name tempo
@@ -85,12 +103,20 @@ tasks:
         -p 4317:4317/tcp
         -p 4318:4318/tcp
         --volume {{.TASKFILE_DIR}}/observability/tempo.yaml:/etc/tempo.yaml:ro
-        --volume ~/sand-observability/tempo-data:/var/tempo
+        --volume {{.OBSERVABILITY_DATA_DIR}}/tempo:/var/tempo
         grafana/tempo:latest
         -config.file=/etc/tempo.yaml
 
-  stopgrafana:
+  stop-observability:
+    ignore_error: true
     cmds:
       - echo "Stopping grafana and tempo..."
       - container rm -f grafana
       - container rm -f tempo
+
+  clear-observability:
+    deps:
+      - stop-observability
+    cmds:
+      - echo "Clearing persistent observability data from {{.OBSERVABILITY_DATA_DIR}}"
+      - rm -r {{.OBSERVABILITY_DATA_DIR}}
