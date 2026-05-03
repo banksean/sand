@@ -194,8 +194,13 @@ func TestGRPCStreamingClientSpansEnd(t *testing.T) {
 		_ = tracerProvider.Shutdown(context.Background())
 		otel.SetTracerProvider(trace.NewNoopTracerProvider())
 	})
+	appDir, err := os.MkdirTemp("", "t*")
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer os.RemoveAll(appDir)
 
-	appDir := t.TempDir()
 	srv := startTestGRPCDaemon(t, appDir, &testGRPCDaemonService{
 		CreateSandboxFunc: func(req *daemonpb.CreateSandboxRequest, stream daemonpb.DaemonService_CreateSandboxServer) error {
 			boxJSON, err := json.Marshal(testSandboxBox)
