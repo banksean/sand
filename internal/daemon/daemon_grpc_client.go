@@ -175,8 +175,6 @@ func (c *GRPCClient) VSC(ctx context.Context, id string) error {
 }
 
 func (c *GRPCClient) CreateSandbox(ctx context.Context, opts CreateSandboxOpts, w io.Writer) (*sandtypes.Box, error) {
-	ctx, span := tracer.Start(ctx, "sand.daemon.v1.DaemonService/CreateSandbox")
-	defer span.End()
 	stream, err := c.client.CreateSandbox(ctx, createSandboxOptsToProto(opts))
 	if err != nil {
 		return nil, err
@@ -193,25 +191,18 @@ func (c *GRPCClient) CreateSandbox(ctx context.Context, opts CreateSandboxOpts, 
 
 		switch e := event.GetEvent().(type) {
 		case *daemonpb.CreateSandboxResponse_Progress:
-			_, span := tracer.Start(ctx, "CreateSandboxResponse_Progress")
 			if w != nil {
 				if _, err := io.WriteString(w, e.Progress); err != nil {
-					span.End()
 					return nil, err
 				}
 			}
-			span.End()
 		case *daemonpb.CreateSandboxResponse_BoxJson:
-			_, span := tracer.Start(ctx, "CreateSandboxResponse_BoxJson")
-			defer span.End()
 			var box sandtypes.Box
 			if err := json.Unmarshal(e.BoxJson, &box); err != nil {
 				return nil, fmt.Errorf("decode created sandbox: %w", err)
 			}
 			return &box, nil
 		case *daemonpb.CreateSandboxResponse_Error:
-			_, span := tracer.Start(ctx, "CreateSandboxResponse_Error")
-			defer span.End()
 			if e.Error == "" {
 				return nil, fmt.Errorf("sandbox creation failed")
 			}
@@ -223,8 +214,6 @@ func (c *GRPCClient) CreateSandbox(ctx context.Context, opts CreateSandboxOpts, 
 }
 
 func (c *GRPCClient) EnsureImage(ctx context.Context, imageName string, w io.Writer) error {
-	ctx, span := tracer.Start(ctx, "sand.daemon.v1.DaemonService/EnsureImage")
-	defer span.End()
 	stream, err := c.client.EnsureImage(ctx, &daemonpb.EnsureImageRequest{ImageName: imageName})
 	if err != nil {
 		return err

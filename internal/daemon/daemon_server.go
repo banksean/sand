@@ -302,6 +302,12 @@ func (d *Daemon) serveInnieGRPCSocket(ctx context.Context, sandboxID string, uni
 		grpc.UnaryInterceptor(func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 			return handler(sandboxlog.WithSandboxID(ctx, sandboxID), req)
 		}),
+		grpc.StreamInterceptor(func(srv any, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+			return handler(srv, &contextServerStream{
+				ServerStream: stream,
+				ctx:          sandboxlog.WithSandboxID(stream.Context(), sandboxID),
+			})
+		}),
 	)
 	daemonpb.RegisterDaemonServiceServer(server, &daemonGRPCServer{daemon: d})
 
@@ -315,6 +321,15 @@ func (d *Daemon) serveInnieGRPCSocket(ctx context.Context, sandboxID string, uni
 	if err := server.Serve(unixListener); err != nil && !isExpectedServeClose(err) {
 		slog.ErrorContext(ctx, "Daemon.serveInnieGRPCSocket", "error", err)
 	}
+}
+
+type contextServerStream struct {
+	grpc.ServerStream
+	ctx context.Context
+}
+
+func (s *contextServerStream) Context() context.Context {
+	return s.ctx
 }
 
 func isExpectedServeClose(err error) bool {
