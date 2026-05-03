@@ -1,17 +1,17 @@
-# Sand Observability
 
-It may seem odd for `sand` to have an "observability" package since `sand` is a local-only sandbox system that doesn't implement or require any remote/cloud services. However, many tools and libraries designed for cloud service reliability use cases also make debugging easier when you're working with a bunch of local containers that need to communicate with each other and have their own distinct lifecycles.
-
-## If you are not debugging `sand` itself, you can safely ignore all of this
+# If you are not working on the `sand` code itself, ignore all of this
 
 - These features exist only to help debug problems with `sand` itself. 
 - `sand` will work fine without running any of this additional infrastructure.
 
-## How to Collect and View Traces
+It may seem odd for `sand` to have an "observability" package since `sand` is a local-only sandbox system that doesn't implement or require any remote/cloud services. However, many tools and libraries designed for cloud service reliability use cases also make debugging easier when you're working with a bunch of local containers that need to communicate with each other and have their own distinct lifecycles.
+
+
+## Collect and View Traces Locally
 
 The `sand` and `sandd` executables include OpenTelemetry instrumentation to generate and export traces for some common operations (at time of this writing, it's limited only to gRPC client/server stub call sites).
 
-`Taskfile.yaml` includes some helper tasks to start a local temp container (for collecting traces) and a local grafana instance (for viewing the collected traces in its web UI)
+[`../Taskfile.yaml`](../Taskfile.yaml) includes some helper tasks to start a local tempo container (for collecting traces) and a local grafana instance (for viewing the collected traces in its web UI)
 
 ```sh
 export CONTAINER_DNS_DOMAIN=$(container system property get dns.domain)
@@ -23,9 +23,11 @@ export OTEL_EXPORTER_OTLP_ENDPOINT=tempo.$CONTAINER_DNS_DOMAIN:4317
 export OTEL_EXPORTER_OTLP_INSECURE=true
 
 # If sandd is already running, stop it so it picks up the above env vars
+# the next time it starts
 sandd stop
 
-# automatically starts sandd:
+# automatically starts sandd, and generates a trace when it makes 
+# the sand.daemon.v1.DaemonService/ListSandboxes gRPC call:
 sand ls 
 ```
 
@@ -33,17 +35,17 @@ Then navigate to http://grafana.dev.local:3000/a/grafana-exploretraces-app/explo
 
 ## Configuration
 
-The tempo configuration should Just Work out of the box, but if you need to modify it the file is [../../observability/tempo.yaml](../../observability/tempo.yaml)
+The tempo configuration should Just Work out of the box, but if you need to modify it the file is [tempo.yaml](./tempo.yaml)
 
 This file gets bind-mounted as a read-only volume in the tempo container.
 
-The `grafana` task in [`../../Taskfile.yaml`](../../Taskfile.yaml) programmatically configures grafana to use this tempo data source by curl'ing a json blob to it after it starts up.
+The `grafana` task in [`../Taskfile.yaml`](../Taskfile.yaml) programmatically configures grafana to use this tempo data source by curl'ing a json blob to it after it starts up.
 
 ### Persistent observability data
 
 Both tempo and grafana mount host filesystem directories as read-write volumes, so that trace data (tempo) and dashboard settings (grafana) can persist across container restarts.
 
-These are the `hostdir:containerdir` paths that `../../Taskfile.yaml` passes to the containers.
+These are the `hostdir:containerdir` paths that [`../Taskfile.yaml`](../Taskfile.yaml) passes to the containers.
 
 - `tempo`: `{{.OBSERVABILITY_DATA_DIR}}/tempo:/var/tempo`
 - `grafana`: `{{.OBSERVABILITY_DATA_DIR}}/grafana:/var/lib/grafana`
@@ -51,7 +53,8 @@ These are the `hostdir:containerdir` paths that `../../Taskfile.yaml` passes to 
 Note that `OBSERVABILITY_DATA_DIR` is set to `.observability-data` by default (and ignored by git). If you prefer to use an XDG-style base path, you can override it like so:
 
 ```sh
-task start-observability OBSERVABILITY_DATA_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/sand/observability"
+task start-observability \ 
+  OBSERVABILITY_DATA_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/sand/observability"
 ```
 
 ## Stopping grafana and tempo
