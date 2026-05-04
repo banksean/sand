@@ -9,9 +9,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/banksean/sand/internal/applecontainer/options"
 	"github.com/banksean/sand/internal/applecontainer/types"
+	"github.com/banksean/sand/internal/cloning"
 	"github.com/banksean/sand/internal/daemon/internal/boxer"
 	"github.com/banksean/sand/internal/hostops"
+	"github.com/banksean/sand/internal/sandtypes"
 	"github.com/banksean/sand/internal/version"
 )
 
@@ -203,6 +206,133 @@ func TestDaemonCreatesContainerHTTPAndGRPCSockets(t *testing.T) {
 	}
 	assertSocketMode(t, httpSocketPath, socketFileMode)
 	assertSocketMode(t, grpcSocketPath, socketFileMode)
+}
+
+func TestStartSandboxRecreatesStoppedContainerAfterSocketCreation(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "sdt-*")
+	if err != nil {
+		t.Fatalf("MkdirTemp: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	ctx := context.Background()
+	oldContainerID := "old-container"
+	newContainerID := "new-container"
+	sandboxID := "rb"
+	httpSocketPath := filepath.Join(tmpDir, "containersockets", sandboxID)
+	grpcSocketPath := filepath.Join(tmpDir, "containergrpc", sandboxID)
+	var stopCalls []string
+	var deleteCalls []string
+	var startCalls []string
+
+	containerSvc := &hostops.MockContainerOps{
+		InspectFunc: func(_ context.Context, containerID string) ([]types.Container, error) {
+			switch containerID {
+			case oldContainerID:
+				return []types.Container{{
+					Status: "stopped",
+					Configuration: types.ContainerConfig{
+						SSH: false,
+					},
+				}}, nil
+			case newContainerID:
+				return []types.Container{{
+					Status: "stopped",
+					Configuration: types.ContainerConfig{
+						SSH: true,
+					},
+				}}, nil
+			default:
+				return nil, nil
+			}
+		},
+		CreateFunc: func(_ context.Context, opts *options.CreateContainer, _ string, _ []string) (string, error) {
+			if !opts.ManagementOptions.SSH {
+				t.Fatal("recreated container did not enable ssh-agent forwarding")
+			}
+			if _, err := os.Stat(httpSocketPath); err != nil {
+				t.Fatalf("HTTP socket did not exist before Create: %v", err)
+			}
+			if _, err := os.Stat(grpcSocketPath); err != nil {
+				t.Fatalf("gRPC socket did not exist before Create: %v", err)
+			}
+			return newContainerID, nil
+		},
+		StopFunc: func(_ context.Context, _ *options.StopContainer, containerID string) (string, error) {
+			stopCalls = append(stopCalls, containerID)
+			return "stopped", nil
+		},
+		DeleteFunc: func(_ context.Context, _ *options.DeleteContainer, containerID string) (string, error) {
+			deleteCalls = append(deleteCalls, containerID)
+			return "deleted", nil
+		},
+		StartFunc: func(_ context.Context, _ *options.StartContainer, containerID string) (string, error) {
+			startCalls = append(startCalls, containerID)
+			return "started", nil
+		},
+	}
+
+	registry := cloning.NewAgentRegistry()
+	registry.Register(&cloning.AgentConfig{
+		Name:          "default",
+		Configuration: noHookContainerConfig{},
+	})
+	b, err := boxer.NewBoxerWithDeps(tmpDir, boxer.BoxerDeps{
+		ContainerService: containerSvc,
+		ImageService:     &testImageOps{},
+		GitOps:           &hostops.MockGitOps{},
+		AgentRegistry:    registry,
+	})
+	if err != nil {
+		t.Fatalf("NewBoxerWithDeps: %v", err)
+	}
+	defer b.Close()
+
+	if err := b.SaveSandbox(ctx, &sandtypes.Box{
+		ID:             sandboxID,
+		AgentType:      "default",
+		ContainerID:    oldContainerID,
+		HostOriginDir:  t.TempDir(),
+		SandboxWorkDir: t.TempDir(),
+		ImageName:      "test-image:latest",
+	}); err != nil {
+		t.Fatalf("SaveSandbox: %v", err)
+	}
+
+	dmn := NewDaemonWithBoxer(tmpDir, "test", b)
+	if err := dmn.StartSandbox(ctx, StartSandboxOpts{ID: sandboxID, SSHAgent: true}); err != nil {
+		t.Fatalf("StartSandbox() error = %v", err)
+	}
+
+	if len(stopCalls) != 1 || stopCalls[0] != oldContainerID {
+		t.Fatalf("Stop calls = %v, want [%s]", stopCalls, oldContainerID)
+	}
+	if len(deleteCalls) != 1 || deleteCalls[0] != oldContainerID {
+		t.Fatalf("Delete calls = %v, want [%s]", deleteCalls, oldContainerID)
+	}
+	if len(startCalls) != 1 || startCalls[0] != newContainerID {
+		t.Fatalf("Start calls = %v, want [%s]", startCalls, newContainerID)
+	}
+	loaded, err := b.Get(ctx, sandboxID)
+	if err != nil {
+		t.Fatalf("Get() error = %v", err)
+	}
+	if loaded.ContainerID != newContainerID {
+		t.Fatalf("ContainerID = %q, want %q", loaded.ContainerID, newContainerID)
+	}
+}
+
+type noHookContainerConfig struct{}
+
+func (noHookContainerConfig) GetMounts(cloning.CloneArtifacts) []sandtypes.MountSpec {
+	return nil
+}
+
+func (noHookContainerConfig) GetFirstStartHooks(cloning.CloneArtifacts) []sandtypes.ContainerHook {
+	return nil
+}
+
+func (noHookContainerConfig) GetStartHooks(cloning.CloneArtifacts) []sandtypes.ContainerHook {
+	return nil
 }
 
 func TestDaemonGRPCList(t *testing.T) {

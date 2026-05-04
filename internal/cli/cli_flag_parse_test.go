@@ -257,11 +257,21 @@ func TestShellCmdDefaults(t *testing.T) {
 		Shell ShellCmd `cmd:""`
 	}
 	kongParse(t, &cli, []string{"shell", "my-box"})
-	if !cli.Shell.SSHAgent {
-		t.Error("expected sand shell to enable SSHAgent by default")
+	if cli.Shell.SSHAgent {
+		t.Error("expected sand shell to disable SSHAgent by default")
 	}
 	if cli.Shell.ProjectEnv {
 		t.Error("expected sand shell to disable ProjectEnv by default")
+	}
+}
+
+func TestShellCmdSSHAgentFlag(t *testing.T) {
+	var cli struct {
+		Shell ShellCmd `cmd:""`
+	}
+	kongParse(t, &cli, []string{"shell", "--ssh-agent", "my-box"})
+	if !cli.Shell.SSHAgent {
+		t.Error("expected sand shell --ssh-agent to enable SSHAgent")
 	}
 }
 

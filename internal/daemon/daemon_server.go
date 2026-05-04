@@ -509,7 +509,7 @@ func (d *Daemon) StartSandbox(ctx context.Context, opts StartSandboxOpts) error 
 		return fmt.Errorf("sandbox not found: %s", opts.ID)
 	}
 
-	recreated := false
+	needsRecreate := false
 	if opts.SSHAgent {
 		ctr, err := d.boxer.GetContainer(ctx, sbox.ContainerID)
 		if err != nil {
@@ -520,10 +520,7 @@ func (d *Daemon) StartSandbox(ctx context.Context, opts StartSandboxOpts) error 
 			if ctr.Status == "running" {
 				return fmt.Errorf("sandbox %s is already running without ssh-agent forwarding", sbox.ID)
 			}
-			if err := d.boxer.RecreateContainer(ctx, sbox, true); err != nil {
-				return err
-			}
-			recreated = true
+			needsRecreate = true
 		}
 	}
 
@@ -531,13 +528,30 @@ func (d *Daemon) StartSandbox(ctx context.Context, opts StartSandboxOpts) error 
 	if err != nil {
 		return err
 	}
+
+	if needsRecreate {
+		if err := d.boxer.RecreateContainer(ctx, sbox, true); err != nil {
+			_ = httpListener.Close()
+			_ = grpcListener.Close()
+			return err
+		}
+	}
+
 	go d.serveInnieHttpSocket(ctx, opts.ID, httpListener)
 	go d.serveInnieGRPCSocket(ctx, opts.ID, grpcListener)
 
-	if recreated {
-		return d.boxer.StartNewContainer(ctx, sbox, nil)
+	var startErr error
+	if needsRecreate {
+		startErr = d.boxer.StartNewContainer(ctx, sbox, nil)
+	} else {
+		startErr = d.boxer.StartExistingContainer(ctx, sbox)
 	}
-	return d.boxer.StartExistingContainer(ctx, sbox)
+	if startErr != nil {
+		_ = httpListener.Close()
+		_ = grpcListener.Close()
+		return startErr
+	}
+	return nil
 }
 
 type CreateSandboxOpts struct {

@@ -11,7 +11,7 @@ import (
 type ShellCmd struct {
 	ShellFlags
 	ProjectEnvFlag
-	SSHAgent bool `default:"true" help:"enable ssh-agent forwarding for the container"`
+	SSHAgent bool `help:"enable ssh-agent forwarding for the container"`
 	SandboxNameFlag
 }
 
@@ -56,7 +56,7 @@ func (c *ShellCmd) Run(cctx *CLIContext) error {
 	}
 
 	if c.SSHAgent && sbox.Container != nil && !sbox.Container.Configuration.SSH {
-		fmt.Printf("warning: %s is already running without ssh-agent forwarding; stop it and run `sand shell %s` again to recreate it with ssh-agent enabled\n", sbox.ID, sbox.ID)
+		fmt.Printf("warning: %s is already running without ssh-agent forwarding; stop it and run `sand shell %s --ssh-agent` again to recreate it with ssh-agent enabled\n", sbox.ID, sbox.ID)
 	}
 
 	shell := c.Shell

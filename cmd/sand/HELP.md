@@ -103,7 +103,7 @@ sand shell [flags] <SANDBOX-NAME>
 - `-s, --shell` _`<shell-command>`_ - shell command to exec in the container (default: `/bin/zsh`)
 - `-t, --tmux` - create or reconnect to a container-side tmux session
 - `--project-env` - pass the sandbox env file to plain shell/exec/git commands as non-secret project env
-- `--ssh-agent` - enable ssh-agent forwarding for the container (default: `true`)
+- `--ssh-agent` - enable ssh-agent forwarding for the container
 
 ## `sand exec`
 
@@ -326,4 +326,3 @@ show effective configuration with sources
 ```
 sand config ls
 ```
-
