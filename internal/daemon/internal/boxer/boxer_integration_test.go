@@ -63,6 +63,23 @@ func (m *mockSSHimmer) NewKeys(ctx context.Context, domain, username string) (*s
 	}, nil
 }
 
+type recordingHookStreamer struct {
+	cmd    string
+	args   []string
+	output string
+	err    error
+}
+
+func (r *recordingHookStreamer) Exec(ctx context.Context, shellCmd string, args ...string) (string, error) {
+	r.cmd = shellCmd
+	r.args = append([]string(nil), args...)
+	return r.output, r.err
+}
+
+func (r *recordingHookStreamer) ExecStream(ctx context.Context, stdout, stderr io.Writer, shellCmd string, args ...string) error {
+	return nil
+}
+
 func newTestBoxer(t *testing.T, containerOps hostops.ContainerOps, imageOps hostops.ImageOps) *Boxer {
 	t.Helper()
 	tmpDir := path.Join(t.TempDir(), "Application Support", "Sand")
@@ -284,11 +301,15 @@ func (m *mockWorkspacePreparation) Prepare(ctx context.Context, req cloning.Clon
 type mockContainerConfiguration struct {
 	getMountsFunc       func(artifacts cloning.CloneArtifacts) []sandtypes.MountSpec
 	getStartupHooksFunc func(artifacts cloning.CloneArtifacts) []sandtypes.ContainerHook
+	getStartHooksFunc   func(artifacts cloning.CloneArtifacts) []sandtypes.ContainerHook
 }
 
 // GetStartHooks implements [cloning.ContainerConfiguration].
 func (m *mockContainerConfiguration) GetStartHooks(artifacts cloning.CloneArtifacts) []sandtypes.ContainerHook {
-	panic("unimplemented")
+	if m.getStartHooksFunc != nil {
+		return m.getStartHooksFunc(artifacts)
+	}
+	return []sandtypes.ContainerHook{}
 }
 
 var _ cloning.ContainerConfiguration = &mockContainerConfiguration{}
@@ -305,6 +326,118 @@ func (m *mockContainerConfiguration) GetFirstStartHooks(artifacts cloning.CloneA
 		return m.getStartupHooksFunc(artifacts)
 	}
 	return []sandtypes.ContainerHook{}
+}
+
+func TestInnieSocketPermissionHookRunsRepairScript(t *testing.T) {
+	streamer := &recordingHookStreamer{}
+
+	if err := innieSocketPermissionHook().Run(context.Background(), nil, streamer); err != nil {
+		t.Fatalf("innieSocketPermissionHook() error = %v", err)
+	}
+
+	if streamer.cmd != "sh" {
+		t.Fatalf("innieSocketPermissionHook() command = %q, want sh", streamer.cmd)
+	}
+	wantArgs := []string{"-c", innieSocketPermissionScript}
+	if len(streamer.args) != len(wantArgs) {
+		t.Fatalf("innieSocketPermissionHook() args = %q, want %q", streamer.args, wantArgs)
+	}
+	for i := range wantArgs {
+		if streamer.args[i] != wantArgs[i] {
+			t.Fatalf("innieSocketPermissionHook() args = %q, want %q", streamer.args, wantArgs)
+		}
+	}
+}
+
+func TestInnieSocketPermissionHookPropagatesExecError(t *testing.T) {
+	expectedErr := errors.New("chmod failed")
+	streamer := &recordingHookStreamer{
+		output: "permission denied\n",
+		err:    expectedErr,
+	}
+
+	err := innieSocketPermissionHook().Run(context.Background(), nil, streamer)
+	if !errors.Is(err, expectedErr) {
+		t.Fatalf("innieSocketPermissionHook() error = %v, want %v", err, expectedErr)
+	}
+	if !strings.Contains(err.Error(), "permission denied") {
+		t.Fatalf("innieSocketPermissionHook() error missing command output: %v", err)
+	}
+}
+
+func TestBoxer_StartContainersPrependInnieSocketPermissionHook(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		startFunc func(*Boxer, *sandtypes.Box) error
+		config    *mockContainerConfiguration
+	}{
+		{
+			name: "first start",
+			startFunc: func(boxer *Boxer, sbox *sandtypes.Box) error {
+				return boxer.StartNewContainer(context.Background(), sbox, nil)
+			},
+			config: &mockContainerConfiguration{
+				getStartupHooksFunc: func(artifacts cloning.CloneArtifacts) []sandtypes.ContainerHook {
+					return []sandtypes.ContainerHook{agentHookForTest("agent first-start hook")}
+				},
+			},
+		},
+		{
+			name: "existing start",
+			startFunc: func(boxer *Boxer, sbox *sandtypes.Box) error {
+				return boxer.StartExistingContainer(context.Background(), sbox)
+			},
+			config: &mockContainerConfiguration{
+				getStartHooksFunc: func(artifacts cloning.CloneArtifacts) []sandtypes.ContainerHook {
+					return []sandtypes.ContainerHook{agentHookForTest("agent restart hook")}
+				},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var execCalls []string
+			mockContainer := &hostops.MockContainerOps{
+				ExecFunc: func(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, args ...string) (string, error) {
+					execCalls = append(execCalls, strings.Join(append([]string{cmd}, args...), " "))
+					return "", nil
+				},
+			}
+			boxer := newTestBoxer(t, mockContainer, &mockImageOps{})
+			boxer.AgentRegistry.Register(&cloning.AgentConfig{
+				Name:          "default",
+				Configuration: tc.config,
+			})
+
+			sbox := &sandtypes.Box{
+				ID:             "test-sandbox",
+				AgentType:      "default",
+				ContainerID:    "test-container",
+				SandboxWorkDir: t.TempDir(),
+				Username:       "user",
+				Uid:            "1000",
+			}
+			if err := tc.startFunc(boxer, sbox); err != nil {
+				t.Fatalf("%s error = %v", tc.name, err)
+			}
+
+			if len(execCalls) != 2 {
+				t.Fatalf("%s exec calls = %v, want 2 calls", tc.name, execCalls)
+			}
+			if got, want := execCalls[0], "sh -c "+innieSocketPermissionScript; got != want {
+				t.Fatalf("%s first exec call = %q, want %q", tc.name, got, want)
+			}
+			if !strings.HasPrefix(execCalls[1], "agent-hook ") {
+				t.Fatalf("%s second exec call = %q, want agent hook", tc.name, execCalls[1])
+			}
+		})
+	}
+}
+
+func agentHookForTest(name string) sandtypes.ContainerHook {
+	return sandtypes.NewContainerHook(name, func(ctx context.Context, ctr *types.Container, exec sandtypes.HookStreamer) error {
+		_, err := exec.Exec(ctx, "agent-hook", name)
+		return err
+	})
 }
 
 func TestBoxer_Sync(t *testing.T) {

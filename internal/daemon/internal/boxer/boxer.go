@@ -28,6 +28,16 @@ import (
 
 const containerGetErrorMsg = "[error getting]"
 
+const innieSocketPermissionScript = `set -e
+if [ -d /run/host-services ]; then
+	chmod 755 /run/host-services
+fi
+for socket in /run/host-services/sandd.grpc.sock /run/host-services/sandd.sock; do
+	if [ -e "$socket" ]; then
+		chmod 666 "$socket"
+	fi
+done`
+
 // SSHimmer provisions SSH keys for a new sandbox.
 type SSHimmer interface {
 	NewKeys(ctx context.Context, domain, username string) (*sshimmer.Keys, error)
@@ -102,6 +112,26 @@ func (h hookExecutor) ExecStream(ctx context.Context, stdout, stderr io.Writer, 
 		return fmt.Errorf("failed to execute command for sandbox %s: %w", h.sandboxID, err)
 	}
 	return nil
+}
+
+func boxerStartHooks(hooks []sandtypes.ContainerHook) []sandtypes.ContainerHook {
+	systemHooks := []sandtypes.ContainerHook{
+		innieSocketPermissionHook(),
+	}
+	return append(systemHooks, hooks...)
+}
+
+func innieSocketPermissionHook() sandtypes.ContainerHook {
+	return sandtypes.NewContainerHook("repair host service socket permissions", func(ctx context.Context, ctr *types.Container, exec sandtypes.HookStreamer) error {
+		out, err := exec.Exec(ctx, "sh", "-c", innieSocketPermissionScript)
+		if err != nil {
+			if out != "" {
+				return fmt.Errorf("repair host service socket permissions: %w: %s", err, strings.TrimSpace(out))
+			}
+			return fmt.Errorf("repair host service socket permissions: %w", err)
+		}
+		return nil
+	})
 }
 
 // BoxerDeps holds the injectable dependencies for a Boxer.
@@ -758,7 +788,7 @@ func (sber *Boxer) StartNewContainer(ctx context.Context, sb *sandtypes.Box, pro
 
 	// Get agent config to reconstruct hooks
 	agentConfig := sber.AgentRegistry.Get(sb.AgentType)
-	hooks := agentConfig.Configuration.GetFirstStartHooks(artifacts)
+	hooks := boxerStartHooks(agentConfig.Configuration.GetFirstStartHooks(artifacts))
 
 	slog.InfoContext(ctx, "Boxer.StartNewContainer", "box", *sb, "ContainerHooks", len(hooks))
 	if err := sber.startContainerProcess(ctx, sb.ID, sb.ContainerID); err != nil {
@@ -785,7 +815,7 @@ func (sber *Boxer) StartExistingContainer(ctx context.Context, sb *sandtypes.Box
 
 	// Get agent config to reconstruct hooks
 	agentConfig := sber.AgentRegistry.Get(sb.AgentType)
-	hooks := agentConfig.Configuration.GetStartHooks(artifacts)
+	hooks := boxerStartHooks(agentConfig.Configuration.GetStartHooks(artifacts))
 
 	slog.InfoContext(ctx, "Boxer.StartExistingContainer", "box", *sb, "ContainerHooks", len(hooks))
 	if err := sber.startContainerProcess(ctx, sb.ID, sb.ContainerID); err != nil {
