@@ -602,6 +602,7 @@ func (d *Daemon) createSandbox(ctx context.Context, opts CreateSandboxOpts, prog
 		SharedCaches:   opts.SharedCaches,
 		CPUs:           opts.CPUs,
 		Memory:         opts.Memory,
+		LocalDomain:    d.LocalDomain,
 	})
 	if err != nil {
 		return nil, err

@@ -13,6 +13,7 @@ set -euo pipefail
 # 
 # Assumptions:
 # - apple/container is already installed on the host machine
+set CONTAINER_DNS_DOMAIN=$(container system property get dns.domain)
 
 # Stop and uninstall everything
 
@@ -89,8 +90,15 @@ sand exec smoke ./sand build-info
 sand vsc smoke
 
 # Try connecting to the container via ssh. Should Just Work and avoid TOFU prompt, warnings etc.
-# TODO: get the domain extension from apple/container instead of assuming it's .test.
-ssh smoke.test whoami
+ssh -vvv smoke.$CONTAINER_DNS_DOMAIN whoami
+
+# Make sure we can still start a stopped container automatically by shelling into it
+# See https://github.com/banksean/sand/issues/78
+sand stop smoke
+echo "exit" | script -q /dev/null sand shell smoke
+
+# TODO: ssh times out when you try to use it after restarting the sandbox.
+# ssh -vvv smoke.$CONTAINER_DNS_DOMAIN whoami
 
 # Clean everything up 
 sand rm -af

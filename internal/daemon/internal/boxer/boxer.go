@@ -242,6 +242,7 @@ type NewSandboxOpts struct {
 	SharedCaches   sandtypes.SharedCacheConfig
 	CPUs           int
 	Memory         int
+	LocalDomain    string
 }
 
 // NewSandbox creates a new sandbox based on a clone of hostWorkDir.
@@ -279,7 +280,7 @@ func (sb *Boxer) NewSandbox(ctx context.Context, opts NewSandboxOpts) (*sandtype
 	mounts := agentConfig.Configuration.GetMounts(*artifacts)
 
 	// TODO: move this to .Hydrate? Or make it a startup hook?
-	keys, err := sb.SSHim.NewKeys(ctx, opts.ID+".test", opts.Username) // pass username here!
+	keys, err := sb.SSHim.NewKeys(ctx, opts.ID+"."+opts.LocalDomain, opts.Username)
 	if err != nil {
 		slog.ErrorContext(ctx, "Boxer.NewSanbox: sshim.Povision", "error", err)
 		return nil, err
