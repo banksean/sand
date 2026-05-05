@@ -56,6 +56,7 @@ sand new [flags] [SANDBOX-NAME]
 - `--project-env` - pass the sandbox env file to plain shell/exec/git commands as non-secret project env
 - `-s, --shell` _`<shell-command>`_ - shell command to exec in the container (default: `/bin/zsh`)
 - `-t, --tmux` - create or reconnect to a container-side tmux session
+- `--atch` - create or reconnect to a container-side atch session
 - `-a, --agent` _`<claude|codex|gemini|opencode>`_ - name of coding agent to use
 - `-b, --branch` - create a new git branch, with the same name as the sandbox, inside the sandbox _container_ (not on your host workdir) (default: `false`)
 - `--username` _`STRING`_ - name of default user to create (defaults to $USER)
@@ -102,6 +103,7 @@ sand shell [flags] <SANDBOX-NAME>
 
 - `-s, --shell` _`<shell-command>`_ - shell command to exec in the container (default: `/bin/zsh`)
 - `-t, --tmux` - create or reconnect to a container-side tmux session
+- `--atch` - create or reconnect to a container-side atch session
 - `--project-env` - pass the sandbox env file to plain shell/exec/git commands as non-secret project env
 - `--ssh-agent` - enable ssh-agent forwarding for the container
 

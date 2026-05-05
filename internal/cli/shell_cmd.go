@@ -61,9 +61,15 @@ func (c *ShellCmd) Run(cctx *CLIContext) error {
 
 	shell := c.Shell
 	var args []string
+	if c.Tmux && c.Atch {
+		return fmt.Errorf("--tmux and --atch cannot be used together")
+	}
 	if c.Tmux {
 		shell = "/usr/bin/tmux"
 		args = []string{"new-session", "-A"}
+	} else if c.Atch {
+		shell = "/usr/local/bin/atch"
+		args = []string{sbox.ID, c.Shell}
 	}
 
 	return runShell(ctx, sbox, shell, args, false, plainCommandEnvFile(sbox, c.ProjectEnv), nil)

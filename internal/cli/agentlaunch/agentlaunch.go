@@ -6,7 +6,11 @@ import (
 	"github.com/banksean/sand/internal/agentdefs"
 )
 
-func BuildInteractiveExec(agent, shell, sandboxID, hostname string, tmux bool) (string, []string, error) {
+func BuildInteractiveExec(agent, shell, sandboxID, hostname string, tmux, atch bool) (string, []string, error) {
+	if tmux && atch {
+		return "", nil, fmt.Errorf("--tmux and --atch cannot be used together")
+	}
+
 	if tmux {
 		if agent == "" {
 			return "/usr/bin/tmux", []string{"new-session", "-A", "-s", sandboxID}, nil
@@ -22,6 +26,24 @@ func BuildInteractiveExec(agent, shell, sandboxID, hostname string, tmux bool) (
 			"-A",
 			"-s",
 			agent + "-" + sandboxID,
+			definition.InteractiveCommand,
+		}, nil
+	}
+
+	if atch {
+		if agent == "" {
+			return "/usr/local/bin/atch", []string{sandboxID, shell}, nil
+		}
+
+		definition, ok := agentdefs.Lookup(agent)
+		if !ok || definition.InteractiveCommand == "" {
+			return "", nil, fmt.Errorf("interactive mode not supported for agent %q", agent)
+		}
+
+		return "/usr/local/bin/atch", []string{
+			agent + "-" + sandboxID,
+			shell,
+			"-c",
 			definition.InteractiveCommand,
 		}, nil
 	}

@@ -195,7 +195,7 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 	}
 
 	// TODO: Sort out how "new" and "shell" should work when invoked inside a container.
-	shell, args, err := agentlaunch.BuildInteractiveExec(c.Agent, c.Shell, sbox.ID, hostname, c.Tmux)
+	shell, args, err := agentlaunch.BuildInteractiveExec(c.Agent, c.Shell, sbox.ID, hostname, c.Tmux, c.Atch)
 	if err != nil {
 		return err
 	}

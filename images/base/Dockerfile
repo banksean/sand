@@ -30,6 +30,12 @@ RUN apk add --no-cache \
   vim \
   zsh
 
+RUN ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') && \
+  curl -fsSL -o /tmp/atch.tgz "https://github.com/mobydeck/atch/releases/latest/download/atch-linux-${ARCH}.tgz" && \
+  tar -C /usr/local/bin -xzf /tmp/atch.tgz atch && \
+  chmod +x /usr/local/bin/atch && \
+  rm /tmp/atch.tgz
+
 ENV DEVCONTAINER=true
 
 RUN mkdir -p /workspace

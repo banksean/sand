@@ -34,6 +34,7 @@ const (
 type ShellFlags struct {
 	Shell string `short:"s" default:"/bin/zsh" placeholder:"<shell-command>" help:"shell command to exec in the container"`
 	Tmux  bool   `short:"t" help:"create or reconnect to a container-side tmux session"`
+	Atch  bool   `help:"create or reconnect to a container-side atch session"`
 }
 
 type SSHAgentFlag struct {

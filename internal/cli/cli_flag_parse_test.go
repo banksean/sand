@@ -26,6 +26,9 @@ func TestShellFlagsDefaults(t *testing.T) {
 	if cli.Shell.Shell != "/bin/zsh" {
 		t.Errorf("expected default shell /bin/zsh, got %q", cli.Shell.Shell)
 	}
+	if cli.Shell.Atch {
+		t.Error("expected Atch=false by default")
+	}
 }
 
 func TestShellFlagsShortFlag(t *testing.T) {
@@ -35,6 +38,16 @@ func TestShellFlagsShortFlag(t *testing.T) {
 	kongParse(t, &cli, []string{"-s", "/bin/bash"})
 	if cli.Shell.Shell != "/bin/bash" {
 		t.Errorf("expected /bin/bash, got %q", cli.Shell.Shell)
+	}
+}
+
+func TestShellFlagsAtchFlag(t *testing.T) {
+	var cli struct {
+		Shell ShellFlags `embed:""`
+	}
+	kongParse(t, &cli, []string{"--atch"})
+	if !cli.Shell.Atch {
+		t.Error("expected Atch=true with --atch")
 	}
 }
 

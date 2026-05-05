@@ -14,6 +14,7 @@ func TestBuildInteractiveExec(t *testing.T) {
 		sandboxID string
 		hostname  string
 		tmux      bool
+		atch      bool
 		wantShell string
 		wantArgs  []string
 		wantErr   string
@@ -61,6 +62,39 @@ func TestBuildInteractiveExec(t *testing.T) {
 			},
 		},
 		{
+			name:      "atch without agent",
+			shell:     "/bin/zsh",
+			sandboxID: "sand-1",
+			hostname:  "sand-1.test.",
+			atch:      true,
+			wantShell: "/usr/local/bin/atch",
+			wantArgs:  []string{"sand-1", "/bin/zsh"},
+		},
+		{
+			name:      "atch wraps opencode tui command",
+			agent:     "opencode",
+			shell:     "/bin/zsh",
+			sandboxID: "sand-1",
+			hostname:  "sand-1.test.",
+			atch:      true,
+			wantShell: "/usr/local/bin/atch",
+			wantArgs: []string{
+				"opencode-sand-1",
+				"/bin/zsh",
+				"-c",
+				"opencode",
+			},
+		},
+		{
+			name:      "tmux and atch conflict",
+			shell:     "/bin/zsh",
+			sandboxID: "sand-1",
+			hostname:  "sand-1.test.",
+			tmux:      true,
+			atch:      true,
+			wantErr:   "--tmux and --atch cannot be used together",
+		},
+		{
 			name:      "unknown agent",
 			agent:     "unknown",
 			shell:     "/bin/zsh",
@@ -72,7 +106,7 @@ func TestBuildInteractiveExec(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotShell, gotArgs, err := BuildInteractiveExec(tt.agent, tt.shell, tt.sandboxID, tt.hostname, tt.tmux)
+			gotShell, gotArgs, err := BuildInteractiveExec(tt.agent, tt.shell, tt.sandboxID, tt.hostname, tt.tmux, tt.atch)
 			if tt.wantErr != "" {
 				if err == nil || err.Error() != tt.wantErr {
 					t.Fatalf("expected error %q, got %v", tt.wantErr, err)
