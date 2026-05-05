@@ -91,7 +91,9 @@ func TestDefaultContainerHook_UsesAlpineFlavorWhenAPKAvailable(t *testing.T) {
 		"exec:/usr/sbin/sshd -f /etc/ssh/sshd_config",
 		"exec:which mise.sh",
 		"stream:mise.sh",
-		"exec:git remote remove origin", "exec:git remote add origin /run/git-origin-ro",
+		"exec:git remote remove origin",
+		"exec:git remote add origin /run/git-origin-ro",
+		"exec:git remote set-url --push origin DISABLED",
 	}
 
 	if !reflect.DeepEqual(exec.calls, wantCalls) {
@@ -138,7 +140,9 @@ func TestDefaultContainerHook_UsesUbuntuFlavorWhenAPKUnavailable(t *testing.T) {
 		"exec:/usr/sbin/sshd -f /etc/ssh/sshd_config",
 		"exec:which mise.sh",
 		"stream:mise.sh",
-		"exec:git remote remove origin", "exec:git remote add origin /run/git-origin-ro",
+		"exec:git remote remove origin",
+		"exec:git remote add origin /run/git-origin-ro",
+		"exec:git remote set-url --push origin DISABLED",
 	}
 
 	if !reflect.DeepEqual(exec.calls, wantCalls) {

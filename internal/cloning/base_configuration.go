@@ -261,6 +261,9 @@ func (c *BaseContainerConfiguration) runDefaultContainerHook(ctx context.Context
 	// Set git origin to țhe bind-mounted read-only dir at ContainerSideGitOrigin
 	runner.run("set git origin", "remove old origin", "git", "remote", "remove", "origin")
 	runner.run("set git origin", "add new origin", "git", "remote", "add", "origin", ContainerSideGitOrigin)
+	// The mounted dir is read-only, but just to make it extra clear in case anyone is unaware that they will
+	// not be pushing to origin from the sandbox:
+	runner.run("set git origin", "disble pushing to origin", "git", "remote", "set-url", "--push", "origin", "DISABLED")
 
 	slog.InfoContext(ctx, flavor.hookName+" completed", "hook", "default container bootstrap", "flavor", flavor.name)
 	return runner.err()
