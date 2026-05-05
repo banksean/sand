@@ -68,9 +68,12 @@ release:
   draft: false
   replace_existing_draft: true
 
-brews:
+homebrew_casks:
   - name: sand
     ids: [sand-combined]
+    binaries:
+      - sand
+      - sandd
     repository:
       owner: banksean
       name: homebrew-tap
@@ -78,9 +81,3 @@ brews:
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     homepage: "https://github.com/banksean/sand"
     description: "Local development sandbox containers"
-    license: "Apache"
-    install: |
-      bin.install "sand"
-      bin.install "sandd"
-    test: |
-      system "#{bin}/sand version"
