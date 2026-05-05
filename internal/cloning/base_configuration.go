@@ -153,6 +153,11 @@ func (c *BaseContainerConfiguration) GetMounts(artifacts CloneArtifacts) []sandt
 			Source: artifacts.PathRegistry.WorkDir(),
 			Target: "/app",
 		},
+		{
+			Source:   artifacts.HostWorkDir,
+			Target:   ContainerSideGitOrigin,
+			ReadOnly: true,
+		},
 	}
 
 	if artifacts.SharedCacheMounts.MiseCacheHostDir != "" {
@@ -252,6 +257,10 @@ func (c *BaseContainerConfiguration) runDefaultContainerHook(ctx context.Context
 			runner.runStream("starting mise.sh", "mise.sh", "mise.sh")
 		}
 	}
+
+	// Set git origin to țhe bind-mounted read-only dir at ContainerSideGitOrigin
+	runner.run("set git origin", "remove old origin", "git", "remote", "remove", "origin")
+	runner.run("set git origin", "add new origin", "git", "remote", "add", "origin", ContainerSideGitOrigin)
 
 	slog.InfoContext(ctx, flavor.hookName+" completed", "hook", "default container bootstrap", "flavor", flavor.name)
 	return runner.err()

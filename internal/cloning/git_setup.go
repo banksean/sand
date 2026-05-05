@@ -10,7 +10,8 @@ import (
 
 const (
 	// OriginalWorkDirRemoteName is the name of the git remote pointing to the original host workspace
-	OriginalWorkDirRemoteName = "origin-host-workdir"
+	OriginalWorkDirRemoteName = "origin"
+	ContainerSideGitOrigin    = "/run/git-origin-ro"
 	// ClonedWorkDirGitRemotePrefix is the prefix for git remotes pointing to cloned workspaces
 	ClonedWorkDirGitRemotePrefix = "sand/"
 )
@@ -37,12 +38,6 @@ func (g *GitSetup) SetupGitRemotes(ctx context.Context, sandboxID, hostDir, clon
 	if gitTopLevel == "" {
 		// Not a git repo, nothing to do
 		return nil
-	}
-
-	// Add remote in clone pointing to original host workdir
-	if err := g.gitOps.AddRemote(ctx, cloneDir, OriginalWorkDirRemoteName, gitTopLevel); err != nil {
-		return fmt.Errorf("failed to add git remote (original work dir) %s for sandbox %s: %w",
-			OriginalWorkDirRemoteName, sandboxID, err)
 	}
 
 	// Add remote in host pointing to cloned workdir

@@ -57,6 +57,7 @@ func (p *BaseWorkspacePreparation) Prepare(ctx context.Context, req CloneRequest
 	}
 
 	return &CloneArtifacts{
+		HostWorkDir:       req.HostWorkDir,
 		SandboxWorkDir:    sandboxRoot,
 		PathRegistry:      pathRegistry,
 		Username:          req.Username,
