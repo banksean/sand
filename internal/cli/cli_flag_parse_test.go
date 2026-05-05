@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/alecthomas/kong"
@@ -149,8 +150,21 @@ func TestMultiSandboxNameFlagsName(t *testing.T) {
 		MultiSandboxNameFlags `embed:""`
 	}
 	kongParse(t, &cli, []string{"my-sandbox"})
-	if cli.SandboxName != "my-sandbox" {
-		t.Errorf("expected SandboxName my-sandbox, got %q", cli.SandboxName)
+	if !slices.Equal(cli.SandboxNames, []string{"my-sandbox"}) {
+		t.Errorf("expected SandboxNames [my-sandbox], got %q", cli.SandboxNames)
+	}
+	if cli.All {
+		t.Error("expected All=false")
+	}
+}
+
+func TestMultiSandboxNameFlagsNames(t *testing.T) {
+	var cli struct {
+		MultiSandboxNameFlags `embed:""`
+	}
+	kongParse(t, &cli, []string{"first-sandbox", "second-sandbox"})
+	if !slices.Equal(cli.SandboxNames, []string{"first-sandbox", "second-sandbox"}) {
+		t.Errorf("expected SandboxNames [first-sandbox second-sandbox], got %q", cli.SandboxNames)
 	}
 	if cli.All {
 		t.Error("expected All=false")
@@ -182,8 +196,8 @@ func TestMultiSandboxNameFlagsNoArgs(t *testing.T) {
 		MultiSandboxNameFlags `embed:""`
 	}
 	kongParse(t, &cli, []string{})
-	if cli.SandboxName != "" {
-		t.Errorf("expected empty SandboxName, got %q", cli.SandboxName)
+	if len(cli.SandboxNames) != 0 {
+		t.Errorf("expected empty SandboxNames, got %q", cli.SandboxNames)
 	}
 	if cli.All {
 		t.Error("expected All=false")
@@ -303,11 +317,21 @@ func TestStopCmdSandboxName(t *testing.T) {
 		Stop StopCmd `cmd:""`
 	}
 	kongParse(t, &cli, []string{"stop", "my-box"})
-	if cli.Stop.SandboxName != "my-box" {
-		t.Errorf("expected SandboxName my-box, got %q", cli.Stop.SandboxName)
+	if !slices.Equal(cli.Stop.SandboxNames, []string{"my-box"}) {
+		t.Errorf("expected SandboxNames [my-box], got %q", cli.Stop.SandboxNames)
 	}
 	if cli.Stop.All {
 		t.Error("expected All=false")
+	}
+}
+
+func TestStopCmdSandboxNames(t *testing.T) {
+	var cli struct {
+		Stop StopCmd `cmd:""`
+	}
+	kongParse(t, &cli, []string{"stop", "my-box", "other-box"})
+	if !slices.Equal(cli.Stop.SandboxNames, []string{"my-box", "other-box"}) {
+		t.Errorf("expected SandboxNames [my-box other-box], got %q", cli.Stop.SandboxNames)
 	}
 }
 
@@ -326,8 +350,28 @@ func TestRmCmdSandboxName(t *testing.T) {
 		Rm RmCmd `cmd:""`
 	}
 	kongParse(t, &cli, []string{"rm", "target-box"})
-	if cli.Rm.SandboxName != "target-box" {
-		t.Errorf("expected SandboxName target-box, got %q", cli.Rm.SandboxName)
+	if !slices.Equal(cli.Rm.SandboxNames, []string{"target-box"}) {
+		t.Errorf("expected SandboxNames [target-box], got %q", cli.Rm.SandboxNames)
+	}
+}
+
+func TestRmCmdSandboxNames(t *testing.T) {
+	var cli struct {
+		Rm RmCmd `cmd:""`
+	}
+	kongParse(t, &cli, []string{"rm", "target-box", "old-box"})
+	if !slices.Equal(cli.Rm.SandboxNames, []string{"target-box", "old-box"}) {
+		t.Errorf("expected SandboxNames [target-box old-box], got %q", cli.Rm.SandboxNames)
+	}
+}
+
+func TestStartCmdSandboxNames(t *testing.T) {
+	var cli struct {
+		Start StartCmd `cmd:""`
+	}
+	kongParse(t, &cli, []string{"start", "first-box", "second-box"})
+	if !slices.Equal(cli.Start.SandboxNames, []string{"first-box", "second-box"}) {
+		t.Errorf("expected SandboxNames [first-box second-box], got %q", cli.Start.SandboxNames)
 	}
 }
 

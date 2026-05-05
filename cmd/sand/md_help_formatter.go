@@ -161,7 +161,7 @@ func buildUsage(cmdPath string, node *kong.Node) string {
 		}
 
 		// Handle variadic args
-		if arg.Passthrough {
+		if arg.IsCumulative() {
 			usage += "..."
 		}
 	}

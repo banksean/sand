@@ -19,7 +19,10 @@ func (c *StartCmd) Run(cctx *CLIContext) error {
 
 	ids := []string{}
 	if !c.All {
-		ids = append(ids, c.SandboxName)
+		ids = append(ids, c.SandboxNames...)
+		if len(ids) == 0 {
+			return fmt.Errorf("sandbox name required unless --all is set")
+		}
 	} else {
 		bxs, err := mc.ListSandboxes(ctx)
 		if err != nil {

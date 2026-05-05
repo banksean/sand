@@ -2,6 +2,8 @@ package cli_test
 
 import (
 	"context"
+	"slices"
+	"sync"
 	"testing"
 
 	"github.com/banksean/sand/internal/applecontainer/options"
@@ -62,7 +64,31 @@ func TestRmCmd_Single(t *testing.T) {
 	})
 
 	cmd := &cli.RmCmd{
-		MultiSandboxNameFlags: cli.MultiSandboxNameFlags{SandboxName: "target"},
+		MultiSandboxNameFlags: cli.MultiSandboxNameFlags{SandboxNames: []string{"target"}},
+		Force:                 true,
+	}
+	if err := cmd.Run(cctx); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	boxes, err := cctx.Daemon.ListSandboxes(context.Background())
+	if err != nil {
+		t.Fatalf("ListSandboxes() error = %v", err)
+	}
+	if len(boxes) != 1 || boxes[0].ID != "keep" {
+		t.Errorf("expected only 'keep' to remain, got %v", boxIDs(boxes))
+	}
+}
+
+func TestRmCmd_Multiple(t *testing.T) {
+	cctx := newCLIContext(t, daemontest.Deps{}, func(ctx context.Context, s daemontest.SandboxStore) {
+		s.SaveSandbox(ctx, testBox("target"))
+		s.SaveSandbox(ctx, testBox("other"))
+		s.SaveSandbox(ctx, testBox("keep"))
+	})
+
+	cmd := &cli.RmCmd{
+		MultiSandboxNameFlags: cli.MultiSandboxNameFlags{SandboxNames: []string{"target", "other"}},
 		Force:                 true,
 	}
 	if err := cmd.Run(cctx); err != nil {
@@ -105,7 +131,7 @@ func TestRmCmd_All(t *testing.T) {
 func TestRmCmd_NotFound(t *testing.T) {
 	cctx := newCLIContext(t, daemontest.Deps{}, nil)
 	cmd := &cli.RmCmd{
-		MultiSandboxNameFlags: cli.MultiSandboxNameFlags{SandboxName: "ghost"},
+		MultiSandboxNameFlags: cli.MultiSandboxNameFlags{SandboxNames: []string{"ghost"}},
 		Force:                 true,
 	}
 	if err := cmd.Run(cctx); err == nil {
@@ -117,9 +143,12 @@ func TestRmCmd_NotFound(t *testing.T) {
 
 func TestStopCmd_Single(t *testing.T) {
 	var stopCalls []string
+	var stopCallsMu sync.Mutex
 	cctx := newCLIContext(t, daemontest.Deps{
 		ContainerService: &hostops.MockContainerOps{
 			StopFunc: func(_ context.Context, _ *options.StopContainer, containerID string) (string, error) {
+				stopCallsMu.Lock()
+				defer stopCallsMu.Unlock()
 				stopCalls = append(stopCalls, containerID)
 				return "stopped", nil
 			},
@@ -128,7 +157,7 @@ func TestStopCmd_Single(t *testing.T) {
 		s.SaveSandbox(ctx, testBox("mysandbox"))
 	})
 
-	cmd := &cli.StopCmd{MultiSandboxNameFlags: cli.MultiSandboxNameFlags{SandboxName: "mysandbox"}}
+	cmd := &cli.StopCmd{MultiSandboxNameFlags: cli.MultiSandboxNameFlags{SandboxNames: []string{"mysandbox"}}}
 	if err := cmd.Run(cctx); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
@@ -138,11 +167,43 @@ func TestStopCmd_Single(t *testing.T) {
 	}
 }
 
-func TestStopCmd_All(t *testing.T) {
+func TestStopCmd_Multiple(t *testing.T) {
 	var stopCalls []string
+	var stopCallsMu sync.Mutex
 	cctx := newCLIContext(t, daemontest.Deps{
 		ContainerService: &hostops.MockContainerOps{
 			StopFunc: func(_ context.Context, _ *options.StopContainer, containerID string) (string, error) {
+				stopCallsMu.Lock()
+				defer stopCallsMu.Unlock()
+				stopCalls = append(stopCalls, containerID)
+				return "stopped", nil
+			},
+		},
+	}, func(ctx context.Context, s daemontest.SandboxStore) {
+		s.SaveSandbox(ctx, testBox("first"))
+		s.SaveSandbox(ctx, testBox("second"))
+		s.SaveSandbox(ctx, testBox("keep-running"))
+	})
+
+	cmd := &cli.StopCmd{MultiSandboxNameFlags: cli.MultiSandboxNameFlags{SandboxNames: []string{"first", "second"}}}
+	if err := cmd.Run(cctx); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	slices.Sort(stopCalls)
+	if !slices.Equal(stopCalls, []string{"ctr-first", "ctr-second"}) {
+		t.Errorf("expected Stop calls for first and second, got: %v", stopCalls)
+	}
+}
+
+func TestStopCmd_All(t *testing.T) {
+	var stopCalls []string
+	var stopCallsMu sync.Mutex
+	cctx := newCLIContext(t, daemontest.Deps{
+		ContainerService: &hostops.MockContainerOps{
+			StopFunc: func(_ context.Context, _ *options.StopContainer, containerID string) (string, error) {
+				stopCallsMu.Lock()
+				defer stopCallsMu.Unlock()
 				stopCalls = append(stopCalls, containerID)
 				return "stopped", nil
 			},
@@ -166,6 +227,7 @@ func TestStopCmd_All(t *testing.T) {
 
 func TestStartCmd_AlreadyRunning(t *testing.T) {
 	var startCalls []string
+	var startCallsMu sync.Mutex
 	cctx := newCLIContext(t, daemontest.Deps{
 		ContainerService: &hostops.MockContainerOps{
 			// Default Inspect returns Status="running"
@@ -173,6 +235,8 @@ func TestStartCmd_AlreadyRunning(t *testing.T) {
 				return []types.Container{{Status: "running"}}, nil
 			},
 			StartFunc: func(_ context.Context, _ *options.StartContainer, containerID string) (string, error) {
+				startCallsMu.Lock()
+				defer startCallsMu.Unlock()
 				startCalls = append(startCalls, containerID)
 				return "started", nil
 			},
@@ -181,7 +245,7 @@ func TestStartCmd_AlreadyRunning(t *testing.T) {
 		s.SaveSandbox(ctx, testBox("running-box"))
 	})
 
-	cmd := &cli.StartCmd{MultiSandboxNameFlags: cli.MultiSandboxNameFlags{SandboxName: "running-box"}}
+	cmd := &cli.StartCmd{MultiSandboxNameFlags: cli.MultiSandboxNameFlags{SandboxNames: []string{"running-box"}}}
 	if err := cmd.Run(cctx); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
@@ -193,12 +257,15 @@ func TestStartCmd_AlreadyRunning(t *testing.T) {
 
 func TestStartCmd_StartsStopped(t *testing.T) {
 	var startCalls []string
+	var startCallsMu sync.Mutex
 	cctx := newCLIContext(t, daemontest.Deps{
 		ContainerService: &hostops.MockContainerOps{
 			InspectFunc: func(_ context.Context, containerID string) ([]types.Container, error) {
 				return []types.Container{{Status: "stopped"}}, nil
 			},
 			StartFunc: func(_ context.Context, _ *options.StartContainer, containerID string) (string, error) {
+				startCallsMu.Lock()
+				defer startCallsMu.Unlock()
 				startCalls = append(startCalls, containerID)
 				return "started", nil
 			},
@@ -207,7 +274,7 @@ func TestStartCmd_StartsStopped(t *testing.T) {
 		s.SaveSandbox(ctx, testBox("stopped-box"))
 	})
 
-	cmd := &cli.StartCmd{MultiSandboxNameFlags: cli.MultiSandboxNameFlags{SandboxName: "stopped-box"}}
+	cmd := &cli.StartCmd{MultiSandboxNameFlags: cli.MultiSandboxNameFlags{SandboxNames: []string{"stopped-box"}}}
 	if err := cmd.Run(cctx); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
@@ -217,14 +284,49 @@ func TestStartCmd_StartsStopped(t *testing.T) {
 	}
 }
 
-func TestStartCmd_All(t *testing.T) {
+func TestStartCmd_Multiple(t *testing.T) {
 	var startCalls []string
+	var startCallsMu sync.Mutex
 	cctx := newCLIContext(t, daemontest.Deps{
 		ContainerService: &hostops.MockContainerOps{
 			InspectFunc: func(_ context.Context, containerID string) ([]types.Container, error) {
 				return []types.Container{{Status: "stopped"}}, nil
 			},
 			StartFunc: func(_ context.Context, _ *options.StartContainer, containerID string) (string, error) {
+				startCallsMu.Lock()
+				defer startCallsMu.Unlock()
+				startCalls = append(startCalls, containerID)
+				return "started", nil
+			},
+		},
+	}, func(ctx context.Context, s daemontest.SandboxStore) {
+		s.SaveSandbox(ctx, testBox("first"))
+		s.SaveSandbox(ctx, testBox("second"))
+		s.SaveSandbox(ctx, testBox("already-running"))
+	})
+
+	cmd := &cli.StartCmd{MultiSandboxNameFlags: cli.MultiSandboxNameFlags{SandboxNames: []string{"first", "second"}}}
+	if err := cmd.Run(cctx); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	slices.Sort(startCalls)
+	if !slices.Equal(startCalls, []string{"ctr-first", "ctr-second"}) {
+		t.Errorf("expected Start calls for first and second, got: %v", startCalls)
+	}
+}
+
+func TestStartCmd_All(t *testing.T) {
+	var startCalls []string
+	var startCallsMu sync.Mutex
+	cctx := newCLIContext(t, daemontest.Deps{
+		ContainerService: &hostops.MockContainerOps{
+			InspectFunc: func(_ context.Context, containerID string) ([]types.Container, error) {
+				return []types.Container{{Status: "stopped"}}, nil
+			},
+			StartFunc: func(_ context.Context, _ *options.StartContainer, containerID string) (string, error) {
+				startCallsMu.Lock()
+				defer startCallsMu.Unlock()
 				startCalls = append(startCalls, containerID)
 				return "started", nil
 			},

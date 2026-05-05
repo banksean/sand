@@ -16,8 +16,8 @@ func (c *StatsCmd) Run(cctx *CLIContext) error {
 	ctx := cctx.Context
 	mc := cctx.Daemon
 	ids := []string{}
-	if c.SandboxName != "" {
-		ids = append(ids, c.SandboxName)
+	if len(c.SandboxNames) > 0 {
+		ids = append(ids, c.SandboxNames...)
 	} else {
 		sboxes, err := mc.ListSandboxes(ctx)
 		if err != nil {

@@ -65,6 +65,6 @@ type SandboxNameFlag struct {
 
 // MultiSandboxNameFlags are shared by commands that operate on a sandbox by name or on all sandboxes.
 type MultiSandboxNameFlags struct {
-	SandboxName string `arg:"" completion-predictor:"sandbox-name" optional:"" help:"name of the sandbox"`
-	All         bool   `short:"a" help:"all sandboxes"`
+	SandboxNames []string `arg:"" completion-predictor:"sandbox-name" optional:"" help:"names of the sandboxes"`
+	All          bool     `short:"a" help:"all sandboxes"`
 }

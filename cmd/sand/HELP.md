@@ -159,7 +159,7 @@ remove sandbox container and its clone directory
 **Usage:**
 
 ```
-sand rm [flags] [SANDBOX-NAME]
+sand rm [flags] [SANDBOX-NAMES]...
 ```
 
 **Flags:**
@@ -174,7 +174,7 @@ stop sandbox container
 **Usage:**
 
 ```
-sand stop [flags] [SANDBOX-NAME]
+sand stop [flags] [SANDBOX-NAMES]...
 ```
 
 **Flags:**
@@ -188,7 +188,7 @@ start sandbox container
 **Usage:**
 
 ```
-sand start [flags] [SANDBOX-NAME]
+sand start [flags] [SANDBOX-NAMES]...
 ```
 
 **Flags:**
@@ -302,7 +302,7 @@ list container stats for sandboxes
 **Usage:**
 
 ```
-sand stats [flags] [SANDBOX-NAME]
+sand stats [flags] [SANDBOX-NAMES]...
 ```
 
 **Flags:**

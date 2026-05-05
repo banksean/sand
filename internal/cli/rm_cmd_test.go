@@ -17,7 +17,7 @@ func TestRmCmd_DeclinedConfirmationSkipsRemoval(t *testing.T) {
 	var stdout bytes.Buffer
 	restoreRmCmdIO(t, bytes.NewBufferString("n\n"), &stdout)
 
-	cmd := &RmCmd{MultiSandboxNameFlags: MultiSandboxNameFlags{SandboxName: "target"}}
+	cmd := &RmCmd{MultiSandboxNameFlags: MultiSandboxNameFlags{SandboxNames: []string{"target"}}}
 	if err := cmd.Run(cctx); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
