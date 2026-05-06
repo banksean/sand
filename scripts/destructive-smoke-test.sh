@@ -90,7 +90,7 @@ sand exec smoke ./sand build-info
 sand vsc smoke
 
 # Try connecting to the container via ssh. Should Just Work and avoid TOFU prompt, warnings etc.
-ssh -vvv smoke.$CONTAINER_DNS_DOMAIN whoami
+ssh -vvv smoke.${CONTAINER_DNS_DOMAIN} whoami
 
 # Make sure we can still start a stopped container automatically by shelling into it
 # See https://github.com/banksean/sand/issues/78
