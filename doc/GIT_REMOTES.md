@@ -2,7 +2,24 @@
 
 TL;DR: Use git pull (but not push) to move commits between host and sandbox containers.
 
-## Overview
+Sand's pull-only git sync workflow prioritizes host safety over agent capabilities.
+
+The sandbox may consume host changes directly, but the host remains the gatekeeper for accepting sandbox changes.
+
+## Why Pull-Only
+
+The pull-only model makes the direction of authority explicit: each side imports changes from the other, but the sandbox cannot write directly back to the host repository through origin.
+
+Some benefits (and trade-offs) of doing it this way:
+
+- Host safety is more important than agent autonomy. A container process cannot accidentally or maliciously git push into the original host checkout through its origin; the host (i.e. the human at the keyboard) decides when to import sandbox commits.
+- The workflow is less symmetrical. You may expect git push origin branch from /app to work. Instead, you need to commit in the sandbox, then run git pull sand/<sandboxname> <branch> from the host checkout to achieve the same result.
+- Final adoption remains host-controlled. Sandbox agents can pull from the host, rebase or merge, resolve conflicts, and commit the result in the sandbox. But they cannot push that result into the host checkout; the user or host-side automation must still run git pull sand/<sandbox> <branch> to accept it.
+- Sandbox updates from host are simple. git pull from /app works naturally for bringing in host-side commits, because origin is fetchable.
+- Publishing sandbox work from host to other remotes requires one extra mental step. The sandbox can produce commits, but the host must pull them. This is safer, but slightly more manual than allowing agents to push directly.
+- It favors review before adoption. Because changes are imported from the host side, users can fetch, diff, inspect, or pull intentionally rather than having sandbox work appear in the host checkout automatically.
+
+## Implementation Details
 
 When `sand` creates a new sandbox, it makes a copy-on-write (COW) clone of your original working directory using APFS's [`clonefile(2)`](https://eclecticlight.co/2020/04/14/copy-move-and-clone-files-in-apfs-a-primer/). 
 
