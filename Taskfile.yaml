@@ -5,7 +5,7 @@ version: '3'
 vars:
   DAEMON_PROTO: internal/daemon/daemonpb/daemon.proto
   DAEMON_PROTO_OUT_DIR: .
-  OBSERVABILITY_DATA_DIR: '{{.OBSERVABILITY_DATA_DIR | default "{{.TASKFILE_DIR}}/.observability-data"}}'
+  OBSERVABILITY_DATA_DIR: '{{.TASKFILE_DIR}}/.observability-data'
   CONTAINER_DNS_DOMAIN: '{{.CONTAINER_DNS_DOMAIN | default "dev.local"}}'
 
 tasks:
