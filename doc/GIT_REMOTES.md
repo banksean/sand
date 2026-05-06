@@ -1,58 +1,71 @@
 # Git Remotes Between Host and Sandbox
 
-`sand`'s design does not require the use of git, but if you do use git `sand` will do some extra work to make it easier to compare your working directory and sandboxed clones of your working directory.
+TL;DR: Use git pull (but not push) to move commits between host and sandbox containers.
 
 ## Overview
 
-When `sand` creates a new sandbox, it makes a copy-on-write (COW) clone of your original working directory using APFS's `clonefile(2)` functionality. To facilitate git operations between the original directory and the sandbox clone, `sand` automatically sets up **bidirectional git remotes** linking these two checkouts _on the host filesystem_.
+When `sand` creates a new sandbox, it makes a copy-on-write (COW) clone of your original working directory using APFS's [`clonefile(2)`](https://eclecticlight.co/2020/04/14/copy-move-and-clone-files-in-apfs-a-primer/). 
+
+It then automatically sets up **bidirectional git remotes** linking the original checkout and the sandbox's cloned checkouts. These are "remotes" only in the logical sense. APFS requires the CoW clone to live _on the same volume_ as the original. 
+
+With those bidirectional remotes set up, you can now use git pull to move changes between host and sandbox container from either side.
 
 ## Directory Structure
 
 - **Original working directory (host)**: The directory where you ran `sand new` (e.g., `/Users/yourname/myproject`)
 - **Sandbox clone directory (host)**: `${--app-base-dir}/clones/<sandbox-id>/app`
-  - Default `--app-base-dir`: `/tmp/sand/clones`
-  - Example full path: `/tmp/sand/clones/my-sandbox/app`
+  - Default `--app-base-dir`: `~/Library/Application\ Support/Sand/clones`
+  - Example full path: `~/Library/Application\ Support/Sand/clones/my-sandbox/app`
 - **Container mount**: The sandbox clone is mounted to `/app` inside the container
 
 ## The Bidirectional Remote Relationship
 
 When creating a sandbox with ID `my-sandbox` and current working directory `/Users/yourname/myproject`, `sand` establishes these git remotes:
 
-### In the sandbox clone (`/tmp/sand/clones/my-sandbox/app`):
+### In the sandbox clone, as mounted inside the container at `/app`:
+
+Example clone dir: `~/Library/Application\ Support/Sand/clones/my-sandbox/app`
+
 ```
-Remote name: origin-host-workdir
-Remote URL:  /Users/yourname/myproject  (the original host working directory)
+Remote name: origin
+Fetch URL:   /run/git-origin-ro  (read-only bind mount of the original host git directory)
+Push URL:    DISABLED
 ```
 
-### In the original working directory (`/Users/yourname/myproject`):
+### In the original working directory
+
+Example working dir: `/Users/yourname/myproject`
+
 ```
 Remote name: sand/my-sandbox
-Remote URL:  /tmp/sand/clones/my-sandbox/app  (the sandbox clone directory)
+Remote URL:  ~/Library/Application\ Support/Sand/clones/clones/my-sandbox/app  (the sandbox clone directory)
 ```
 
-## Important Caveat: Host-Only Paths
+## How To Move Changes Between Host and Sandbox
 
-**These git remote paths only make sense on the host OS, not inside the container.**
+`sand` sets up git remotes in both directions, but they are used from different sides.
 
-The remote URLs are absolute filesystem paths on the macOS host. Inside the container:
-- The path `/tmp/sand/clones/my-sandbox/app` doesn't exist
-- The path `/Users/yourname/myproject` doesn't exist
-- Only `/app` (the mounted clone) is visible
+Inside the sandbox container, `/app` has an `origin` remote whose fetch URL is `/run/git-origin-ro`. That path is a read-only bind mount of the original host repository's git directory, so `git pull` from `/app` can bring the latest host commits into the sandbox. Pushing back through this remote is intentionally disabled: `origin`'s push URL is set to `DISABLED`.
 
-This means:
-- YES: `git fetch origin-host-workdir` works on the **host** (from the sandbox clone directory)
-- NO: `git fetch origin-host-workdir` **fails** inside the **container** (paths don't exist)
-- YES: `git fetch sand/my-sandbox` works on the **host** (from the original working directory)
-- NO: `git fetch sand/my-sandbox` **fails** inside the **container**
+To move commits from the sandbox back to your original host checkout, run git from the host checkout and pull from the sandbox remote that `sand` added there:
+
+```sh
+cd /Users/yourname/myproject
+git pull sand/my-sandbox <branchname>
+```
+
+In short: pull host changes into the sandbox with `git pull` from `/app`; pull sandbox changes back to the host with `git pull sand/<sandboxname> <branchname>` from the host checkout.
 
 ## Example: Comparing Original Working Directory to Sandbox
 
 Let's say you have:
 - Sandbox ID: `my-sandbox`
 - Original working directory: `/Users/yourname/myproject`
-- Sandbox clone: `/tmp/sand/clones/my-sandbox/app`
+- Sandbox clone: `~/Library/Application\ Support/Sand/clones/my-sandbox/app`
 
 ### Using the `sand git` Commands
+
+Sand provides some convenience sub-commands that wrap a few common git operations.
 
 #### Viewing Sandbox Status
 
@@ -98,9 +111,9 @@ sand git diff -b main my-sandbox
 
 The `--include-uncommitted` flag is useful when you want to see all changes in the sandbox, including files that haven't been committed yet. This creates a temporary commit in the sandbox, fetches it, shows the diff, and then cleans up the temporary commit automatically.
 
-### From the Host OS (Manual Git Operations)
+### Manual Git Operations
 
-You can also diff manually from either directory:
+You can also diff manually from either side:
 
 #### Option 1: From the original working directory
 ```sh
@@ -115,26 +128,29 @@ git diff sand/my-sandbox/main
 git diff HEAD..sand/my-sandbox/main
 ```
 
-#### Option 2: From the sandbox clone directory
+#### Option 2: From inside the container at `/app`
 ```sh
-# First, fetch the latest from the original working directory
-cd /tmp/sand/clones/my-sandbox/app
-git fetch origin-host-workdir
+# Pull the latest host commits into the sandbox
+cd /app
+git pull
 
 # Compare the sandbox's working tree to the original's main branch
-git diff origin-host-workdir/main
+git diff origin/main
 
 # Or compare specific commits/branches
-git diff HEAD..origin-host-workdir/main
+git diff HEAD..origin/main
 ```
 
 ### From Inside the Container
 
-Inside the container, you **cannot** use the git remotes directly because the remote URLs point to host filesystem paths. However, you can still perform diffs using commit SHAs or by comparing against the initial clone state:
+Inside the container, use `origin` to pull host commits into the sandbox. Do not push to `origin`; it is intentionally disabled.
 
 ```sh
 # Inside the container at /app
 cd /app
+
+# Pull the latest commits from the original host checkout
+git pull
 
 # Show uncommitted changes in the sandbox
 git status
@@ -146,33 +162,26 @@ git diff <commit-sha>
 # Show the log to see what's been done in this sandbox
 git log --oneline
 
-# Compare to a specific branch if it was fetched before container creation
-git diff main  # only works if main exists locally
+# Compare to a fetched host branch
+git diff origin/main
 ```
 
-#### Workaround: Use the Host for Remote Operations
+#### Pulling Sandbox Commits Back to the Host
 
-To compare the container's current state with the original working directory:
+To bring committed sandbox changes back to the original working directory:
 
-1. **From a host shell**, commit or fetch the sandbox's changes:
+1. **Inside the container**, commit the sandbox changes:
    ```sh
-   # On host: check what's in the sandbox clone
-   cd /tmp/sand/clones/my-sandbox/app
+   cd /app
    git status
    git add -A
    git commit -m "sandbox changes"
    ```
 
-2. **From the original working directory on host**, fetch and diff:
+2. **From the original working directory on the host**, pull from the sandbox remote:
    ```sh
    cd /Users/yourname/myproject
-   git fetch sand/my-sandbox
-   git diff sand/my-sandbox/main
+   git pull sand/my-sandbox <branchname>
    ```
 
 Alternatively, use `sand shell` to run git commands on the host OS that inspect the sandbox clone's state without entering the container.
-
-## Future Enhancement Ideas
-
-- Implement a host-side service that the container can communicate with to perform `git fetch` operations against the original working directory
-- Create container-accessible git remotes using a git server protocol or ssh access back to the host
