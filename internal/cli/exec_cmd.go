@@ -40,7 +40,7 @@ func (c *ExecCmd) Run(cctx *CLIContext) error {
 		c.EnvFile = filepath.Join(c.CloneFromDir, c.EnvFile)
 	}
 
-	// Generate ID if not provided
+	// Generate a name if not provided
 	if c.SandboxName == "" {
 		seed := time.Now().UTC().UnixNano()
 		nameGenerator := namegenerator.NewNameGenerator(seed)
@@ -63,11 +63,11 @@ func (c *ExecCmd) Run(cctx *CLIContext) error {
 	}
 	// Try to get existing sandbox
 	sbox, err := mc.GetSandbox(ctx, c.SandboxName)
-	if err != nil {
+	if sbox == nil || err != nil {
 		// Sandbox doesn't exist, create it via daemon
-		slog.InfoContext(ctx, "Creating new sandbox via daemon", "id", c.SandboxName)
+		slog.InfoContext(ctx, "Creating new sandbox via daemon", "name", c.SandboxName)
 		sbox, err = mc.CreateSandbox(ctx, daemon.CreateSandboxOpts{
-			ID:           c.SandboxName,
+			Name:         c.SandboxName,
 			CloneFromDir: c.CloneFromDir,
 			ImageName:    c.ImageName,
 			EnvFile:      c.EnvFile,
@@ -119,7 +119,7 @@ func (c *ExecCmd) Run(cctx *CLIContext) error {
 	if c.Rm {
 		slog.InfoContext(ctx, "sbox.exec finished, cleaning up...")
 		// Use daemon for cleanup
-		if err := mc.RemoveSandbox(ctx, sbox.ID); err != nil {
+		if err := mc.RemoveSandbox(ctx, sbox.Name); err != nil {
 			slog.ErrorContext(ctx, "RemoveSandbox", "error", err)
 		}
 		slog.InfoContext(ctx, "Cleanup complete. Exiting.")

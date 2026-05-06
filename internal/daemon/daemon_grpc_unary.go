@@ -83,7 +83,7 @@ func (s *daemonGRPCServer) StopSandbox(ctx context.Context, req *daemonpb.IDRequ
 
 func (s *daemonGRPCServer) StartSandbox(ctx context.Context, req *daemonpb.StartSandboxRequest) (*daemonpb.StatusResponse, error) {
 	if err := s.daemon.StartSandbox(ctx, StartSandboxOpts{
-		ID:       req.GetId(),
+		Name:     req.GetId(),
 		SSHAgent: req.GetSshAgent(),
 	}); err != nil {
 		return nil, err
@@ -103,14 +103,32 @@ func (s *daemonGRPCServer) ResolveAgentLaunchEnv(ctx context.Context, req *daemo
 }
 
 func (s *daemonGRPCServer) ExportImage(ctx context.Context, req *daemonpb.ExportImageRequest) (*daemonpb.StatusResponse, error) {
-	if _, err := s.daemon.boxer.ContainerService.Export(ctx, &options.ExportContainer{Output: req.GetDestinationPath()}, req.GetId()); err != nil {
+	sbox, err := s.daemon.GetSandbox(ctx, req.GetId())
+	if err != nil {
+		return nil, err
+	}
+	if sbox == nil {
+		return nil, fmt.Errorf("sandbox not found: %s", req.GetId())
+	}
+	if _, err := s.daemon.boxer.ContainerService.Export(ctx, &options.ExportContainer{Output: req.GetDestinationPath()}, sbox.ContainerID); err != nil {
 		return nil, err
 	}
 	return okStatus(), nil
 }
 
 func (s *daemonGRPCServer) Stats(ctx context.Context, req *daemonpb.StatsRequest) (*daemonpb.StatsResponse, error) {
-	stats, err := s.daemon.boxer.GetContainerStats(ctx, req.GetIds()...)
+	ids := make([]string, 0, len(req.GetIds()))
+	for _, name := range req.GetIds() {
+		sbox, err := s.daemon.GetSandbox(ctx, name)
+		if err != nil {
+			return nil, err
+		}
+		if sbox == nil {
+			return nil, fmt.Errorf("sandbox not found: %s", name)
+		}
+		ids = append(ids, sbox.ContainerID)
+	}
+	stats, err := s.daemon.boxer.GetContainerStats(ctx, ids...)
 	if err != nil {
 		return nil, err
 	}

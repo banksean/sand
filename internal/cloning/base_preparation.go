@@ -42,7 +42,7 @@ func (p *BaseWorkspacePreparation) Prepare(ctx context.Context, req CloneRequest
 	}
 
 	// Clone workspace directory
-	if err := p.cloneWorkDir(ctx, req.ID, req.HostWorkDir, pathRegistry); err != nil {
+	if err := p.cloneWorkDir(ctx, req.ID, req.Name, req.HostWorkDir, pathRegistry); err != nil {
 		return nil, fmt.Errorf("failed to clone workdir for sandbox %s: %w", req.ID, err)
 	}
 
@@ -66,7 +66,7 @@ func (p *BaseWorkspacePreparation) Prepare(ctx context.Context, req CloneRequest
 	}, nil
 }
 
-func (p *BaseWorkspacePreparation) cloneWorkDir(ctx context.Context, id, hostWorkDir string, pathRegistry PathRegistry) error {
+func (p *BaseWorkspacePreparation) cloneWorkDir(ctx context.Context, id, name, hostWorkDir string, pathRegistry PathRegistry) error {
 	p.messenger.Message(ctx, "Cloning "+hostWorkDir)
 
 	// Check if hostWorkDir is part of a git repository
@@ -101,7 +101,7 @@ func (p *BaseWorkspacePreparation) cloneWorkDir(ctx context.Context, id, hostWor
 
 	// Set up git remotes if this is a git repository
 	if gitTopLevel != "" {
-		if err := p.gitSetup.SetupGitRemotes(ctx, id, gitTopLevel, hostCloneDir); err != nil {
+		if err := p.gitSetup.SetupGitRemotes(ctx, id, name, gitTopLevel, hostCloneDir); err != nil {
 			return err
 		}
 	}

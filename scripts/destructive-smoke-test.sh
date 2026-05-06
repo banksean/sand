@@ -42,7 +42,7 @@ fi
 rm -rf /tmp/sand
 
 # Install sand and sandd from source
-go install ./cmd/...
+task install
 
 # Build default:local image we'll use for testing
 pushd . && cd images && make default && popd
@@ -100,11 +100,11 @@ echo "exit" | script -q /dev/null sand shell smoke
 # TODO: ssh times out when you try to use it after restarting the sandbox.
 # ssh -vvv smoke.$CONTAINER_DNS_DOMAIN whoami
 
-# Clean everything up 
-sand rm -af
-
 sand log smoke
 sand log smoke-2
+
+# Clean everything up
+sand rm -af
 
 sandd stop
 rm $(which sand)

@@ -14,10 +14,10 @@ func (c *StopCmd) Run(cctx *CLIContext) error {
 	ctx := cctx.Context
 	mc := cctx.Daemon
 
-	ids := []string{}
+	names := []string{}
 	if !c.All {
-		ids = append(ids, c.SandboxNames...)
-		if len(ids) == 0 {
+		names = append(names, c.SandboxNames...)
+		if len(names) == 0 {
 			return fmt.Errorf("sandbox name required unless --all is set")
 		}
 	} else {
@@ -26,24 +26,24 @@ func (c *StopCmd) Run(cctx *CLIContext) error {
 			return err
 		}
 		for _, bx := range bxs {
-			ids = append(ids, bx.ID)
+			names = append(names, bx.Name)
 		}
 	}
 
 	var wg sync.WaitGroup
-	errChan := make(chan error, len(ids))
+	errChan := make(chan error, len(names))
 
-	for _, id := range ids {
+	for _, name := range names {
 		wg.Add(1)
-		go func(id string) {
+		go func(name string) {
 			defer wg.Done()
-			if err := mc.StopSandbox(ctx, id); err != nil {
-				slog.ErrorContext(ctx, "StopSandbox", "error", err, "id", id)
+			if err := mc.StopSandbox(ctx, name); err != nil {
+				slog.ErrorContext(ctx, "StopSandbox", "error", err, "name", name)
 				errChan <- err
 				return
 			}
-			fmt.Printf("%s\n", id)
-		}(id)
+			fmt.Printf("%s\n", name)
+		}(name)
 	}
 
 	wg.Wait()

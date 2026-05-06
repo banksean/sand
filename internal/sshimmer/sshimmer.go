@@ -73,6 +73,7 @@ func newLocalSSHimmerWithDeps(ctx context.Context, localDomain string, fs FileSy
 		}
 	}
 
+	slog.InfoContext(ctx, "newLocalSSHimmerWithDeps", "base", base)
 	s := &LocalSSHimmer{
 		localDomain:      localDomain,
 		knownHostsPath:   filepath.Join(base, "known_hosts"),
@@ -199,6 +200,7 @@ func (s *LocalSSHimmer) getOrCreateKeyPair(idPath string) (ssh.PublicKey, []byte
 	// concurrent caller that observes the private key file will also find the
 	// public key file. Both writes use SafeWriteFile (temp-file + rename) so
 	// each file is written atomically.
+
 	if err = s.fs.SafeWriteFile(idPath+".pub", []byte(pubKeyBytes), 0o600); err != nil {
 		return nil, nil, fmt.Errorf("error writing public key to file %w", err)
 	}

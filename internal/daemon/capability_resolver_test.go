@@ -227,8 +227,8 @@ func TestCreateSandboxRejectsUnknownAgentBeforeSandboxCreation(t *testing.T) {
 func newCapabilityTestDaemon(t *testing.T, registry *cloning.AgentRegistry, containerSvc *hostops.MockContainerOps) *Daemon {
 	t.Helper()
 
-	// Keep the app dir prefix short so the derived unix socket path
-	// (<appDir>/containersockets/<sandbox-id>) stays within macOS sun_path limits.
+	// Keep this short because it still appears in a few test fixture paths. Runtime
+	// container sockets use /tmp/sand-<uid>/ and are independent of appDir length.
 	appDir, err := os.MkdirTemp("", "sdt-*")
 	if err != nil {
 		t.Fatalf("MkdirTemp: %v", err)

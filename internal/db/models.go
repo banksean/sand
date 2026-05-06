@@ -28,4 +28,8 @@ type Sandbox struct {
 	MemoryMb           sql.NullInt64  `json:"memory_mb"`
 	DefaultUsername    sql.NullString `json:"default_username"`
 	DefaultUid         sql.NullString `json:"default_uid"`
+	Name               string         `json:"name"`
+	State              string         `json:"state"`
+	DeletedAt          sql.NullTime   `json:"deleted_at"`
+	TrashWorkDir       sql.NullString `json:"trash_work_dir"`
 }

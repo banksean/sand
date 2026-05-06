@@ -37,8 +37,8 @@ func StartDaemon(t testing.TB, deps Deps, configure func(context.Context, Sandbo
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 
-	// Use a short prefix so the unix socket path (<tmpDir>/containersockets/<id>)
-	// stays within macOS's 104-byte sun_path limit even with long sandbox IDs.
+	// Keep the test app dir compact for other fixture paths. Runtime container
+	// sockets use /tmp/sand-<uid>/ and are independent of this path.
 	tmpDir, err := os.MkdirTemp("", "sdt-*")
 	if err != nil {
 		t.Fatalf("daemontest: MkdirTemp: %v", err)

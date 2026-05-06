@@ -15,9 +15,9 @@ type StatsCmd struct {
 func (c *StatsCmd) Run(cctx *CLIContext) error {
 	ctx := cctx.Context
 	mc := cctx.Daemon
-	ids := []string{}
+	names := []string{}
 	if len(c.SandboxNames) > 0 {
-		ids = append(ids, c.SandboxNames...)
+		names = append(names, c.SandboxNames...)
 	} else {
 		sboxes, err := mc.ListSandboxes(ctx)
 		if err != nil {
@@ -25,11 +25,11 @@ func (c *StatsCmd) Run(cctx *CLIContext) error {
 		}
 		for _, sb := range sboxes {
 			if sb.Container != nil {
-				ids = append(ids, sb.ContainerID)
+				names = append(names, sb.Name)
 			}
 		}
 	}
-	list, err := mc.Stats(ctx, ids...)
+	list, err := mc.Stats(ctx, names...)
 	if err != nil {
 		slog.ErrorContext(ctx, "Stats", "error", err)
 		return err

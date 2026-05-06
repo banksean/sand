@@ -28,17 +28,23 @@ tasks:
         --go-grpc_opt=paths=source_relative
         {{.DAEMON_PROTO}}
 
+  generate:
+    deps:
+      - proto:generate
+    cmds:
+      - go generate ./...
+
   build:
     desc: Build all Go packages
     deps:
-      - proto:generate
+      - generate
     cmds:
       - go build -v ./...
 
   test:
     desc: Run Go tests
     deps:
-      - proto:generate
+      - generate
     cmds:
       - GOEXPERIMENT=synctest gotestsum ./...
 
@@ -46,6 +52,7 @@ tasks:
     desc: Install Go commands
     deps:
       - stopdaemon
+      - generate
     cmds:
       - go install ./cmd/...
 

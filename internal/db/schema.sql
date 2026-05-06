@@ -1,5 +1,7 @@
 CREATE TABLE IF NOT EXISTS sandboxes (
     id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    state TEXT NOT NULL DEFAULT 'active',
     container_id TEXT,
     host_origin_dir TEXT NOT NULL,
     sandbox_work_dir TEXT NOT NULL,
@@ -16,6 +18,10 @@ CREATE TABLE IF NOT EXISTS sandboxes (
     allowed_domains TEXT,
     default_username TEXT,
     default_uid TEXT,
+    deleted_at DATETIME,
+    trash_work_dir TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_container_id ON sandboxes(container_id);
+CREATE INDEX IF NOT EXISTS idx_sandboxes_state ON sandboxes(state);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_active_sandbox_name ON sandboxes(name) WHERE state = 'active';

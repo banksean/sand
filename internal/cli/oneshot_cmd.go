@@ -92,10 +92,10 @@ func (c *OneshotCmd) Run(cctx *CLIContext) error {
 
 	sbox, err := mc.GetSandbox(ctx, c.SandboxName)
 	if sbox == nil || err != nil {
-		slog.InfoContext(ctx, "OneshotCmd: creating sandbox", "id", c.SandboxName)
+		slog.InfoContext(ctx, "OneshotCmd: creating sandbox", "name", c.SandboxName)
 		fmt.Printf("creating new sandbox...\n")
 		sbox, err = mc.CreateSandbox(ctx, daemon.CreateSandboxOpts{
-			ID:             c.SandboxName,
+			Name:           c.SandboxName,
 			CloneFromDir:   c.CloneFromDir,
 			ImageName:      c.ImageName,
 			EnvFile:        c.EnvFile,
@@ -113,7 +113,7 @@ func (c *OneshotCmd) Run(cctx *CLIContext) error {
 			return fmt.Errorf("creating sandbox: %w", err)
 		}
 	}
-	fmt.Printf("executing in sanbox: %s\n", sbox.ID)
+	fmt.Printf("executing in sandbox: %s (%s)\n", sbox.Name, sbox.ID)
 
 	containerSvc := hostops.NewAppleContainerOps()
 	hostname := types.GetContainerHostname(sbox.Container)
@@ -145,17 +145,17 @@ func (c *OneshotCmd) Run(cctx *CLIContext) error {
 
 	if c.Stop {
 		slog.InfoContext(ctx, "OneshotCmd: stopping sandbox container", "id", sbox.ID)
-		if err := mc.StopSandbox(ctx, sbox.ID); err != nil {
+		if err := mc.StopSandbox(ctx, sbox.Name); err != nil {
 			slog.ErrorContext(ctx, "OneshotCmd: StopContainer", "error", err)
 		}
-		fmt.Printf("stopped sandbox: %s\n", sbox.ID)
+		fmt.Printf("stopped sandbox: %s\n", sbox.Name)
 	}
 	if c.Rm {
 		slog.InfoContext(ctx, "OneshotCmd: removing sandbox", "id", sbox.ID)
-		if err := mc.RemoveSandbox(ctx, sbox.ID); err != nil {
+		if err := mc.RemoveSandbox(ctx, sbox.Name); err != nil {
 			slog.ErrorContext(ctx, "OneshotCmd: RemoveSandbox", "error", err)
 		}
-		fmt.Printf("removed sandbox: %s\n", sbox.ID)
+		fmt.Printf("removed sandbox: %s (%s)\n", sbox.Name, sbox.ID)
 	}
 
 	return nil

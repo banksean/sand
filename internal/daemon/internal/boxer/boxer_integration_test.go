@@ -15,6 +15,7 @@ import (
 	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/cloning"
 	"github.com/banksean/sand/internal/hostops"
+	"github.com/banksean/sand/internal/runtimepaths"
 	"github.com/banksean/sand/internal/sandtypes"
 	"github.com/banksean/sand/internal/sshimmer"
 )
@@ -241,6 +242,7 @@ func TestBoxer_CreateContainerSSHAgentOptIn(t *testing.T) {
 	boxer := newTestBoxer(t, mockContainer, mockImage)
 	sbox := &sandtypes.Box{
 		ID:        "test-sandbox",
+		Name:      "friendly-name",
 		ImageName: "test-image:latest",
 		EnvFile:   "/tmp/test.env",
 		Volumes:   []string{"/host:/container"},
@@ -268,13 +270,16 @@ func TestBoxer_CreateContainerSSHAgentOptIn(t *testing.T) {
 		t.Fatalf("CreateContainer mutated sandbox volumes, len = %d, want 1", got)
 	}
 	for i, call := range createCalls {
+		if got := call.ManagementOptions.Name; got != "friendly-name" {
+			t.Fatalf("create call %d container name = %q, want friendly-name", i, got)
+		}
 		if got := len(call.ManagementOptions.Volume); got != 3 {
 			t.Fatalf("create call %d volume count = %d, want 3", i, got)
 		}
-		if got := call.ManagementOptions.Volume[1]; !strings.HasSuffix(got, "/containersockets/test-sandbox:/run/host-services/sandd.sock") {
+		if got, want := call.ManagementOptions.Volume[1], runtimepaths.ContainerHTTPSocketPath("test-sandbox")+":/run/host-services/sandd.sock"; got != want {
 			t.Fatalf("create call %d HTTP socket volume = %q", i, got)
 		}
-		if got := call.ManagementOptions.Volume[2]; !strings.HasSuffix(got, "/containergrpc/test-sandbox:/run/host-services/sandd.grpc.sock") {
+		if got, want := call.ManagementOptions.Volume[2], runtimepaths.ContainerGRPCSocketPath("test-sandbox")+":/run/host-services/sandd.grpc.sock"; got != want {
 			t.Fatalf("create call %d gRPC socket volume = %q", i, got)
 		}
 		if got := call.ProcessOptions.EnvFile; got != "" {
@@ -520,7 +525,7 @@ func TestBoxer_Cleanup_EndToEnd(t *testing.T) {
 		var stopCalls []string
 		var deleteCalls []string
 		var removeRemoteCalls []struct{ dir, name string }
-		var removeAllCalls []string
+		var renameCalls []struct{ oldpath, newpath string }
 
 		mockContainer := &hostops.MockContainerOps{
 			StopFunc: func(ctx context.Context, opts *options.StopContainer, containerID string) (string, error) {
@@ -541,8 +546,8 @@ func TestBoxer_Cleanup_EndToEnd(t *testing.T) {
 		}
 
 		mockFile := &hostops.MockFileOps{
-			RemoveAllFunc: func(path string) error {
-				removeAllCalls = append(removeAllCalls, path)
+			RenameFunc: func(oldpath, newpath string) error {
+				renameCalls = append(renameCalls, struct{ oldpath, newpath string }{oldpath: oldpath, newpath: newpath})
 				return nil
 			},
 		}
@@ -588,8 +593,9 @@ func TestBoxer_Cleanup_EndToEnd(t *testing.T) {
 			}
 		}
 
-		if len(removeAllCalls) != 1 || removeAllCalls[0] != sandboxDir {
-			t.Errorf("Expected RemoveAll called with sandbox dir, got: %v", removeAllCalls)
+		wantTrashDir := filepath.Join(boxer.appRoot, "trash", "sandboxes", "test-sandbox")
+		if len(renameCalls) != 1 || renameCalls[0].oldpath != sandboxDir || renameCalls[0].newpath != wantTrashDir {
+			t.Errorf("Expected Rename(%q, %q), got: %v", sandboxDir, wantTrashDir, renameCalls)
 		}
 
 		loadedBox, err := boxer.Get(ctx, "test-sandbox")
@@ -597,12 +603,19 @@ func TestBoxer_Cleanup_EndToEnd(t *testing.T) {
 			t.Fatalf("Get() error = %v", err)
 		}
 		if loadedBox != nil {
-			t.Error("Expected sandbox to be removed from DB")
+			t.Error("Expected sandbox to be hidden from active lookup")
+		}
+		deletedBox, err := boxer.GetByID(ctx, "test-sandbox")
+		if err != nil {
+			t.Fatalf("GetByID() error = %v", err)
+		}
+		if deletedBox == nil || deletedBox.State != "deleted" || deletedBox.TrashWorkDir != wantTrashDir {
+			t.Fatalf("Expected deleted sandbox with trash dir %q, got %#v", wantTrashDir, deletedBox)
 		}
 	})
 
 	t.Run("cleanup logs container errors but continues", func(t *testing.T) {
-		var removeAllCalled bool
+		var renameCalled bool
 		mockContainer := &hostops.MockContainerOps{
 			StopFunc: func(ctx context.Context, opts *options.StopContainer, containerID string) (string, error) {
 				return "", errors.New("stop failed")
@@ -613,8 +626,8 @@ func TestBoxer_Cleanup_EndToEnd(t *testing.T) {
 		}
 
 		mockFile := &hostops.MockFileOps{
-			RemoveAllFunc: func(path string) error {
-				removeAllCalled = true
+			RenameFunc: func(oldpath, newpath string) error {
+				renameCalled = true
 				return nil
 			},
 		}
@@ -639,8 +652,8 @@ func TestBoxer_Cleanup_EndToEnd(t *testing.T) {
 			t.Fatalf("Cleanup() should succeed even with container errors, got: %v", err)
 		}
 
-		if !removeAllCalled {
-			t.Error("Expected cleanup to continue to file removal despite container errors")
+		if !renameCalled {
+			t.Error("Expected cleanup to continue to trash move despite container errors")
 		}
 	})
 
@@ -674,11 +687,14 @@ func TestBoxer_Cleanup_EndToEnd(t *testing.T) {
 		}
 	})
 
-	t.Run("cleanup returns error on file removal failure", func(t *testing.T) {
-		expectedErr := errors.New("remove all failed")
+	t.Run("cleanup returns error on trash move failure", func(t *testing.T) {
+		expectedErr := errors.New("rename failed")
 		mockContainer := &hostops.MockContainerOps{}
 		mockFile := &hostops.MockFileOps{
-			RemoveAllFunc: func(path string) error {
+			RenameFunc: func(oldpath, newpath string) error {
+				return expectedErr
+			},
+			CopyFunc: func(ctx context.Context, src, dst string) error {
 				return expectedErr
 			},
 		}
@@ -699,8 +715,8 @@ func TestBoxer_Cleanup_EndToEnd(t *testing.T) {
 		}
 
 		err := boxer.Cleanup(ctx, box)
-		if err != nil {
-			t.Fatal("Error from file removal should not cause Cleanup to return an error")
+		if err == nil {
+			t.Fatal("Expected trash move failure to be returned")
 		}
 	})
 }

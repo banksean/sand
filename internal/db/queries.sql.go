@@ -20,14 +20,14 @@ func (q *Queries) DeleteSandbox(ctx context.Context, id string) error {
 	return err
 }
 
-const getSandbox = `-- name: GetSandbox :one
-SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains, cpu, memory_mb, default_username, default_uid FROM sandboxes
-WHERE id = ?
+const getActiveSandboxByName = `-- name: GetActiveSandboxByName :one
+SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains, cpu, memory_mb, default_username, default_uid, name, state, deleted_at, trash_work_dir FROM sandboxes
+WHERE name = ? AND state = 'active'
 LIMIT 1
 `
 
-func (q *Queries) GetSandbox(ctx context.Context, id string) (Sandbox, error) {
-	row := q.db.QueryRowContext(ctx, getSandbox, id)
+func (q *Queries) GetActiveSandboxByName(ctx context.Context, name string) (Sandbox, error) {
+	row := q.db.QueryRowContext(ctx, getActiveSandboxByName, name)
 	var i Sandbox
 	err := row.Scan(
 		&i.ID,
@@ -49,13 +49,54 @@ func (q *Queries) GetSandbox(ctx context.Context, id string) (Sandbox, error) {
 		&i.MemoryMb,
 		&i.DefaultUsername,
 		&i.DefaultUid,
+		&i.Name,
+		&i.State,
+		&i.DeletedAt,
+		&i.TrashWorkDir,
+	)
+	return i, err
+}
+
+const getSandboxByID = `-- name: GetSandboxByID :one
+SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains, cpu, memory_mb, default_username, default_uid, name, state, deleted_at, trash_work_dir FROM sandboxes
+WHERE id = ?
+LIMIT 1
+`
+
+func (q *Queries) GetSandboxByID(ctx context.Context, id string) (Sandbox, error) {
+	row := q.db.QueryRowContext(ctx, getSandboxByID, id)
+	var i Sandbox
+	err := row.Scan(
+		&i.ID,
+		&i.ContainerID,
+		&i.HostOriginDir,
+		&i.SandboxWorkDir,
+		&i.ImageName,
+		&i.DnsDomain,
+		&i.EnvFile,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.AgentType,
+		&i.OriginalGitOrigin,
+		&i.OriginalGitBranch,
+		&i.OriginalGitCommit,
+		&i.OriginalGitIsDirty,
+		&i.AllowedDomains,
+		&i.Cpu,
+		&i.MemoryMb,
+		&i.DefaultUsername,
+		&i.DefaultUid,
+		&i.Name,
+		&i.State,
+		&i.DeletedAt,
+		&i.TrashWorkDir,
 	)
 	return i, err
 }
 
 const getSandboxesByImage = `-- name: GetSandboxesByImage :many
-SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains, cpu, memory_mb, default_username, default_uid FROM sandboxes
-WHERE image_name = ?
+SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains, cpu, memory_mb, default_username, default_uid, name, state, deleted_at, trash_work_dir FROM sandboxes
+WHERE image_name = ? AND state = 'active'
 ORDER BY created_at DESC
 `
 
@@ -88,6 +129,10 @@ func (q *Queries) GetSandboxesByImage(ctx context.Context, imageName string) ([]
 			&i.MemoryMb,
 			&i.DefaultUsername,
 			&i.DefaultUid,
+			&i.Name,
+			&i.State,
+			&i.DeletedAt,
+			&i.TrashWorkDir,
 		); err != nil {
 			return nil, err
 		}
@@ -103,7 +148,8 @@ func (q *Queries) GetSandboxesByImage(ctx context.Context, imageName string) ([]
 }
 
 const listSandboxes = `-- name: ListSandboxes :many
-SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains, cpu, memory_mb, default_username, default_uid FROM sandboxes
+SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains, cpu, memory_mb, default_username, default_uid, name, state, deleted_at, trash_work_dir FROM sandboxes
+WHERE state = 'active'
 ORDER BY created_at DESC
 `
 
@@ -136,6 +182,10 @@ func (q *Queries) ListSandboxes(ctx context.Context) ([]Sandbox, error) {
 			&i.MemoryMb,
 			&i.DefaultUsername,
 			&i.DefaultUid,
+			&i.Name,
+			&i.State,
+			&i.DeletedAt,
+			&i.TrashWorkDir,
 		); err != nil {
 			return nil, err
 		}
@@ -148,6 +198,26 @@ func (q *Queries) ListSandboxes(ctx context.Context) ([]Sandbox, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const softDeleteSandbox = `-- name: SoftDeleteSandbox :exec
+UPDATE sandboxes
+SET state = 'deleted',
+    container_id = NULL,
+    deleted_at = CURRENT_TIMESTAMP,
+    trash_work_dir = ?,
+    updated_at = CURRENT_TIMESTAMP
+WHERE id = ?
+`
+
+type SoftDeleteSandboxParams struct {
+	TrashWorkDir sql.NullString `json:"trash_work_dir"`
+	ID           string         `json:"id"`
+}
+
+func (q *Queries) SoftDeleteSandbox(ctx context.Context, arg SoftDeleteSandboxParams) error {
+	_, err := q.db.ExecContext(ctx, softDeleteSandbox, arg.TrashWorkDir, arg.ID)
+	return err
 }
 
 const updateContainerID = `-- name: UpdateContainerID :exec
@@ -169,13 +239,16 @@ func (q *Queries) UpdateContainerID(ctx context.Context, arg UpdateContainerIDPa
 
 const upsertSandbox = `-- name: UpsertSandbox :exec
 INSERT INTO sandboxes (
-    id, container_id, host_origin_dir, sandbox_work_dir,
+    id, name, state, container_id, host_origin_dir, sandbox_work_dir,
     image_name, dns_domain, env_file, agent_type,
     original_git_origin, original_git_branch, original_git_commit,
     original_git_is_dirty, allowed_domains,
-    cpu, memory_mb, default_username, default_uid
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    cpu, memory_mb, default_username, default_uid,
+    deleted_at, trash_work_dir
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(id) DO UPDATE SET
+    name = excluded.name,
+    state = excluded.state,
     container_id = excluded.container_id,
     host_origin_dir = excluded.host_origin_dir,
     sandbox_work_dir = excluded.sandbox_work_dir,
@@ -192,11 +265,15 @@ ON CONFLICT(id) DO UPDATE SET
     cpu = excluded.cpu,
     memory_mb = excluded.memory_mb,
     default_username = excluded.default_username,
-    default_uid = excluded.default_uid
+    default_uid = excluded.default_uid,
+    deleted_at = excluded.deleted_at,
+    trash_work_dir = excluded.trash_work_dir
 `
 
 type UpsertSandboxParams struct {
 	ID                 string         `json:"id"`
+	Name               string         `json:"name"`
+	State              string         `json:"state"`
 	ContainerID        sql.NullString `json:"container_id"`
 	HostOriginDir      string         `json:"host_origin_dir"`
 	SandboxWorkDir     string         `json:"sandbox_work_dir"`
@@ -213,11 +290,15 @@ type UpsertSandboxParams struct {
 	MemoryMb           sql.NullInt64  `json:"memory_mb"`
 	DefaultUsername    sql.NullString `json:"default_username"`
 	DefaultUid         sql.NullString `json:"default_uid"`
+	DeletedAt          sql.NullTime   `json:"deleted_at"`
+	TrashWorkDir       sql.NullString `json:"trash_work_dir"`
 }
 
 func (q *Queries) UpsertSandbox(ctx context.Context, arg UpsertSandboxParams) error {
 	_, err := q.db.ExecContext(ctx, upsertSandbox,
 		arg.ID,
+		arg.Name,
+		arg.State,
 		arg.ContainerID,
 		arg.HostOriginDir,
 		arg.SandboxWorkDir,
@@ -234,6 +315,8 @@ func (q *Queries) UpsertSandbox(ctx context.Context, arg UpsertSandboxParams) er
 		arg.MemoryMb,
 		arg.DefaultUsername,
 		arg.DefaultUid,
+		arg.DeletedAt,
+		arg.TrashWorkDir,
 	)
 	return err
 }

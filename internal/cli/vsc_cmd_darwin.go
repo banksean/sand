@@ -23,8 +23,8 @@ func (c *VscCmd) Run(cctx *CLIContext) error {
 
 	sbox, err := mc.GetSandbox(ctx, c.SandboxName)
 	if err != nil {
-		slog.ErrorContext(ctx, "GetSandbox", "error", err, "id", c.SandboxName)
-		return fmt.Errorf("could not find sandbox with ID %s: %w", c.SandboxName, err)
+		slog.ErrorContext(ctx, "GetSandbox", "error", err, "name", c.SandboxName)
+		return fmt.Errorf("could not find sandbox named %s: %w", c.SandboxName, err)
 	}
 
 	ctr := sbox.Container

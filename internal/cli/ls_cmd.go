@@ -27,7 +27,7 @@ func (c *LsCmd) Run(cctx *CLIContext) error {
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "SANDBOX NAME\tSTATUS\tFROM DIR\tFROM GIT\tCURRENT GIT\tIMAGE NAME")
+	fmt.Fprintln(w, "SANDBOX NAME\tSANDBOX ID\tSTATUS\tFROM DIR\tFROM GIT\tCURRENT GIT\tIMAGE NAME")
 	for _, sbox := range list {
 		ctr := sbox.Container
 		status := []string{"dormant"}
@@ -50,7 +50,7 @@ func (c *LsCmd) Run(cctx *CLIContext) error {
 		originalBranch := gitSummary(sbox.OriginalGitDetails)
 		currentBranch := gitSummary(sbox.CurrentGitDetails)
 
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n", sbox.ID, strings.Join(status, ", "), hostOriginDir, originalBranch, currentBranch, imgName)
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", sbox.Name, sbox.ID, strings.Join(status, ", "), hostOriginDir, originalBranch, currentBranch, imgName)
 	}
 	w.Flush()
 	return nil

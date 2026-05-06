@@ -79,9 +79,9 @@ container hostname: shy-snow
 And in another shell window from your host MacOS, use `sand ls` to list the sandboxes:
 ```sh
 > sand ls
-SANDBOX NAME  STATUS   FROM DIR     FROM GIT          CURRENT GIT       IMAGE NAME
-shy-snow      running  ~/code/sand  *2be518ca readme  *2be518ca readme  claude:latest
-my-sandbox    running  ~/code/sand  *2be518ca readme  *2be518ca readme  default:latest
+SANDBOX NAME  SANDBOX ID                            STATUS   FROM DIR     FROM GIT          CURRENT GIT       IMAGE NAME
+shy-snow      3a9a0df8-3ad2-4b79-9a4f-0d7e41f1df1b  running  ~/code/sand  *2be518ca readme  *2be518ca readme  claude:latest
+my-sandbox    7f3b5c18-f5c4-4f93-9aa0-91f67bb2b4a1  running  ~/code/sand  *2be518ca readme  *2be518ca readme  default:latest
 ```
 ## Details
 
@@ -152,7 +152,7 @@ executing in sanbox: small-pond
 [...]
 ```
 
-Will create new sandbox, run claude the that prompt, write Claude's summary to stdout and then remove the sandbox.
+Will create new sandbox, run claude the that prompt, write Claude's summary to stdout, then stop/remove the container and move the sandbox data to trash.
 
 ```sh
 $ sand oneshot --agent claude "Add unit tests for the auth package and commit"
@@ -163,7 +163,7 @@ executing in sanbox: holy-waterfall
 
 Will create a new sandbox, have Claude add unit tests and commit them, leaving the sandbox running. Adding a `--stop` flag will stop the sandbox container. Either way, whatever changes Claude committed will be available in the git remote `sand/holy-waterfall` (which you can pull using regular git commands).
 
-The sandbox is created fresh (or reused by name with `-n`). Pass `--rm` to tear it down automatically when the agent finishes, or `--stop` to just stop it.
+The sandbox is created fresh (or reused by active name with `-n`). Pass `--rm` to tear it down automatically when the agent finishes, or `--stop` to just stop it. Deleted names can be reused; each sandbox also has a stable ID shown by `sand ls`.
 
 ## Configuration defaults
 
@@ -228,7 +228,7 @@ $ sand git diff your-sandbox-name # compares your working directory to the sandb
 $ sand vsc your-sandbox-name # launches a vscode window, connected "remotely" to your-sandbox-name
 $ sand shell your-sandbox-name # open a new shell into the your-sandbox-name's container
 $ sand stop your-sandbox-name # stops the sandbox container, but does *not* delete its filesystem
-$ sand rm your-sandbox-name # stops and removes the container, and *does* remove the sandbox's filesystem.
+$ sand rm your-sandbox-name # stops/removes the container and moves the sandbox filesystem to sand's trash.
 ```
 
 For more information about `sand`'s subcommands and other options, see [cmd/sand/HELP.md](./cmd/sand/HELP.md).

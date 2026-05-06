@@ -14,6 +14,7 @@ import (
 	"github.com/banksean/sand/internal/cloning"
 	"github.com/banksean/sand/internal/daemon/internal/boxer"
 	"github.com/banksean/sand/internal/hostops"
+	"github.com/banksean/sand/internal/runtimepaths"
 	"github.com/banksean/sand/internal/sandtypes"
 	"github.com/banksean/sand/internal/version"
 )
@@ -196,8 +197,12 @@ func TestDaemonCreatesContainerHTTPAndGRPCSockets(t *testing.T) {
 	defer httpListener.Close()
 	defer grpcListener.Close()
 
-	httpSocketPath := filepath.Join(tmpDir, "containersockets", "test-sandbox")
-	grpcSocketPath := filepath.Join(tmpDir, "containergrpc", "test-sandbox")
+	httpSocketPath := runtimepaths.ContainerHTTPSocketPath("test-sandbox")
+	grpcSocketPath := runtimepaths.ContainerGRPCSocketPath("test-sandbox")
+	t.Cleanup(func() {
+		_ = os.Remove(httpSocketPath)
+		_ = os.Remove(grpcSocketPath)
+	})
 	if _, err := os.Stat(httpSocketPath); err != nil {
 		t.Fatalf("HTTP container socket was not created: %v", err)
 	}
@@ -218,8 +223,12 @@ func TestStartSandboxRecreatesStoppedContainerAfterSocketCreation(t *testing.T) 
 	oldContainerID := "old-container"
 	newContainerID := "new-container"
 	sandboxID := "rb"
-	httpSocketPath := filepath.Join(tmpDir, "containersockets", sandboxID)
-	grpcSocketPath := filepath.Join(tmpDir, "containergrpc", sandboxID)
+	httpSocketPath := runtimepaths.ContainerHTTPSocketPath(sandboxID)
+	grpcSocketPath := runtimepaths.ContainerGRPCSocketPath(sandboxID)
+	t.Cleanup(func() {
+		_ = os.Remove(httpSocketPath)
+		_ = os.Remove(grpcSocketPath)
+	})
 	var stopCalls []string
 	var deleteCalls []string
 	var startCalls []string

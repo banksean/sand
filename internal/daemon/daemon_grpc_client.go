@@ -81,8 +81,8 @@ func (c *GRPCClient) Shutdown(ctx context.Context) error {
 	return err
 }
 
-func (c *GRPCClient) LogSandbox(ctx context.Context, id string, w io.Writer) error {
-	resp, err := c.client.LogSandbox(ctx, &daemonpb.IDRequest{Id: id})
+func (c *GRPCClient) LogSandbox(ctx context.Context, name string, w io.Writer) error {
+	resp, err := c.client.LogSandbox(ctx, &daemonpb.IDRequest{Id: name})
 	if err != nil {
 		return err
 	}
@@ -105,8 +105,8 @@ func (c *GRPCClient) ListSandboxes(ctx context.Context) ([]sandtypes.Box, error)
 	return boxes, nil
 }
 
-func (c *GRPCClient) GetSandbox(ctx context.Context, id string) (*sandtypes.Box, error) {
-	resp, err := c.client.GetSandbox(ctx, &daemonpb.IDRequest{Id: id})
+func (c *GRPCClient) GetSandbox(ctx context.Context, name string) (*sandtypes.Box, error) {
+	resp, err := c.client.GetSandbox(ctx, &daemonpb.IDRequest{Id: name})
 	if err != nil {
 		return nil, err
 	}
@@ -117,19 +117,23 @@ func (c *GRPCClient) GetSandbox(ctx context.Context, id string) (*sandtypes.Box,
 	return &box, nil
 }
 
-func (c *GRPCClient) RemoveSandbox(ctx context.Context, id string) error {
-	_, err := c.client.RemoveSandbox(ctx, &daemonpb.IDRequest{Id: id})
+func (c *GRPCClient) RemoveSandbox(ctx context.Context, name string) error {
+	_, err := c.client.RemoveSandbox(ctx, &daemonpb.IDRequest{Id: name})
 	return err
 }
 
-func (c *GRPCClient) StopSandbox(ctx context.Context, id string) error {
-	_, err := c.client.StopSandbox(ctx, &daemonpb.IDRequest{Id: id})
+func (c *GRPCClient) StopSandbox(ctx context.Context, name string) error {
+	_, err := c.client.StopSandbox(ctx, &daemonpb.IDRequest{Id: name})
 	return err
 }
 
 func (c *GRPCClient) StartSandbox(ctx context.Context, opts StartSandboxOpts) error {
+	name := opts.Name
+	if name == "" {
+		name = opts.ID
+	}
 	_, err := c.client.StartSandbox(ctx, &daemonpb.StartSandboxRequest{
-		Id:       opts.ID,
+		Id:       name,
 		SshAgent: opts.SSHAgent,
 	})
 	return err
@@ -149,16 +153,16 @@ func (c *GRPCClient) ResolveAgentLaunchEnv(ctx context.Context, agent, envFile s
 	return resp.GetEnv(), nil
 }
 
-func (c *GRPCClient) ExportImage(ctx context.Context, id, destinationPath string) error {
+func (c *GRPCClient) ExportImage(ctx context.Context, name, destinationPath string) error {
 	_, err := c.client.ExportImage(ctx, &daemonpb.ExportImageRequest{
-		Id:              id,
+		Id:              name,
 		DestinationPath: destinationPath,
 	})
 	return err
 }
 
-func (c *GRPCClient) Stats(ctx context.Context, ids ...string) ([]types.ContainerStats, error) {
-	resp, err := c.client.Stats(ctx, &daemonpb.StatsRequest{Ids: ids})
+func (c *GRPCClient) Stats(ctx context.Context, names ...string) ([]types.ContainerStats, error) {
+	resp, err := c.client.Stats(ctx, &daemonpb.StatsRequest{Ids: names})
 	if err != nil {
 		return nil, err
 	}
@@ -169,8 +173,8 @@ func (c *GRPCClient) Stats(ctx context.Context, ids ...string) ([]types.Containe
 	return stats, nil
 }
 
-func (c *GRPCClient) VSC(ctx context.Context, id string) error {
-	_, err := c.client.VSC(ctx, &daemonpb.IDRequest{Id: id})
+func (c *GRPCClient) VSC(ctx context.Context, name string) error {
+	_, err := c.client.VSC(ctx, &daemonpb.IDRequest{Id: name})
 	return err
 }
 

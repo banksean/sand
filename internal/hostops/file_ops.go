@@ -16,6 +16,7 @@ type FileOps interface {
 	Lstat(path string) (os.FileInfo, error)
 	Readlink(path string) (string, error)
 	Create(path string) (*os.File, error)
+	Rename(oldpath, newpath string) error
 	RemoveAll(path string) error
 	WriteFile(path string, data []byte, perm os.FileMode) error
 	Volume(path string) (*VolumeInfo, error)
@@ -63,6 +64,10 @@ func (f *defaultFileOps) Create(path string) (*os.File, error) {
 		return nil, err
 	}
 	return ret, nil
+}
+
+func (f *defaultFileOps) Rename(oldpath, newpath string) error {
+	return os.Rename(oldpath, newpath)
 }
 
 func (f *defaultFileOps) RemoveAll(path string) error {

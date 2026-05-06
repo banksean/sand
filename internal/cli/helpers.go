@@ -27,7 +27,7 @@ func (s *sandboxNamePredictor) Predict(args complete.Args) []string {
 	}
 	ret := []string{}
 	for _, box := range sandboxes {
-		ret = append(ret, box.ID)
+		ret = append(ret, box.Name)
 	}
 	return ret
 }

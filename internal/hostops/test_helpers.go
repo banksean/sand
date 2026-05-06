@@ -172,6 +172,7 @@ type MockFileOps struct {
 	LstatFunc     func(path string) (os.FileInfo, error)
 	ReadlinkFunc  func(path string) (string, error)
 	CreateFunc    func(path string) (*os.File, error)
+	RenameFunc    func(oldpath, newpath string) error
 	RemoveAllFunc func(path string) error
 	WriteFileFunc func(path string, data []byte, perm os.FileMode) error
 	VolumeFunc    func(path string) (*VolumeInfo, error)
@@ -217,6 +218,13 @@ func (m *MockFileOps) Create(path string) (*os.File, error) {
 		return m.CreateFunc(path)
 	}
 	return nil, nil
+}
+
+func (m *MockFileOps) Rename(oldpath, newpath string) error {
+	if m.RenameFunc != nil {
+		return m.RenameFunc(oldpath, newpath)
+	}
+	return nil
 }
 
 func (m *MockFileOps) RemoveAll(path string) error {

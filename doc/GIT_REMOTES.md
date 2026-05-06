@@ -32,16 +32,16 @@ With those bidirectional remotes set up, you can now use git pull to move change
 - **Original working directory (host)**: The directory where you ran `sand new` (e.g., `/Users/yourname/myproject`)
 - **Sandbox clone directory (host)**: `${--app-base-dir}/clones/<sandbox-id>/app`
   - Default `--app-base-dir`: `~/Library/Application\ Support/Sand/clones`
-  - Example full path: `~/Library/Application\ Support/Sand/clones/my-sandbox/app`
+  - Example full path: `~/Library/Application\ Support/Sand/clones/3a9a0df8-3ad2-4b79-9a4f-0d7e41f1df1b/app`
 - **Container mount**: The sandbox clone is mounted to `/app` inside the container
 
 ## The Bidirectional Remote Relationship
 
-When creating a sandbox with ID `my-sandbox` and current working directory `/Users/yourname/myproject`, `sand` establishes these git remotes:
+When creating a sandbox named `my-sandbox` with ID `3a9a0df8-3ad2-4b79-9a4f-0d7e41f1df1b` and current working directory `/Users/yourname/myproject`, `sand` establishes these git remotes:
 
 ### In the sandbox clone, as mounted inside the container at `/app`:
 
-Example clone dir: `~/Library/Application\ Support/Sand/clones/my-sandbox/app`
+Example clone dir: `~/Library/Application\ Support/Sand/clones/3a9a0df8-3ad2-4b79-9a4f-0d7e41f1df1b/app`
 
 ```
 Remote name: origin
@@ -55,7 +55,7 @@ Example working dir: `/Users/yourname/myproject`
 
 ```
 Remote name: sand/my-sandbox
-Remote URL:  ~/Library/Application\ Support/Sand/clones/clones/my-sandbox/app  (the sandbox clone directory)
+Remote URL:  ~/Library/Application\ Support/Sand/clones/3a9a0df8-3ad2-4b79-9a4f-0d7e41f1df1b/app  (the sandbox clone directory)
 ```
 
 ## How To Move Changes Between Host and Sandbox
@@ -73,12 +73,15 @@ git pull sand/my-sandbox <branchname>
 
 In short: pull host changes into the sandbox with `git pull` from `/app`; pull sandbox changes back to the host with `git pull sand/<sandboxname> <branchname>` from the host checkout.
 
+Because deleted sandbox names can be reused, creating a new active sandbox with the same name replaces the host-side `sand/<sandboxname>` remote so it points at the new sandbox clone.
+
 ## Example: Comparing Original Working Directory to Sandbox
 
 Let's say you have:
-- Sandbox ID: `my-sandbox`
+- Sandbox name: `my-sandbox`
+- Sandbox ID: `3a9a0df8-3ad2-4b79-9a4f-0d7e41f1df1b`
 - Original working directory: `/Users/yourname/myproject`
-- Sandbox clone: `~/Library/Application\ Support/Sand/clones/my-sandbox/app`
+- Sandbox clone: `~/Library/Application\ Support/Sand/clones/3a9a0df8-3ad2-4b79-9a4f-0d7e41f1df1b/app`
 
 ### Using the `sand git` Commands
 
@@ -122,7 +125,7 @@ sand git diff --include-uncommitted my-sandbox
 # or use the short flag
 sand git diff -u my-sandbox
 
-# Diff against a specific branch (default is the sandbox ID)
+# Diff against a specific branch (default is the active host branch)
 sand git diff -b main my-sandbox
 ```
 

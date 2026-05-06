@@ -15,16 +15,16 @@ type Client interface {
 	Ping(ctx context.Context) error
 	Version(ctx context.Context) (version.Info, error)
 	Shutdown(ctx context.Context) error
-	LogSandbox(ctx context.Context, id string, w io.Writer) error
+	LogSandbox(ctx context.Context, name string, w io.Writer) error
 	ListSandboxes(ctx context.Context) ([]sandtypes.Box, error)
-	GetSandbox(ctx context.Context, id string) (*sandtypes.Box, error)
-	RemoveSandbox(ctx context.Context, id string) error
-	StopSandbox(ctx context.Context, id string) error
+	GetSandbox(ctx context.Context, name string) (*sandtypes.Box, error)
+	RemoveSandbox(ctx context.Context, name string) error
+	StopSandbox(ctx context.Context, name string) error
 	StartSandbox(ctx context.Context, opts StartSandboxOpts) error
 	ResolveAgentLaunchEnv(ctx context.Context, agent, envFile string) (map[string]string, error)
-	ExportImage(ctx context.Context, id, imageName string) error
-	Stats(ctx context.Context, id ...string) ([]types.ContainerStats, error)
-	VSC(ctx context.Context, id string) error
+	ExportImage(ctx context.Context, name, imageName string) error
+	Stats(ctx context.Context, name ...string) ([]types.ContainerStats, error)
+	VSC(ctx context.Context, name string) error
 	CreateSandbox(ctx context.Context, opts CreateSandboxOpts, w io.Writer) (*sandtypes.Box, error)
 	// EnsureImage ensures imageName is present locally and up to date, pulling if needed.
 	// Progress lines from the daemon are written to w as they arrive.

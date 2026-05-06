@@ -154,7 +154,7 @@ sand log <SANDBOX-NAME>
 
 ## `sand rm`
 
-remove sandbox container and its clone directory
+soft-delete sandbox container and move its clone directory to trash
 
 **Usage:**
 
@@ -165,7 +165,7 @@ sand rm [flags] [SANDBOX-NAMES]...
 **Flags:**
 
 - `-a, --all` - all sandboxes
-- `-f, --force` - remove without confirmation
+- `-f, --force` - move sandbox to trash without confirmation
 
 ## `sand stop`
 

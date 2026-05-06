@@ -127,9 +127,9 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 	sbox, err := mc.GetSandbox(ctx, c.SandboxName)
 	if sbox == nil || err != nil {
 		// Sandbox doesn't exist, create it via daemon
-		slog.InfoContext(ctx, "Creating new sandbox via daemon", "id", c.SandboxName)
+		slog.InfoContext(ctx, "Creating new sandbox via daemon", "name", c.SandboxName)
 		sbox, err = mc.CreateSandbox(ctx, daemon.CreateSandboxOpts{
-			ID:             c.SandboxName,
+			Name:           c.SandboxName,
 			CloneFromDir:   c.CloneFromDir,
 			ImageName:      c.ImageName,
 			EnvFile:        c.EnvFile,
@@ -162,13 +162,13 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 
 	slog.InfoContext(ctx, "main: sbox.new starting")
 
-	fmt.Printf("Connecting you to %q. CPUs: %d, Mem: %dMB, dns: %s\n", sbox.ID,
+	fmt.Printf("Connecting you to %q (%s). CPUs: %d, Mem: %dMB, dns: %s\n", sbox.Name, sbox.ID,
 		sbox.Container.Configuration.Resources.CPUs,
 		sbox.Container.Configuration.Resources.MemoryInBytes>>20,
 		hostname)
 
 	if c.Branch {
-		// Create and check out a git branch inside the container, named after the sandbox id
+		// Create and check out a git branch inside the container, named after the sandbox name.
 		if err := checkoutSandboxBranch(ctx, hostops.NewAppleContainerOps(), sbox, plainCommandEnvFile(sbox, c.ProjectEnv)); err != nil {
 			return err
 		}
@@ -195,7 +195,7 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 	}
 
 	// TODO: Sort out how "new" and "shell" should work when invoked inside a container.
-	shell, args, err := agentlaunch.BuildInteractiveExec(c.Agent, c.Shell, sbox.ID, hostname, c.Tmux, c.Atch)
+	shell, args, err := agentlaunch.BuildInteractiveExec(c.Agent, c.Shell, sbox.Name, hostname, c.Tmux, c.Atch)
 	if err != nil {
 		return err
 	}
@@ -219,7 +219,7 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 
 	if c.Rm {
 		slog.InfoContext(ctx, "sbox.new finished, cleaning up...")
-		if err := mc.RemoveSandbox(ctx, sbox.ID); err != nil {
+		if err := mc.RemoveSandbox(ctx, sbox.Name); err != nil {
 			slog.ErrorContext(ctx, "RemoveSandbox", "error", err)
 		}
 		slog.InfoContext(ctx, "Cleanup complete. Exiting.")
@@ -252,13 +252,13 @@ func checkoutSandboxBranch(ctx context.Context, containerSvc hostops.ContainerOp
 	}
 
 	out, err = containerSvc.Exec(ctx, execOpts, sbox.ContainerID, "git", os.Environ(),
-		"checkout", "-b", sbox.ID)
+		"checkout", "-b", sbox.Name)
 	if err != nil {
 		slog.ErrorContext(ctx, "sbox.new git checkout", "error", err, "out", out)
 		if out != "" {
-			return fmt.Errorf("creating branch %q in sandbox %q: %w: %s", sbox.ID, sbox.ID, err, strings.TrimSpace(out))
+			return fmt.Errorf("creating branch %q in sandbox %q: %w: %s", sbox.Name, sbox.Name, err, strings.TrimSpace(out))
 		}
-		return fmt.Errorf("creating branch %q in sandbox %q: %w", sbox.ID, sbox.ID, err)
+		return fmt.Errorf("creating branch %q in sandbox %q: %w", sbox.Name, sbox.Name, err)
 	}
 	return nil
 }

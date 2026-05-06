@@ -1,6 +1,8 @@
 package sandtypes
 
 import (
+	"time"
+
 	"github.com/banksean/sand/internal/applecontainer/types"
 )
 
@@ -15,6 +17,10 @@ import (
 type Box struct {
 	// ID is an opaque identifier for the sandbox
 	ID string
+	// Name is the user-facing, reusable name for the sandbox.
+	Name string
+	// State is the lifecycle state for the sandbox, usually "active" or "deleted".
+	State string
 	// AgentType identifies which agent configuration to use (default, claude, opencode)
 	AgentType string
 	// ContainerID is the ID of the container
@@ -23,6 +29,10 @@ type Box struct {
 	HostOriginDir string
 	// SandboxWorkDir is the host OS filesystem path containing the sandbox's c-o-w clone of hostOriginDir.
 	SandboxWorkDir string
+	// TrashWorkDir is the host OS filesystem path containing soft-deleted sandbox data.
+	TrashWorkDir string
+	// DeletedAt is set when State is "deleted".
+	DeletedAt time.Time
 	// ImageName is the name of the container image
 	ImageName string
 	// DNSDomain is the dns domain for the sandbox's network

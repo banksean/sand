@@ -18,9 +18,11 @@ import (
 
 	"github.com/banksean/sand/internal/daemon/daemonpb"
 	"github.com/banksean/sand/internal/daemon/internal/boxer"
+	"github.com/banksean/sand/internal/runtimepaths"
 	"github.com/banksean/sand/internal/sandboxlog"
 	"github.com/banksean/sand/internal/sandtypes"
 	"github.com/banksean/sand/internal/version"
+	"github.com/google/uuid"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel/attribute"
 	"google.golang.org/grpc"
@@ -433,16 +435,16 @@ func acquireLock(lockFile string) (*os.File, error) {
 }
 
 // StopSandbox stops a single sandbox container.
-func (d *Daemon) StopSandbox(ctx context.Context, id string) error {
-	ctx = sandboxlog.WithSandboxID(ctx, id)
-	sbox, err := d.boxer.Get(ctx, id)
+func (d *Daemon) StopSandbox(ctx context.Context, name string) error {
+	sbox, err := d.boxer.Get(ctx, name)
 	if err != nil {
 		return err
 	}
 	if sbox == nil {
-		return fmt.Errorf("sandbox not found: %s", id)
+		return fmt.Errorf("sandbox not found: %s", name)
 	}
-	if err := d.stopInnieServer(ctx, id); err != nil {
+	ctx = sandboxlog.WithSandboxID(ctx, sbox.ID)
+	if err := d.stopInnieServer(ctx, sbox.ID); err != nil {
 		return err
 	}
 
@@ -451,12 +453,12 @@ func (d *Daemon) StopSandbox(ctx context.Context, id string) error {
 
 func (d *Daemon) createContainerSocket(ctx context.Context, id string) (net.Listener, error) {
 	ctx = sandboxlog.WithSandboxID(ctx, id)
-	socketsDir := filepath.Join(d.AppBaseDir, "containersockets")
+	socketsDir := runtimepaths.ContainerHTTPSocketDir()
 	slog.InfoContext(ctx, "Daemon.createContainerSocket", "socketsDir", socketsDir)
 	if err := os.MkdirAll(socketsDir, 0o777); err != nil {
 		return nil, err
 	}
-	socketPath := filepath.Join(socketsDir, id)
+	socketPath := runtimepaths.ContainerHTTPSocketPath(id)
 	slog.InfoContext(ctx, "Daemon.createContainerSocket", "socketPath", socketPath)
 	// Don't care about errors, e.g. socketPath already does not exist:
 	os.Remove(socketPath)
@@ -469,12 +471,12 @@ func (d *Daemon) createContainerSocket(ctx context.Context, id string) (net.List
 
 func (d *Daemon) createContainerGRPCSocket(ctx context.Context, id string) (net.Listener, error) {
 	ctx = sandboxlog.WithSandboxID(ctx, id)
-	socketsDir := filepath.Join(d.AppBaseDir, "containergrpc")
+	socketsDir := runtimepaths.ContainerGRPCSocketDir()
 	slog.InfoContext(ctx, "Daemon.createContainerGRPCSocket", "socketsDir", socketsDir)
 	if err := os.MkdirAll(socketsDir, 0o777); err != nil {
 		return nil, err
 	}
-	socketPath := filepath.Join(socketsDir, id)
+	socketPath := runtimepaths.ContainerGRPCSocketPath(id)
 	slog.InfoContext(ctx, "Daemon.createContainerGRPCSocket", "socketPath", socketPath)
 	// Don't care about errors, e.g. socketPath already does not exist:
 	os.Remove(socketPath)
@@ -500,14 +502,18 @@ func (d *Daemon) createContainerSockets(ctx context.Context, id string) (httpLis
 
 // StartSandbox starts a single sandbox container.
 func (d *Daemon) StartSandbox(ctx context.Context, opts StartSandboxOpts) error {
-	ctx = sandboxlog.WithSandboxID(ctx, opts.ID)
-	sbox, err := d.boxer.Get(ctx, opts.ID)
+	name := opts.Name
+	if name == "" {
+		name = opts.ID
+	}
+	sbox, err := d.boxer.Get(ctx, name)
 	if err != nil {
 		return err
 	}
 	if sbox == nil {
-		return fmt.Errorf("sandbox not found: %s", opts.ID)
+		return fmt.Errorf("sandbox not found: %s", name)
 	}
+	ctx = sandboxlog.WithSandboxID(ctx, sbox.ID)
 
 	needsRecreate := false
 	if opts.SSHAgent {
@@ -524,7 +530,7 @@ func (d *Daemon) StartSandbox(ctx context.Context, opts StartSandboxOpts) error 
 		}
 	}
 
-	httpListener, grpcListener, err := d.createContainerSockets(ctx, opts.ID)
+	httpListener, grpcListener, err := d.createContainerSockets(ctx, sbox.ID)
 	if err != nil {
 		return err
 	}
@@ -537,8 +543,8 @@ func (d *Daemon) StartSandbox(ctx context.Context, opts StartSandboxOpts) error 
 		}
 	}
 
-	go d.serveInnieHttpSocket(ctx, opts.ID, httpListener)
-	go d.serveInnieGRPCSocket(ctx, opts.ID, grpcListener)
+	go d.serveInnieHttpSocket(ctx, sbox.ID, httpListener)
+	go d.serveInnieGRPCSocket(ctx, sbox.ID, grpcListener)
 
 	var startErr error
 	if needsRecreate {
@@ -556,6 +562,7 @@ func (d *Daemon) StartSandbox(ctx context.Context, opts StartSandboxOpts) error 
 
 type CreateSandboxOpts struct {
 	ID           string `json:"id,omitempty"`
+	Name         string `json:"name,omitempty"`
 	CloneFromDir string `json:"cloneFromDir,omitempty"`
 	ImageName    string `json:"imageName,omitempty"`
 	EnvFile      string `json:"envFile,omitempty"`
@@ -572,12 +579,19 @@ type CreateSandboxOpts struct {
 }
 
 type StartSandboxOpts struct {
+	Name     string `json:"name,omitempty"`
 	ID       string `json:"id,omitempty"`
 	SSHAgent bool   `json:"sshAgent,omitempty"`
 }
 
 // createSandbox creates a new sandbox and starts its container.
 func (d *Daemon) createSandbox(ctx context.Context, opts CreateSandboxOpts, progress io.Writer) (*sandtypes.Box, error) {
+	if opts.Name == "" {
+		opts.Name = opts.ID
+	}
+	if opts.ID == "" {
+		opts.ID = uuid.NewString()
+	}
 	ctx = sandboxlog.WithSandboxID(ctx, opts.ID)
 	agentType := opts.Agent
 	if agentType == "" {
@@ -592,6 +606,7 @@ func (d *Daemon) createSandbox(ctx context.Context, opts CreateSandboxOpts, prog
 	sbox, err := d.boxer.NewSandbox(ctx, boxer.NewSandboxOpts{
 		AgentType:      agentType,
 		ID:             opts.ID,
+		Name:           opts.Name,
 		HostWorkDir:    opts.CloneFromDir,
 		ImageName:      opts.ImageName,
 		EnvFile:        opts.EnvFile,
@@ -613,12 +628,12 @@ func (d *Daemon) createSandbox(ctx context.Context, opts CreateSandboxOpts, prog
 	ctr, err := d.boxer.GetContainer(ctx, sbox.ContainerID)
 
 	if ctr == nil {
-		unixListener, grpcListener, err := d.createContainerSockets(ctx, opts.ID)
+		unixListener, grpcListener, err := d.createContainerSockets(ctx, sbox.ID)
 		if err != nil {
 			return nil, err
 		}
-		go d.serveInnieHttpSocket(ctx, opts.ID, unixListener)
-		go d.serveInnieGRPCSocket(ctx, opts.ID, grpcListener)
+		go d.serveInnieHttpSocket(ctx, sbox.ID, unixListener)
+		go d.serveInnieGRPCSocket(ctx, sbox.ID, grpcListener)
 
 		err = d.boxer.CreateContainer(ctx, sbox, opts.SSHAgent)
 		if err != nil {
@@ -648,42 +663,48 @@ func (d *Daemon) ListSandboxes(ctx context.Context) ([]sandtypes.Box, error) {
 	return d.boxer.List(ctx)
 }
 
-// GetSandbox retrieves a sandbox by ID.
-func (d *Daemon) GetSandbox(ctx context.Context, id string) (*sandtypes.Box, error) {
-	ctx = sandboxlog.WithSandboxID(ctx, id)
-	return d.boxer.Get(ctx, id)
+// GetSandbox retrieves an active sandbox by user-facing name.
+func (d *Daemon) GetSandbox(ctx context.Context, name string) (*sandtypes.Box, error) {
+	return d.boxer.Get(ctx, name)
 }
 
-func (d *Daemon) LogSandbox(ctx context.Context, id string, w io.Writer) error {
-	ctx = sandboxlog.WithSandboxID(ctx, id)
-	return copySandboxLog(d.LogFile, id, w)
-}
-
-// RemoveSandbox removes a single sandbox.
-func (d *Daemon) RemoveSandbox(ctx context.Context, id string) error {
-	ctx = sandboxlog.WithSandboxID(ctx, id)
-	sbox, err := d.boxer.Get(ctx, id)
+func (d *Daemon) LogSandbox(ctx context.Context, name string, w io.Writer) error {
+	sbox, err := d.boxer.Get(ctx, name)
 	if err != nil {
 		return err
 	}
 	if sbox == nil {
-		return fmt.Errorf("sandbox not found: %s", id)
+		return fmt.Errorf("sandbox not found: %s", name)
 	}
-	if err := d.stopInnieServer(ctx, id); err != nil {
+	ctx = sandboxlog.WithSandboxID(ctx, sbox.ID)
+	return copySandboxLog(d.LogFile, sbox.ID, w)
+}
+
+// RemoveSandbox soft-deletes a single active sandbox by name.
+func (d *Daemon) RemoveSandbox(ctx context.Context, name string) error {
+	sbox, err := d.boxer.Get(ctx, name)
+	if err != nil {
+		return err
+	}
+	if sbox == nil {
+		return fmt.Errorf("sandbox not found: %s", name)
+	}
+	ctx = sandboxlog.WithSandboxID(ctx, sbox.ID)
+	if err := d.stopInnieServer(ctx, sbox.ID); err != nil {
 		return err
 	}
 	// Remove the container socket, if there is one.
-	socketPath := filepath.Join(d.AppBaseDir, "containersockets", id)
+	socketPath := runtimepaths.ContainerHTTPSocketPath(sbox.ID)
 	if _, err := os.Stat(socketPath); err == nil {
 		if err := os.Remove(socketPath); err != nil {
 			return err
 		}
 	}
-	grpcSocketPath := filepath.Join(d.AppBaseDir, "containergrpc", id)
+	grpcSocketPath := runtimepaths.ContainerGRPCSocketPath(sbox.ID)
 	if _, err := os.Stat(grpcSocketPath); err == nil {
 		if err := os.Remove(grpcSocketPath); err != nil {
 			return err
 		}
 	}
-	return d.boxer.Cleanup(ctx, sbox)
+	return d.boxer.SoftDelete(ctx, sbox)
 }

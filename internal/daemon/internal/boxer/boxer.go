@@ -19,6 +19,7 @@ import (
 	"github.com/banksean/sand/internal/db"
 	"github.com/banksean/sand/internal/hostops"
 	"github.com/banksean/sand/internal/runtimedeps"
+	"github.com/banksean/sand/internal/runtimepaths"
 	"github.com/banksean/sand/internal/sandboxlog"
 	"github.com/banksean/sand/internal/sandtypes"
 	"github.com/banksean/sand/internal/sshimmer"
@@ -236,7 +237,7 @@ func (sb *Boxer) Sync(ctx context.Context) error {
 	// For each sandbox, update the status of its filesystem clone and its container instance.
 	for _, dbBox := range sboxes {
 		slog.InfoContext(ctx, "Boxer.Sync", "box", dbBox)
-		box, err := sb.Get(ctx, dbBox.ID)
+		box, err := sb.GetByID(ctx, dbBox.ID)
 		if err != nil {
 			return err
 		}
@@ -262,6 +263,7 @@ func (b *Boxer) SyncBox(ctx context.Context, sb *sandtypes.Box) error {
 type NewSandboxOpts struct {
 	AgentType      string
 	ID             string
+	Name           string
 	HostWorkDir    string
 	ImageName      string
 	EnvFile        string
@@ -280,7 +282,7 @@ type NewSandboxOpts struct {
 // commands can keep using a stable copy even if the original file changes.
 func (sb *Boxer) NewSandbox(ctx context.Context, opts NewSandboxOpts) (*sandtypes.Box, error) {
 	ctx = sandboxlog.WithSandboxID(ctx, opts.ID)
-	slog.InfoContext(ctx, "Boxer.NewSandbox", "hostWorkDir", opts.HostWorkDir, "id", opts.ID, "agentType", opts.AgentType)
+	slog.InfoContext(ctx, "Boxer.NewSandbox", "hostWorkDir", opts.HostWorkDir, "id", opts.ID, "name", opts.Name, "agentType", opts.AgentType)
 
 	// Get agent configuration from registry
 	agentConfig := sb.AgentRegistry.Get(opts.AgentType)
@@ -296,6 +298,7 @@ func (sb *Boxer) NewSandbox(ctx context.Context, opts NewSandboxOpts) (*sandtype
 	// Prepare workspace
 	artifacts, err := agentConfig.Preparation.Prepare(ctx, cloning.CloneRequest{
 		ID:                opts.ID,
+		Name:              opts.Name,
 		HostWorkDir:       opts.HostWorkDir,
 		EnvFile:           envFile,
 		Username:          opts.Username,
@@ -310,7 +313,7 @@ func (sb *Boxer) NewSandbox(ctx context.Context, opts NewSandboxOpts) (*sandtype
 	mounts := agentConfig.Configuration.GetMounts(*artifacts)
 
 	// TODO: move this to .Hydrate? Or make it a startup hook?
-	keys, err := sb.SSHim.NewKeys(ctx, opts.ID+"."+opts.LocalDomain, opts.Username)
+	keys, err := sb.SSHim.NewKeys(ctx, opts.Name+"."+opts.LocalDomain, opts.Username)
 	if err != nil {
 		slog.ErrorContext(ctx, "Boxer.NewSanbox: sshim.Povision", "error", err)
 		return nil, err
@@ -345,6 +348,8 @@ func (sb *Boxer) NewSandbox(ctx context.Context, opts NewSandboxOpts) (*sandtype
 
 	ret := &sandtypes.Box{
 		ID:                opts.ID,
+		Name:              opts.Name,
+		State:             "active",
 		AgentType:         opts.AgentType,
 		HostOriginDir:     hostWorkDir,
 		SandboxWorkDir:    artifacts.SandboxWorkDir,
@@ -447,10 +452,9 @@ func (sb *Boxer) List(ctx context.Context) ([]sandtypes.Box, error) {
 	return boxes, nil
 }
 
-func (sb *Boxer) Get(ctx context.Context, id string) (*sandtypes.Box, error) {
-	ctx = sandboxlog.WithSandboxID(ctx, id)
-	slog.InfoContext(ctx, "Boxer.Get", "id", id)
-	sandbox, err := sb.queries.GetSandbox(ctx, id)
+func (sb *Boxer) Get(ctx context.Context, name string) (*sandtypes.Box, error) {
+	slog.InfoContext(ctx, "Boxer.Get", "name", name)
+	sandbox, err := sb.queries.GetActiveSandboxByName(ctx, name)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -470,9 +474,29 @@ func (sb *Boxer) Get(ctx context.Context, id string) (*sandtypes.Box, error) {
 	return box, nil
 }
 
-func (sb *Boxer) Cleanup(ctx context.Context, sbox *sandtypes.Box) error {
+func (sb *Boxer) GetByID(ctx context.Context, id string) (*sandtypes.Box, error) {
+	ctx = sandboxlog.WithSandboxID(ctx, id)
+	slog.InfoContext(ctx, "Boxer.GetByID", "id", id)
+	sandbox, err := sb.queries.GetSandboxByID(ctx, id)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sandbox by id: %w", err)
+	}
+	box := sb.sandboxFromDB(&sandbox)
+	ctr, err := sb.GetContainer(ctx, box.ContainerID)
+	if err != nil {
+		box.SandboxContainerError = containerGetErrorMsg
+	}
+	box.Container = ctr
+	box.CurrentGitDetails = sb.getCurrentGitDetails(ctx, box)
+	return box, nil
+}
+
+func (sb *Boxer) SoftDelete(ctx context.Context, sbox *sandtypes.Box) error {
 	ctx = sandboxlog.WithSandboxID(ctx, sbox.ID)
-	slog.InfoContext(ctx, "Boxer.Cleanup", "id", sbox.ID)
+	slog.InfoContext(ctx, "Boxer.SoftDelete", "id", sbox.ID, "name", sbox.Name)
 
 	out, err := sb.ContainerService.Stop(ctx, nil, sbox.ContainerID)
 	if err != nil {
@@ -484,20 +508,53 @@ func (sb *Boxer) Cleanup(ctx context.Context, sbox *sandtypes.Box) error {
 		slog.ErrorContext(ctx, "Boxer Containers.Delete", "error", err, "out", out)
 	}
 
-	if err := sb.GitOps.RemoveRemote(ctx, sbox.HostOriginDir, cloning.ClonedWorkDirGitRemotePrefix+sbox.ID); err != nil {
+	if err := sb.GitOps.RemoveRemote(ctx, sbox.HostOriginDir, cloning.ClonedWorkDirGitRemotePrefix+sandboxRemoteName(sbox)); err != nil {
 		slog.ErrorContext(ctx, "Boxer Containers.Delete failed to remove git remote", "error", err)
 	}
 
-	if err := sb.FileOps.RemoveAll(sbox.SandboxWorkDir); err != nil {
-		slog.ErrorContext(ctx, "Boxer Containers.Delete failed to remove workdir", "error", err)
+	trashWorkDir, err := sb.moveSandboxToTrash(ctx, sbox)
+	if err != nil {
+		return err
 	}
 
-	// Finally, remove from database
-	if err := sb.queries.DeleteSandbox(ctx, sbox.ID); err != nil {
-		return fmt.Errorf("failed to delete sandbox %s from database: %w", sbox.ID, err)
+	if err := sb.queries.SoftDeleteSandbox(ctx, db.SoftDeleteSandboxParams{
+		ID:           sbox.ID,
+		TrashWorkDir: toNullString(trashWorkDir),
+	}); err != nil {
+		return fmt.Errorf("failed to mark sandbox %s deleted in database: %w", sbox.ID, err)
 	}
 
 	return nil
+}
+
+func (sb *Boxer) Cleanup(ctx context.Context, sbox *sandtypes.Box) error {
+	return sb.SoftDelete(ctx, sbox)
+}
+
+func (sb *Boxer) moveSandboxToTrash(ctx context.Context, sbox *sandtypes.Box) (string, error) {
+	if sbox.SandboxWorkDir == "" {
+		return "", nil
+	}
+	if _, err := sb.FileOps.Stat(sbox.SandboxWorkDir); errors.Is(err, os.ErrNotExist) {
+		slog.InfoContext(ctx, "Boxer.SoftDelete workdir already missing", "workdir", sbox.SandboxWorkDir)
+		return "", nil
+	}
+	trashWorkDir := filepath.Join(sb.appRoot, "trash", "sandboxes", sbox.ID)
+	if err := sb.FileOps.MkdirAll(filepath.Dir(trashWorkDir), 0o750); err != nil {
+		return "", fmt.Errorf("create trash directory for sandbox %s: %w", sbox.ID, err)
+	}
+	if err := sb.FileOps.Rename(sbox.SandboxWorkDir, trashWorkDir); err == nil {
+		return trashWorkDir, nil
+	} else {
+		slog.InfoContext(ctx, "Boxer.SoftDelete rename to trash failed; falling back to copy", "from", sbox.SandboxWorkDir, "to", trashWorkDir, "error", err)
+	}
+	if err := sb.FileOps.Copy(ctx, sbox.SandboxWorkDir, trashWorkDir); err != nil {
+		return "", fmt.Errorf("copy sandbox %s to trash: %w", sbox.ID, err)
+	}
+	if err := sb.FileOps.RemoveAll(sbox.SandboxWorkDir); err != nil {
+		return "", fmt.Errorf("remove original sandbox workdir %s after trash copy: %w", sbox.SandboxWorkDir, err)
+	}
+	return trashWorkDir, nil
 }
 
 func (sb *Boxer) getCurrentGitDetails(ctx context.Context, box *sandtypes.Box) *sandtypes.GitDetails {
@@ -522,7 +579,7 @@ func (sb *Boxer) addHostBranchRelativeGitDetails(ctx context.Context, box *sandt
 	if !sb.GitOps.LocalBranchExists(ctx, hostGitTopLevel, currentGit.Branch) {
 		return
 	}
-	sandboxRemote := cloning.ClonedWorkDirGitRemotePrefix + box.ID
+	sandboxRemote := cloning.ClonedWorkDirGitRemotePrefix + sandboxRemoteName(box)
 	if err := sb.GitOps.Fetch(ctx, hostGitTopLevel, sandboxRemote); err != nil {
 		slog.InfoContext(ctx, "Boxer.addHostBranchRelativeGitDetails fetch sandbox remote", "remote", sandboxRemote, "error", err)
 	}
@@ -534,6 +591,20 @@ func (sb *Boxer) addHostBranchRelativeGitDetails(ctx context.Context, box *sandt
 	}
 }
 
+func sandboxRemoteName(box *sandtypes.Box) string {
+	if box.Name != "" {
+		return box.Name
+	}
+	return box.ID
+}
+
+func sandboxContainerName(box *sandtypes.Box) string {
+	if box.Name != "" {
+		return box.Name
+	}
+	return box.ID
+}
+
 // Helper functions for converting between Box and db.Sandbox
 
 func (sb *Boxer) sandboxFromDB(s *db.Sandbox) *sandtypes.Box {
@@ -541,9 +612,19 @@ func (sb *Boxer) sandboxFromDB(s *db.Sandbox) *sandtypes.Box {
 	if agentType == "" {
 		agentType = "default" // Fallback for old sandboxes
 	}
+	name := s.Name
+	if name == "" {
+		name = s.ID
+	}
+	state := s.State
+	if state == "" {
+		state = "active"
+	}
 
 	return &sandtypes.Box{
 		ID:             s.ID,
+		Name:           name,
+		State:          state,
 		AgentType:      agentType,
 		ContainerID:    fromNullString(s.ContainerID),
 		HostOriginDir:  s.HostOriginDir,
@@ -562,6 +643,13 @@ func (sb *Boxer) sandboxFromDB(s *db.Sandbox) *sandtypes.Box {
 		MemoryMB: fromNullInt(s.MemoryMb),
 		Username: fromNullString(s.DefaultUsername),
 		Uid:      fromNullString(s.DefaultUid),
+		DeletedAt: func() time.Time {
+			if s.DeletedAt.Valid {
+				return s.DeletedAt.Time
+			}
+			return time.Time{}
+		}(),
+		TrashWorkDir: fromNullString(s.TrashWorkDir),
 	}
 }
 
@@ -686,13 +774,11 @@ func (sber *Boxer) CreateContainer(ctx context.Context, sb *sandtypes.Box, enabl
 	}
 
 	volumeOpts := append([]string(nil), sb.Volumes...)
-	volumeOpts = append(volumeOpts, filepath.Join(sber.appRoot, "containersockets", sb.ID)+":/run/host-services/sandd.sock")
-	volumeOpts = append(volumeOpts, filepath.Join(sber.appRoot, "containergrpc", sb.ID)+":/run/host-services/sandd.grpc.sock")
+	volumeOpts = append(volumeOpts, runtimepaths.ContainerHTTPSocketPath(sb.ID)+":/run/host-services/sandd.sock")
+	volumeOpts = append(volumeOpts, runtimepaths.ContainerGRPCSocketPath(sb.ID)+":/run/host-services/sandd.grpc.sock")
 
 	mgmtOpts := options.ManagementOptions{
-		// TODO: Try to name the container after the sandbox, and handle collisions
-		// if the name is already in use (e.g. append random chars to sb.ID).
-		Name:      sb.ID,
+		Name:      sandboxContainerName(sb),
 		SSH:       enableSSHAgent,
 		DNSDomain: sb.DNSDomain,
 		Remove:    false,
@@ -939,9 +1025,17 @@ func (sb *Boxer) pullImage(ctx context.Context, imageName string, w io.Writer) e
 func (sb *Boxer) SaveSandbox(ctx context.Context, sbox *sandtypes.Box) error {
 	ctx = sandboxlog.WithSandboxID(ctx, sbox.ID)
 	slog.InfoContext(ctx, "Boxer.SaveSandbox", "id", sbox.ID)
+	if sbox.Name == "" {
+		sbox.Name = sbox.ID
+	}
+	if sbox.State == "" {
+		sbox.State = "active"
+	}
 
 	upsertParams := db.UpsertSandboxParams{
 		ID:              sbox.ID,
+		Name:            sbox.Name,
+		State:           sbox.State,
 		ContainerID:     toNullString(sbox.ContainerID),
 		HostOriginDir:   sbox.HostOriginDir,
 		SandboxWorkDir:  sbox.SandboxWorkDir,
@@ -954,6 +1048,8 @@ func (sb *Boxer) SaveSandbox(ctx context.Context, sbox *sandtypes.Box) error {
 		MemoryMb:        toNullInt(sbox.MemoryMB),
 		DefaultUsername: toNullString(sbox.Username),
 		DefaultUid:      toNullString(sbox.Uid),
+		DeletedAt:       sql.NullTime{Time: sbox.DeletedAt, Valid: !sbox.DeletedAt.IsZero()},
+		TrashWorkDir:    toNullString(sbox.TrashWorkDir),
 	}
 	if sbox.OriginalGitDetails != nil {
 		upsertParams.OriginalGitOrigin = toNullString(sbox.OriginalGitDetails.RemoteOrigin)
@@ -1002,7 +1098,7 @@ func (sb *Boxer) loadSandbox(ctx context.Context, id string) (*sandtypes.Box, er
 	ctx = sandboxlog.WithSandboxID(ctx, id)
 	slog.InfoContext(ctx, "Boxer.loadSandbox", "id", id)
 
-	sandbox, err := sb.queries.GetSandbox(ctx, id)
+	sandbox, err := sb.queries.GetSandboxByID(ctx, id)
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("sandbox not found for id %s", id)
 	}

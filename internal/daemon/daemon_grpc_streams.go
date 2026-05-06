@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/banksean/sand/internal/daemon/daemonpb"
-	"github.com/banksean/sand/internal/sandboxlog"
 	"github.com/banksean/sand/internal/sandtypes"
 )
 
@@ -45,7 +44,7 @@ func (w *grpcEnsureImageProgressWriter) Write(p []byte) (int, error) {
 
 func (s *daemonGRPCServer) CreateSandbox(req *daemonpb.CreateSandboxRequest, stream daemonpb.DaemonService_CreateSandboxServer) error {
 	opts := createSandboxOptsFromProto(req)
-	ctx := sandboxlog.WithSandboxID(stream.Context(), opts.ID)
+	ctx := stream.Context()
 	writer := &grpcCreateSandboxProgressWriter{stream: stream}
 
 	sbox, err := s.daemon.createSandbox(ctx, opts, writer)
@@ -82,8 +81,12 @@ func (s *daemonGRPCServer) EnsureImage(req *daemonpb.EnsureImageRequest, stream 
 }
 
 func createSandboxOptsToProto(opts CreateSandboxOpts) *daemonpb.CreateSandboxRequest {
+	name := opts.Name
+	if name == "" {
+		name = opts.ID
+	}
 	return &daemonpb.CreateSandboxRequest{
-		Id:             opts.ID,
+		Id:             name,
 		CloneFromDir:   opts.CloneFromDir,
 		ImageName:      opts.ImageName,
 		EnvFile:        opts.EnvFile,
@@ -104,7 +107,7 @@ func createSandboxOptsToProto(opts CreateSandboxOpts) *daemonpb.CreateSandboxReq
 
 func createSandboxOptsFromProto(req *daemonpb.CreateSandboxRequest) CreateSandboxOpts {
 	opts := CreateSandboxOpts{
-		ID:             req.GetId(),
+		Name:           req.GetId(),
 		CloneFromDir:   req.GetCloneFromDir(),
 		ImageName:      req.GetImageName(),
 		EnvFile:        req.GetEnvFile(),

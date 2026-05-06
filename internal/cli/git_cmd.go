@@ -43,8 +43,8 @@ func (c *DiffCmd) Run(cctx *CLIContext) error {
 
 	sbox, err := mc.GetSandbox(ctx, c.SandboxName)
 	if err != nil {
-		slog.ErrorContext(ctx, "GetSandbox", "error", err, "id", c.SandboxName)
-		return fmt.Errorf("could not find sandbox with ID %s: %w", c.SandboxName, err)
+		slog.ErrorContext(ctx, "GetSandbox", "error", err, "name", c.SandboxName)
+		return fmt.Errorf("could not find sandbox named %s: %w", c.SandboxName, err)
 	}
 
 	// Get current working directory
@@ -54,7 +54,7 @@ func (c *DiffCmd) Run(cctx *CLIContext) error {
 	}
 
 	// Construct the remote name for the sandbox clone
-	remoteName := cloning.ClonedWorkDirGitRemotePrefix + c.SandboxName
+	remoteName := cloning.ClonedWorkDirGitRemotePrefix + sbox.Name
 
 	// First, fetch from the sandbox remote
 	gitFetch := exec.CommandContext(ctx, "git", "fetch", remoteName)
@@ -118,7 +118,8 @@ func (c *DiffCmd) Run(cctx *CLIContext) error {
 
 	// Print information about the sandbox
 	slog.InfoContext(ctx, "DiffCmd completed",
-		"sandbox_id", c.SandboxName,
+		"sandbox_id", sbox.ID,
+		"sandbox_name", sbox.Name,
 		"sandbox_workdir", sbox.SandboxWorkDir,
 		"host_origin_dir", sbox.HostOriginDir,
 		"cwd", cwd,
@@ -200,12 +201,12 @@ func (c *StatusCmd) Run(cctx *CLIContext) error {
 
 	sbox, err := mc.GetSandbox(ctx, c.SandboxName)
 	if err != nil {
-		slog.ErrorContext(ctx, "GetSandbox", "error", err, "id", c.SandboxName)
-		return fmt.Errorf("could not find sandbox with ID %s: %w", c.SandboxName, err)
+		slog.ErrorContext(ctx, "GetSandbox", "error", err, "name", c.SandboxName)
+		return fmt.Errorf("could not find sandbox named %s: %w", c.SandboxName, err)
 	}
 
 	// Construct the remote name for the sandbox clone
-	remoteName := cloning.ClonedWorkDirGitRemotePrefix + c.SandboxName
+	remoteName := cloning.ClonedWorkDirGitRemotePrefix + sbox.Name
 
 	// Get current working directory
 	cwd, err := os.Getwd()
@@ -236,7 +237,8 @@ func (c *StatusCmd) Run(cctx *CLIContext) error {
 
 	// Print information about the sandbox
 	slog.InfoContext(ctx, "StatusCmd completed",
-		"sandbox_id", c.SandboxName,
+		"sandbox_id", sbox.ID,
+		"sandbox_name", sbox.Name,
 		"sandbox_workdir", sbox.SandboxWorkDir,
 		"host_origin_dir", sbox.HostOriginDir,
 	)
@@ -254,12 +256,12 @@ func (c *LogCmd) Run(cctx *CLIContext) error {
 
 	sbox, err := mc.GetSandbox(ctx, c.SandboxName)
 	if err != nil {
-		slog.ErrorContext(ctx, "GetSandbox", "error", err, "id", c.SandboxName)
-		return fmt.Errorf("could not find sandbox with ID %s: %w", c.SandboxName, err)
+		slog.ErrorContext(ctx, "GetSandbox", "error", err, "name", c.SandboxName)
+		return fmt.Errorf("could not find sandbox named %s: %w", c.SandboxName, err)
 	}
 
 	// Construct the remote name for the sandbox clone
-	remoteName := cloning.ClonedWorkDirGitRemotePrefix + c.SandboxName
+	remoteName := cloning.ClonedWorkDirGitRemotePrefix + sbox.Name
 
 	// Get current working directory
 	cwd, err := os.Getwd()
@@ -290,7 +292,8 @@ func (c *LogCmd) Run(cctx *CLIContext) error {
 
 	// Print information about the sandbox
 	slog.InfoContext(ctx, "LogCmd completed",
-		"sandbox_id", c.SandboxName,
+		"sandbox_id", sbox.ID,
+		"sandbox_name", sbox.Name,
 		"sandbox_workdir", sbox.SandboxWorkDir,
 		"host_origin_dir", sbox.HostOriginDir,
 	)

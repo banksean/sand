@@ -31,8 +31,11 @@ func NewGitSetup(gitOps hostops.GitOps) *GitSetup {
 // This allows easy synchronization of changes between the original workspace and the sandbox.
 //
 // Returns nil if hostDir is not a git repository (no error).
-func (g *GitSetup) SetupGitRemotes(ctx context.Context, sandboxID, hostDir, cloneDir string) error {
-	slog.InfoContext(ctx, "GitSetup.SetupGitRemotes", "hostDir", hostDir, "cloneDir", cloneDir)
+func (g *GitSetup) SetupGitRemotes(ctx context.Context, sandboxID, sandboxName, hostDir, cloneDir string) error {
+	if sandboxName == "" {
+		sandboxName = sandboxID
+	}
+	slog.InfoContext(ctx, "GitSetup.SetupGitRemotes", "hostDir", hostDir, "cloneDir", cloneDir, "sandboxID", sandboxID, "sandboxName", sandboxName)
 	// Check if hostDir is part of a git repository
 	gitTopLevel := g.gitOps.TopLevel(ctx, hostDir)
 	if gitTopLevel == "" {
@@ -41,22 +44,29 @@ func (g *GitSetup) SetupGitRemotes(ctx context.Context, sandboxID, hostDir, clon
 	}
 
 	// Add remote in host pointing to cloned workdir
-	remoteName := ClonedWorkDirGitRemotePrefix + sandboxID
+	remoteName := ClonedWorkDirGitRemotePrefix + sandboxName
+	if existingURL := g.gitOps.RemoteURL(ctx, gitTopLevel, remoteName); existingURL != "" {
+		slog.InfoContext(ctx, "GitSetup.SetupGitRemotes replacing existing sandbox remote", "remote", remoteName, "oldURL", existingURL, "newURL", cloneDir)
+		if err := g.gitOps.RemoveRemote(ctx, gitTopLevel, remoteName); err != nil {
+			return fmt.Errorf("failed to replace existing git remote %s for sandbox %s (%s): %w",
+				remoteName, sandboxName, sandboxID, err)
+		}
+	}
 	if err := g.gitOps.AddRemote(ctx, gitTopLevel, remoteName, cloneDir); err != nil {
-		return fmt.Errorf("failed to add git remote (cloned work dir) %s for sandbox %s: %w",
-			remoteName, sandboxID, err)
+		return fmt.Errorf("failed to add git remote (cloned work dir) %s for sandbox %s (%s): %w",
+			remoteName, sandboxName, sandboxID, err)
 	}
 
 	// Fetch from original workdir into clone
 	if err := g.gitOps.Fetch(ctx, cloneDir, OriginalWorkDirRemoteName); err != nil {
-		return fmt.Errorf("failed to fetch git remote %s for sandbox %s: %w",
-			OriginalWorkDirRemoteName, sandboxID, err)
+		return fmt.Errorf("failed to fetch git remote %s for sandbox %s (%s): %w",
+			OriginalWorkDirRemoteName, sandboxName, sandboxID, err)
 	}
 
 	// Fetch from clone into original workdir
 	if err := g.gitOps.Fetch(ctx, gitTopLevel, remoteName); err != nil {
-		return fmt.Errorf("failed to fetch git remote %s for sandbox %s: %w",
-			remoteName, sandboxID, err)
+		return fmt.Errorf("failed to fetch git remote %s for sandbox %s (%s): %w",
+			remoteName, sandboxName, sandboxID, err)
 	}
 
 	return nil

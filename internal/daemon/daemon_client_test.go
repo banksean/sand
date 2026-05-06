@@ -238,7 +238,7 @@ func TestGRPCStreamingClientSpansEnd(t *testing.T) {
 
 func TestCreateSandboxOptsProtoRoundTrip(t *testing.T) {
 	opts := CreateSandboxOpts{
-		ID:             "test-box",
+		Name:           "test-box",
 		CloneFromDir:   "/src",
 		ImageName:      "test-image:latest",
 		EnvFile:        "/src/.env",
@@ -254,7 +254,7 @@ func TestCreateSandboxOptsProtoRoundTrip(t *testing.T) {
 	}
 
 	got := createSandboxOptsFromProto(createSandboxOptsToProto(opts))
-	if got.ID != opts.ID ||
+	if got.Name != opts.Name ||
 		got.CloneFromDir != opts.CloneFromDir ||
 		got.ImageName != opts.ImageName ||
 		got.EnvFile != opts.EnvFile ||

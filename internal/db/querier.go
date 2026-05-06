@@ -10,9 +10,11 @@ import (
 
 type Querier interface {
 	DeleteSandbox(ctx context.Context, id string) error
-	GetSandbox(ctx context.Context, id string) (Sandbox, error)
+	GetActiveSandboxByName(ctx context.Context, name string) (Sandbox, error)
+	GetSandboxByID(ctx context.Context, id string) (Sandbox, error)
 	GetSandboxesByImage(ctx context.Context, imageName string) ([]Sandbox, error)
 	ListSandboxes(ctx context.Context) ([]Sandbox, error)
+	SoftDeleteSandbox(ctx context.Context, arg SoftDeleteSandboxParams) error
 	UpdateContainerID(ctx context.Context, arg UpdateContainerIDParams) error
 	UpsertSandbox(ctx context.Context, arg UpsertSandboxParams) error
 }

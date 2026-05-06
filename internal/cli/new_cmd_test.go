@@ -22,6 +22,7 @@ func TestCheckoutSandboxBranch(t *testing.T) {
 
 	sbox := &sandtypes.Box{
 		ID:          "sb-123",
+		Name:        "sb-123",
 		ContainerID: "ctr-123",
 		EnvFile:     "/tmp/test.env",
 		Username:    "alice",
@@ -97,7 +98,7 @@ func TestCheckoutSandboxBranch(t *testing.T) {
 			if calls[1].cmd != "git" {
 				t.Fatalf("checkout call cmd = %q, want git", calls[1].cmd)
 			}
-			if diff := reflect.DeepEqual(calls[1].args, []string{"checkout", "-b", sbox.ID}); !diff {
+			if diff := reflect.DeepEqual(calls[1].args, []string{"checkout", "-b", sbox.Name}); !diff {
 				t.Fatalf("checkout call args = %v", calls[1].args)
 			}
 
@@ -130,6 +131,7 @@ func TestCheckoutSandboxBranch_ReturnsCheckoutError(t *testing.T) {
 	}
 	sbox := &sandtypes.Box{
 		ID:          "sb-123",
+		Name:        "sb-123",
 		ContainerID: "ctr-123",
 	}
 

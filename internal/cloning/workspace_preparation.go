@@ -17,6 +17,7 @@ type WorkspacePreparation interface {
 // CloneRequest captures the inputs necessary to prepare a sandbox workspace.
 type CloneRequest struct {
 	ID                string
+	Name              string
 	HostWorkDir       string
 	EnvFile           string
 	Username          string

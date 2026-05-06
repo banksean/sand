@@ -17,10 +17,10 @@ func (c *StartCmd) Run(cctx *CLIContext) error {
 	ctx := cctx.Context
 	mc := cctx.Daemon
 
-	ids := []string{}
+	names := []string{}
 	if !c.All {
-		ids = append(ids, c.SandboxNames...)
-		if len(ids) == 0 {
+		names = append(names, c.SandboxNames...)
+		if len(names) == 0 {
 			return fmt.Errorf("sandbox name required unless --all is set")
 		}
 	} else {
@@ -29,45 +29,45 @@ func (c *StartCmd) Run(cctx *CLIContext) error {
 			return err
 		}
 		for _, bx := range bxs {
-			ids = append(ids, bx.ID)
+			names = append(names, bx.Name)
 		}
 	}
 
 	var wg sync.WaitGroup
-	errChan := make(chan error, len(ids))
+	errChan := make(chan error, len(names))
 
-	for _, id := range ids {
+	for _, name := range names {
 		wg.Add(1)
-		go func(id string) {
+		go func(name string) {
 			defer wg.Done()
-			sb, err := mc.GetSandbox(ctx, id)
+			sb, err := mc.GetSandbox(ctx, name)
 			if err != nil {
-				slog.ErrorContext(ctx, "GetSandbox", "error", err, "id", id)
+				slog.ErrorContext(ctx, "GetSandbox", "error", err, "name", name)
 				errChan <- err
 				return
 			}
 			if sb.Container == nil {
-				fmt.Printf("%s has no container\n", id)
+				fmt.Printf("%s has no container\n", name)
 				return
 			}
 			if sb.Container.Status == "running" {
 				if c.SSHAgent && !sb.Container.Configuration.SSH {
-					errChan <- fmt.Errorf("%s is already running without ssh-agent forwarding; stop it first and restart with --ssh-agent", id)
+					errChan <- fmt.Errorf("%s is already running without ssh-agent forwarding; stop it first and restart with --ssh-agent", name)
 					return
 				}
-				fmt.Printf("%s is already running\n", id)
+				fmt.Printf("%s is already running\n", name)
 				return
 			}
 			if err := mc.StartSandbox(ctx, daemon.StartSandboxOpts{
-				ID:       id,
+				Name:     name,
 				SSHAgent: c.SSHAgent,
 			}); err != nil {
-				slog.ErrorContext(ctx, "StartSandbox", "error", err, "id", id)
+				slog.ErrorContext(ctx, "StartSandbox", "error", err, "name", name)
 				errChan <- err
 				return
 			}
-			fmt.Printf("%s\n", id)
-		}(id)
+			fmt.Printf("%s\n", name)
+		}(name)
 	}
 
 	wg.Wait()

@@ -18,7 +18,7 @@ var (
 
 type RmCmd struct {
 	MultiSandboxNameFlags
-	Force bool `short:"f" help:"remove without confirmation"`
+	Force bool `short:"f" help:"move sandbox to trash without confirmation"`
 }
 
 func (c *RmCmd) Run(cctx *CLIContext) error {
@@ -27,11 +27,17 @@ func (c *RmCmd) Run(cctx *CLIContext) error {
 
 	slog.InfoContext(ctx, "RmCmd", "run", *c)
 
-	ids := []string{}
+	type rmTarget struct {
+		name string
+		id   string
+	}
+	targets := []rmTarget{}
 	if !c.All {
-		ids = append(ids, c.SandboxNames...)
-		if len(ids) == 0 {
+		if len(c.SandboxNames) == 0 {
 			return fmt.Errorf("sandbox name required unless --all is set")
+		}
+		for _, name := range c.SandboxNames {
+			targets = append(targets, rmTarget{name: name})
 		}
 	} else {
 		bxs, err := mc.ListSandboxes(ctx)
@@ -39,38 +45,52 @@ func (c *RmCmd) Run(cctx *CLIContext) error {
 			return err
 		}
 		for _, bx := range bxs {
-			ids = append(ids, bx.ID)
+			targets = append(targets, rmTarget{name: bx.Name, id: bx.ID})
 		}
 	}
 
 	if !c.Force {
 		reader := bufio.NewReader(rmCmdStdin)
-		confirmed := make([]string, 0, len(ids))
-		for _, id := range ids {
-			ok, err := confirmSandboxRemoval(id, reader, rmCmdStdout)
+		confirmed := make([]rmTarget, 0, len(targets))
+		for _, target := range targets {
+			ok, err := confirmSandboxRemoval(target.name, reader, rmCmdStdout)
 			if err != nil {
 				return err
 			}
 			if ok {
-				confirmed = append(confirmed, id)
+				confirmed = append(confirmed, target)
 			}
 		}
-		ids = confirmed
+		targets = confirmed
 	}
 
 	var wg sync.WaitGroup
-	errChan := make(chan error, len(ids))
+	errChan := make(chan error, len(targets))
 
-	for _, id := range ids {
+	for _, target := range targets {
 		wg.Add(1)
-		go func(id string) {
+		go func(target rmTarget) {
 			defer wg.Done()
-			if err := mc.RemoveSandbox(ctx, id); err != nil {
+			if target.id == "" {
+				sbox, err := mc.GetSandbox(ctx, target.name)
+				if err != nil {
+					errChan <- err
+					return
+				}
+				if sbox != nil {
+					target.id = sbox.ID
+				}
+			}
+			if err := mc.RemoveSandbox(ctx, target.name); err != nil {
 				errChan <- err
 				return
 			}
-			fmt.Printf("%s\n", id)
-		}(id)
+			if target.id != "" {
+				fmt.Printf("%s\t%s\n", target.name, target.id)
+			} else {
+				fmt.Printf("%s\n", target.name)
+			}
+		}(target)
 	}
 
 	wg.Wait()
