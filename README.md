@@ -137,13 +137,9 @@ Note: The original files on your MacOS host filesystem are not affected by chang
 
 ## Getting changes out of the sandbox
 
-You can use `git` commands to push changes from the container to github, or wherever your origin is. 
+You can use `git` commands to pull changes from the container to host, and then push to github, or wherever your origin is.
 
-Git ssh authentication can pass from your MacOS host through `sand` containers via `ssh-agent`. Commands can opt in with `--ssh-agent`. That means if the git checkout on your MacOS host is authenticated with ssh (`git remote -v origin` prints something that starts with `git@github.com:...`), then you don't need to log in again inside the container to make git push/pull to work.
-
-Using `ssh-agent` also means you don't have to leave copies of your github credentials scattered around in places where they shouldn't be.
-
-See [doc/GIT_REMOTES.md](doc/GIT_REMOTES.md) for a more detailed explanation of how `sand` uses git locally to link the MacOS-side clones back to your original working directory.  If you are a git enthusiast, you can probably figure out how move changes around between your MacOS host and your sandbox containers without involving github at all.
+See [doc/GIT_REMOTES.md](doc/GIT_REMOTES.md) for a more detailed explanation of how `sand` uses git locally to link the host-side clones back to your original working directory.
 
 ## Non-interactive (one-shot) agent runs
 
