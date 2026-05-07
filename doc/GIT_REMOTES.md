@@ -15,7 +15,7 @@ Some benefits (and trade-offs) of doing it this way:
 - Host safety is more important than agent autonomy. A container process cannot accidentally or maliciously git push into the original host checkout through its origin; the host (i.e. the human at the keyboard) decides when to import sandbox commits.
 - The workflow is less symmetrical. You may expect git push origin branch from /app to work. Instead, you need to commit in the sandbox, then run git pull sand/<sandboxname> <branch> from the host checkout to achieve the same result.
 - Final adoption remains host-controlled. Sandbox agents can pull from the host, rebase or merge, resolve conflicts, and commit the result in the sandbox. But they cannot push that result into the host checkout; the user or host-side automation must still run git pull sand/<sandbox> <branch> to accept it.
-- Sandbox updates from host are simple. git pull from /app works naturally for bringing in host-side commits, because origin is fetchable.
+- Sandbox updates from host are simple after the shared mirror has been refreshed. `git pull` from `/app` brings in committed host-side changes because `origin` points at a read-only mirror.
 - Publishing sandbox work from host to other remotes requires one extra mental step. The sandbox can produce commits, but the host must pull them. This is safer, but slightly more manual than allowing agents to push directly.
 - It favors review before adoption. Because changes are imported from the host side, users can fetch, diff, inspect, or pull intentionally rather than having sandbox work appear in the host checkout automatically.
 
@@ -25,24 +25,34 @@ When `sand` creates a new sandbox, it makes a copy-on-write (COW) clone of your 
 
 It then automatically sets up git remotes linking the original checkout, a sand-managed shared bare mirror, and the sandbox's cloned checkout. APFS requires the CoW clone to live _on the same volume_ as the original.
 
-With those bidirectional remotes set up, you can now use git pull to move changes between host and sandbox container from either side.
+Host-to-sandbox updates flow through the shared mirror. Sandbox-to-host updates flow through the `sand/<sandboxname>` remote added to the original checkout.
 
 ## Directory Structure
 
 - **Original working directory (host)**: The directory where you ran `sand new` (e.g., `/Users/yourname/myproject`)
 - **Shared host mirror (host)**: `${--app-base-dir}/git-mirrors/<repo-id>.git`
 - **Sandbox clone directory (host)**: `${--app-base-dir}/clones/<sandbox-id>/app`
-  - Default `--app-base-dir`: `~/Library/Application\ Support/Sand/clones`
+  - Default `--app-base-dir`: `~/Library/Application\ Support/Sand`
   - Example full path: `~/Library/Application\ Support/Sand/clones/3a9a0df8-3ad2-4b79-9a4f-0d7e41f1df1b/app`
 - **Container mount**: The sandbox clone is mounted to `/app` inside the container
 
-## The Bidirectional Remote Relationship
+## The Remote Relationship
 
 When creating a sandbox named `my-sandbox` with ID `3a9a0df8-3ad2-4b79-9a4f-0d7e41f1df1b` and current working directory `/Users/yourname/myproject`, `sand` establishes these git remotes:
 
-### In the sandbox clone, as mounted inside the container at `/app`:
+### In the sandbox clone, on the host
 
 Example clone dir: `~/Library/Application\ Support/Sand/clones/3a9a0df8-3ad2-4b79-9a4f-0d7e41f1df1b/app`
+
+```
+Remote name: origin
+Fetch URL:   ~/Library/Application\ Support/Sand/git-mirrors/<repo-id>.git
+Push URL:    DISABLED
+```
+
+The sandbox branch upstream is set to `origin/<branch>`, so plain `git pull` pulls from the shared mirror instead of any upstream config copied from the original checkout.
+
+### In the sandbox clone, as mounted inside the container at `/app`
 
 ```
 Remote name: origin
@@ -63,7 +73,7 @@ Remote URL:  ~/Library/Application\ Support/Sand/clones/3a9a0df8-3ad2-4b79-9a4f-
 
 ## How To Move Changes Between Host and Sandbox
 
-`sand` sets up git remotes in both directions, but they are used from different sides.
+`sand` sets up remotes for both directions, but they are used from different sides.
 
 Inside the sandbox container, `/app` has an `origin` remote whose fetch URL is `/run/git-origin-ro`. That path is a read-only bind mount of sand's shared bare mirror for the original host repository, so `git pull` from `/app` can bring committed host changes into the sandbox after sand updates the mirror. Pushing back through this remote is intentionally disabled: `origin`'s push URL is set to `DISABLED`.
 
@@ -77,6 +87,8 @@ git pull sand/my-sandbox <branchname>
 In short: update the shared host mirror with sandbox creation, sandbox start, or `sand git sync-host <sandboxname>`; pull host changes into the sandbox with `git pull` from `/app`; pull sandbox changes back to the host with `git pull sand/<sandboxname> <branchname>` from the host checkout.
 
 Because deleted sandbox names can be reused, creating a new active sandbox with the same name replaces the host-side `sand/<sandboxname>` remote so it points at the new sandbox clone.
+
+Sand does not migrate old sandbox containers across changes to this git mirror model. After upgrading across this change, remove and recreate existing sandboxes.
 
 ## Example: Comparing Original Working Directory to Sandbox
 
@@ -183,7 +195,7 @@ Inside the container, use `origin` to pull host commits into the sandbox. Do not
 # Inside the container at /app
 cd /app
 
-# Pull the latest commits from the original host checkout
+# Pull the latest committed host changes from the refreshed shared mirror
 git pull
 
 # Show uncommitted changes in the sandbox
