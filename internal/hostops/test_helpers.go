@@ -85,10 +85,15 @@ func (m *MockContainerOps) Stats(ctx context.Context, containerID ...string) ([]
 type MockGitOps struct {
 	AddRemoteFunc         func(ctx context.Context, dir, name, url string) error
 	RemoveRemoteFunc      func(ctx context.Context, dir, name string) error
+	SetRemoteURLFunc      func(ctx context.Context, dir, name, url string) error
 	FetchFunc             func(ctx context.Context, dir, remote string) error
+	CloneMirrorFunc       func(ctx context.Context, sourceDir, mirrorDir string) error
+	UpdateMirrorFunc      func(ctx context.Context, mirrorDir string) error
+	UpdateRefFunc         func(ctx context.Context, dir, ref, value string) error
 	TopLevelFunc          func(ctx context.Context, dir string) string
 	RemoteURLFunc         func(ctx context.Context, dir, name string) string
 	LocalBranchExistsFunc func(ctx context.Context, dir, branch string) bool
+	SetBranchUpstreamFunc func(ctx context.Context, dir, branch, remote string) error
 	BranchFunc            func(ctx context.Context, dir string) string
 	CommitFunc            func(ctx context.Context, dir string) string
 	IsDirtyFunc           func(ctx context.Context, dir string) bool
@@ -109,9 +114,37 @@ func (m *MockGitOps) RemoveRemote(ctx context.Context, dir, name string) error {
 	return nil
 }
 
+func (m *MockGitOps) SetRemoteURL(ctx context.Context, dir, name, url string) error {
+	if m.SetRemoteURLFunc != nil {
+		return m.SetRemoteURLFunc(ctx, dir, name, url)
+	}
+	return nil
+}
+
 func (m *MockGitOps) Fetch(ctx context.Context, dir, remote string) error {
 	if m.FetchFunc != nil {
 		return m.FetchFunc(ctx, dir, remote)
+	}
+	return nil
+}
+
+func (m *MockGitOps) CloneMirror(ctx context.Context, sourceDir, mirrorDir string) error {
+	if m.CloneMirrorFunc != nil {
+		return m.CloneMirrorFunc(ctx, sourceDir, mirrorDir)
+	}
+	return nil
+}
+
+func (m *MockGitOps) UpdateMirror(ctx context.Context, mirrorDir string) error {
+	if m.UpdateMirrorFunc != nil {
+		return m.UpdateMirrorFunc(ctx, mirrorDir)
+	}
+	return nil
+}
+
+func (m *MockGitOps) UpdateRef(ctx context.Context, dir, ref, value string) error {
+	if m.UpdateRefFunc != nil {
+		return m.UpdateRefFunc(ctx, dir, ref, value)
 	}
 	return nil
 }
@@ -135,6 +168,13 @@ func (m *MockGitOps) LocalBranchExists(ctx context.Context, dir, branch string) 
 		return m.LocalBranchExistsFunc(ctx, dir, branch)
 	}
 	return false
+}
+
+func (m *MockGitOps) SetBranchUpstream(ctx context.Context, dir, branch, remote string) error {
+	if m.SetBranchUpstreamFunc != nil {
+		return m.SetBranchUpstreamFunc(ctx, dir, branch, remote)
+	}
+	return nil
 }
 
 func (m *MockGitOps) Branch(ctx context.Context, dir string) string {

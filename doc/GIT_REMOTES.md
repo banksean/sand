@@ -23,13 +23,14 @@ Some benefits (and trade-offs) of doing it this way:
 
 When `sand` creates a new sandbox, it makes a copy-on-write (COW) clone of your original working directory using APFS's [`clonefile(2)`](https://eclecticlight.co/2020/04/14/copy-move-and-clone-files-in-apfs-a-primer/). 
 
-It then automatically sets up **bidirectional git remotes** linking the original checkout and the sandbox's cloned checkouts. These are "remotes" only in the logical sense. APFS requires the CoW clone to live _on the same volume_ as the original. 
+It then automatically sets up git remotes linking the original checkout, a sand-managed shared bare mirror, and the sandbox's cloned checkout. APFS requires the CoW clone to live _on the same volume_ as the original.
 
 With those bidirectional remotes set up, you can now use git pull to move changes between host and sandbox container from either side.
 
 ## Directory Structure
 
 - **Original working directory (host)**: The directory where you ran `sand new` (e.g., `/Users/yourname/myproject`)
+- **Shared host mirror (host)**: `${--app-base-dir}/git-mirrors/<repo-id>.git`
 - **Sandbox clone directory (host)**: `${--app-base-dir}/clones/<sandbox-id>/app`
   - Default `--app-base-dir`: `~/Library/Application\ Support/Sand/clones`
   - Example full path: `~/Library/Application\ Support/Sand/clones/3a9a0df8-3ad2-4b79-9a4f-0d7e41f1df1b/app`
@@ -45,9 +46,11 @@ Example clone dir: `~/Library/Application\ Support/Sand/clones/3a9a0df8-3ad2-4b7
 
 ```
 Remote name: origin
-Fetch URL:   /run/git-origin-ro  (read-only bind mount of the original host git directory)
+Fetch URL:   /run/git-origin-ro  (read-only bind mount of the shared host mirror)
 Push URL:    DISABLED
 ```
+
+`/run/git-origin-ro` is a read-only bind mount of sand's shared bare mirror for the original host repository, not the live host checkout itself.
 
 ### In the original working directory
 
@@ -62,7 +65,7 @@ Remote URL:  ~/Library/Application\ Support/Sand/clones/3a9a0df8-3ad2-4b79-9a4f-
 
 `sand` sets up git remotes in both directions, but they are used from different sides.
 
-Inside the sandbox container, `/app` has an `origin` remote whose fetch URL is `/run/git-origin-ro`. That path is a read-only bind mount of the original host repository's git directory, so `git pull` from `/app` can bring the latest host commits into the sandbox. Pushing back through this remote is intentionally disabled: `origin`'s push URL is set to `DISABLED`.
+Inside the sandbox container, `/app` has an `origin` remote whose fetch URL is `/run/git-origin-ro`. That path is a read-only bind mount of sand's shared bare mirror for the original host repository, so `git pull` from `/app` can bring committed host changes into the sandbox after sand updates the mirror. Pushing back through this remote is intentionally disabled: `origin`'s push URL is set to `DISABLED`.
 
 To move commits from the sandbox back to your original host checkout, run git from the host checkout and pull from the sandbox remote that `sand` added there:
 
@@ -71,7 +74,7 @@ cd /Users/yourname/myproject
 git pull sand/my-sandbox <branchname>
 ```
 
-In short: pull host changes into the sandbox with `git pull` from `/app`; pull sandbox changes back to the host with `git pull sand/<sandboxname> <branchname>` from the host checkout.
+In short: update the shared host mirror with sandbox creation, sandbox start, or `sand git sync-host <sandboxname>`; pull host changes into the sandbox with `git pull` from `/app`; pull sandbox changes back to the host with `git pull sand/<sandboxname> <branchname>` from the host checkout.
 
 Because deleted sandbox names can be reused, creating a new active sandbox with the same name replaces the host-side `sand/<sandboxname>` remote so it points at the new sandbox clone.
 
@@ -108,6 +111,17 @@ sand git log my-sandbox
 ```
 
 This runs `git log` in the sandbox's working directory and shows you the commit history.
+
+#### Syncing Host Commits
+
+To refresh the shared mirror for a sandbox's original host repo:
+
+```sh
+# From anywhere on the host
+sand git sync-host my-sandbox
+```
+
+After this succeeds, run `git pull` inside `/app` in the sandbox to fetch committed host changes from the refreshed mirror.
 
 #### Comparing with Diff
 

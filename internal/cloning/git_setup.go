@@ -31,7 +31,7 @@ func NewGitSetup(gitOps hostops.GitOps) *GitSetup {
 // This allows easy synchronization of changes between the original workspace and the sandbox.
 //
 // Returns nil if hostDir is not a git repository (no error).
-func (g *GitSetup) SetupGitRemotes(ctx context.Context, sandboxID, sandboxName, hostDir, cloneDir string) error {
+func (g *GitSetup) SetupGitRemotes(ctx context.Context, sandboxID, sandboxName, hostDir, cloneDir, mirrorDir string) error {
 	if sandboxName == "" {
 		sandboxName = sandboxID
 	}
@@ -57,10 +57,24 @@ func (g *GitSetup) SetupGitRemotes(ctx context.Context, sandboxID, sandboxName, 
 			remoteName, sandboxName, sandboxID, err)
 	}
 
+	if mirrorDir != "" {
+		if err := g.gitOps.SetRemoteURL(ctx, cloneDir, OriginalWorkDirRemoteName, mirrorDir); err != nil {
+			return fmt.Errorf("failed to set git remote %s to mirror for sandbox %s (%s): %w",
+				OriginalWorkDirRemoteName, sandboxName, sandboxID, err)
+		}
+	}
+
 	// Fetch from original workdir into clone
 	if err := g.gitOps.Fetch(ctx, cloneDir, OriginalWorkDirRemoteName); err != nil {
 		return fmt.Errorf("failed to fetch git remote %s for sandbox %s (%s): %w",
 			OriginalWorkDirRemoteName, sandboxName, sandboxID, err)
+	}
+
+	if branch := g.gitOps.Branch(ctx, cloneDir); branch != "" {
+		if err := g.gitOps.SetBranchUpstream(ctx, cloneDir, branch, OriginalWorkDirRemoteName); err != nil {
+			return fmt.Errorf("failed to set branch %s upstream to %s for sandbox %s (%s): %w",
+				branch, OriginalWorkDirRemoteName, sandboxName, sandboxID, err)
+		}
 	}
 
 	// Fetch from clone into original workdir

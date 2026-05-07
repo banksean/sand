@@ -28,6 +28,8 @@ type CloneRequest struct {
 // CloneArtifacts describes the file system artifacts created during workspace preparation.
 type CloneArtifacts struct {
 	HostWorkDir string
+	// HostGitMirrorDir is the shared bare mirror for HostWorkDir when HostWorkDir is a git repository.
+	HostGitMirrorDir string
 	// SandboxWorkDir is the root directory on the host containing all sandbox files
 	SandboxWorkDir string
 	// PathRegistry provides structured access to all paths within the sandbox

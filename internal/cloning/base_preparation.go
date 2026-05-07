@@ -17,6 +17,7 @@ type BaseWorkspacePreparation struct {
 	cloneRoot string
 	messenger hostops.UserMessenger
 	gitSetup  *GitSetup
+	gitMirror *GitMirror
 	fileOps   hostops.FileOps
 }
 
@@ -26,6 +27,7 @@ func NewBaseWorkspacePreparation(cloneRoot string, messenger hostops.UserMesseng
 		cloneRoot: cloneRoot,
 		messenger: messenger,
 		gitSetup:  NewGitSetup(gitOps),
+		gitMirror: NewGitMirror(DefaultGitMirrorRoot(cloneRoot), gitOps, fileOps),
 		fileOps:   fileOps,
 	}
 }
@@ -42,7 +44,8 @@ func (p *BaseWorkspacePreparation) Prepare(ctx context.Context, req CloneRequest
 	}
 
 	// Clone workspace directory
-	if err := p.cloneWorkDir(ctx, req.ID, req.Name, req.HostWorkDir, pathRegistry); err != nil {
+	hostWorkDir, hostGitMirrorDir, err := p.cloneWorkDir(ctx, req.ID, req.Name, req.HostWorkDir, pathRegistry)
+	if err != nil {
 		return nil, fmt.Errorf("failed to clone workdir for sandbox %s: %w", req.ID, err)
 	}
 
@@ -57,7 +60,8 @@ func (p *BaseWorkspacePreparation) Prepare(ctx context.Context, req CloneRequest
 	}
 
 	return &CloneArtifacts{
-		HostWorkDir:       req.HostWorkDir,
+		HostWorkDir:       hostWorkDir,
+		HostGitMirrorDir:  hostGitMirrorDir,
 		SandboxWorkDir:    sandboxRoot,
 		PathRegistry:      pathRegistry,
 		Username:          req.Username,
@@ -66,12 +70,13 @@ func (p *BaseWorkspacePreparation) Prepare(ctx context.Context, req CloneRequest
 	}, nil
 }
 
-func (p *BaseWorkspacePreparation) cloneWorkDir(ctx context.Context, id, name, hostWorkDir string, pathRegistry PathRegistry) error {
+func (p *BaseWorkspacePreparation) cloneWorkDir(ctx context.Context, id, name, hostWorkDir string, pathRegistry PathRegistry) (string, string, error) {
 	p.messenger.Message(ctx, "Cloning "+hostWorkDir)
 
 	// Check if hostWorkDir is part of a git repository
 	gitTopLevel := p.gitSetup.GetGitTopLevel(ctx, hostWorkDir)
 	slog.InfoContext(ctx, "BaseWorkspacePreparation.cloneWorkDir", "gitTopLevel", gitTopLevel, "hostWorkDir", hostWorkDir)
+	var hostGitMirrorDir string
 	if gitTopLevel != "" {
 		// Clone from git top level instead
 		hostWorkDir = gitTopLevel
@@ -83,30 +88,38 @@ func (p *BaseWorkspacePreparation) cloneWorkDir(ctx context.Context, id, name, h
 
 	workDirVol, err := p.fileOps.Volume(hostWorkDir)
 	if err != nil {
-		return fmt.Errorf("failed to get volume info for work dir %s: %v", hostWorkDir, err)
+		return "", "", fmt.Errorf("failed to get volume info for work dir %s: %v", hostWorkDir, err)
 	}
 
 	cloneDirVol, err := p.fileOps.Volume(p.cloneRoot)
 	if err != nil {
-		return fmt.Errorf("failed to get volume info for clone root dir %s: %v", p.cloneRoot, err)
+		return "", "", fmt.Errorf("failed to get volume info for clone root dir %s: %v", p.cloneRoot, err)
 	}
 
 	if workDirVol.DeviceID != cloneDirVol.DeviceID {
-		return fmt.Errorf("can't clone dirs across volumes: workdir volume %s vs clone dir volume %s", workDirVol.MountPoint, cloneDirVol.MountPoint)
+		return "", "", fmt.Errorf("can't clone dirs across volumes: workdir volume %s vs clone dir volume %s", workDirVol.MountPoint, cloneDirVol.MountPoint)
+	}
+
+	if gitTopLevel != "" {
+		var err error
+		hostGitMirrorDir, err = p.gitMirror.EnsureUpdated(ctx, gitTopLevel)
+		if err != nil {
+			return "", "", err
+		}
 	}
 
 	if err := p.fileOps.Copy(ctx, hostWorkDir, hostCloneDir); err != nil {
-		return fmt.Errorf("failed to copy workdir %s to %s for sandbox %s: %w", hostWorkDir, hostCloneDir, id, err)
+		return "", "", fmt.Errorf("failed to copy workdir %s to %s for sandbox %s: %w", hostWorkDir, hostCloneDir, id, err)
 	}
 
 	// Set up git remotes if this is a git repository
 	if gitTopLevel != "" {
-		if err := p.gitSetup.SetupGitRemotes(ctx, id, name, gitTopLevel, hostCloneDir); err != nil {
-			return err
+		if err := p.gitSetup.SetupGitRemotes(ctx, id, name, gitTopLevel, hostCloneDir, hostGitMirrorDir); err != nil {
+			return "", "", err
 		}
 	}
 
-	return nil
+	return hostWorkDir, hostGitMirrorDir, nil
 }
 
 func (p *BaseWorkspacePreparation) cloneDotfiles(ctx context.Context, id string, pathRegistry PathRegistry) error {

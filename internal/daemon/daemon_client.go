@@ -21,6 +21,7 @@ type Client interface {
 	RemoveSandbox(ctx context.Context, name string) error
 	StopSandbox(ctx context.Context, name string) error
 	StartSandbox(ctx context.Context, opts StartSandboxOpts) error
+	SyncHostGitMirror(ctx context.Context, name string) (string, error)
 	ResolveAgentLaunchEnv(ctx context.Context, agent, envFile string) (map[string]string, error)
 	ExportImage(ctx context.Context, name, imageName string) error
 	Stats(ctx context.Context, name ...string) ([]types.ContainerStats, error)

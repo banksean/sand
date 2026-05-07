@@ -457,6 +457,7 @@ type testGRPCDaemonService struct {
 	RemoveSandboxFunc         func(context.Context, *daemonpb.IDRequest) (*daemonpb.StatusResponse, error)
 	StopSandboxFunc           func(context.Context, *daemonpb.IDRequest) (*daemonpb.StatusResponse, error)
 	StartSandboxFunc          func(context.Context, *daemonpb.StartSandboxRequest) (*daemonpb.StatusResponse, error)
+	SyncHostGitMirrorFunc     func(context.Context, *daemonpb.IDRequest) (*daemonpb.SyncHostGitMirrorResponse, error)
 	ResolveAgentLaunchEnvFunc func(context.Context, *daemonpb.ResolveAgentLaunchEnvRequest) (*daemonpb.ResolveAgentLaunchEnvResponse, error)
 	ExportImageFunc           func(context.Context, *daemonpb.ExportImageRequest) (*daemonpb.StatusResponse, error)
 	StatsFunc                 func(context.Context, *daemonpb.StatsRequest) (*daemonpb.StatsResponse, error)
@@ -487,6 +488,10 @@ func (s *testGRPCDaemonService) StopSandbox(ctx context.Context, req *daemonpb.I
 
 func (s *testGRPCDaemonService) StartSandbox(ctx context.Context, req *daemonpb.StartSandboxRequest) (*daemonpb.StatusResponse, error) {
 	return s.StartSandboxFunc(ctx, req)
+}
+
+func (s *testGRPCDaemonService) SyncHostGitMirror(ctx context.Context, req *daemonpb.IDRequest) (*daemonpb.SyncHostGitMirrorResponse, error) {
+	return s.SyncHostGitMirrorFunc(ctx, req)
 }
 
 func (s *testGRPCDaemonService) ResolveAgentLaunchEnv(ctx context.Context, req *daemonpb.ResolveAgentLaunchEnvRequest) (*daemonpb.ResolveAgentLaunchEnvResponse, error) {

@@ -139,6 +139,14 @@ func (c *GRPCClient) StartSandbox(ctx context.Context, opts StartSandboxOpts) er
 	return err
 }
 
+func (c *GRPCClient) SyncHostGitMirror(ctx context.Context, name string) (string, error) {
+	resp, err := c.client.SyncHostGitMirror(ctx, &daemonpb.IDRequest{Id: name})
+	if err != nil {
+		return "", err
+	}
+	return resp.GetMirrorPath(), nil
+}
+
 func (c *GRPCClient) ResolveAgentLaunchEnv(ctx context.Context, agent, envFile string) (map[string]string, error) {
 	resp, err := c.client.ResolveAgentLaunchEnv(ctx, &daemonpb.ResolveAgentLaunchEnvRequest{
 		Agent:   agent,

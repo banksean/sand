@@ -12,12 +12,18 @@ import (
 type GitOps interface {
 	AddRemote(ctx context.Context, dir, name, url string) error
 	RemoveRemote(ctx context.Context, dir, name string) error
+	SetRemoteURL(ctx context.Context, dir, name, url string) error
 	Fetch(ctx context.Context, dir, remote string) error
+	CloneMirror(ctx context.Context, sourceDir, mirrorDir string) error
+	UpdateMirror(ctx context.Context, mirrorDir string) error
+	UpdateRef(ctx context.Context, dir, ref, value string) error
 	TopLevel(ctx context.Context, dir string) string
 	// RemoteURL returns the URL of the named remote (e.g. "origin"), or "" if not found.
 	RemoteURL(ctx context.Context, dir, name string) string
 	// LocalBranchExists reports whether refs/heads/branch exists in dir.
 	LocalBranchExists(ctx context.Context, dir, branch string) bool
+	// SetBranchUpstream configures branch to pull from remote/branch without validating that the upstream exists yet.
+	SetBranchUpstream(ctx context.Context, dir, branch, remote string) error
 	// Branch returns the current branch name, or "" if detached/unavailable.
 	Branch(ctx context.Context, dir string) string
 	// Commit returns the current HEAD commit hash, or "" if unavailable.
@@ -58,6 +64,18 @@ func (g *defaultGitOps) RemoveRemote(ctx context.Context, dir, name string) erro
 	return nil
 }
 
+func (g *defaultGitOps) SetRemoteURL(ctx context.Context, dir, name, url string) error {
+	cmd := exec.CommandContext(ctx, "git", "remote", "set-url", name, url)
+	cmd.Dir = dir
+	slog.InfoContext(ctx, "GitOps.SetRemoteURL", "cmd", strings.Join(cmd.Args, " "), "dir", dir)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		slog.InfoContext(ctx, "GitOps.SetRemoteURL", "error", err, "output", string(output))
+		return fmt.Errorf("git remote set-url failed: %w (output: %s)", err, output)
+	}
+	return nil
+}
+
 func (g *defaultGitOps) Fetch(ctx context.Context, dir, remote string) error {
 	cmd := exec.CommandContext(ctx, "git", "fetch", remote)
 	cmd.Dir = dir
@@ -66,6 +84,41 @@ func (g *defaultGitOps) Fetch(ctx context.Context, dir, remote string) error {
 	if err != nil {
 		slog.InfoContext(ctx, "GitOps.Fetch", "error", err, "output", string(output))
 		return fmt.Errorf("git fetch failed: %w (output: %s)", err, output)
+	}
+	return nil
+}
+
+func (g *defaultGitOps) CloneMirror(ctx context.Context, sourceDir, mirrorDir string) error {
+	cmd := exec.CommandContext(ctx, "git", "clone", "--mirror", sourceDir, mirrorDir)
+	slog.InfoContext(ctx, "GitOps.CloneMirror", "cmd", strings.Join(cmd.Args, " "))
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		slog.InfoContext(ctx, "GitOps.CloneMirror", "error", err, "output", string(output))
+		return fmt.Errorf("git clone --mirror failed: %w (output: %s)", err, output)
+	}
+	return nil
+}
+
+func (g *defaultGitOps) UpdateMirror(ctx context.Context, mirrorDir string) error {
+	cmd := exec.CommandContext(ctx, "git", "remote", "update", "--prune")
+	cmd.Dir = mirrorDir
+	slog.InfoContext(ctx, "GitOps.UpdateMirror", "cmd", strings.Join(cmd.Args, " "), "dir", mirrorDir)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		slog.InfoContext(ctx, "GitOps.UpdateMirror", "error", err, "output", string(output))
+		return fmt.Errorf("git remote update --prune failed: %w (output: %s)", err, output)
+	}
+	return nil
+}
+
+func (g *defaultGitOps) UpdateRef(ctx context.Context, dir, ref, value string) error {
+	cmd := exec.CommandContext(ctx, "git", "update-ref", ref, value)
+	cmd.Dir = dir
+	slog.InfoContext(ctx, "GitOps.UpdateRef", "cmd", strings.Join(cmd.Args, " "), "dir", dir)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		slog.InfoContext(ctx, "GitOps.UpdateRef", "error", err, "output", string(output))
+		return fmt.Errorf("git update-ref failed: %w (output: %s)", err, output)
 	}
 	return nil
 }
@@ -104,6 +157,25 @@ func (g *defaultGitOps) LocalBranchExists(ctx context.Context, dir, branch strin
 		return false
 	}
 	return true
+}
+
+func (g *defaultGitOps) SetBranchUpstream(ctx context.Context, dir, branch, remote string) error {
+	remoteCmd := exec.CommandContext(ctx, "git", "config", "branch."+branch+".remote", remote)
+	remoteCmd.Dir = dir
+	slog.InfoContext(ctx, "GitOps.SetBranchUpstream remote", "cmd", strings.Join(remoteCmd.Args, " "), "dir", dir)
+	if output, err := remoteCmd.CombinedOutput(); err != nil {
+		slog.InfoContext(ctx, "GitOps.SetBranchUpstream remote", "error", err, "output", string(output))
+		return fmt.Errorf("git config branch remote failed: %w (output: %s)", err, output)
+	}
+
+	mergeCmd := exec.CommandContext(ctx, "git", "config", "branch."+branch+".merge", "refs/heads/"+branch)
+	mergeCmd.Dir = dir
+	slog.InfoContext(ctx, "GitOps.SetBranchUpstream merge", "cmd", strings.Join(mergeCmd.Args, " "), "dir", dir)
+	if output, err := mergeCmd.CombinedOutput(); err != nil {
+		slog.InfoContext(ctx, "GitOps.SetBranchUpstream merge", "error", err, "output", string(output))
+		return fmt.Errorf("git config branch merge failed: %w (output: %s)", err, output)
+	}
+	return nil
 }
 
 func (g *defaultGitOps) Branch(ctx context.Context, dir string) string {

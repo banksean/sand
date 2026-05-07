@@ -259,6 +259,40 @@ func (b *Boxer) SyncBox(ctx context.Context, sb *sandtypes.Box) error {
 	return nil
 }
 
+func (b *Boxer) SyncHostGitMirror(ctx context.Context, sb *sandtypes.Box) (string, error) {
+	ctx = sandboxlog.WithSandboxID(ctx, sb.ID)
+	if sb.HostOriginDir == "" {
+		return "", fmt.Errorf("sandbox %s has no host origin directory", sb.ID)
+	}
+	hostGitTopLevel := b.GitOps.TopLevel(ctx, sb.HostOriginDir)
+	if hostGitTopLevel == "" {
+		return "", fmt.Errorf("sandbox %s was not created from a git repository", sb.ID)
+	}
+	mirror := cloning.NewGitMirror(filepath.Join(b.appRoot, "git-mirrors"), b.GitOps, b.FileOps)
+	mirrorDir, err := mirror.EnsureUpdated(ctx, hostGitTopLevel)
+	if err != nil {
+		return "", err
+	}
+	if sb.ContainerID == "" || len(sb.Mounts) == 0 {
+		b.hydrateMounts(sb, mirrorDir)
+	}
+	return mirrorDir, nil
+}
+
+func (b *Boxer) hydrateMounts(sb *sandtypes.Box, hostGitMirrorDir string) {
+	pathRegistry := cloning.NewStandardPathRegistry(sb.SandboxWorkDir)
+	baseConfig := cloning.NewBaseContainerConfiguration()
+	sb.Mounts = baseConfig.GetMounts(cloning.CloneArtifacts{
+		HostWorkDir:       sb.HostOriginDir,
+		HostGitMirrorDir:  hostGitMirrorDir,
+		SandboxWorkDir:    sb.SandboxWorkDir,
+		PathRegistry:      pathRegistry,
+		Username:          sb.Username,
+		Uid:               sb.Uid,
+		SharedCacheMounts: sb.SharedCacheMounts,
+	})
+}
+
 // NewSandboxOpts holds the parameters for creating a new sandbox.
 type NewSandboxOpts struct {
 	AgentType      string
@@ -344,6 +378,13 @@ func (sb *Boxer) NewSandbox(ctx context.Context, opts NewSandboxOpts) (*sandtype
 		gitBranch = sb.GitOps.Branch(ctx, hostWorkDir)
 		gitCommit = sb.GitOps.Commit(ctx, hostWorkDir)
 		gitIsDirty = sb.GitOps.IsDirty(ctx, hostWorkDir)
+		if artifacts.HostGitMirrorDir != "" {
+			mirror := cloning.NewGitMirror(filepath.Join(sb.appRoot, "git-mirrors"), sb.GitOps, sb.FileOps)
+			if err := mirror.WriteSnapshotRef(ctx, artifacts.HostGitMirrorDir, opts.ID, gitCommit); err != nil {
+				slog.WarnContext(ctx, "failed to write sandbox creation snapshot ref",
+					"mirror", artifacts.HostGitMirrorDir, "sandbox", opts.ID, "error", err)
+			}
+		}
 	}
 
 	ret := &sandtypes.Box{

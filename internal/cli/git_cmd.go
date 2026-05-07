@@ -14,9 +14,10 @@ import (
 )
 
 type GitCmd struct {
-	Diff   DiffCmd   `cmd:"" help:"diff current working directory with sandbox clone"`
-	Status StatusCmd `cmd:"" help:"show git status of sandbox working tree"`
-	Log    LogCmd    `cmd:"" help:"show git log of sandbox working tree"`
+	Diff     DiffCmd     `cmd:"" help:"diff current working directory with sandbox clone"`
+	Status   StatusCmd   `cmd:"" help:"show git status of sandbox working tree"`
+	Log      LogCmd      `cmd:"" help:"show git log of sandbox working tree"`
+	SyncHost SyncHostCmd `cmd:"" name:"sync-host" help:"update the shared mirror for a sandbox's original host repo"`
 }
 
 type StatusCmd struct {
@@ -24,6 +25,10 @@ type StatusCmd struct {
 }
 
 type LogCmd struct {
+	SandboxNameFlag
+}
+
+type SyncHostCmd struct {
 	SandboxNameFlag
 }
 
@@ -298,5 +303,17 @@ func (c *LogCmd) Run(cctx *CLIContext) error {
 		"host_origin_dir", sbox.HostOriginDir,
 	)
 
+	return nil
+}
+
+func (c *SyncHostCmd) Run(cctx *CLIContext) error {
+	ctx := cctx.Context
+	mc := cctx.Daemon
+
+	mirrorPath, err := mc.SyncHostGitMirror(ctx, c.SandboxName)
+	if err != nil {
+		return fmt.Errorf("sync host git mirror for sandbox %s: %w", c.SandboxName, err)
+	}
+	fmt.Fprintf(os.Stdout, "updated host git mirror: %s\n", mirrorPath)
 	return nil
 }

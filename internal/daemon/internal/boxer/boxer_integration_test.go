@@ -213,6 +213,48 @@ func TestBoxer_NewSandbox_EndToEnd(t *testing.T) {
 			t.Error("Expected sandbox not to be saved after preparation error")
 		}
 	})
+
+	t.Run("snapshot ref error does not fail sandbox creation", func(t *testing.T) {
+		mockContainer := &hostops.MockContainerOps{}
+		mockImage := &mockImageOps{}
+		boxer := newTestBoxer(t, mockContainer, mockImage)
+		boxer.FileOps = &hostops.MockFileOps{
+			MkdirAllFunc: os.MkdirAll,
+			CreateFunc:   os.Create,
+		}
+		hostWorkDir := t.TempDir()
+		boxer.GitOps = &hostops.MockGitOps{
+			TopLevelFunc: func(ctx context.Context, dir string) string {
+				return hostWorkDir
+			},
+			CommitFunc: func(ctx context.Context, dir string) string {
+				return "abc123"
+			},
+			UpdateRefFunc: func(ctx context.Context, dir, ref, value string) error {
+				return errors.New("snapshot failed")
+			},
+		}
+
+		testPrep := &mockWorkspacePreparation{
+			prepareFunc: func(ctx context.Context, req cloning.CloneRequest) (*cloning.CloneArtifacts, error) {
+				sandboxRoot := filepath.Join(boxer.appRoot, "clones", req.ID)
+				return &cloning.CloneArtifacts{
+					HostGitMirrorDir: "/mirror/repo.git",
+					SandboxWorkDir:   sandboxRoot,
+					PathRegistry:     cloning.NewStandardPathRegistry(sandboxRoot),
+				}, nil
+			},
+		}
+		boxer.AgentRegistry.Register(&cloning.AgentConfig{
+			Name:          "test-snapshot-agent",
+			Preparation:   testPrep,
+			Configuration: &mockContainerConfiguration{},
+		})
+
+		if _, err := boxer.NewSandbox(ctx, NewSandboxOpts{AgentType: "test-snapshot-agent", ID: "test-sandbox", HostWorkDir: hostWorkDir, ImageName: "test-image:latest", CPUs: 2, Memory: 1024}); err != nil {
+			t.Fatalf("NewSandbox() error = %v", err)
+		}
+	})
 }
 
 func TestBoxer_CreateContainerSSHAgentOptIn(t *testing.T) {

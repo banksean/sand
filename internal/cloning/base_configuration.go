@@ -153,11 +153,14 @@ func (c *BaseContainerConfiguration) GetMounts(artifacts CloneArtifacts) []sandt
 			Source: artifacts.PathRegistry.WorkDir(),
 			Target: "/app",
 		},
-		{
-			Source:   artifacts.HostWorkDir,
+	}
+
+	if artifacts.HostGitMirrorDir != "" {
+		mounts = append(mounts, sandtypes.MountSpec{
+			Source:   artifacts.HostGitMirrorDir,
 			Target:   ContainerSideGitOrigin,
 			ReadOnly: true,
-		},
+		})
 	}
 
 	if artifacts.SharedCacheMounts.MiseCacheHostDir != "" {

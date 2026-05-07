@@ -28,6 +28,7 @@ const (
 	DaemonService_RemoveSandbox_FullMethodName         = "/sand.daemon.v1.DaemonService/RemoveSandbox"
 	DaemonService_StopSandbox_FullMethodName           = "/sand.daemon.v1.DaemonService/StopSandbox"
 	DaemonService_StartSandbox_FullMethodName          = "/sand.daemon.v1.DaemonService/StartSandbox"
+	DaemonService_SyncHostGitMirror_FullMethodName     = "/sand.daemon.v1.DaemonService/SyncHostGitMirror"
 	DaemonService_ResolveAgentLaunchEnv_FullMethodName = "/sand.daemon.v1.DaemonService/ResolveAgentLaunchEnv"
 	DaemonService_ExportImage_FullMethodName           = "/sand.daemon.v1.DaemonService/ExportImage"
 	DaemonService_Stats_FullMethodName                 = "/sand.daemon.v1.DaemonService/Stats"
@@ -49,6 +50,7 @@ type DaemonServiceClient interface {
 	RemoveSandbox(ctx context.Context, in *IDRequest, opts ...grpc.CallOption) (*StatusResponse, error)
 	StopSandbox(ctx context.Context, in *IDRequest, opts ...grpc.CallOption) (*StatusResponse, error)
 	StartSandbox(ctx context.Context, in *StartSandboxRequest, opts ...grpc.CallOption) (*StatusResponse, error)
+	SyncHostGitMirror(ctx context.Context, in *IDRequest, opts ...grpc.CallOption) (*SyncHostGitMirrorResponse, error)
 	ResolveAgentLaunchEnv(ctx context.Context, in *ResolveAgentLaunchEnvRequest, opts ...grpc.CallOption) (*ResolveAgentLaunchEnvResponse, error)
 	ExportImage(ctx context.Context, in *ExportImageRequest, opts ...grpc.CallOption) (*StatusResponse, error)
 	Stats(ctx context.Context, in *StatsRequest, opts ...grpc.CallOption) (*StatsResponse, error)
@@ -155,6 +157,16 @@ func (c *daemonServiceClient) StartSandbox(ctx context.Context, in *StartSandbox
 	return out, nil
 }
 
+func (c *daemonServiceClient) SyncHostGitMirror(ctx context.Context, in *IDRequest, opts ...grpc.CallOption) (*SyncHostGitMirrorResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SyncHostGitMirrorResponse)
+	err := c.cc.Invoke(ctx, DaemonService_SyncHostGitMirror_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *daemonServiceClient) ResolveAgentLaunchEnv(ctx context.Context, in *ResolveAgentLaunchEnvRequest, opts ...grpc.CallOption) (*ResolveAgentLaunchEnvResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ResolveAgentLaunchEnvResponse)
@@ -246,6 +258,7 @@ type DaemonServiceServer interface {
 	RemoveSandbox(context.Context, *IDRequest) (*StatusResponse, error)
 	StopSandbox(context.Context, *IDRequest) (*StatusResponse, error)
 	StartSandbox(context.Context, *StartSandboxRequest) (*StatusResponse, error)
+	SyncHostGitMirror(context.Context, *IDRequest) (*SyncHostGitMirrorResponse, error)
 	ResolveAgentLaunchEnv(context.Context, *ResolveAgentLaunchEnvRequest) (*ResolveAgentLaunchEnvResponse, error)
 	ExportImage(context.Context, *ExportImageRequest) (*StatusResponse, error)
 	Stats(context.Context, *StatsRequest) (*StatsResponse, error)
@@ -288,6 +301,9 @@ func (UnimplementedDaemonServiceServer) StopSandbox(context.Context, *IDRequest)
 }
 func (UnimplementedDaemonServiceServer) StartSandbox(context.Context, *StartSandboxRequest) (*StatusResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method StartSandbox not implemented")
+}
+func (UnimplementedDaemonServiceServer) SyncHostGitMirror(context.Context, *IDRequest) (*SyncHostGitMirrorResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SyncHostGitMirror not implemented")
 }
 func (UnimplementedDaemonServiceServer) ResolveAgentLaunchEnv(context.Context, *ResolveAgentLaunchEnvRequest) (*ResolveAgentLaunchEnvResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ResolveAgentLaunchEnv not implemented")
@@ -490,6 +506,24 @@ func _DaemonService_StartSandbox_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DaemonService_SyncHostGitMirror_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(IDRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DaemonServiceServer).SyncHostGitMirror(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DaemonService_SyncHostGitMirror_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DaemonServiceServer).SyncHostGitMirror(ctx, req.(*IDRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _DaemonService_ResolveAgentLaunchEnv_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ResolveAgentLaunchEnvRequest)
 	if err := dec(in); err != nil {
@@ -626,6 +660,10 @@ var DaemonService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "StartSandbox",
 			Handler:    _DaemonService_StartSandbox_Handler,
+		},
+		{
+			MethodName: "SyncHostGitMirror",
+			Handler:    _DaemonService_SyncHostGitMirror_Handler,
 		},
 		{
 			MethodName: "ResolveAgentLaunchEnv",

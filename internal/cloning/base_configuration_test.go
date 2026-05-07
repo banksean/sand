@@ -101,6 +101,45 @@ func TestDefaultContainerHook_UsesAlpineFlavorWhenAPKAvailable(t *testing.T) {
 	}
 }
 
+func TestBaseContainerConfigurationMountsGitMirrorAsOrigin(t *testing.T) {
+	cfg := NewBaseContainerConfiguration()
+	mounts := cfg.GetMounts(CloneArtifacts{
+		HostGitMirrorDir: "/host/mirrors/repo.git",
+		SandboxWorkDir:   "/host/sandboxes/one",
+		PathRegistry:     NewStandardPathRegistry("/host/sandboxes/one"),
+	})
+
+	var found bool
+	for _, mount := range mounts {
+		if mount.Target == ContainerSideGitOrigin {
+			found = true
+			if mount.Source != "/host/mirrors/repo.git" {
+				t.Fatalf("origin mount source = %q, want mirror", mount.Source)
+			}
+			if !mount.ReadOnly {
+				t.Fatal("origin mirror mount is not read-only")
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("missing %s mount in %#v", ContainerSideGitOrigin, mounts)
+	}
+}
+
+func TestBaseContainerConfigurationSkipsOriginMountWithoutGitMirror(t *testing.T) {
+	cfg := NewBaseContainerConfiguration()
+	mounts := cfg.GetMounts(CloneArtifacts{
+		SandboxWorkDir: "/host/sandboxes/one",
+		PathRegistry:   NewStandardPathRegistry("/host/sandboxes/one"),
+	})
+
+	for _, mount := range mounts {
+		if mount.Target == ContainerSideGitOrigin {
+			t.Fatalf("unexpected origin mount without mirror: %#v", mount)
+		}
+	}
+}
+
 func TestDefaultContainerHook_UsesUbuntuFlavorWhenAPKUnavailable(t *testing.T) {
 	cfg := NewBaseContainerConfiguration()
 	exec := &fakeHookStreamer{

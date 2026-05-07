@@ -515,13 +515,19 @@ func (d *Daemon) StartSandbox(ctx context.Context, opts StartSandboxOpts) error 
 	}
 	ctx = sandboxlog.WithSandboxID(ctx, sbox.ID)
 
-	needsRecreate := false
-	if opts.SSHAgent {
-		ctr, err := d.boxer.GetContainer(ctx, sbox.ContainerID)
-		if err != nil {
+	if sbox.OriginalGitDetails != nil && sbox.OriginalGitDetails.Commit != "" {
+		if _, err := d.boxer.SyncHostGitMirror(ctx, sbox); err != nil {
 			return err
 		}
-		sbox.Container = ctr
+	}
+
+	needsRecreate := false
+	ctr, err := d.boxer.GetContainer(ctx, sbox.ContainerID)
+	if err != nil {
+		return err
+	}
+	sbox.Container = ctr
+	if opts.SSHAgent {
 		if ctr != nil && !ctr.Configuration.SSH {
 			if ctr.Status == "running" {
 				return fmt.Errorf("sandbox %s is already running without ssh-agent forwarding", sbox.ID)
@@ -558,6 +564,18 @@ func (d *Daemon) StartSandbox(ctx context.Context, opts StartSandboxOpts) error 
 		return startErr
 	}
 	return nil
+}
+
+func (d *Daemon) SyncHostGitMirror(ctx context.Context, name string) (string, error) {
+	sbox, err := d.boxer.Get(ctx, name)
+	if err != nil {
+		return "", err
+	}
+	if sbox == nil {
+		return "", fmt.Errorf("sandbox not found: %s", name)
+	}
+	ctx = sandboxlog.WithSandboxID(ctx, sbox.ID)
+	return d.boxer.SyncHostGitMirror(ctx, sbox)
 }
 
 type CreateSandboxOpts struct {
