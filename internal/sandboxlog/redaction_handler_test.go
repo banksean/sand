@@ -15,7 +15,8 @@ func TestRedactionHandlerRedactsCommandSecrets(t *testing.T) {
 	var out bytes.Buffer
 	logger := slog.New(NewRedactionHandler(slog.NewJSONHandler(&out, nil)))
 
-	logger.Info("exec",
+	logger.Info(
+		"exec",
 		"cmd", "container exec --env OPENAI_API_KEY=sk-test --env-file /repo/.env --token abc123 sandbox sh",
 		"output", "ANTHROPIC_API_KEY=secret-value",
 	)

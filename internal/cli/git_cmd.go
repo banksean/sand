@@ -122,7 +122,8 @@ func (c *DiffCmd) Run(cctx *CLIContext) error {
 	}
 
 	// Print information about the sandbox
-	slog.InfoContext(ctx, "DiffCmd completed",
+	slog.InfoContext(
+		ctx, "DiffCmd completed",
 		"sandbox_id", sbox.ID,
 		"sandbox_name", sbox.Name,
 		"sandbox_workdir", sbox.SandboxWorkDir,
@@ -241,7 +242,8 @@ func (c *StatusCmd) Run(cctx *CLIContext) error {
 	}
 
 	// Print information about the sandbox
-	slog.InfoContext(ctx, "StatusCmd completed",
+	slog.InfoContext(
+		ctx, "StatusCmd completed",
 		"sandbox_id", sbox.ID,
 		"sandbox_name", sbox.Name,
 		"sandbox_workdir", sbox.SandboxWorkDir,
@@ -296,7 +298,8 @@ func (c *LogCmd) Run(cctx *CLIContext) error {
 	}
 
 	// Print information about the sandbox
-	slog.InfoContext(ctx, "LogCmd completed",
+	slog.InfoContext(
+		ctx, "LogCmd completed",
 		"sandbox_id", sbox.ID,
 		"sandbox_name", sbox.Name,
 		"sandbox_workdir", sbox.SandboxWorkDir,

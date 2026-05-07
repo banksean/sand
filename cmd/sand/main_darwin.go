@@ -249,7 +249,8 @@ func main() {
 	if p := cli.FindProjectConfig(); p != "" {
 		kongConfigPaths = append(kongConfigPaths, p)
 	}
-	kongCtx := kong.Parse(&app,
+	kongCtx := kong.Parse(
+		&app,
 		kong.UsageOnError(),
 		kong.Configuration(kongyaml.Loader, kongConfigPaths...),
 		kong.Description(description),

@@ -59,7 +59,8 @@ func TestCacheFlagsLoadedByKongYAML(t *testing.T) {
 	}
 
 	var parsed cli
-	parser := kong.Must(&parsed,
+	parser := kong.Must(
+		&parsed,
 		kong.Configuration(kongyaml.Loader, filepath.Join(homeDir, ".sand.yaml"), filepath.Join(projDir, ".sand.yaml")),
 	)
 	_, err := parser.Parse([]string{})

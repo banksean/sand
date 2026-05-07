@@ -115,7 +115,8 @@ func traceInsecureFromEnv() bool {
 
 func traceResource(ctx context.Context, serviceName string, attrs ...attribute.KeyValue) (*resource.Resource, error) {
 	attrs = append(defaultServiceName(serviceName), attrs...)
-	return resource.New(ctx,
+	return resource.New(
+		ctx,
 		resource.WithTelemetrySDK(),
 		resource.WithProcess(),
 		resource.WithHost(),

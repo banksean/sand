@@ -242,7 +242,8 @@ func TestLoadEffectiveConfigMaps_NormalizesCacheFlags(t *testing.T) {
 	}
 
 	var parsed target
-	parser := kong.Must(&parsed,
+	parser := kong.Must(
+		&parsed,
 		kong.Configuration(kongyaml.Loader, filepath.Join(homeDir, ".sand.yaml"), filepath.Join(projDir, ".sand.yaml")),
 	)
 	if _, err := parser.Parse([]string{}); err != nil {

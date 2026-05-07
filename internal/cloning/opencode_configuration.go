@@ -37,7 +37,8 @@ func (c *OpenCodeContainerConfiguration) GetStartHooks(artifacts CloneArtifacts)
 	hooks := c.base.GetStartHooks(artifacts)
 
 	// Add OpenCode-specific hooks
-	hooks = append(hooks,
+	hooks = append(
+		hooks,
 		c.openSSHTunnelHook(artifacts.Username),
 	)
 
@@ -49,7 +50,8 @@ func (c *OpenCodeContainerConfiguration) GetFirstStartHooks(artifacts CloneArtif
 	hooks := c.base.GetFirstStartHooks(artifacts)
 
 	// Add OpenCode-specific hooks
-	hooks = append(hooks,
+	hooks = append(
+		hooks,
 		c.copyOpenCodeBinaryHook(artifacts.Username),
 		c.openSSHTunnelHook(artifacts.Username),
 	)

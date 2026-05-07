@@ -19,7 +19,8 @@ type HostMCP struct {
 // StartHostServices starts MCP-supporting processes on the host machine. Since these processes
 // are not specific to a particular sandbox, they are shared across sandboxes.
 func (m *HostMCP) StartHostServices(ctx context.Context) error {
-	cmd := exec.Command("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+	cmd := exec.Command(
+		"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
 		fmt.Sprintf("--remote-debugging-port=%d", m.ChromeDevToolsPort),
 		"--user-data-dir="+m.ChromeUserDataDir,
 		"--no-startup-window",
