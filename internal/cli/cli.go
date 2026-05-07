@@ -48,7 +48,7 @@ type ProjectEnvFlag struct {
 // SandboxCreationFlags are shared by commands that create a sandbox.
 type SandboxCreationFlags struct {
 	SSHAgentFlag
-	ImageName          string   `short:"i" placeholder:"<container-image-name>" help:"name of container image to use"`
+	ImageName          string   `name:"image" short:"i" placeholder:"<container-image-name>" help:"name of container image to use"`
 	CloneFromDir       string   `short:"d" placeholder:"<project-dir>" help:"directory to clone into the sandbox. Defaults to current working directory, if unset."`
 	EnvFile            string   `short:"e" default:".env" placholder:"<file-path>" help:"path to env file associated with the sandbox for agent auth and optional project env injection"`
 	Rm                 bool     `help:"remove the sandbox after the command terminates"`

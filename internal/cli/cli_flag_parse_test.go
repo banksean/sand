@@ -115,6 +115,16 @@ func TestSandboxCreationFlagsShortFlags(t *testing.T) {
 	}
 }
 
+func TestSandboxCreationFlagsImageLongFlag(t *testing.T) {
+	var cli struct {
+		SandboxCreationFlags `embed:""`
+	}
+	kongParse(t, &cli, []string{"--image", "myimage:latest"})
+	if cli.ImageName != "myimage:latest" {
+		t.Errorf("expected ImageName myimage:latest, got %q", cli.ImageName)
+	}
+}
+
 func TestProjectEnvFlagDefaults(t *testing.T) {
 	var cli struct {
 		ProjectEnvFlag `embed:""`

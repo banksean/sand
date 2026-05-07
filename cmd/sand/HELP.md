@@ -45,7 +45,7 @@ sand new [flags] [SANDBOX-NAME]
 **Flags:**
 
 - `--ssh-agent` - enable ssh-agent forwarding for the container
-- `-i, --image-name` _`<container-image-name>`_ - name of container image to use
+- `-i, --image` _`<container-image-name>`_ - name of container image to use
 - `-d, --clone-from-dir` _`<project-dir>`_ - directory to clone into the sandbox. Defaults to current working directory, if unset.
 - `-e, --env-file` _`".env"`_ - path to env file associated with the sandbox for agent auth and optional project env injection (default: `.env`)
 - `--rm` - remove the sandbox after the command terminates
@@ -75,7 +75,7 @@ sand oneshot [flags] <PROMPT>
 **Flags:**
 
 - `--ssh-agent` - enable ssh-agent forwarding for the container
-- `-i, --image-name` _`<container-image-name>`_ - name of container image to use
+- `-i, --image` _`<container-image-name>`_ - name of container image to use
 - `-d, --clone-from-dir` _`<project-dir>`_ - directory to clone into the sandbox. Defaults to current working directory, if unset.
 - `-e, --env-file` _`".env"`_ - path to env file associated with the sandbox for agent auth and optional project env injection (default: `.env`)
 - `--rm` - remove the sandbox after the command terminates
@@ -120,7 +120,7 @@ sand exec [flags] <SANDBOX-NAME> <ARG>...
 **Flags:**
 
 - `--ssh-agent` - enable ssh-agent forwarding for the container
-- `-i, --image-name` _`<container-image-name>`_ - name of container image to use
+- `-i, --image` _`<container-image-name>`_ - name of container image to use
 - `-d, --clone-from-dir` _`<project-dir>`_ - directory to clone into the sandbox. Defaults to current working directory, if unset.
 - `-e, --env-file` _`".env"`_ - path to env file associated with the sandbox for agent auth and optional project env injection (default: `.env`)
 - `--rm` - remove the sandbox after the command terminates
