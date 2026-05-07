@@ -37,6 +37,8 @@ shell:
 
 Commit a `.sand.yaml` at the root of a project to share default flag values with your team, such as image name, allowed-domains file, CPU limits, and memory limits.
 
+`sand` exits with an error if a user or project `.sand.yaml` contains keys that do not match known flags. This prevents typos from being silently ignored.
+
 ## Shared caches
 
 For shared runtime caches across sandboxes, including the Go module cache and Go build cache under the shared mise cache mount, add this to `~/.sand.yaml` or a project `.sand.yaml`:

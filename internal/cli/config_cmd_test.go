@@ -3,6 +3,7 @@ package cli
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/alecthomas/kong"
@@ -284,5 +285,69 @@ func TestLoadEffectiveConfigMaps_NormalizesCacheFlags(t *testing.T) {
 	}
 	if defCaches["apk"] != "true" || defCaches["mise"] != "true" {
 		t.Fatalf("default caches: got %v", defCaches)
+	}
+}
+
+func TestValidateConfigFilesAcceptsKnownKeys(t *testing.T) {
+	type target struct {
+		LogLevel string     `default:"info"`
+		Caches   CacheFlags `embed:"" prefix:"caches-"`
+		New      struct {
+			ImageName          string `name:"image"`
+			AllowedDomainsFile string `name:"allowed-domains-file"`
+		} `cmd:""`
+	}
+
+	tmp := t.TempDir()
+	cfgPath := filepath.Join(tmp, ".sand.yaml")
+	if err := os.WriteFile(cfgPath, []byte(`
+log-level: debug
+caches:
+  mise: false
+caches-apk: true
+new:
+  image: test-image:latest
+  allowed-domains-file: allowed-domains.txt
+new-allowed-domains-file: other-allowed-domains.txt
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var parsed target
+	parser := kong.Must(&parsed)
+	if err := ValidateConfigFiles(parser, cfgPath); err != nil {
+		t.Fatalf("ValidateConfigFiles: %v", err)
+	}
+}
+
+func TestValidateConfigFilesRejectsUnknownKeys(t *testing.T) {
+	type target struct {
+		New struct {
+			ImageName string `name:"image"`
+		} `cmd:""`
+	}
+
+	tmp := t.TempDir()
+	cfgPath := filepath.Join(tmp, ".sand.yaml")
+	if err := os.WriteFile(cfgPath, []byte(`
+new:
+  image-name: test-image:latest
+oneshot:
+  image: test-image:latest
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var parsed target
+	parser := kong.Must(&parsed)
+	err := ValidateConfigFiles(parser, cfgPath)
+	if err == nil {
+		t.Fatal("expected unknown config key error")
+	}
+	msg := err.Error()
+	for _, want := range []string{"invalid .sand.yaml configuration", cfgPath + ": new.image-name", cfgPath + ": oneshot.image"} {
+		if !strings.Contains(msg, want) {
+			t.Fatalf("expected error to contain %q, got:\n%s", want, msg)
+		}
 	}
 }

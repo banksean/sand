@@ -132,6 +132,10 @@ func main() {
 	if p := cli.FindProjectConfig(); p != "" {
 		kongConfigPaths = append(kongConfigPaths, p)
 	}
+	if err := cli.ValidateConfigFiles(kongApp, kongConfigPaths...); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 	kongCtx := kong.Parse(&app,
 		kong.UsageOnError(),
 		kong.Configuration(kongyaml.Loader, kongConfigPaths...),
