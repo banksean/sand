@@ -240,6 +240,7 @@ func TestCreateSandboxOptsProtoRoundTrip(t *testing.T) {
 	opts := CreateSandboxOpts{
 		Name:           "test-box",
 		CloneFromDir:   "/src",
+		ProfileName:    "dev",
 		ImageName:      "test-image:latest",
 		EnvFile:        "/src/.env",
 		Agent:          "codex",
@@ -256,6 +257,7 @@ func TestCreateSandboxOptsProtoRoundTrip(t *testing.T) {
 	got := createSandboxOptsFromProto(createSandboxOptsToProto(opts))
 	if got.Name != opts.Name ||
 		got.CloneFromDir != opts.CloneFromDir ||
+		got.ProfileName != opts.ProfileName ||
 		got.ImageName != opts.ImageName ||
 		got.EnvFile != opts.EnvFile ||
 		got.Agent != opts.Agent ||

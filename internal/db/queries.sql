@@ -16,12 +16,12 @@ ORDER BY created_at DESC;
 -- name: UpsertSandbox :exec
 INSERT INTO sandboxes (
     id, name, state, container_id, host_origin_dir, sandbox_work_dir,
-    image_name, dns_domain, env_file, agent_type,
+    image_name, dns_domain, env_file, agent_type, profile_name,
     original_git_origin, original_git_branch, original_git_commit,
     original_git_is_dirty, allowed_domains,
     cpu, memory_mb, default_username, default_uid,
     deleted_at, trash_work_dir
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(id) DO UPDATE SET
     name = excluded.name,
     state = excluded.state,
@@ -32,6 +32,7 @@ ON CONFLICT(id) DO UPDATE SET
     dns_domain = excluded.dns_domain,
     env_file = excluded.env_file,
     agent_type = excluded.agent_type,
+    profile_name = excluded.profile_name,
     updated_at = CURRENT_TIMESTAMP,
     original_git_origin = excluded.original_git_origin,
     original_git_branch = excluded.original_git_branch,

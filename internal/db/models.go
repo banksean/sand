@@ -19,6 +19,7 @@ type Sandbox struct {
 	CreatedAt          sql.NullTime   `json:"created_at"`
 	UpdatedAt          sql.NullTime   `json:"updated_at"`
 	AgentType          sql.NullString `json:"agent_type"`
+	ProfileName        sql.NullString `json:"profile_name"`
 	OriginalGitOrigin  sql.NullString `json:"original_git_origin"`
 	OriginalGitBranch  sql.NullString `json:"original_git_branch"`
 	OriginalGitCommit  sql.NullString `json:"original_git_commit"`

@@ -19,6 +19,7 @@ type CloneRequest struct {
 	ID                string
 	Name              string
 	HostWorkDir       string
+	ProfileName       string
 	EnvFile           string
 	Username          string
 	Uid               string

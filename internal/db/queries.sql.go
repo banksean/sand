@@ -21,7 +21,7 @@ func (q *Queries) DeleteSandbox(ctx context.Context, id string) error {
 }
 
 const getActiveSandboxByName = `-- name: GetActiveSandboxByName :one
-SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains, cpu, memory_mb, default_username, default_uid, name, state, deleted_at, trash_work_dir FROM sandboxes
+SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, profile_name, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains, cpu, memory_mb, default_username, default_uid, name, state, deleted_at, trash_work_dir FROM sandboxes
 WHERE name = ? AND state = 'active'
 LIMIT 1
 `
@@ -40,6 +40,7 @@ func (q *Queries) GetActiveSandboxByName(ctx context.Context, name string) (Sand
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.AgentType,
+		&i.ProfileName,
 		&i.OriginalGitOrigin,
 		&i.OriginalGitBranch,
 		&i.OriginalGitCommit,
@@ -58,7 +59,7 @@ func (q *Queries) GetActiveSandboxByName(ctx context.Context, name string) (Sand
 }
 
 const getSandboxByID = `-- name: GetSandboxByID :one
-SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains, cpu, memory_mb, default_username, default_uid, name, state, deleted_at, trash_work_dir FROM sandboxes
+SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, profile_name, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains, cpu, memory_mb, default_username, default_uid, name, state, deleted_at, trash_work_dir FROM sandboxes
 WHERE id = ?
 LIMIT 1
 `
@@ -77,6 +78,7 @@ func (q *Queries) GetSandboxByID(ctx context.Context, id string) (Sandbox, error
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.AgentType,
+		&i.ProfileName,
 		&i.OriginalGitOrigin,
 		&i.OriginalGitBranch,
 		&i.OriginalGitCommit,
@@ -95,7 +97,7 @@ func (q *Queries) GetSandboxByID(ctx context.Context, id string) (Sandbox, error
 }
 
 const getSandboxesByImage = `-- name: GetSandboxesByImage :many
-SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains, cpu, memory_mb, default_username, default_uid, name, state, deleted_at, trash_work_dir FROM sandboxes
+SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, profile_name, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains, cpu, memory_mb, default_username, default_uid, name, state, deleted_at, trash_work_dir FROM sandboxes
 WHERE image_name = ? AND state = 'active'
 ORDER BY created_at DESC
 `
@@ -120,6 +122,7 @@ func (q *Queries) GetSandboxesByImage(ctx context.Context, imageName string) ([]
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.AgentType,
+			&i.ProfileName,
 			&i.OriginalGitOrigin,
 			&i.OriginalGitBranch,
 			&i.OriginalGitCommit,
@@ -148,7 +151,7 @@ func (q *Queries) GetSandboxesByImage(ctx context.Context, imageName string) ([]
 }
 
 const listSandboxes = `-- name: ListSandboxes :many
-SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains, cpu, memory_mb, default_username, default_uid, name, state, deleted_at, trash_work_dir FROM sandboxes
+SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, profile_name, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains, cpu, memory_mb, default_username, default_uid, name, state, deleted_at, trash_work_dir FROM sandboxes
 WHERE state = 'active'
 ORDER BY created_at DESC
 `
@@ -173,6 +176,7 @@ func (q *Queries) ListSandboxes(ctx context.Context) ([]Sandbox, error) {
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.AgentType,
+			&i.ProfileName,
 			&i.OriginalGitOrigin,
 			&i.OriginalGitBranch,
 			&i.OriginalGitCommit,
@@ -240,12 +244,12 @@ func (q *Queries) UpdateContainerID(ctx context.Context, arg UpdateContainerIDPa
 const upsertSandbox = `-- name: UpsertSandbox :exec
 INSERT INTO sandboxes (
     id, name, state, container_id, host_origin_dir, sandbox_work_dir,
-    image_name, dns_domain, env_file, agent_type,
+    image_name, dns_domain, env_file, agent_type, profile_name,
     original_git_origin, original_git_branch, original_git_commit,
     original_git_is_dirty, allowed_domains,
     cpu, memory_mb, default_username, default_uid,
     deleted_at, trash_work_dir
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(id) DO UPDATE SET
     name = excluded.name,
     state = excluded.state,
@@ -256,6 +260,7 @@ ON CONFLICT(id) DO UPDATE SET
     dns_domain = excluded.dns_domain,
     env_file = excluded.env_file,
     agent_type = excluded.agent_type,
+    profile_name = excluded.profile_name,
     updated_at = CURRENT_TIMESTAMP,
     original_git_origin = excluded.original_git_origin,
     original_git_branch = excluded.original_git_branch,
@@ -281,6 +286,7 @@ type UpsertSandboxParams struct {
 	DnsDomain          sql.NullString `json:"dns_domain"`
 	EnvFile            sql.NullString `json:"env_file"`
 	AgentType          sql.NullString `json:"agent_type"`
+	ProfileName        sql.NullString `json:"profile_name"`
 	OriginalGitOrigin  sql.NullString `json:"original_git_origin"`
 	OriginalGitBranch  sql.NullString `json:"original_git_branch"`
 	OriginalGitCommit  sql.NullString `json:"original_git_commit"`
@@ -306,6 +312,7 @@ func (q *Queries) UpsertSandbox(ctx context.Context, arg UpsertSandboxParams) er
 		arg.DnsDomain,
 		arg.EnvFile,
 		arg.AgentType,
+		arg.ProfileName,
 		arg.OriginalGitOrigin,
 		arg.OriginalGitBranch,
 		arg.OriginalGitCommit,

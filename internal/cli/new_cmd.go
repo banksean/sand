@@ -131,6 +131,7 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 		sbox, err = mc.CreateSandbox(ctx, daemon.CreateSandboxOpts{
 			Name:           c.SandboxName,
 			CloneFromDir:   c.CloneFromDir,
+			ProfileName:    c.ProfileName,
 			ImageName:      c.ImageName,
 			EnvFile:        c.EnvFile,
 			Agent:          c.Agent,

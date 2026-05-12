@@ -2,6 +2,8 @@ package sandtypes
 
 type DotfileMode string
 
+const DefaultProfileName = "default"
+
 const (
 	DotfileModeNone      DotfileMode = "none"
 	DotfileModeMinimal   DotfileMode = "minimal"

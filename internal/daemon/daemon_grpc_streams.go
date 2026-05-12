@@ -88,6 +88,7 @@ func createSandboxOptsToProto(opts CreateSandboxOpts) *daemonpb.CreateSandboxReq
 	return &daemonpb.CreateSandboxRequest{
 		Id:             name,
 		CloneFromDir:   opts.CloneFromDir,
+		ProfileName:    opts.ProfileName,
 		ImageName:      opts.ImageName,
 		EnvFile:        opts.EnvFile,
 		Agent:          opts.Agent,
@@ -109,6 +110,7 @@ func createSandboxOptsFromProto(req *daemonpb.CreateSandboxRequest) CreateSandbo
 	opts := CreateSandboxOpts{
 		Name:           req.GetId(),
 		CloneFromDir:   req.GetCloneFromDir(),
+		ProfileName:    req.GetProfileName(),
 		ImageName:      req.GetImageName(),
 		EnvFile:        req.GetEnvFile(),
 		Agent:          req.GetAgent(),

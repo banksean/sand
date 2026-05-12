@@ -904,6 +904,7 @@ type CreateSandboxRequest struct {
 	SharedCaches   *SharedCacheConfig     `protobuf:"bytes,11,opt,name=shared_caches,json=sharedCaches,proto3" json:"shared_caches,omitempty"`
 	Cpus           int32                  `protobuf:"varint,12,opt,name=cpus,proto3" json:"cpus,omitempty"`
 	Memory         int32                  `protobuf:"varint,13,opt,name=memory,proto3" json:"memory,omitempty"`
+	ProfileName    string                 `protobuf:"bytes,14,opt,name=profile_name,json=profileName,proto3" json:"profile_name,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1027,6 +1028,13 @@ func (x *CreateSandboxRequest) GetMemory() int32 {
 		return x.Memory
 	}
 	return 0
+}
+
+func (x *CreateSandboxRequest) GetProfileName() string {
+	if x != nil {
+		return x.ProfileName
+	}
+	return ""
 }
 
 type CreateSandboxResponse struct {
@@ -1324,7 +1332,7 @@ const file_internal_daemon_daemonpb_daemon_proto_rawDesc = "" +
 	"stats_json\x18\x01 \x01(\fR\tstatsJson\"9\n" +
 	"\x11SharedCacheConfig\x12\x12\n" +
 	"\x04mise\x18\x01 \x01(\bR\x04mise\x12\x10\n" +
-	"\x03apk\x18\x02 \x01(\bR\x03apk\"\x9e\x03\n" +
+	"\x03apk\x18\x02 \x01(\bR\x03apk\"\xc1\x03\n" +
 	"\x14CreateSandboxRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12$\n" +
 	"\x0eclone_from_dir\x18\x02 \x01(\tR\fcloneFromDir\x12\x1d\n" +
@@ -1340,7 +1348,8 @@ const file_internal_daemon_daemonpb_daemon_proto_rawDesc = "" +
 	" \x03(\tR\avolumes\x12F\n" +
 	"\rshared_caches\x18\v \x01(\v2!.sand.daemon.v1.SharedCacheConfigR\fsharedCaches\x12\x12\n" +
 	"\x04cpus\x18\f \x01(\x05R\x04cpus\x12\x16\n" +
-	"\x06memory\x18\r \x01(\x05R\x06memory\"s\n" +
+	"\x06memory\x18\r \x01(\x05R\x06memory\x12!\n" +
+	"\fprofile_name\x18\x0e \x01(\tR\vprofileName\"s\n" +
 	"\x15CreateSandboxResponse\x12\x1c\n" +
 	"\bprogress\x18\x01 \x01(\tH\x00R\bprogress\x12\x1b\n" +
 	"\bbox_json\x18\x02 \x01(\fH\x00R\aboxJson\x12\x16\n" +

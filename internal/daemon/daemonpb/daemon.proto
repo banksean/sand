@@ -113,6 +113,7 @@ message CreateSandboxRequest {
   SharedCacheConfig shared_caches = 11;
   int32 cpus = 12;
   int32 memory = 13;
+  string profile_name = 14;
 }
 
 message CreateSandboxResponse {

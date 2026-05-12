@@ -50,6 +50,7 @@ type SandboxCreationFlags struct {
 	SSHAgentFlag
 	ImageName          string   `name:"image" short:"i" placeholder:"<container-image-name>" help:"name of container image to use"`
 	CloneFromDir       string   `short:"d" placeholder:"<project-dir>" help:"directory to clone into the sandbox. Defaults to current working directory, if unset."`
+	ProfileName        string   `name:"profile" default:"default" placeholder:"<profile-name>" help:"profile policy to associate with the sandbox"`
 	EnvFile            string   `short:"e" default:".env" placholder:"<file-path>" help:"path to env file associated with the sandbox for agent auth and optional project env injection"`
 	Rm                 bool     `help:"remove the sandbox after the command terminates"`
 	AllowedDomainsFile string   `placeholder:"<file-path>" help:"path to allowed-domains.txt file for DNS egress filtering (overrides the init image default)"`

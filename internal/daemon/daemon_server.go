@@ -582,6 +582,7 @@ type CreateSandboxOpts struct {
 	ID           string `json:"id,omitempty"`
 	Name         string `json:"name,omitempty"`
 	CloneFromDir string `json:"cloneFromDir,omitempty"`
+	ProfileName  string `json:"profileName,omitempty"`
 	ImageName    string `json:"imageName,omitempty"`
 	EnvFile      string `json:"envFile,omitempty"`
 	Agent        string `json:"agent,omitempty"`
@@ -615,6 +616,10 @@ func (d *Daemon) createSandbox(ctx context.Context, opts CreateSandboxOpts, prog
 	if agentType == "" {
 		agentType = "default"
 	}
+	profileName := opts.ProfileName
+	if profileName == "" {
+		profileName = sandtypes.DefaultProfileName
+	}
 	slog.InfoContext(ctx, "createSandbox", "agentType", agentType, "opts", opts)
 
 	if err := d.validateSelectableAgent(opts.Agent); err != nil {
@@ -626,6 +631,7 @@ func (d *Daemon) createSandbox(ctx context.Context, opts CreateSandboxOpts, prog
 		ID:             opts.ID,
 		Name:           opts.Name,
 		HostWorkDir:    opts.CloneFromDir,
+		ProfileName:    profileName,
 		ImageName:      opts.ImageName,
 		EnvFile:        opts.EnvFile,
 		Username:       opts.Username,

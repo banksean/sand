@@ -23,6 +23,8 @@ type Box struct {
 	State string
 	// AgentType identifies which agent configuration to use (default, claude, opencode)
 	AgentType string
+	// ProfileName identifies the user-facing exposure policy selected for this sandbox.
+	ProfileName string
 	// ContainerID is the ID of the container
 	ContainerID string
 	// HostOriginDir is the origin of the sandbox, from which we clone its contents

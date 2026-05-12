@@ -86,6 +86,9 @@ func TestSandboxCreationFlagsDefaults(t *testing.T) {
 	if cli.CloneFromDir != "" {
 		t.Errorf("expected empty CloneFromDir, got %q", cli.CloneFromDir)
 	}
+	if cli.ProfileName != "default" {
+		t.Errorf("expected default ProfileName default, got %q", cli.ProfileName)
+	}
 	if cli.Rm {
 		t.Error("expected Rm=false by default")
 	}
@@ -99,6 +102,7 @@ func TestSandboxCreationFlagsShortFlags(t *testing.T) {
 		"-i", "myimage:latest",
 		"-d", "/some/dir",
 		"-e", "prod.env",
+		"--profile", "dev",
 		"--rm",
 	})
 	if cli.ImageName != "myimage:latest" {
@@ -109,6 +113,9 @@ func TestSandboxCreationFlagsShortFlags(t *testing.T) {
 	}
 	if cli.EnvFile != "prod.env" {
 		t.Errorf("expected EnvFile prod.env, got %q", cli.EnvFile)
+	}
+	if cli.ProfileName != "dev" {
+		t.Errorf("expected ProfileName dev, got %q", cli.ProfileName)
 	}
 	if !cli.Rm {
 		t.Error("expected Rm=true")

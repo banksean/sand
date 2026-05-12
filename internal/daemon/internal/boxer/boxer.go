@@ -299,6 +299,7 @@ type NewSandboxOpts struct {
 	ID             string
 	Name           string
 	HostWorkDir    string
+	ProfileName    string
 	ImageName      string
 	EnvFile        string
 	Username       string
@@ -317,6 +318,9 @@ type NewSandboxOpts struct {
 func (sb *Boxer) NewSandbox(ctx context.Context, opts NewSandboxOpts) (*sandtypes.Box, error) {
 	ctx = sandboxlog.WithSandboxID(ctx, opts.ID)
 	slog.InfoContext(ctx, "Boxer.NewSandbox", "hostWorkDir", opts.HostWorkDir, "id", opts.ID, "name", opts.Name, "agentType", opts.AgentType)
+	if opts.ProfileName == "" {
+		opts.ProfileName = sandtypes.DefaultProfileName
+	}
 
 	// Get agent configuration from registry
 	agentConfig := sb.AgentRegistry.Get(opts.AgentType)
@@ -334,6 +338,7 @@ func (sb *Boxer) NewSandbox(ctx context.Context, opts NewSandboxOpts) (*sandtype
 		ID:                opts.ID,
 		Name:              opts.Name,
 		HostWorkDir:       opts.HostWorkDir,
+		ProfileName:       opts.ProfileName,
 		EnvFile:           envFile,
 		Username:          opts.Username,
 		Uid:               opts.Uid,
@@ -392,6 +397,7 @@ func (sb *Boxer) NewSandbox(ctx context.Context, opts NewSandboxOpts) (*sandtype
 		Name:              opts.Name,
 		State:             "active",
 		AgentType:         opts.AgentType,
+		ProfileName:       opts.ProfileName,
 		HostOriginDir:     hostWorkDir,
 		SandboxWorkDir:    artifacts.SandboxWorkDir,
 		ImageName:         opts.ImageName,
@@ -661,12 +667,17 @@ func (sb *Boxer) sandboxFromDB(s *db.Sandbox) *sandtypes.Box {
 	if state == "" {
 		state = "active"
 	}
+	profileName := fromNullString(s.ProfileName)
+	if profileName == "" {
+		profileName = sandtypes.DefaultProfileName
+	}
 
 	return &sandtypes.Box{
 		ID:             s.ID,
 		Name:           name,
 		State:          state,
 		AgentType:      agentType,
+		ProfileName:    profileName,
 		ContainerID:    fromNullString(s.ContainerID),
 		HostOriginDir:  s.HostOriginDir,
 		SandboxWorkDir: s.SandboxWorkDir,
@@ -1072,6 +1083,9 @@ func (sb *Boxer) SaveSandbox(ctx context.Context, sbox *sandtypes.Box) error {
 	if sbox.State == "" {
 		sbox.State = "active"
 	}
+	if sbox.ProfileName == "" {
+		sbox.ProfileName = sandtypes.DefaultProfileName
+	}
 
 	upsertParams := db.UpsertSandboxParams{
 		ID:              sbox.ID,
@@ -1084,6 +1098,7 @@ func (sb *Boxer) SaveSandbox(ctx context.Context, sbox *sandtypes.Box) error {
 		DnsDomain:       toNullString(sbox.DNSDomain),
 		EnvFile:         toNullString(sbox.EnvFile),
 		AgentType:       toNullString(sbox.AgentType),
+		ProfileName:     toNullString(sbox.ProfileName),
 		AllowedDomains:  domainsToNullString(sbox.AllowedDomains),
 		Cpu:             toNullInt(sbox.CPUs),
 		MemoryMb:        toNullInt(sbox.MemoryMB),

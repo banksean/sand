@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS sandboxes (
     dns_domain TEXT,
     env_file TEXT,
     agent_type TEXT DEFAULT 'default',
+    profile_name TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     original_git_origin TEXT,

@@ -134,6 +134,7 @@ func TestSaveSandbox(t *testing.T) {
 	testSandbox := &sandtypes.Box{
 		ID:             "test-id",
 		ContainerID:    "container-123",
+		ProfileName:    "dev",
 		HostOriginDir:  "/tmp/host-origin",
 		SandboxWorkDir: filepath.Join(tmpDir, "test-id"),
 		ImageName:      "test-image",
@@ -183,6 +184,9 @@ func TestSaveSandbox(t *testing.T) {
 	if loadedSandbox.EnvFile != testSandbox.EnvFile {
 		t.Errorf("EnvFile mismatch: got %s, want %s", loadedSandbox.EnvFile, testSandbox.EnvFile)
 	}
+	if loadedSandbox.ProfileName != testSandbox.ProfileName {
+		t.Errorf("ProfileName mismatch: got %s, want %s", loadedSandbox.ProfileName, testSandbox.ProfileName)
+	}
 
 	// Test that UpsertSandbox works (update existing)
 	testSandbox.ContainerID = "updated-container-999"
@@ -221,6 +225,7 @@ func TestLoadSandbox(t *testing.T) {
 	testSandbox := &sandtypes.Box{
 		ID:             testID,
 		ContainerID:    "container-456",
+		ProfileName:    "dev",
 		HostOriginDir:  "/tmp/host-load",
 		SandboxWorkDir: sandboxDir,
 		ImageName:      "load-image",
@@ -261,6 +266,9 @@ func TestLoadSandbox(t *testing.T) {
 	}
 	if loadedSandbox.EnvFile != testSandbox.EnvFile {
 		t.Errorf("EnvFile mismatch: got %s, want %s", loadedSandbox.EnvFile, testSandbox.EnvFile)
+	}
+	if loadedSandbox.ProfileName != testSandbox.ProfileName {
+		t.Errorf("ProfileName mismatch: got %s, want %s", loadedSandbox.ProfileName, testSandbox.ProfileName)
 	}
 }
 
