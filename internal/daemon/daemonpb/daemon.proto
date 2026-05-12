@@ -75,10 +75,28 @@ message SyncHostGitMirrorResponse {
 message ResolveAgentLaunchEnvRequest {
   string agent = 1;
   string env_file = 2;
+  string profile_name = 3;
+  EnvPolicy profile_env = 4;
+  bool profile_env_configured = 5;
 }
 
 message ResolveAgentLaunchEnvResponse {
   map<string, string> env = 1;
+}
+
+message EnvPolicy {
+  repeated EnvFileRef files = 1;
+  repeated EnvVarRule vars = 2;
+}
+
+message EnvFileRef {
+  string path = 1;
+  string scope = 2;
+}
+
+message EnvVarRule {
+  string name = 1;
+  string scope = 2;
 }
 
 message ExportImageRequest {

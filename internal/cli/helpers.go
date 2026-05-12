@@ -5,14 +5,15 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 
 	"github.com/banksean/sand/internal/applecontainer/options"
 	"github.com/banksean/sand/internal/applecontainer/types"
+	"github.com/banksean/sand/internal/daemon"
 	"github.com/banksean/sand/internal/hostops"
+	"github.com/banksean/sand/internal/profiles"
 	"github.com/banksean/sand/internal/sandtypes"
 	"github.com/posener/complete"
-
-	"github.com/banksean/sand/internal/daemon"
 )
 
 type sandboxNamePredictor struct {
@@ -60,6 +61,56 @@ func plainCommandEnvFile(sbox *sandtypes.Box, includeProjectEnv bool) string {
 		return ""
 	}
 	return sbox.EnvFile
+}
+
+func resolveAgentLaunchEnv(ctx context.Context, mc daemon.Client, agent string, sbox *sandtypes.Box) (map[string]string, error) {
+	opts := daemon.ResolveAgentLaunchEnvOpts{Agent: agent}
+	if sbox != nil {
+		opts.EnvFile = sbox.EnvFile
+		opts.ProfileName = sbox.ProfileName
+		profileEnv, profileEnvConfigured, err := selectedProfileEnvPolicy(sbox)
+		if err != nil {
+			return nil, err
+		}
+		opts.ProfileEnv = profileEnv
+		opts.ProfileEnvConfigured = profileEnvConfigured
+	}
+	return mc.ResolveAgentLaunchEnv(ctx, opts)
+}
+
+func selectedProfileEnvPolicy(sbox *sandtypes.Box) (sandtypes.EnvPolicy, bool, error) {
+	if sbox == nil {
+		return sandtypes.EnvPolicy{}, false, nil
+	}
+	profileName := sbox.ProfileName
+	if profileName == "" {
+		profileName = sandtypes.DefaultProfileName
+	}
+	cfg, err := profiles.LoadConfigForDir(sbox.HostOriginDir)
+	if err != nil {
+		return sandtypes.EnvPolicy{}, false, err
+	}
+	profile, ok := cfg.Profiles[profileName]
+	if !ok {
+		if profileName == sandtypes.DefaultProfileName {
+			return sandtypes.EnvPolicy{}, false, nil
+		}
+		return sandtypes.EnvPolicy{}, false, fmt.Errorf("profile %q not found", profileName)
+	}
+	return resolveEnvPolicyPaths(profile.Env, sbox.HostOriginDir), true, nil
+}
+
+func resolveEnvPolicyPaths(policy sandtypes.EnvPolicy, baseDir string) sandtypes.EnvPolicy {
+	if baseDir == "" {
+		return policy
+	}
+	for i := range policy.Files {
+		path := policy.Files[i].Path
+		if path != "" && !filepath.IsAbs(path) {
+			policy.Files[i].Path = filepath.Join(baseDir, path)
+		}
+	}
+	return policy
 }
 
 // runShell executes an interactive shell or command in sbox's container,

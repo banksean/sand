@@ -203,7 +203,7 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 
 	var agentEnv map[string]string
 	if c.Agent != "" {
-		agentEnv, err = mc.ResolveAgentLaunchEnv(ctx, c.Agent, sbox.EnvFile)
+		agentEnv, err = resolveAgentLaunchEnv(ctx, mc, c.Agent, sbox)
 		if err != nil {
 			return err
 		}

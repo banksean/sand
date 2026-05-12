@@ -147,10 +147,13 @@ func (c *GRPCClient) SyncHostGitMirror(ctx context.Context, name string) (string
 	return resp.GetMirrorPath(), nil
 }
 
-func (c *GRPCClient) ResolveAgentLaunchEnv(ctx context.Context, agent, envFile string) (map[string]string, error) {
+func (c *GRPCClient) ResolveAgentLaunchEnv(ctx context.Context, opts ResolveAgentLaunchEnvOpts) (map[string]string, error) {
 	resp, err := c.client.ResolveAgentLaunchEnv(ctx, &daemonpb.ResolveAgentLaunchEnvRequest{
-		Agent:   agent,
-		EnvFile: envFile,
+		Agent:                opts.Agent,
+		EnvFile:              opts.EnvFile,
+		ProfileName:          opts.ProfileName,
+		ProfileEnv:           envPolicyToProto(opts.ProfileEnv),
+		ProfileEnvConfigured: opts.ProfileEnvConfigured,
 	})
 	if err != nil {
 		return nil, err
@@ -159,6 +162,29 @@ func (c *GRPCClient) ResolveAgentLaunchEnv(ctx context.Context, agent, envFile s
 		return map[string]string{}, nil
 	}
 	return resp.GetEnv(), nil
+}
+
+func envPolicyToProto(policy sandtypes.EnvPolicy) *daemonpb.EnvPolicy {
+	if len(policy.Files) == 0 && len(policy.Vars) == 0 {
+		return nil
+	}
+	out := &daemonpb.EnvPolicy{
+		Files: make([]*daemonpb.EnvFileRef, 0, len(policy.Files)),
+		Vars:  make([]*daemonpb.EnvVarRule, 0, len(policy.Vars)),
+	}
+	for _, file := range policy.Files {
+		out.Files = append(out.Files, &daemonpb.EnvFileRef{
+			Path:  file.Path,
+			Scope: string(file.Scope),
+		})
+	}
+	for _, variable := range policy.Vars {
+		out.Vars = append(out.Vars, &daemonpb.EnvVarRule{
+			Name:  variable.Name,
+			Scope: string(variable.Scope),
+		})
+	}
+	return out
 }
 
 func (c *GRPCClient) ExportImage(ctx context.Context, name, destinationPath string) error {

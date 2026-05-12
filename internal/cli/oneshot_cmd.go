@@ -118,7 +118,7 @@ func (c *OneshotCmd) Run(cctx *CLIContext) error {
 
 	containerSvc := hostops.NewAppleContainerOps()
 	hostname := types.GetContainerHostname(sbox.Container)
-	authEnv, err := mc.ResolveAgentLaunchEnv(ctx, c.Agent, sbox.EnvFile)
+	authEnv, err := resolveAgentLaunchEnv(ctx, mc, c.Agent, sbox)
 	if err != nil {
 		return err
 	}

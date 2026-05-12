@@ -124,3 +124,54 @@ func TestLoadConfigIgnoresMissingAndEmptyFiles(t *testing.T) {
 		t.Fatalf("profiles = %#v, want empty", cfg.Profiles)
 	}
 }
+
+func TestFindProjectConfigSearchesAncestors(t *testing.T) {
+	root := t.TempDir()
+	child := filepath.Join(root, "a", "b")
+	if err := os.MkdirAll(child, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	configPath := filepath.Join(root, ".sand.yaml")
+	if err := os.WriteFile(configPath, []byte("profiles: {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := FindProjectConfig(child); got != configPath {
+		t.Fatalf("FindProjectConfig() = %q, want %q", got, configPath)
+	}
+}
+
+func TestLoadConfigForDirUsesUserThenProjectOrder(t *testing.T) {
+	home := t.TempDir()
+	project := t.TempDir()
+	t.Setenv("HOME", home)
+	if err := os.WriteFile(filepath.Join(home, ".sand.yaml"), []byte(`
+profiles:
+  default:
+    env:
+      vars:
+        - name: OPENAI_API_KEY
+          scope: auth
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(project, ".sand.yaml"), []byte(`
+profiles:
+  default:
+    env:
+      vars:
+        - name: ANTHROPIC_API_KEY
+          scope: auth
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadConfigForDir(project)
+	if err != nil {
+		t.Fatalf("LoadConfigForDir: %v", err)
+	}
+	vars := cfg.Profiles["default"].Env.Vars
+	if len(vars) != 1 || vars[0].Name != "ANTHROPIC_API_KEY" {
+		t.Fatalf("default vars = %#v, want project override", vars)
+	}
+}

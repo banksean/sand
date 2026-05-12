@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/banksean/sand/internal/cloning"
+	"github.com/banksean/sand/internal/sandtypes"
 )
 
 type resolvedAgentRequirements struct {
@@ -45,7 +46,7 @@ func (d *Daemon) resolveCreateSandboxRequirements(opts CreateSandboxOpts) (resol
 		return resolvedAgentRequirements{}, err
 	}
 
-	fileEnv, err := loadEnvFileValues(opts.EnvFile)
+	fileEnv, processEnvNames, restrictProcessEnv, err := resolveAuthSources(opts)
 	if err != nil {
 		return resolvedAgentRequirements{}, err
 	}
@@ -57,7 +58,7 @@ func (d *Daemon) resolveCreateSandboxRequirements(opts CreateSandboxOpts) (resol
 	}
 
 	resolved.AuthRequired = true
-	if authEnv, ok := resolveAnyEnvGroup(authSpec.EnvAnyOf, fileEnv); ok {
+	if authEnv, ok := resolveAnyEnvGroup(authSpec.EnvAnyOf, fileEnv, processEnvNames, restrictProcessEnv); ok {
 		resolved.AuthAvailable = true
 		resolved.AuthEnv = authEnv
 		return resolved, nil
@@ -71,19 +72,68 @@ func (d *Daemon) resolveCreateSandboxRequirements(opts CreateSandboxOpts) (resol
 	)
 }
 
-func resolveAnyEnvGroup(groups [][]string, fileEnv map[string]string) (map[string]string, bool) {
+func resolveAuthSources(opts CreateSandboxOpts) (map[string]string, map[string]struct{}, bool, error) {
+	if !opts.ProfileEnvConfigured && !envPolicyConfigured(opts.ProfileEnv) {
+		fileEnv, err := loadEnvFileValues(opts.EnvFile)
+		return fileEnv, nil, false, err
+	}
+
+	fileEnv, err := loadAuthEnvFileValues(opts.ProfileEnv.Files)
+	if err != nil {
+		return nil, nil, true, err
+	}
+	return fileEnv, authEnvVarNames(opts.ProfileEnv.Vars), true, nil
+}
+
+func envPolicyConfigured(policy sandtypes.EnvPolicy) bool {
+	return len(policy.Files) > 0 || len(policy.Vars) > 0
+}
+
+func loadAuthEnvFileValues(files []sandtypes.EnvFileRef) (map[string]string, error) {
+	values := make(map[string]string)
+	for _, file := range files {
+		if !envScopeAllowsAuth(file.Scope) {
+			continue
+		}
+		fileValues, err := loadEnvFileValues(file.Path)
+		if err != nil {
+			return nil, err
+		}
+		for key, value := range fileValues {
+			values[key] = value
+		}
+	}
+	return values, nil
+}
+
+func authEnvVarNames(vars []sandtypes.EnvVarRule) map[string]struct{} {
+	names := make(map[string]struct{}, len(vars))
+	for _, variable := range vars {
+		if !envScopeAllowsAuth(variable.Scope) || strings.TrimSpace(variable.Name) == "" {
+			continue
+		}
+		names[variable.Name] = struct{}{}
+	}
+	return names
+}
+
+func envScopeAllowsAuth(scope sandtypes.EnvScope) bool {
+	return scope == sandtypes.EnvScopeAuth || scope == sandtypes.EnvScopeAll
+}
+
+func resolveAnyEnvGroup(groups [][]string, fileEnv map[string]string, processEnvNames map[string]struct{}, restrictProcessEnv bool) (map[string]string, bool) {
 	for _, group := range groups {
-		if values, ok := resolveAllEnvVars(group, fileEnv); ok {
+		if values, ok := resolveAllEnvVars(group, fileEnv, processEnvNames, restrictProcessEnv); ok {
 			return values, true
 		}
 	}
 	return nil, false
 }
 
-func resolveAllEnvVars(names []string, fileEnv map[string]string) (map[string]string, bool) {
+func resolveAllEnvVars(names []string, fileEnv map[string]string, processEnvNames map[string]struct{}, restrictProcessEnv bool) (map[string]string, bool) {
 	values := make(map[string]string, len(names))
 	for _, name := range names {
-		value, ok := resolveEnvValue(name, fileEnv)
+		value, ok := resolveEnvValue(name, fileEnv, processEnvNames, restrictProcessEnv)
 		if !ok {
 			return nil, false
 		}
@@ -92,14 +142,21 @@ func resolveAllEnvVars(names []string, fileEnv map[string]string) (map[string]st
 	return values, true
 }
 
-func resolveEnvValue(name string, fileEnv map[string]string) (string, bool) {
-	if value, ok := os.LookupEnv(name); ok && strings.TrimSpace(value) != "" {
-		return value, true
+func resolveEnvValue(name string, fileEnv map[string]string, processEnvNames map[string]struct{}, restrictProcessEnv bool) (string, bool) {
+	if !restrictProcessEnv || processEnvAllowed(name, processEnvNames) {
+		if value, ok := os.LookupEnv(name); ok && strings.TrimSpace(value) != "" {
+			return value, true
+		}
 	}
 	if value := strings.TrimSpace(fileEnv[name]); value != "" {
 		return value, true
 	}
 	return "", false
+}
+
+func processEnvAllowed(name string, processEnvNames map[string]struct{}) bool {
+	_, ok := processEnvNames[name]
+	return ok
 }
 
 func loadEnvFileValues(path string) (map[string]string, error) {

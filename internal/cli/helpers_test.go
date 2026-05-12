@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/banksean/sand/internal/sandtypes"
@@ -42,5 +44,75 @@ func TestPlainCommandEnvFile(t *testing.T) {
 	}
 	if got := plainCommandEnvFile(sbox, true); got != sbox.EnvFile {
 		t.Fatalf("plainCommandEnvFile(true) = %q, want %q", got, sbox.EnvFile)
+	}
+}
+
+func TestSelectedProfileEnvPolicy(t *testing.T) {
+	home := t.TempDir()
+	project := t.TempDir()
+	t.Setenv("HOME", home)
+	if err := os.WriteFile(filepath.Join(project, ".sand.yaml"), []byte(`
+profiles:
+  dev:
+    env:
+      files:
+        - path: .env
+          scope: auth
+      vars:
+        - name: OPENAI_API_KEY
+          scope: auth
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	policy, configured, err := selectedProfileEnvPolicy(&sandtypes.Box{
+		HostOriginDir: project,
+		ProfileName:   "dev",
+	})
+	if err != nil {
+		t.Fatalf("selectedProfileEnvPolicy: %v", err)
+	}
+	if !configured {
+		t.Fatal("configured = false, want true")
+	}
+	if len(policy.Files) != 1 || policy.Files[0].Path != filepath.Join(project, ".env") {
+		t.Fatalf("files = %#v, want project .env", policy.Files)
+	}
+	if len(policy.Vars) != 1 || policy.Vars[0].Name != "OPENAI_API_KEY" {
+		t.Fatalf("vars = %#v, want OPENAI_API_KEY", policy.Vars)
+	}
+}
+
+func TestSelectedProfileEnvPolicyAllowsMissingDefaultProfile(t *testing.T) {
+	home := t.TempDir()
+	project := t.TempDir()
+	t.Setenv("HOME", home)
+
+	policy, configured, err := selectedProfileEnvPolicy(&sandtypes.Box{
+		HostOriginDir: project,
+		ProfileName:   sandtypes.DefaultProfileName,
+	})
+	if err != nil {
+		t.Fatalf("selectedProfileEnvPolicy: %v", err)
+	}
+	if configured {
+		t.Fatal("configured = true, want false")
+	}
+	if len(policy.Files) != 0 || len(policy.Vars) != 0 {
+		t.Fatalf("policy = %#v, want empty", policy)
+	}
+}
+
+func TestSelectedProfileEnvPolicyRejectsMissingNamedProfile(t *testing.T) {
+	home := t.TempDir()
+	project := t.TempDir()
+	t.Setenv("HOME", home)
+
+	_, _, err := selectedProfileEnvPolicy(&sandtypes.Box{
+		HostOriginDir: project,
+		ProfileName:   "dev",
+	})
+	if err == nil {
+		t.Fatal("expected missing profile error")
 	}
 }

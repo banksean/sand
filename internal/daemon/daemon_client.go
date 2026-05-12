@@ -22,7 +22,7 @@ type Client interface {
 	StopSandbox(ctx context.Context, name string) error
 	StartSandbox(ctx context.Context, opts StartSandboxOpts) error
 	SyncHostGitMirror(ctx context.Context, name string) (string, error)
-	ResolveAgentLaunchEnv(ctx context.Context, agent, envFile string) (map[string]string, error)
+	ResolveAgentLaunchEnv(ctx context.Context, opts ResolveAgentLaunchEnvOpts) (map[string]string, error)
 	ExportImage(ctx context.Context, name, imageName string) error
 	Stats(ctx context.Context, name ...string) ([]types.ContainerStats, error)
 	VSC(ctx context.Context, name string) error
@@ -30,6 +30,14 @@ type Client interface {
 	// EnsureImage ensures imageName is present locally and up to date, pulling if needed.
 	// Progress lines from the daemon are written to w as they arrive.
 	EnsureImage(ctx context.Context, imageName string, w io.Writer) error
+}
+
+type ResolveAgentLaunchEnvOpts struct {
+	Agent                string
+	EnvFile              string
+	ProfileName          string
+	ProfileEnv           sandtypes.EnvPolicy
+	ProfileEnvConfigured bool
 }
 
 func NewUnixSocketClient(ctx context.Context, appBaseDir string) (Client, error) {

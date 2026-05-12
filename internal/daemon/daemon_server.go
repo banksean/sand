@@ -579,16 +579,18 @@ func (d *Daemon) SyncHostGitMirror(ctx context.Context, name string) (string, er
 }
 
 type CreateSandboxOpts struct {
-	ID           string `json:"id,omitempty"`
-	Name         string `json:"name,omitempty"`
-	CloneFromDir string `json:"cloneFromDir,omitempty"`
-	ProfileName  string `json:"profileName,omitempty"`
-	ImageName    string `json:"imageName,omitempty"`
-	EnvFile      string `json:"envFile,omitempty"`
-	Agent        string `json:"agent,omitempty"`
-	SSHAgent     bool   `json:"sshAgent,omitempty"`
-	Username     string `json:"username,omitempty"`
-	Uid          string `json:"uid,omitempty"`
+	ID                   string              `json:"id,omitempty"`
+	Name                 string              `json:"name,omitempty"`
+	CloneFromDir         string              `json:"cloneFromDir,omitempty"`
+	ProfileName          string              `json:"profileName,omitempty"`
+	ProfileEnv           sandtypes.EnvPolicy `json:"profileEnv,omitempty"`
+	ProfileEnvConfigured bool                `json:"profileEnvConfigured,omitempty"`
+	ImageName            string              `json:"imageName,omitempty"`
+	EnvFile              string              `json:"envFile,omitempty"`
+	Agent                string              `json:"agent,omitempty"`
+	SSHAgent             bool                `json:"sshAgent,omitempty"`
+	Username             string              `json:"username,omitempty"`
+	Uid                  string              `json:"uid,omitempty"`
 
 	AllowedDomains []string                    `json:"allowedDomains,omitempty"`
 	Volumes        []string                    `json:"volumes,omitempty"`

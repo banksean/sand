@@ -337,6 +337,15 @@ func TestGRPCUnary(t *testing.T) {
 			if req.GetEnvFile() != "/tmp/test.env" {
 				t.Fatalf("ResolveAgentLaunchEnv request envFile = %q, want /tmp/test.env", req.GetEnvFile())
 			}
+			if req.GetProfileName() != "dev" {
+				t.Fatalf("ResolveAgentLaunchEnv request profile = %q, want dev", req.GetProfileName())
+			}
+			if len(req.GetProfileEnv().GetFiles()) != 1 || req.GetProfileEnv().GetFiles()[0].GetScope() != "auth" {
+				t.Fatalf("ResolveAgentLaunchEnv profile env = %+v, want one auth file", req.GetProfileEnv())
+			}
+			if !req.GetProfileEnvConfigured() {
+				t.Fatal("ResolveAgentLaunchEnv profile env configured = false, want true")
+			}
 			return &daemonpb.ResolveAgentLaunchEnvResponse{Env: map[string]string{"OPENAI_API_KEY": "sk-test"}}, nil
 		},
 		StatsFunc: func(ctx context.Context, req *daemonpb.StatsRequest) (*daemonpb.StatsResponse, error) {
@@ -413,7 +422,15 @@ func TestGRPCUnary(t *testing.T) {
 	if err := client.StartSandbox(context.Background(), StartSandboxOpts{ID: "test-box", SSHAgent: true}); err != nil {
 		t.Fatalf("StartSandbox() error = %v", err)
 	}
-	env, err := client.ResolveAgentLaunchEnv(context.Background(), "codex", "/tmp/test.env")
+	env, err := client.ResolveAgentLaunchEnv(context.Background(), ResolveAgentLaunchEnvOpts{
+		Agent:       "codex",
+		EnvFile:     "/tmp/test.env",
+		ProfileName: "dev",
+		ProfileEnv: sandtypes.EnvPolicy{
+			Files: []sandtypes.EnvFileRef{{Path: "/tmp/test.env", Scope: sandtypes.EnvScopeAuth}},
+		},
+		ProfileEnvConfigured: true,
+	})
 	if err != nil {
 		t.Fatalf("ResolveAgentLaunchEnv() error = %v", err)
 	}

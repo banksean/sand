@@ -52,22 +52,7 @@ func (c *ConfigLsCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 // FindProjectConfig searches cwd and its ancestors for a .sand.yaml file,
 // returning the first path found or "" if none exists.
 func FindProjectConfig() string {
-	dir, err := os.Getwd()
-	if err != nil {
-		return ""
-	}
-	for {
-		candidate := filepath.Join(dir, ".sand.yaml")
-		if _, err := os.Stat(candidate); err == nil {
-			return candidate
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			break
-		}
-		dir = parent
-	}
-	return ""
+	return profilecfg.FindProjectConfig("")
 }
 
 // loadEffectiveConfigMaps loads the project-level and user-level (~/.sand.yaml)
@@ -98,23 +83,11 @@ func loadEffectiveConfigMaps(k *kong.Kong) (projCfg, userCfg, defaultsCfg map[st
 }
 
 func LoadEffectiveProfileConfig() (profilecfg.Config, error) {
-	paths, err := effectiveConfigPaths()
-	if err != nil {
-		return profilecfg.Config{}, err
-	}
-	return profilecfg.LoadConfig(paths...)
+	return profilecfg.LoadConfigForDir("")
 }
 
 func effectiveConfigPaths() ([]string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return nil, err
-	}
-	paths := []string{filepath.Join(home, ".sand.yaml")}
-	if projectPath := FindProjectConfig(); projectPath != "" {
-		paths = append(paths, projectPath)
-	}
-	return paths, nil
+	return profilecfg.ConfigPaths("")
 }
 
 func walkMerge(path []string, a, b, c map[string]any, f func(path []string, name string, aVal any, bVal any, cVal any)) {

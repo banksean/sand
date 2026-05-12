@@ -14,6 +14,7 @@ import (
 	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/daemon/daemonpb"
 	"github.com/banksean/sand/internal/sandboxlog"
+	"github.com/banksean/sand/internal/sandtypes"
 )
 
 func (s *daemonGRPCServer) Shutdown(ctx context.Context, _ *daemonpb.ShutdownRequest) (*daemonpb.StatusResponse, error) {
@@ -101,13 +102,39 @@ func (s *daemonGRPCServer) SyncHostGitMirror(ctx context.Context, req *daemonpb.
 
 func (s *daemonGRPCServer) ResolveAgentLaunchEnv(ctx context.Context, req *daemonpb.ResolveAgentLaunchEnvRequest) (*daemonpb.ResolveAgentLaunchEnvResponse, error) {
 	resolved, err := s.daemon.resolveCreateSandboxRequirements(CreateSandboxOpts{
-		Agent:   req.GetAgent(),
-		EnvFile: req.GetEnvFile(),
+		Agent:                req.GetAgent(),
+		EnvFile:              req.GetEnvFile(),
+		ProfileName:          req.GetProfileName(),
+		ProfileEnv:           envPolicyFromProto(req.GetProfileEnv()),
+		ProfileEnvConfigured: req.GetProfileEnvConfigured(),
 	})
 	if err != nil {
 		return nil, err
 	}
 	return &daemonpb.ResolveAgentLaunchEnvResponse{Env: resolved.AuthEnv}, nil
+}
+
+func envPolicyFromProto(policy *daemonpb.EnvPolicy) sandtypes.EnvPolicy {
+	if policy == nil {
+		return sandtypes.EnvPolicy{}
+	}
+	out := sandtypes.EnvPolicy{
+		Files: make([]sandtypes.EnvFileRef, 0, len(policy.GetFiles())),
+		Vars:  make([]sandtypes.EnvVarRule, 0, len(policy.GetVars())),
+	}
+	for _, file := range policy.GetFiles() {
+		out.Files = append(out.Files, sandtypes.EnvFileRef{
+			Path:  file.GetPath(),
+			Scope: sandtypes.EnvScope(file.GetScope()),
+		})
+	}
+	for _, variable := range policy.GetVars() {
+		out.Vars = append(out.Vars, sandtypes.EnvVarRule{
+			Name:  variable.GetName(),
+			Scope: sandtypes.EnvScope(variable.GetScope()),
+		})
+	}
+	return out
 }
 
 func (s *daemonGRPCServer) ExportImage(ctx context.Context, req *daemonpb.ExportImageRequest) (*daemonpb.StatusResponse, error) {

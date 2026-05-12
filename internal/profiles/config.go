@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/banksean/sand/internal/sandtypes"
 	"gopkg.in/yaml.v3"
@@ -27,6 +28,52 @@ func LoadConfig(paths ...string) (Config, error) {
 		merged = MergeConfigs(merged, cfg)
 	}
 	return merged, nil
+}
+
+func LoadConfigForDir(projectDir string) (Config, error) {
+	paths, err := ConfigPaths(projectDir)
+	if err != nil {
+		return Config{}, err
+	}
+	return LoadConfig(paths...)
+}
+
+func ConfigPaths(projectDir string) ([]string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, err
+	}
+	paths := []string{filepath.Join(home, ".sand.yaml")}
+	if projectPath := FindProjectConfig(projectDir); projectPath != "" {
+		paths = append(paths, projectPath)
+	}
+	return paths, nil
+}
+
+func FindProjectConfig(startDir string) string {
+	if startDir == "" {
+		var err error
+		startDir, err = os.Getwd()
+		if err != nil {
+			return ""
+		}
+	}
+	dir, err := filepath.Abs(startDir)
+	if err != nil {
+		return ""
+	}
+	for {
+		candidate := filepath.Join(dir, ".sand.yaml")
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	return ""
 }
 
 func MergeConfigs(base, override Config) Config {

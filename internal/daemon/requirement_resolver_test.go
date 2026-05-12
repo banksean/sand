@@ -14,6 +14,7 @@ import (
 	"github.com/banksean/sand/internal/cloning"
 	"github.com/banksean/sand/internal/daemon/internal/boxer"
 	"github.com/banksean/sand/internal/hostops"
+	"github.com/banksean/sand/internal/sandtypes"
 	"github.com/banksean/sand/internal/sshimmer"
 )
 
@@ -98,6 +99,106 @@ func TestResolveCreateSandboxRequirementsUsesEnvFile(t *testing.T) {
 	}
 	if got := caps.AuthEnv["OPENAI_API_KEY"]; got != "from-file" {
 		t.Fatalf("resolved OPENAI_API_KEY = %q, want %q", got, "from-file")
+	}
+}
+
+func TestResolveCreateSandboxRequirementsUsesProfileApprovedEnvFile(t *testing.T) {
+	t.Setenv("OPENAI_API_KEY", "")
+	dir := t.TempDir()
+	envFile := filepath.Join(dir, ".env")
+	if err := os.WriteFile(envFile, []byte("OPENAI_API_KEY=from-profile-file\n"), 0o644); err != nil {
+		t.Fatalf("os.WriteFile: %v", err)
+	}
+
+	d := newRequirementTestDaemon(t, requirementTestRegistry(), &hostops.MockContainerOps{})
+	caps, err := d.resolveCreateSandboxRequirements(CreateSandboxOpts{
+		Agent:       "codex",
+		ProfileName: "default",
+		ProfileEnv: sandtypes.EnvPolicy{
+			Files: []sandtypes.EnvFileRef{{Path: envFile, Scope: sandtypes.EnvScopeAuth}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("resolveCreateSandboxRequirements returned error: %v", err)
+	}
+	if !caps.AuthRequired || !caps.AuthAvailable {
+		t.Fatalf("resolved requirements = %+v, want auth required and available", caps)
+	}
+	if got := caps.AuthEnv["OPENAI_API_KEY"]; got != "from-profile-file" {
+		t.Fatalf("resolved OPENAI_API_KEY = %q, want %q", got, "from-profile-file")
+	}
+}
+
+func TestResolveCreateSandboxRequirementsRejectsProjectOnlyProfileEnvFile(t *testing.T) {
+	t.Setenv("OPENAI_API_KEY", "")
+	dir := t.TempDir()
+	envFile := filepath.Join(dir, ".env")
+	if err := os.WriteFile(envFile, []byte("OPENAI_API_KEY=project-only\n"), 0o644); err != nil {
+		t.Fatalf("os.WriteFile: %v", err)
+	}
+
+	d := newRequirementTestDaemon(t, requirementTestRegistry(), &hostops.MockContainerOps{})
+	_, err := d.resolveCreateSandboxRequirements(CreateSandboxOpts{
+		Agent:       "codex",
+		ProfileName: "default",
+		ProfileEnv: sandtypes.EnvPolicy{
+			Files: []sandtypes.EnvFileRef{{Path: envFile, Scope: sandtypes.EnvScopeProject}},
+		},
+	})
+	if err == nil {
+		t.Fatal("expected missing auth error for project-only profile env file")
+	}
+	if got := err.Error(); !strings.Contains(got, "OPENAI_API_KEY") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestResolveCreateSandboxRequirementsUsesProfileApprovedProcessEnvVar(t *testing.T) {
+	t.Setenv("OPENAI_API_KEY", "from-process")
+	d := newRequirementTestDaemon(t, requirementTestRegistry(), &hostops.MockContainerOps{})
+
+	caps, err := d.resolveCreateSandboxRequirements(CreateSandboxOpts{
+		Agent:       "codex",
+		ProfileName: "default",
+		ProfileEnv: sandtypes.EnvPolicy{
+			Vars: []sandtypes.EnvVarRule{{Name: "OPENAI_API_KEY", Scope: sandtypes.EnvScopeAuth}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("resolveCreateSandboxRequirements returned error: %v", err)
+	}
+	if got := caps.AuthEnv["OPENAI_API_KEY"]; got != "from-process" {
+		t.Fatalf("resolved OPENAI_API_KEY = %q, want %q", got, "from-process")
+	}
+}
+
+func TestResolveCreateSandboxRequirementsRejectsUnapprovedProcessEnvVar(t *testing.T) {
+	t.Setenv("OPENAI_API_KEY", "from-process")
+	d := newRequirementTestDaemon(t, requirementTestRegistry(), &hostops.MockContainerOps{})
+
+	_, err := d.resolveCreateSandboxRequirements(CreateSandboxOpts{
+		Agent:       "codex",
+		ProfileName: "default",
+		ProfileEnv: sandtypes.EnvPolicy{
+			Vars: []sandtypes.EnvVarRule{{Name: "OTHER_API_KEY", Scope: sandtypes.EnvScopeAuth}},
+		},
+	})
+	if err == nil {
+		t.Fatal("expected missing auth error for unapproved process env var")
+	}
+}
+
+func TestResolveCreateSandboxRequirementsRejectsEmptyConfiguredProfileEnv(t *testing.T) {
+	t.Setenv("OPENAI_API_KEY", "from-process")
+	d := newRequirementTestDaemon(t, requirementTestRegistry(), &hostops.MockContainerOps{})
+
+	_, err := d.resolveCreateSandboxRequirements(CreateSandboxOpts{
+		Agent:                "codex",
+		ProfileName:          "default",
+		ProfileEnvConfigured: true,
+	})
+	if err == nil {
+		t.Fatal("expected missing auth error for empty configured profile env")
 	}
 }
 

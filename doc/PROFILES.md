@@ -141,7 +141,7 @@ Persist only profile name and non-secret policy references in sandbox metadata. 
 1. [x] Terminology-only refactor: replace agent-side "capability" naming with "requirement" naming without changing behavior.
 2. [x] Add profile model and loading: introduce profile policy types and config parsing/merge support.
 3. [x] Thread selected profile through sandbox creation: carry the selected profile into workspace preparation and metadata.
-4. Move auth env resolution behind profile policy: intersect `AgentRequirements` with `Profile.Env` and return only the minimum required auth vars.
+4. [x] Move auth env resolution behind profile policy: intersect `AgentRequirements` with `Profile.Env` and return only the minimum required auth vars.
 5. Separate project/shell env behavior: keep auth env out of plain shell/exec/git unless explicitly allowed, and keep `--project-env` scoped to project env.
 6. Replace hard-coded dotfile copying: use `Profile.Dotfiles` instead of the current `.gitconfig`, `.ssh`, `.zshrc` list.
 7. Add sanitized git config handling: implement `GitPolicy.Config = sanitized` as a specialized git config transformation.
