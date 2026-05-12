@@ -320,6 +320,74 @@ new-allowed-domains-file: other-allowed-domains.txt
 	}
 }
 
+func TestValidateConfigFilesAcceptsProfiles(t *testing.T) {
+	type target struct {
+		LogLevel string `default:"info"`
+	}
+
+	tmp := t.TempDir()
+	cfgPath := filepath.Join(tmp, ".sand.yaml")
+	if err := os.WriteFile(cfgPath, []byte(`
+profiles:
+  default:
+    dotfiles:
+      mode: minimal
+      files:
+        - source: ~/.gitconfig
+          target: ~/.gitconfig
+          allowSymlink: true
+          allowOutsideHome: false
+    env:
+      files:
+        - path: .env
+          scope: auth
+      vars:
+        - name: OPENAI_API_KEY
+          scope: auth
+    ssh:
+      agentForwarding: opt-in
+    git:
+      config: sanitized
+    network:
+      allowedDomainsFile: allowed-domains.txt
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var parsed target
+	parser := kong.Must(&parsed)
+	if err := ValidateConfigFiles(parser, cfgPath); err != nil {
+		t.Fatalf("ValidateConfigFiles: %v", err)
+	}
+}
+
+func TestValidateConfigFilesRejectsUnknownProfileKeys(t *testing.T) {
+	type target struct {
+		LogLevel string `default:"info"`
+	}
+
+	tmp := t.TempDir()
+	cfgPath := filepath.Join(tmp, ".sand.yaml")
+	if err := os.WriteFile(cfgPath, []byte(`
+profiles:
+  default:
+    dotfiles:
+      copyEverything: true
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var parsed target
+	parser := kong.Must(&parsed)
+	err := ValidateConfigFiles(parser, cfgPath)
+	if err == nil {
+		t.Fatal("expected unknown profile config key error")
+	}
+	if got, want := err.Error(), cfgPath+": profiles.default.dotfiles.copyEverything"; !strings.Contains(got, want) {
+		t.Fatalf("expected error to contain %q, got:\n%s", want, got)
+	}
+}
+
 func TestValidateConfigFilesRejectsUnknownKeys(t *testing.T) {
 	type target struct {
 		New struct {

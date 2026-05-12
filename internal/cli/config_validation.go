@@ -83,6 +83,9 @@ func collectValidConfigKeys(node *kong.Node, commandPath []string, keys map[stri
 func unknownConfigKeys(cfg map[string]any, validKeys map[string]struct{}) []string {
 	var unknown []string
 	walkConfigLeaves(nil, cfg, func(path []string) {
+		if isProfileConfigLeaf(path) {
+			return
+		}
 		key := strings.Join(path, "-")
 		if _, ok := validKeys[key]; !ok {
 			unknown = append(unknown, strings.Join(path, "."))
@@ -102,9 +105,40 @@ func walkConfigLeaves(path []string, value any, visit func(path []string)) {
 		for key, child := range typed {
 			walkConfigLeaves(append(path, key), child, visit)
 		}
+	case []any:
+		if len(typed) == 0 && len(path) > 0 {
+			visit(path)
+			return
+		}
+		for _, child := range typed {
+			walkConfigLeaves(path, child, visit)
+		}
 	default:
 		if len(path) > 0 {
 			visit(path)
 		}
 	}
+}
+
+func isProfileConfigLeaf(path []string) bool {
+	if len(path) < 3 || path[0] != "profiles" || path[1] == "" {
+		return false
+	}
+	_, ok := profileConfigLeafKeys[strings.Join(path[2:], ".")]
+	return ok
+}
+
+var profileConfigLeafKeys = map[string]struct{}{
+	"dotfiles.mode":                   {},
+	"dotfiles.files.source":           {},
+	"dotfiles.files.target":           {},
+	"dotfiles.files.allowSymlink":     {},
+	"dotfiles.files.allowOutsideHome": {},
+	"env.files.path":                  {},
+	"env.files.scope":                 {},
+	"env.vars.name":                   {},
+	"env.vars.scope":                  {},
+	"ssh.agentForwarding":             {},
+	"git.config":                      {},
+	"network.allowedDomainsFile":      {},
 }
