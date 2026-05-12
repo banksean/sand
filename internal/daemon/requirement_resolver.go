@@ -9,7 +9,7 @@ import (
 	"github.com/banksean/sand/internal/cloning"
 )
 
-type resolvedAgentCapabilities struct {
+type resolvedAgentRequirements struct {
 	AuthRequired  bool
 	AuthAvailable bool
 	AuthEnv       map[string]string
@@ -35,23 +35,23 @@ func (d *Daemon) lookupSelectableAgent(agent string) (*cloning.AgentConfig, erro
 	return agentConfig, nil
 }
 
-func (d *Daemon) resolveCreateSandboxCapabilities(opts CreateSandboxOpts) (resolvedAgentCapabilities, error) {
+func (d *Daemon) resolveCreateSandboxRequirements(opts CreateSandboxOpts) (resolvedAgentRequirements, error) {
 	if opts.Agent == "" {
-		return resolvedAgentCapabilities{}, nil
+		return resolvedAgentRequirements{}, nil
 	}
 
 	agentConfig, err := d.lookupSelectableAgent(opts.Agent)
 	if err != nil {
-		return resolvedAgentCapabilities{}, err
+		return resolvedAgentRequirements{}, err
 	}
 
 	fileEnv, err := loadEnvFileValues(opts.EnvFile)
 	if err != nil {
-		return resolvedAgentCapabilities{}, err
+		return resolvedAgentRequirements{}, err
 	}
 
-	resolved := resolvedAgentCapabilities{}
-	authSpec := agentConfig.Capabilities.Auth
+	resolved := resolvedAgentRequirements{}
+	authSpec := agentConfig.Requirements.Auth
 	if authSpec == nil || len(authSpec.EnvAnyOf) == 0 {
 		return resolved, nil
 	}

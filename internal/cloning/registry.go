@@ -40,7 +40,7 @@ func newAgentConfigFromDefinition(definition agentdefs.Definition, cloneRoot str
 		Selectable:    definition.Selectable,
 		Preparation:   workspacePreparationForDefinition(definition, cloneRoot, messenger, gitOps, fileOps),
 		Configuration: containerConfigurationForDefinition(definition),
-		Capabilities:  capabilitiesForDefinition(definition),
+		Requirements:  requirementsForDefinition(definition),
 	}
 }
 
@@ -70,12 +70,12 @@ func containerConfigurationForDefinition(definition agentdefs.Definition) Contai
 	}
 }
 
-func capabilitiesForDefinition(definition agentdefs.Definition) AgentCapabilities {
+func requirementsForDefinition(definition agentdefs.Definition) AgentRequirements {
 	if len(definition.AuthEnvAnyOf) == 0 {
-		return AgentCapabilities{}
+		return AgentRequirements{}
 	}
-	return AgentCapabilities{
-		Auth: &AuthCapabilitySpec{
+	return AgentRequirements{
+		Auth: &AuthRequirementSpec{
 			EnvAnyOf: definition.AuthEnvAnyOf,
 		},
 	}

@@ -17,10 +17,10 @@ import (
 	"github.com/banksean/sand/internal/sshimmer"
 )
 
-func TestResolveCreateSandboxCapabilitiesRejectsUnknownAgent(t *testing.T) {
-	d := newCapabilityTestDaemon(t, capabilityTestRegistry(), &hostops.MockContainerOps{})
+func TestResolveCreateSandboxRequirementsRejectsUnknownAgent(t *testing.T) {
+	d := newRequirementTestDaemon(t, requirementTestRegistry(), &hostops.MockContainerOps{})
 
-	_, err := d.resolveCreateSandboxCapabilities(CreateSandboxOpts{Agent: "not-real"})
+	_, err := d.resolveCreateSandboxRequirements(CreateSandboxOpts{Agent: "not-real"})
 	if err == nil {
 		t.Fatal("expected error for unknown agent")
 	}
@@ -32,12 +32,12 @@ func TestResolveCreateSandboxCapabilitiesRejectsUnknownAgent(t *testing.T) {
 	}
 }
 
-func TestResolveCreateSandboxCapabilitiesAllowsNoAgentWithoutAuthRequirements(t *testing.T) {
-	d := newCapabilityTestDaemon(t, capabilityTestRegistry(), &hostops.MockContainerOps{})
+func TestResolveCreateSandboxRequirementsAllowsNoAgentWithoutAuthRequirements(t *testing.T) {
+	d := newRequirementTestDaemon(t, requirementTestRegistry(), &hostops.MockContainerOps{})
 
-	caps, err := d.resolveCreateSandboxCapabilities(CreateSandboxOpts{})
+	caps, err := d.resolveCreateSandboxRequirements(CreateSandboxOpts{})
 	if err != nil {
-		t.Fatalf("resolveCreateSandboxCapabilities returned error: %v", err)
+		t.Fatalf("resolveCreateSandboxRequirements returned error: %v", err)
 	}
 	if caps.AuthRequired {
 		t.Fatal("AuthRequired = true, want false")
@@ -47,40 +47,40 @@ func TestResolveCreateSandboxCapabilitiesAllowsNoAgentWithoutAuthRequirements(t 
 	}
 }
 
-func TestResolveCreateSandboxCapabilitiesSupportsOpenCodeProviderEnv(t *testing.T) {
+func TestResolveCreateSandboxRequirementsSupportsOpenCodeProviderEnv(t *testing.T) {
 	t.Setenv("ANTHROPIC_API_KEY", "")
 	t.Setenv("OPENAI_API_KEY", "opencode-key")
-	d := newCapabilityTestDaemon(t, capabilityTestRegistry(), &hostops.MockContainerOps{})
+	d := newRequirementTestDaemon(t, requirementTestRegistry(), &hostops.MockContainerOps{})
 
-	caps, err := d.resolveCreateSandboxCapabilities(CreateSandboxOpts{Agent: "opencode"})
+	caps, err := d.resolveCreateSandboxRequirements(CreateSandboxOpts{Agent: "opencode"})
 	if err != nil {
-		t.Fatalf("resolveCreateSandboxCapabilities returned error: %v", err)
+		t.Fatalf("resolveCreateSandboxRequirements returned error: %v", err)
 	}
 	if !caps.AuthRequired || !caps.AuthAvailable {
-		t.Fatalf("resolved capabilities = %+v, want auth required and available", caps)
+		t.Fatalf("resolved requirements = %+v, want auth required and available", caps)
 	}
 	if got := caps.AuthEnv["OPENAI_API_KEY"]; got != "opencode-key" {
 		t.Fatalf("resolved OPENAI_API_KEY = %q, want %q", got, "opencode-key")
 	}
 }
 
-func TestResolveCreateSandboxCapabilitiesUsesProcessEnv(t *testing.T) {
+func TestResolveCreateSandboxRequirementsUsesProcessEnv(t *testing.T) {
 	t.Setenv("OPENAI_API_KEY", "test-key")
-	d := newCapabilityTestDaemon(t, capabilityTestRegistry(), &hostops.MockContainerOps{})
+	d := newRequirementTestDaemon(t, requirementTestRegistry(), &hostops.MockContainerOps{})
 
-	caps, err := d.resolveCreateSandboxCapabilities(CreateSandboxOpts{Agent: "codex"})
+	caps, err := d.resolveCreateSandboxRequirements(CreateSandboxOpts{Agent: "codex"})
 	if err != nil {
-		t.Fatalf("resolveCreateSandboxCapabilities returned error: %v", err)
+		t.Fatalf("resolveCreateSandboxRequirements returned error: %v", err)
 	}
 	if !caps.AuthRequired || !caps.AuthAvailable {
-		t.Fatalf("resolved capabilities = %+v, want auth required and available", caps)
+		t.Fatalf("resolved requirements = %+v, want auth required and available", caps)
 	}
 	if got := caps.AuthEnv["OPENAI_API_KEY"]; got != "test-key" {
 		t.Fatalf("resolved OPENAI_API_KEY = %q, want %q", got, "test-key")
 	}
 }
 
-func TestResolveCreateSandboxCapabilitiesUsesEnvFile(t *testing.T) {
+func TestResolveCreateSandboxRequirementsUsesEnvFile(t *testing.T) {
 	t.Setenv("OPENAI_API_KEY", "")
 	dir := t.TempDir()
 	envFile := filepath.Join(dir, ".env")
@@ -88,20 +88,20 @@ func TestResolveCreateSandboxCapabilitiesUsesEnvFile(t *testing.T) {
 		t.Fatalf("os.WriteFile: %v", err)
 	}
 
-	d := newCapabilityTestDaemon(t, capabilityTestRegistry(), &hostops.MockContainerOps{})
-	caps, err := d.resolveCreateSandboxCapabilities(CreateSandboxOpts{Agent: "codex", EnvFile: envFile})
+	d := newRequirementTestDaemon(t, requirementTestRegistry(), &hostops.MockContainerOps{})
+	caps, err := d.resolveCreateSandboxRequirements(CreateSandboxOpts{Agent: "codex", EnvFile: envFile})
 	if err != nil {
-		t.Fatalf("resolveCreateSandboxCapabilities returned error: %v", err)
+		t.Fatalf("resolveCreateSandboxRequirements returned error: %v", err)
 	}
 	if !caps.AuthRequired || !caps.AuthAvailable {
-		t.Fatalf("resolved capabilities = %+v, want auth required and available", caps)
+		t.Fatalf("resolved requirements = %+v, want auth required and available", caps)
 	}
 	if got := caps.AuthEnv["OPENAI_API_KEY"]; got != "from-file" {
 		t.Fatalf("resolved OPENAI_API_KEY = %q, want %q", got, "from-file")
 	}
 }
 
-func TestResolveCreateSandboxCapabilitiesSupportsMultiVarRequirementGroup(t *testing.T) {
+func TestResolveCreateSandboxRequirementsSupportsMultiVarRequirementGroup(t *testing.T) {
 	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "")
 	t.Setenv("ANTHROPIC_API_KEY", "")
 	t.Setenv("CLAUDE_CODE_OAUTH_REFRESH_TOKEN", "")
@@ -112,13 +112,13 @@ func TestResolveCreateSandboxCapabilitiesSupportsMultiVarRequirementGroup(t *tes
 		t.Fatalf("os.WriteFile: %v", err)
 	}
 
-	d := newCapabilityTestDaemon(t, capabilityTestRegistry(), &hostops.MockContainerOps{})
-	caps, err := d.resolveCreateSandboxCapabilities(CreateSandboxOpts{Agent: "claude", EnvFile: envFile})
+	d := newRequirementTestDaemon(t, requirementTestRegistry(), &hostops.MockContainerOps{})
+	caps, err := d.resolveCreateSandboxRequirements(CreateSandboxOpts{Agent: "claude", EnvFile: envFile})
 	if err != nil {
-		t.Fatalf("resolveCreateSandboxCapabilities returned error: %v", err)
+		t.Fatalf("resolveCreateSandboxRequirements returned error: %v", err)
 	}
 	if !caps.AuthRequired || !caps.AuthAvailable {
-		t.Fatalf("resolved capabilities = %+v, want auth required and available", caps)
+		t.Fatalf("resolved requirements = %+v, want auth required and available", caps)
 	}
 	if got := caps.AuthEnv["CLAUDE_CODE_OAUTH_REFRESH_TOKEN"]; got != "refresh" {
 		t.Fatalf("resolved refresh token = %q, want %q", got, "refresh")
@@ -128,14 +128,14 @@ func TestResolveCreateSandboxCapabilitiesSupportsMultiVarRequirementGroup(t *tes
 	}
 }
 
-func TestResolveCreateSandboxCapabilitiesRejectsMissingAuthEnv(t *testing.T) {
+func TestResolveCreateSandboxRequirementsRejectsMissingAuthEnv(t *testing.T) {
 	t.Setenv("GEMINI_API_KEY", "")
 	t.Setenv("GOOGLE_API_KEY", "")
 	dir := t.TempDir()
 	envFile := filepath.Join(dir, ".env")
-	d := newCapabilityTestDaemon(t, capabilityTestRegistry(), &hostops.MockContainerOps{})
+	d := newRequirementTestDaemon(t, requirementTestRegistry(), &hostops.MockContainerOps{})
 
-	_, err := d.resolveCreateSandboxCapabilities(CreateSandboxOpts{Agent: "gemini", EnvFile: envFile})
+	_, err := d.resolveCreateSandboxRequirements(CreateSandboxOpts{Agent: "gemini", EnvFile: envFile})
 	if err == nil {
 		t.Fatal("expected error for missing auth env")
 	}
@@ -174,7 +174,7 @@ func TestCreateSandboxAllowsMissingAuthBeforeAgentLaunch(t *testing.T) {
 	t.Setenv("OPENAI_API_KEY", "")
 	var createCalls int
 	var inspectCalls int
-	d := newCapabilityTestDaemon(t, capabilityTestRegistry(), &hostops.MockContainerOps{
+	d := newRequirementTestDaemon(t, requirementTestRegistry(), &hostops.MockContainerOps{
 		CreateFunc: func(ctx context.Context, _ *options.CreateContainer, image string, args []string) (string, error) {
 			createCalls++
 			return "mock-container-id", nil
@@ -202,7 +202,7 @@ func TestCreateSandboxAllowsMissingAuthBeforeAgentLaunch(t *testing.T) {
 
 func TestCreateSandboxRejectsUnknownAgentBeforeSandboxCreation(t *testing.T) {
 	var createCalls int
-	d := newCapabilityTestDaemon(t, capabilityTestRegistry(), &hostops.MockContainerOps{
+	d := newRequirementTestDaemon(t, requirementTestRegistry(), &hostops.MockContainerOps{
 		CreateFunc: func(ctx context.Context, _ *options.CreateContainer, image string, args []string) (string, error) {
 			createCalls++
 			return "mock-container-id", nil
@@ -224,7 +224,7 @@ func TestCreateSandboxRejectsUnknownAgentBeforeSandboxCreation(t *testing.T) {
 	}
 }
 
-func newCapabilityTestDaemon(t *testing.T, registry *cloning.AgentRegistry, containerSvc *hostops.MockContainerOps) *Daemon {
+func newRequirementTestDaemon(t *testing.T, registry *cloning.AgentRegistry, containerSvc *hostops.MockContainerOps) *Daemon {
 	t.Helper()
 
 	// Keep this short because it still appears in a few test fixture paths. Runtime
@@ -242,7 +242,7 @@ func newCapabilityTestDaemon(t *testing.T, registry *cloning.AgentRegistry, cont
 			MkdirAllFunc: os.MkdirAll,
 			CreateFunc:   os.Create,
 		},
-		SSHim:         &capabilityTestSSHimmer{},
+		SSHim:         &requirementTestSSHimmer{},
 		AgentRegistry: registry,
 	})
 	if err != nil {
@@ -253,8 +253,8 @@ func newCapabilityTestDaemon(t *testing.T, registry *cloning.AgentRegistry, cont
 	return NewDaemonWithBoxer(appDir, "test", b)
 }
 
-func capabilityTestRegistry() *cloning.AgentRegistry {
-	prep := &capabilityTestPreparation{cloneRoot: filepath.Join(os.TempDir(), "sand-capability-test")}
+func requirementTestRegistry() *cloning.AgentRegistry {
+	prep := &requirementTestPreparation{cloneRoot: filepath.Join(os.TempDir(), "sand-requirement-test")}
 	config := cloning.NewBaseContainerConfiguration()
 	r := cloning.NewAgentRegistry()
 	for _, definition := range agentdefs.All() {
@@ -263,28 +263,28 @@ func capabilityTestRegistry() *cloning.AgentRegistry {
 			Selectable:    definition.Selectable,
 			Preparation:   prep,
 			Configuration: config,
-			Capabilities:  capabilityTestCapabilities(definition),
+			Requirements:  requirementTestRequirements(definition),
 		})
 	}
 	return r
 }
 
-func capabilityTestCapabilities(definition agentdefs.Definition) cloning.AgentCapabilities {
+func requirementTestRequirements(definition agentdefs.Definition) cloning.AgentRequirements {
 	if len(definition.AuthEnvAnyOf) == 0 {
-		return cloning.AgentCapabilities{}
+		return cloning.AgentRequirements{}
 	}
-	return cloning.AgentCapabilities{
-		Auth: &cloning.AuthCapabilitySpec{
+	return cloning.AgentRequirements{
+		Auth: &cloning.AuthRequirementSpec{
 			EnvAnyOf: definition.AuthEnvAnyOf,
 		},
 	}
 }
 
-type capabilityTestPreparation struct {
+type requirementTestPreparation struct {
 	cloneRoot string
 }
 
-func (p *capabilityTestPreparation) Prepare(_ context.Context, req cloning.CloneRequest) (*cloning.CloneArtifacts, error) {
+func (p *requirementTestPreparation) Prepare(_ context.Context, req cloning.CloneRequest) (*cloning.CloneArtifacts, error) {
 	sandboxRoot := filepath.Join(p.cloneRoot, req.ID)
 	return &cloning.CloneArtifacts{
 		SandboxWorkDir:    sandboxRoot,
@@ -295,9 +295,9 @@ func (p *capabilityTestPreparation) Prepare(_ context.Context, req cloning.Clone
 	}, nil
 }
 
-type capabilityTestSSHimmer struct{}
+type requirementTestSSHimmer struct{}
 
-func (s *capabilityTestSSHimmer) NewKeys(_ context.Context, _, _ string) (*sshimmer.Keys, error) {
+func (s *requirementTestSSHimmer) NewKeys(_ context.Context, _, _ string) (*sshimmer.Keys, error) {
 	return &sshimmer.Keys{
 		HostKey:     []byte("fake-host-key"),
 		HostKeyPub:  []byte("fake-host-key-pub"),

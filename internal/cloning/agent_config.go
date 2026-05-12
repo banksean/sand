@@ -6,16 +6,16 @@ import (
 	"sync"
 )
 
-// AgentCapabilities describes the optional capabilities an agent requires.
+// AgentRequirements describes the optional launch requirements an agent declares.
 // For now this only models authentication requirements, but it is intended to
-// grow as new daemon-side capability checks are added.
-type AgentCapabilities struct {
-	Auth *AuthCapabilitySpec
+// grow as new daemon-side requirement checks are added.
+type AgentRequirements struct {
+	Auth *AuthRequirementSpec
 }
 
-// AuthCapabilitySpec describes the env-var groups that satisfy agent auth.
+// AuthRequirementSpec describes the env-var groups that satisfy agent auth.
 // Any one group in EnvAnyOf is sufficient.
-type AuthCapabilitySpec struct {
+type AuthRequirementSpec struct {
 	EnvAnyOf [][]string
 }
 
@@ -27,7 +27,7 @@ type AgentConfig struct {
 	Selectable    bool
 	Preparation   WorkspacePreparation
 	Configuration ContainerConfiguration
-	Capabilities  AgentCapabilities
+	Requirements  AgentRequirements
 }
 
 // AgentRegistry manages the available agent configurations.

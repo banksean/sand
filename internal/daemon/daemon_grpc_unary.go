@@ -100,7 +100,7 @@ func (s *daemonGRPCServer) SyncHostGitMirror(ctx context.Context, req *daemonpb.
 }
 
 func (s *daemonGRPCServer) ResolveAgentLaunchEnv(ctx context.Context, req *daemonpb.ResolveAgentLaunchEnvRequest) (*daemonpb.ResolveAgentLaunchEnvResponse, error) {
-	resolved, err := s.daemon.resolveCreateSandboxCapabilities(CreateSandboxOpts{
+	resolved, err := s.daemon.resolveCreateSandboxRequirements(CreateSandboxOpts{
 		Agent:   req.GetAgent(),
 		EnvFile: req.GetEnvFile(),
 	})

@@ -17,7 +17,7 @@ const opencodeJSON = `
 
 // OpenCodeWorkspacePreparation extends base preparation with OpenCode-specific files.
 // It writes non-secret OpenCode configuration. Authentication is provided at
-// launch time through agent capabilities, not by copying host auth files.
+// launch time through agent requirements, not by copying host auth files.
 type OpenCodeWorkspacePreparation struct {
 	base      *BaseWorkspacePreparation
 	messenger hostops.UserMessenger
