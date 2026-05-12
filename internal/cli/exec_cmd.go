@@ -100,15 +100,20 @@ func (c *ExecCmd) Run(cctx *CLIContext) error {
 	}
 	containerSvc := hostops.NewAppleContainerOps()
 	hostname := types.GetContainerHostname(sbox.Container)
-	env := map[string]string{
-		"HOSTNAME": hostname,
+	projectEnv, err := plainCommandProjectEnv(sbox, c.ProjectEnv)
+	if err != nil {
+		return err
 	}
+	defer projectEnv.Cleanup()
+	env := mergeEnv(projectEnv.Env, map[string]string{
+		"HOSTNAME": hostname,
+	})
 	out, err := containerSvc.Exec(ctx,
 		&options.ExecContainer{
 			ProcessOptions: options.ProcessOptions{
 				WorkDir: "/app",
 				Env:     env,
-				EnvFile: plainCommandEnvFile(sbox, c.ProjectEnv),
+				EnvFile: projectEnv.EnvFile,
 				User:    c.Username,
 				UID:     c.Uid,
 			},

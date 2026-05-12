@@ -72,5 +72,10 @@ func (c *ShellCmd) Run(cctx *CLIContext) error {
 		args = []string{sbox.Name, c.Shell}
 	}
 
-	return runShell(ctx, sbox, shell, args, false, plainCommandEnvFile(sbox, c.ProjectEnv), nil)
+	projectEnv, err := plainCommandProjectEnv(sbox, c.ProjectEnv)
+	if err != nil {
+		return err
+	}
+	defer projectEnv.Cleanup()
+	return runShell(ctx, sbox, shell, args, false, projectEnv.EnvFile, projectEnv.Env)
 }

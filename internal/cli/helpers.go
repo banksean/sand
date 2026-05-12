@@ -3,9 +3,11 @@ package cli
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/banksean/sand/internal/applecontainer/options"
 	"github.com/banksean/sand/internal/applecontainer/types"
@@ -56,11 +58,53 @@ func buildInteractiveEnv(hostname string, scrubSSHAgent bool, extraEnv map[strin
 	return env
 }
 
-func plainCommandEnvFile(sbox *sandtypes.Box, includeProjectEnv bool) string {
-	if !includeProjectEnv || sbox == nil {
-		return ""
+func mergeEnv(envs ...map[string]string) map[string]string {
+	merged := map[string]string{}
+	for _, env := range envs {
+		for key, value := range env {
+			merged[key] = value
+		}
 	}
-	return sbox.EnvFile
+	if len(merged) == 0 {
+		return nil
+	}
+	return merged
+}
+
+type plainCommandEnv struct {
+	EnvFile string
+	Env     map[string]string
+	cleanup func()
+}
+
+func (e plainCommandEnv) Cleanup() {
+	if e.cleanup != nil {
+		e.cleanup()
+	}
+}
+
+func plainCommandProjectEnv(sbox *sandtypes.Box, includeProjectEnv bool) (plainCommandEnv, error) {
+	if !includeProjectEnv || sbox == nil {
+		return plainCommandEnv{}, nil
+	}
+
+	policy, configured, err := selectedProfileEnvPolicy(sbox)
+	if err != nil {
+		return plainCommandEnv{}, err
+	}
+	if !configured {
+		return plainCommandEnv{EnvFile: sbox.EnvFile}, nil
+	}
+
+	envFile, cleanup, err := projectEnvFile(policy.Files)
+	if err != nil {
+		return plainCommandEnv{}, err
+	}
+	return plainCommandEnv{
+		EnvFile: envFile,
+		Env:     projectEnvVars(policy.Vars),
+		cleanup: cleanup,
+	}, nil
 }
 
 func resolveAgentLaunchEnv(ctx context.Context, mc daemon.Client, agent string, sbox *sandtypes.Box) (map[string]string, error) {
@@ -111,6 +155,77 @@ func resolveEnvPolicyPaths(policy sandtypes.EnvPolicy, baseDir string) sandtypes
 		}
 	}
 	return policy
+}
+
+func projectEnvFile(files []sandtypes.EnvFileRef) (string, func(), error) {
+	var paths []string
+	for _, file := range files {
+		if !envScopeAllowsProject(file.Scope) || strings.TrimSpace(file.Path) == "" {
+			continue
+		}
+		if info, err := os.Stat(file.Path); err == nil && !info.IsDir() {
+			paths = append(paths, file.Path)
+		}
+	}
+	if len(paths) == 0 {
+		return "", nil, nil
+	}
+	if len(paths) == 1 {
+		return paths[0], nil, nil
+	}
+
+	tmp, err := os.CreateTemp("", "sand-project-env-*")
+	if err != nil {
+		return "", nil, fmt.Errorf("creating project env file: %w", err)
+	}
+	cleanup := func() { _ = os.Remove(tmp.Name()) }
+	for _, path := range paths {
+		if err := appendEnvFile(tmp, path); err != nil {
+			_ = tmp.Close()
+			cleanup()
+			return "", nil, err
+		}
+	}
+	if err := tmp.Close(); err != nil {
+		cleanup()
+		return "", nil, fmt.Errorf("closing project env file: %w", err)
+	}
+	return tmp.Name(), cleanup, nil
+}
+
+func appendEnvFile(dst *os.File, path string) error {
+	src, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("reading project env file %q: %w", path, err)
+	}
+	defer src.Close()
+	if _, err := io.Copy(dst, src); err != nil {
+		return fmt.Errorf("copying project env file %q: %w", path, err)
+	}
+	if _, err := dst.WriteString("\n"); err != nil {
+		return fmt.Errorf("writing project env file: %w", err)
+	}
+	return nil
+}
+
+func projectEnvVars(vars []sandtypes.EnvVarRule) map[string]string {
+	env := map[string]string{}
+	for _, variable := range vars {
+		if !envScopeAllowsProject(variable.Scope) || strings.TrimSpace(variable.Name) == "" {
+			continue
+		}
+		if value, ok := os.LookupEnv(variable.Name); ok && strings.TrimSpace(value) != "" {
+			env[variable.Name] = value
+		}
+	}
+	if len(env) == 0 {
+		return nil
+	}
+	return env
+}
+
+func envScopeAllowsProject(scope sandtypes.EnvScope) bool {
+	return scope == sandtypes.EnvScopeProject || scope == sandtypes.EnvScopeAll
 }
 
 // runShell executes an interactive shell or command in sbox's container,

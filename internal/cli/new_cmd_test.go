@@ -40,7 +40,7 @@ func TestCheckoutSandboxBranch(t *testing.T) {
 			return "", nil
 		},
 	}
-	if err := checkoutSandboxBranch(context.Background(), containerSvc, sbox, ""); err != nil {
+	if err := checkoutSandboxBranch(context.Background(), containerSvc, sbox, plainCommandEnv{}); err != nil {
 		t.Fatalf("checkoutSandboxBranch() error = %v", err)
 	}
 	if len(calls) != 2 {
@@ -57,11 +57,14 @@ func TestCheckoutSandboxBranch(t *testing.T) {
 	}
 
 	tests := []struct {
-		name    string
-		envFile string
+		name       string
+		projectEnv plainCommandEnv
 	}{
 		{name: "without project env"},
-		{name: "with project env", envFile: sbox.EnvFile},
+		{name: "with project env", projectEnv: plainCommandEnv{
+			EnvFile: sbox.EnvFile,
+			Env:     map[string]string{"PROJECT_NAME": "sand"},
+		}},
 	}
 
 	for _, tt := range tests {
@@ -79,7 +82,7 @@ func TestCheckoutSandboxBranch(t *testing.T) {
 				},
 			}
 
-			checkoutSandboxBranch(context.Background(), containerSvc, sbox, tt.envFile)
+			checkoutSandboxBranch(context.Background(), containerSvc, sbox, tt.projectEnv)
 
 			if len(calls) != 2 {
 				t.Fatalf("expected 2 exec calls, got %d", len(calls))
@@ -105,7 +108,8 @@ func TestCheckoutSandboxBranch(t *testing.T) {
 			wantOpts := &options.ExecContainer{
 				ProcessOptions: options.ProcessOptions{
 					WorkDir: "/app",
-					EnvFile: tt.envFile,
+					Env:     tt.projectEnv.Env,
+					EnvFile: tt.projectEnv.EnvFile,
 					User:    sbox.Username,
 					UID:     sbox.Uid,
 				},
@@ -135,7 +139,7 @@ func TestCheckoutSandboxBranch_ReturnsCheckoutError(t *testing.T) {
 		ContainerID: "ctr-123",
 	}
 
-	err := checkoutSandboxBranch(context.Background(), containerSvc, sbox, "")
+	err := checkoutSandboxBranch(context.Background(), containerSvc, sbox, plainCommandEnv{})
 	if err == nil {
 		t.Fatal("checkoutSandboxBranch() error = nil, want non-nil")
 	}

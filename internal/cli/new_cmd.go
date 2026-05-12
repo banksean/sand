@@ -170,7 +170,12 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 
 	if c.Branch {
 		// Create and check out a git branch inside the container, named after the sandbox name.
-		if err := checkoutSandboxBranch(ctx, hostops.NewAppleContainerOps(), sbox, plainCommandEnvFile(sbox, c.ProjectEnv)); err != nil {
+		projectEnv, err := plainCommandProjectEnv(sbox, c.ProjectEnv)
+		if err != nil {
+			return err
+		}
+		defer projectEnv.Cleanup()
+		if err := checkoutSandboxBranch(ctx, hostops.NewAppleContainerOps(), sbox, projectEnv); err != nil {
 			return err
 		}
 	}
@@ -209,12 +214,16 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 		}
 	}
 
-	envFile := ""
+	var shellEnv plainCommandEnv
 	if c.Agent == "" {
-		envFile = plainCommandEnvFile(sbox, c.ProjectEnv)
+		shellEnv, err = plainCommandProjectEnv(sbox, c.ProjectEnv)
+		if err != nil {
+			return err
+		}
+		defer shellEnv.Cleanup()
 	}
 
-	if err := runShell(ctx, sbox, shell, args, c.Agent != "", envFile, agentEnv); err != nil {
+	if err := runShell(ctx, sbox, shell, args, c.Agent != "", shellEnv.EnvFile, mergeEnv(shellEnv.Env, agentEnv)); err != nil {
 		return err
 	}
 
@@ -235,11 +244,12 @@ func validateNewSandboxBranch(ctx context.Context, gitOps hostops.GitOps, cloneF
 	return fmt.Errorf("branch name %q is already taken in %q", sandboxName, cloneFromDir)
 }
 
-func checkoutSandboxBranch(ctx context.Context, containerSvc hostops.ContainerOps, sbox *sandtypes.Box, envFile string) error {
+func checkoutSandboxBranch(ctx context.Context, containerSvc hostops.ContainerOps, sbox *sandtypes.Box, projectEnv plainCommandEnv) error {
 	execOpts := &options.ExecContainer{
 		ProcessOptions: options.ProcessOptions{
 			WorkDir: "/app",
-			EnvFile: envFile,
+			Env:     projectEnv.Env,
+			EnvFile: projectEnv.EnvFile,
 			User:    sbox.Username,
 			UID:     sbox.Uid,
 		},
