@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/banksean/sand/internal/applecontainer"
+	"github.com/banksean/sand/internal/applecontainer/options"
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/crane"
 )
@@ -42,6 +43,7 @@ const (
 	ContainerSystemDNSDomain PrerequID = "container-dns-domain-set"
 	ContainerSystemDNSName   PrerequID = "container-dns-name"
 	ContainerCommand         PrerequID = "container-runtime"
+	ContainerSystemRunning   PrerequID = "container-system-running"
 	MacOSVersion             PrerequID = "macos-version"
 	MacOS                    PrerequID = "macos"
 	CustomInitImagePulled    PrerequID = "custom-init-image-pulled"
@@ -57,6 +59,8 @@ type containerSystem interface {
 	DNSList(context.Context) ([]string, error)
 	PropertyGet(context.Context, string) (string, error)
 	PropertySet(context.Context, string, string) error
+	Status(ctx context.Context, opts *options.SystemStatus) (string, error)
+	Start(ctx context.Context, opts *options.SystemStart) (string, error)
 }
 
 type VerifyOptions struct {
@@ -121,6 +125,33 @@ var (
 					return fmt.Errorf("no container system dns domains exist. vsc and ssh will not work without at least one dns domain")
 				}
 				slog.InfoContext(ctx, "configured DNS domains", "domains", domains)
+				return nil
+			},
+		},
+		{
+			ID:          ContainerSystemRunning,
+			Description: "Container system service is running",
+			Run: func(ctx context.Context, appBaseDir string, opts VerifyOptions) error {
+				status, err := systemOps.Status(ctx, nil)
+				if err == nil {
+					return nil
+				}
+				if status == "apiserver is not running and not registered with launchd" {
+					if !opts.PromptRemedies {
+						return fmt.Errorf("container system service is not running")
+					}
+					ok, err := PromptYesDefault(opts.Stdin, opts.Stdout, fmt.Sprintf("Start container system [Y/n]? "))
+					if err != nil {
+						return err
+					}
+					if !ok {
+						return fmt.Errorf("start container service by running `container system start`")
+					}
+
+					if msg, err := systemOps.Start(ctx, nil); err != nil {
+						return fmt.Errorf("starting container service: %q %w", msg, err)
+					}
+				}
 				return nil
 			},
 		},
@@ -267,7 +298,8 @@ func IsContainerSystemNotRunningError(err error) bool {
 		return true
 	}
 	msg := strings.ToLower(err.Error())
-	return strings.Contains(msg, "container system is not running") ||
+	return strings.Contains(msg, "Ensure container system service has been started") ||
+		strings.Contains(msg, "container system is not running") ||
 		strings.Contains(msg, "container system service is not running") ||
 		strings.Contains(msg, "container system service isn't running") ||
 		strings.Contains(msg, "system service is not running") ||

@@ -6,6 +6,8 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/banksean/sand/internal/applecontainer/options"
 )
 
 type fakeContainerSystem struct {
@@ -13,6 +15,16 @@ type fakeContainerSystem struct {
 	dnsListFunc     func(context.Context) ([]string, error)
 	propertyGetFunc func(context.Context, string) (string, error)
 	propertySetFunc func(context.Context, string, string) error
+}
+
+// Start implements [containerSystem].
+func (f *fakeContainerSystem) Start(ctx context.Context, opts *options.SystemStart) (string, error) {
+	panic("unimplemented")
+}
+
+// Status implements [containerSystem].
+func (f *fakeContainerSystem) Status(ctx context.Context, opts *options.SystemStatus) (string, error) {
+	panic("unimplemented")
 }
 
 func (f *fakeContainerSystem) Version(ctx context.Context) (string, error) {

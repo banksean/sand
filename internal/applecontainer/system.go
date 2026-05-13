@@ -35,10 +35,7 @@ func (s *SystemSvc) Status(ctx context.Context, opts *options.SystemStatus) (str
 	args := options.ToArgs(opts)
 	cmd := exec.CommandContext(ctx, "container", append([]string{"system", "status"}, args...)...)
 	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(string(output)), nil
+	return strings.TrimSpace(string(output)), err
 }
 
 // Start starts the container system. It returns the output of the command, or an error.
