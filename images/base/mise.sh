@@ -5,6 +5,7 @@ set -e
 export MISE_DATA_DIR="/opt/tool-cache/mise"
 export MISE_CONFIG_DIR="/opt/tool-cache/mise/config"
 export MISE_CACHE_DIR="/opt/tool-cache/mise/cache"
+export MISE_STATE_DIR="/opt/tool-cache/mise/state"
 
 # Since we're running Alpine, we don't have glibc so the offocial node builds won't work.
 # Setting the following vars tell mise to use community-provided musl builds,
@@ -61,6 +62,7 @@ export PIP_CACHE_DIR="/opt/tool-cache/python/pip"
   echo "export MISE_DATA_DIR=\"$MISE_DATA_DIR\""
   echo "export MISE_CONFIG_DIR=\"$MISE_CONFIG_DIR\""
   echo "export MISE_CACHE_DIR=\"$MISE_CACHE_DIR\""
+  echo "export MISE_STATE_DIR=\"$MISE_STATE_DIR\""
   # Add any other dynamic vars here
 } > /etc/shared_env.sh
 

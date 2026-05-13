@@ -201,6 +201,7 @@ func TestBaseMiseScriptPersistsMiseEnvironment(t *testing.T) {
 		`echo "export MISE_DATA_DIR=\"$MISE_DATA_DIR\""`,
 		`echo "export MISE_CONFIG_DIR=\"$MISE_CONFIG_DIR\""`,
 		`echo "export MISE_CACHE_DIR=\"$MISE_CACHE_DIR\""`,
+		`echo "export MISE_STATE_DIR=\"$MISE_STATE_DIR\""`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("mise.sh missing shared env export %q", want)
