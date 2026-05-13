@@ -145,17 +145,17 @@ Persist only profile name and non-secret policy references in sandbox metadata. 
 5. [x] Separate project/shell env behavior: keep auth env out of plain shell/exec/git unless explicitly allowed, and keep `--project-env` scoped to project env.
 6. [x] Replace hard-coded dotfile copying: use `Profile.Dotfiles` instead of the current `.gitconfig`, `.ssh`, `.zshrc` list.
 7. [x] Add sanitized git config handling: implement `GitPolicy.Config = sanitized` as a specialized git config transformation.
-8. Finish docs, CLI help, and tests: update user-facing docs/help and cover the behavior matrix below.
+8. [x] Finish docs, CLI help, and tests: update user-facing docs/help and cover the behavior matrix below.
 
 ## Test Plan
 
 Cover these scenarios:
 
-- Default profile does not copy `.zshrc`.
-- Allowlisted dotfiles are copied to requested targets.
-- Absolute symlink targets outside `$HOME` are rejected by default.
-- Agent auth resolves from profile-approved env files.
-- Agent auth does not resolve from env files scoped only as `project`.
-- Plain shell/exec do not receive auth env by default.
-- `--project-env` continues to pass project-scoped env only.
-- Sanitized git config excludes credential helpers and executable aliases.
+- [x] Default profile does not copy `.zshrc`.
+- [x] Allowlisted dotfiles are copied to requested targets.
+- [x] Absolute symlink targets outside `$HOME` are rejected by default.
+- [x] Agent auth resolves from profile-approved env files.
+- [x] Agent auth does not resolve from env files scoped only as `project`.
+- [x] Plain shell/exec do not receive auth env by default.
+- [x] `--project-env` continues to pass project-scoped env only.
+- [x] Sanitized git config excludes credential helpers and executable aliases.

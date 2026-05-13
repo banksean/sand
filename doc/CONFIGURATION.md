@@ -39,6 +39,50 @@ Commit a `.sand.yaml` at the root of a project to share default flag values with
 
 `sand` exits with an error if a user or project `.sand.yaml` contains keys that do not match known flags. This prevents typos from being silently ignored.
 
+## Profiles
+
+Profiles describe which host-side material a sandbox may receive. Select one at sandbox creation with `--profile <name>`; if omitted, `sand` uses `default`.
+
+Profile policy is read from user and project `.sand.yaml` files. The project file overrides profile entries from the user file by profile name.
+
+```yaml
+profiles:
+  default:
+    dotfiles:
+      mode: allowlist
+      files:
+        - source: ~/.zshrc.sand
+          target: ~/.zshrc
+    env:
+      files:
+        - path: .env
+          scope: auth
+      vars:
+        - name: OPENAI_API_KEY
+          scope: auth
+    ssh:
+      agentForwarding: opt-in
+    git:
+      config: sanitized
+```
+
+Dotfiles are not copied unless allowed by the selected profile. `dotfiles.mode: none` copies nothing; `allowlist` and `minimal` copy only entries listed under `files`. Relative `source` paths are resolved from the project directory. Symlinks are rejected unless `allowSymlink: true`, and symlink targets outside `$HOME` are rejected unless `allowOutsideHome: true`.
+
+Environment policy uses scopes:
+
+- `auth`: may satisfy agent launch requirements, but is not passed to plain shell, exec, or git commands.
+- `project`: available to plain shell, exec, and git commands only when `--project-env` is set.
+- `shell`: reserved for explicit shell exposure.
+- `all`: available in every supported context.
+
+Agent auth resolution intersects the selected profile with the agent's declared requirements and passes only the minimum required variables to the agent process. Plain shells and plain exec commands do not receive auth-scoped environment by default.
+
+Git config policy controls `~/.gitconfig` separately from general dotfiles:
+
+- `none`: do not write a git config.
+- `sanitized`: write a filtered copy that removes credential helpers, include directives, executable aliases, and host command hooks.
+- `copy`: copy `~/.gitconfig` as a normal dotfile.
+
 ## Shared caches
 
 For shared runtime caches across sandboxes, including the Go module cache and Go build cache under the shared mise cache mount, add this to `~/.sand.yaml` or a project `.sand.yaml`:

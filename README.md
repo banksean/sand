@@ -85,6 +85,7 @@ See [Git remotes between host and sandbox](doc/GIT_REMOTES.md) for the full work
 - [Command reference](cmd/sand/HELP.md)
 - [Common workflows](doc/WORKFLOWS.md)
 - [Configuration defaults](doc/CONFIGURATION.md)
+- [Sandbox profiles](doc/CONFIGURATION.md#profiles)
 - [Non-interactive oneshot runs](doc/ONESHOT.md)
 - [Network filtering](doc/NETWORK_FILTERING.md)
 - [Architecture and trade-offs](doc/ARCHITECTURE.md)
