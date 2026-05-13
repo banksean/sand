@@ -27,7 +27,11 @@ func (c *ConfigLsCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 	if err != nil {
 		return err
 	}
+	var renderErr error
 	walkMerge(nil, projCfg, userCfg, defaultsCfg, func(path []string, name string, projVal, userVal, defaultVal any) {
+		if renderErr != nil {
+			return
+		}
 		var val any
 		source := ""
 		if projVal != nil {
@@ -39,14 +43,48 @@ func (c *ConfigLsCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 		} else if defaultVal != nil {
 			val = defaultVal
 		}
-		prefix := strings.Repeat("  ", len(path)-1)
-		if val != nil {
-			fmt.Printf(prefix+"%s: %v%s\n", name, val, source)
-		} else {
-			fmt.Printf(prefix+"%s:\n", name)
-		}
+		renderErr = writeConfigEntry(os.Stdout, path, name, val, source)
 	})
-	return nil
+	return renderErr
+}
+
+func writeConfigEntry(w io.Writer, path []string, name string, val any, source string) error {
+	prefix := strings.Repeat("  ", len(path)-1)
+	if val == nil {
+		_, err := fmt.Fprintf(w, "%s%s:\n", prefix, name)
+		return err
+	}
+	if isYAMLBlockValue(val) {
+		encoded, err := yaml.Marshal(val)
+		if err != nil {
+			return fmt.Errorf("marshal config value %s: %w", strings.Join(path, "."), err)
+		}
+		if _, err := fmt.Fprintf(w, "%s%s:%s\n", prefix, name, source); err != nil {
+			return err
+		}
+		for _, line := range strings.Split(strings.TrimRight(string(encoded), "\n"), "\n") {
+			if _, err := fmt.Fprintf(w, "%s  %s\n", prefix, line); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	_, err := fmt.Fprintf(w, "%s%s: %v%s\n", prefix, name, val, source)
+	return err
+}
+
+func isYAMLBlockValue(value any) bool {
+	value = derefValue(value)
+	if value == nil {
+		return false
+	}
+
+	switch reflect.ValueOf(value).Kind() {
+	case reflect.Array, reflect.Map, reflect.Slice, reflect.Struct:
+		return true
+	default:
+		return false
+	}
 }
 
 // FindProjectConfig searches cwd and its ancestors for a .sand.yaml file,

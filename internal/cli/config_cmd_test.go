@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -114,6 +115,34 @@ func TestWalkMerge_EmptyMaps(t *testing.T) {
 	})
 	if count != 0 {
 		t.Errorf("expected no visits for empty maps, got %d", count)
+	}
+}
+
+func TestWriteConfigEntrySerializesSlicesAsYAML(t *testing.T) {
+	var out bytes.Buffer
+	value := []any{
+		map[string]any{"source": "~/.zshrc.sand", "target": "~/.zshrc"},
+		map[string]any{"source": "~/code/dotfiles/oh-my-posh/.omp.json", "target": "~/.omp.json"},
+	}
+
+	if err := writeConfigEntry(&out, []string{"profiles", "default", "dotfiles", "files"}, "files", value, " # /tmp/.sand.yaml"); err != nil {
+		t.Fatalf("writeConfigEntry: %v", err)
+	}
+
+	got := out.String()
+	if strings.Contains(got, "map[") {
+		t.Fatalf("output contains Go map formatting:\n%s", got)
+	}
+	for _, want := range []string{
+		"      files: # /tmp/.sand.yaml\n",
+		"        - source: ~/.zshrc.sand\n",
+		"          target: ~/.zshrc\n",
+		"        - source: ~/code/dotfiles/oh-my-posh/.omp.json\n",
+		"          target: ~/.omp.json\n",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("output missing %q:\n%s", want, got)
+		}
 	}
 }
 
