@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -186,6 +187,24 @@ func TestDefaultContainerHook_UsesUbuntuFlavorWhenAPKUnavailable(t *testing.T) {
 
 	if !reflect.DeepEqual(exec.calls, wantCalls) {
 		t.Fatalf("hook.Run() calls mismatch\n got: %#v\nwant: %#v", exec.calls, wantCalls)
+	}
+}
+
+func TestBaseMiseScriptPersistsMiseEnvironment(t *testing.T) {
+	script, err := os.ReadFile("../../images/base/mise.sh")
+	if err != nil {
+		t.Fatalf("ReadFile(mise.sh): %v", err)
+	}
+	body := string(script)
+
+	for _, want := range []string{
+		`echo "export MISE_DATA_DIR=\"$MISE_DATA_DIR\""`,
+		`echo "export MISE_CONFIG_DIR=\"$MISE_CONFIG_DIR\""`,
+		`echo "export MISE_CACHE_DIR=\"$MISE_CACHE_DIR\""`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("mise.sh missing shared env export %q", want)
+		}
 	}
 }
 

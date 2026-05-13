@@ -33,7 +33,9 @@ has_project_file() {
 # Automatically install runtimes defined in .tool-versions or mise.toml
 if [ -f ".tool-versions" ] || [ -f "mise.toml" ]; then
     echo "🛠 Detecting runtimes from config..."
-		mise trust ./mise.toml
+    if [ -f "mise.toml" ]; then
+        mise trust ./mise.toml
+    fi
     mise install -y
     eval "$(mise activate zsh)"
 else
@@ -57,6 +59,8 @@ export PIP_CACHE_DIR="/opt/tool-cache/python/pip"
   echo "export GOMODCACHE=\"$GOMODCACHE\""
   echo "export PIP_CACHE_DIR=\"$PIP_CACHE_DIR\""
   echo "export MISE_DATA_DIR=\"$MISE_DATA_DIR\""
+  echo "export MISE_CONFIG_DIR=\"$MISE_CONFIG_DIR\""
+  echo "export MISE_CACHE_DIR=\"$MISE_CACHE_DIR\""
   # Add any other dynamic vars here
 } > /etc/shared_env.sh
 
