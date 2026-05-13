@@ -21,7 +21,7 @@ func (q *Queries) DeleteSandbox(ctx context.Context, id string) error {
 }
 
 const getActiveSandboxByName = `-- name: GetActiveSandboxByName :one
-SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, profile_name, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains, cpu, memory_mb, default_username, default_uid, name, state, deleted_at, trash_work_dir FROM sandboxes
+SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains, cpu, memory_mb, default_username, default_uid, name, state, deleted_at, trash_work_dir, profile_name FROM sandboxes
 WHERE name = ? AND state = 'active'
 LIMIT 1
 `
@@ -40,7 +40,6 @@ func (q *Queries) GetActiveSandboxByName(ctx context.Context, name string) (Sand
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.AgentType,
-		&i.ProfileName,
 		&i.OriginalGitOrigin,
 		&i.OriginalGitBranch,
 		&i.OriginalGitCommit,
@@ -54,12 +53,13 @@ func (q *Queries) GetActiveSandboxByName(ctx context.Context, name string) (Sand
 		&i.State,
 		&i.DeletedAt,
 		&i.TrashWorkDir,
+		&i.ProfileName,
 	)
 	return i, err
 }
 
 const getSandboxByID = `-- name: GetSandboxByID :one
-SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, profile_name, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains, cpu, memory_mb, default_username, default_uid, name, state, deleted_at, trash_work_dir FROM sandboxes
+SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains, cpu, memory_mb, default_username, default_uid, name, state, deleted_at, trash_work_dir, profile_name FROM sandboxes
 WHERE id = ?
 LIMIT 1
 `
@@ -78,7 +78,6 @@ func (q *Queries) GetSandboxByID(ctx context.Context, id string) (Sandbox, error
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.AgentType,
-		&i.ProfileName,
 		&i.OriginalGitOrigin,
 		&i.OriginalGitBranch,
 		&i.OriginalGitCommit,
@@ -92,12 +91,13 @@ func (q *Queries) GetSandboxByID(ctx context.Context, id string) (Sandbox, error
 		&i.State,
 		&i.DeletedAt,
 		&i.TrashWorkDir,
+		&i.ProfileName,
 	)
 	return i, err
 }
 
 const getSandboxesByImage = `-- name: GetSandboxesByImage :many
-SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, profile_name, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains, cpu, memory_mb, default_username, default_uid, name, state, deleted_at, trash_work_dir FROM sandboxes
+SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains, cpu, memory_mb, default_username, default_uid, name, state, deleted_at, trash_work_dir, profile_name FROM sandboxes
 WHERE image_name = ? AND state = 'active'
 ORDER BY created_at DESC
 `
@@ -122,7 +122,6 @@ func (q *Queries) GetSandboxesByImage(ctx context.Context, imageName string) ([]
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.AgentType,
-			&i.ProfileName,
 			&i.OriginalGitOrigin,
 			&i.OriginalGitBranch,
 			&i.OriginalGitCommit,
@@ -136,6 +135,7 @@ func (q *Queries) GetSandboxesByImage(ctx context.Context, imageName string) ([]
 			&i.State,
 			&i.DeletedAt,
 			&i.TrashWorkDir,
+			&i.ProfileName,
 		); err != nil {
 			return nil, err
 		}
@@ -151,7 +151,7 @@ func (q *Queries) GetSandboxesByImage(ctx context.Context, imageName string) ([]
 }
 
 const listSandboxes = `-- name: ListSandboxes :many
-SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, profile_name, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains, cpu, memory_mb, default_username, default_uid, name, state, deleted_at, trash_work_dir FROM sandboxes
+SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains, cpu, memory_mb, default_username, default_uid, name, state, deleted_at, trash_work_dir, profile_name FROM sandboxes
 WHERE state = 'active'
 ORDER BY created_at DESC
 `
@@ -176,7 +176,6 @@ func (q *Queries) ListSandboxes(ctx context.Context) ([]Sandbox, error) {
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.AgentType,
-			&i.ProfileName,
 			&i.OriginalGitOrigin,
 			&i.OriginalGitBranch,
 			&i.OriginalGitCommit,
@@ -190,6 +189,7 @@ func (q *Queries) ListSandboxes(ctx context.Context) ([]Sandbox, error) {
 			&i.State,
 			&i.DeletedAt,
 			&i.TrashWorkDir,
+			&i.ProfileName,
 		); err != nil {
 			return nil, err
 		}

@@ -13,7 +13,7 @@ set -euo pipefail
 # 
 # Assumptions:
 # - apple/container is already installed on the host machine
-set CONTAINER_DNS_DOMAIN=$(container system property get dns.domain)
+CONTAINER_DNS_DOMAIN=$(container system property get dns.domain)
 
 # Stop and uninstall everything
 

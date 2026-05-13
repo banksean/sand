@@ -30,10 +30,10 @@ has_project_file() {
         \) -prune \) \
         -o \( -type f -name "$filename" -print -quit \) | grep -q .
 }
-
 # Automatically install runtimes defined in .tool-versions or mise.toml
 if [ -f ".tool-versions" ] || [ -f "mise.toml" ]; then
     echo "🛠 Detecting runtimes from config..."
+		mise trust ./mise.toml
     mise install -y
     eval "$(mise activate zsh)"
 else
