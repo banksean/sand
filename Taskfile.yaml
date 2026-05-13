@@ -7,6 +7,12 @@ vars:
   DAEMON_PROTO_OUT_DIR: .
   OBSERVABILITY_DATA_DIR: '{{.TASKFILE_DIR}}/.observability-data'
   CONTAINER_DNS_DOMAIN: '{{.CONTAINER_DNS_DOMAIN | default "dev.local"}}'
+  MISE_EXEC: >-
+    if command -v mise >/dev/null 2>&1; then
+      exec mise exec -- "$@";
+    else
+      exec "$@";
+    fi
 
 tasks:
   default:
@@ -21,6 +27,7 @@ tasks:
     desc: Generate Go protobuf and gRPC bindings for the daemon API
     cmds:
       - >-
+        sh -c '{{.MISE_EXEC}}' --
         protoc
         --go_out={{.DAEMON_PROTO_OUT_DIR}}
         --go_opt=paths=source_relative
@@ -32,7 +39,7 @@ tasks:
     deps:
       - proto:generate
     cmds:
-      - go generate ./...
+      - sh -c '{{.MISE_EXEC}}' -- go generate ./...
 
   build:
     desc: Build all Go packages
