@@ -12,7 +12,7 @@
   - hardware isolation via Apple Silicon
   - low memory overhead and fast start times
   - kernel based on [Kata](https://katacontainers.io/)
-  - used via Apple's [`container` CLI](https://github.com/apple/container), currently requiring version `0.12.0`
+  - used via Apple's [`container` CLI](https://github.com/apple/container), currently requiring version `0.12.3`
   - supported on macOS 26 and up
 - Filesystem:
   - base container image is minimal, with dynamic provisioning based on which agent you use
