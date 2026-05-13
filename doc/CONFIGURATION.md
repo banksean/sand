@@ -45,6 +45,8 @@ Profiles describe which host-side material a sandbox may receive. Select one at 
 
 Profile policy is read from user and project `.sand.yaml` files. The project file overrides profile entries from the user file by profile name.
 
+Example:
+
 ```yaml
 profiles:
   default:
@@ -66,22 +68,9 @@ profiles:
       config: sanitized
 ```
 
-Dotfiles are not copied unless allowed by the selected profile. `dotfiles.mode: none` copies nothing; `allowlist` and `minimal` copy only entries listed under `files`. Relative `source` paths are resolved from the project directory. Symlinks are rejected unless `allowSymlink: true`, and symlink targets outside `$HOME` are rejected unless `allowOutsideHome: true`.
+Note that only a *subset* of this material is passed to the sandbox environment based on what the agent launch (or other command) explicitly requires. This follows the [Principle of Least Privilege](https://en.wikipedia.org/wiki/Principle_of_least_privilege). 
 
-Environment policy uses scopes:
-
-- `auth`: may satisfy agent launch requirements, but is not passed to plain shell, exec, or git commands.
-- `project`: available to plain shell, exec, and git commands only when `--project-env` is set.
-- `shell`: reserved for explicit shell exposure.
-- `all`: available in every supported context.
-
-Agent auth resolution intersects the selected profile with the agent's declared requirements and passes only the minimum required variables to the agent process. Plain shells and plain exec commands do not receive auth-scoped environment by default.
-
-Git config policy controls `~/.gitconfig` separately from general dotfiles:
-
-- `none`: do not write a git config.
-- `sanitized`: write a filtered copy that removes credential helpers, include directives, executable aliases, and host command hooks.
-- `copy`: copy `~/.gitconfig` as a normal dotfile.
+See [PROFILES.md](PROFILES.md) for more information about what profiles may contain and how `sand` uses them.
 
 ## Shared caches
 
@@ -90,11 +79,12 @@ For shared runtime caches across sandboxes, including the Go module cache and Go
 ```yaml
 caches:
   mise: true
+  apk: true
 ```
 
-That makes new sandboxes mount a sand-managed host cache directory for mise and for Go's `GOMODCACHE` and `GOCACHE`, so repeated `mise install`, `go mod download`, `go test`, and `go build` work can be reused across containers.
+`mise: true` makes new sandboxes mount a sand-managed host cache directory for mise and for Go's `GOMODCACHE` and `GOCACHE`, so repeated `mise install`, `go mod download`, `go test`, and `go build` work can be reused across containers.
 
-Older `caches.go.*` settings are still accepted as compatibility aliases for the same shared mise-backed cache.
+`apk: true` allows `apk add ...` commands to re-use `apk` packages that have already been downloaded by other sandbox instances. 
 
 ## Network filtering config
 
