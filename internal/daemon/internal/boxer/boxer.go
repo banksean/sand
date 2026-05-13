@@ -300,6 +300,7 @@ type NewSandboxOpts struct {
 	Name           string
 	HostWorkDir    string
 	ProfileName    string
+	Profile        sandtypes.Profile
 	ImageName      string
 	EnvFile        string
 	Username       string
@@ -339,6 +340,7 @@ func (sb *Boxer) NewSandbox(ctx context.Context, opts NewSandboxOpts) (*sandtype
 		Name:              opts.Name,
 		HostWorkDir:       opts.HostWorkDir,
 		ProfileName:       opts.ProfileName,
+		Profile:           opts.Profile,
 		EnvFile:           envFile,
 		Username:          opts.Username,
 		Uid:               opts.Uid,

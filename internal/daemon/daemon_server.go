@@ -18,6 +18,7 @@ import (
 
 	"github.com/banksean/sand/internal/daemon/daemonpb"
 	"github.com/banksean/sand/internal/daemon/internal/boxer"
+	"github.com/banksean/sand/internal/profiles"
 	"github.com/banksean/sand/internal/runtimepaths"
 	"github.com/banksean/sand/internal/sandboxlog"
 	"github.com/banksean/sand/internal/sandtypes"
@@ -583,6 +584,7 @@ type CreateSandboxOpts struct {
 	Name                 string              `json:"name,omitempty"`
 	CloneFromDir         string              `json:"cloneFromDir,omitempty"`
 	ProfileName          string              `json:"profileName,omitempty"`
+	Profile              sandtypes.Profile   `json:"profile,omitempty"`
 	ProfileEnv           sandtypes.EnvPolicy `json:"profileEnv,omitempty"`
 	ProfileEnvConfigured bool                `json:"profileEnvConfigured,omitempty"`
 	ImageName            string              `json:"imageName,omitempty"`
@@ -605,6 +607,21 @@ type StartSandboxOpts struct {
 	SSHAgent bool   `json:"sshAgent,omitempty"`
 }
 
+func loadSandboxProfile(projectDir, profileName string) (sandtypes.Profile, error) {
+	cfg, err := profiles.LoadConfigForDir(projectDir)
+	if err != nil {
+		return sandtypes.Profile{}, err
+	}
+	profile, ok := cfg.Profiles[profileName]
+	if !ok {
+		if profileName == sandtypes.DefaultProfileName {
+			return sandtypes.Profile{Name: sandtypes.DefaultProfileName}, nil
+		}
+		return sandtypes.Profile{}, fmt.Errorf("profile %q not found", profileName)
+	}
+	return profile, nil
+}
+
 // createSandbox creates a new sandbox and starts its container.
 func (d *Daemon) createSandbox(ctx context.Context, opts CreateSandboxOpts, progress io.Writer) (*sandtypes.Box, error) {
 	if opts.Name == "" {
@@ -622,6 +639,14 @@ func (d *Daemon) createSandbox(ctx context.Context, opts CreateSandboxOpts, prog
 	if profileName == "" {
 		profileName = sandtypes.DefaultProfileName
 	}
+	profile := opts.Profile
+	if profile.Name == "" {
+		var err error
+		profile, err = loadSandboxProfile(opts.CloneFromDir, profileName)
+		if err != nil {
+			return nil, err
+		}
+	}
 	slog.InfoContext(ctx, "createSandbox", "agentType", agentType, "opts", opts)
 
 	if err := d.validateSelectableAgent(opts.Agent); err != nil {
@@ -634,6 +659,7 @@ func (d *Daemon) createSandbox(ctx context.Context, opts CreateSandboxOpts, prog
 		Name:           opts.Name,
 		HostWorkDir:    opts.CloneFromDir,
 		ProfileName:    profileName,
+		Profile:        profile,
 		ImageName:      opts.ImageName,
 		EnvFile:        opts.EnvFile,
 		Username:       opts.Username,

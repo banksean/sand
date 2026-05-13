@@ -123,8 +123,16 @@ func resolveAgentLaunchEnv(ctx context.Context, mc daemon.Client, agent string, 
 }
 
 func selectedProfileEnvPolicy(sbox *sandtypes.Box) (sandtypes.EnvPolicy, bool, error) {
+	profile, configured, err := selectedProfile(sbox)
+	if err != nil || !configured {
+		return sandtypes.EnvPolicy{}, configured, err
+	}
+	return profile.Env, true, nil
+}
+
+func selectedProfile(sbox *sandtypes.Box) (sandtypes.Profile, bool, error) {
 	if sbox == nil {
-		return sandtypes.EnvPolicy{}, false, nil
+		return sandtypes.Profile{}, false, nil
 	}
 	profileName := sbox.ProfileName
 	if profileName == "" {
@@ -132,16 +140,25 @@ func selectedProfileEnvPolicy(sbox *sandtypes.Box) (sandtypes.EnvPolicy, bool, e
 	}
 	cfg, err := profiles.LoadConfigForDir(sbox.HostOriginDir)
 	if err != nil {
-		return sandtypes.EnvPolicy{}, false, err
+		return sandtypes.Profile{}, false, err
 	}
 	profile, ok := cfg.Profiles[profileName]
 	if !ok {
 		if profileName == sandtypes.DefaultProfileName {
-			return sandtypes.EnvPolicy{}, false, nil
+			return sandtypes.Profile{}, false, nil
 		}
-		return sandtypes.EnvPolicy{}, false, fmt.Errorf("profile %q not found", profileName)
+		return sandtypes.Profile{}, false, fmt.Errorf("profile %q not found", profileName)
 	}
-	return resolveEnvPolicyPaths(profile.Env, sbox.HostOriginDir), true, nil
+	return resolveProfilePaths(profile, sbox.HostOriginDir), true, nil
+}
+
+func resolveProfilePaths(profile sandtypes.Profile, baseDir string) sandtypes.Profile {
+	profile.Env = resolveEnvPolicyPaths(profile.Env, baseDir)
+	profile.Dotfiles = resolveDotfilePolicyPaths(profile.Dotfiles, baseDir)
+	if baseDir != "" && profile.Network.AllowedDomainsFile != "" && !filepath.IsAbs(profile.Network.AllowedDomainsFile) {
+		profile.Network.AllowedDomainsFile = filepath.Join(baseDir, profile.Network.AllowedDomainsFile)
+	}
+	return profile
 }
 
 func resolveEnvPolicyPaths(policy sandtypes.EnvPolicy, baseDir string) sandtypes.EnvPolicy {
@@ -152,6 +169,19 @@ func resolveEnvPolicyPaths(policy sandtypes.EnvPolicy, baseDir string) sandtypes
 		path := policy.Files[i].Path
 		if path != "" && !filepath.IsAbs(path) {
 			policy.Files[i].Path = filepath.Join(baseDir, path)
+		}
+	}
+	return policy
+}
+
+func resolveDotfilePolicyPaths(policy sandtypes.DotfilePolicy, baseDir string) sandtypes.DotfilePolicy {
+	if baseDir == "" {
+		return policy
+	}
+	for i := range policy.Files {
+		source := policy.Files[i].Source
+		if source != "" && !filepath.IsAbs(source) && !strings.HasPrefix(source, "~") {
+			policy.Files[i].Source = filepath.Join(baseDir, source)
 		}
 	}
 	return policy

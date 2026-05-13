@@ -20,6 +20,7 @@ type CloneRequest struct {
 	Name              string
 	HostWorkDir       string
 	ProfileName       string
+	Profile           sandtypes.Profile
 	EnvFile           string
 	Username          string
 	Uid               string

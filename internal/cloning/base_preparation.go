@@ -7,8 +7,10 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/banksean/sand/internal/hostops"
+	"github.com/banksean/sand/internal/sandtypes"
 )
 
 // BaseWorkspacePreparation implements the default workspace preparation behavior.
@@ -55,7 +57,7 @@ func (p *BaseWorkspacePreparation) Prepare(ctx context.Context, req CloneRequest
 	}
 
 	// Clone dotfiles
-	if err := p.cloneDotfiles(ctx, req.ID, pathRegistry); err != nil {
+	if err := p.cloneDotfiles(ctx, req, pathRegistry); err != nil {
 		return nil, fmt.Errorf("failed to clone dotfiles for sandbox %s: %w", req.ID, err)
 	}
 
@@ -122,81 +124,132 @@ func (p *BaseWorkspacePreparation) cloneWorkDir(ctx context.Context, id, name, h
 	return hostWorkDir, hostGitMirrorDir, nil
 }
 
-func (p *BaseWorkspacePreparation) cloneDotfiles(ctx context.Context, id string, pathRegistry PathRegistry) error {
+func (p *BaseWorkspacePreparation) cloneDotfiles(ctx context.Context, req CloneRequest, pathRegistry PathRegistry) error {
 	p.messenger.Message(ctx, "Cloning dotfiles...")
 
-	// TODO: get this list from somewhere less hard-coded.
-	// There are plenty of reasons one might not want to clone their dotfiles directly,
-	// and instead use some written specifically for interactive sandbox shells.
-	dotfiles := []string{
-		".gitconfig",
-		".p10k.zsh",
-		".zshrc",
-		".omp.json",
-	}
-
-	for _, dotfile := range dotfiles {
-		clone := filepath.Join(pathRegistry.DotfilesDir(), dotfile)
-		original := filepath.Join(os.Getenv("HOME"), dotfile)
-
-		fi, err := p.fileOps.Lstat(original)
-		if errors.Is(err, os.ErrNotExist) {
-			p.messenger.Message(ctx, "skipping "+original)
-			// Create empty file as placeholder
-			f, err := os.Create(clone)
-			if err != nil {
-				return fmt.Errorf("failed to create empty dotfile %s for sandbox %s: %w", dotfile, id, err)
-			}
-			f.Close()
-			continue
+	for _, rule := range dotfileRules(req.Profile.Dotfiles) {
+		source, target, err := normalizeDotfileRule(req.HostWorkDir, rule)
+		if err != nil {
+			return err
 		}
-
-		// Handle symbolic links
-		if fi.Mode()&os.ModeSymlink != 0 {
-			destination, err := p.fileOps.Readlink(original)
-			if err != nil {
-				slog.ErrorContext(ctx, "cloneDotfiles error reading symbolic link", "original", original, "error", err)
-				continue
-			}
-
-			// Make destination absolute if it's relative
-			if !filepath.IsAbs(destination) {
-				destination = filepath.Join(os.Getenv("HOME"), destination)
-			}
-
-			// Check if symlink target exists
-			_, err = p.fileOps.Lstat(destination)
-			if errors.Is(err, os.ErrNotExist) {
-				slog.ErrorContext(ctx, "cloneDotfiles symbolic link points to nonexistent file",
-					"sandbox", id, "dotfile", dotfile, "original", original, "destination", destination, "error", err)
-				// Create empty placeholder
-				f, err := os.Create(clone)
-				if err != nil {
-					return fmt.Errorf("failed to create empty dotfile %s for sandbox %s: %w", dotfile, id, err)
-				}
-				f.Close()
-				continue
-			}
-
-			slog.InfoContext(ctx, "cloneDotfiles resolved symbolic link",
-				"original", original, "destination", destination)
-			original = destination
+		if err := p.cloneDotfileRule(ctx, req.ID, pathRegistry, source, target, rule); err != nil {
+			return err
 		}
-
-		// Ensure clone directory exists
-		cloneDir := filepath.Dir(clone)
-		if err := p.fileOps.MkdirAll(cloneDir, 0o750); err != nil {
-			slog.ErrorContext(ctx, "cloneDotfiles couldn't make clone dir", "sandbox", id, "dotfile", dotfile, "cloneDir", cloneDir, "error", err)
-			return fmt.Errorf("failed to create dotfile directory %s for sandbox %s: %w", cloneDir, id, err)
-		}
-
-		// Copy the dotfile
-		if err := p.fileOps.Copy(ctx, original, clone); err != nil {
-			return fmt.Errorf("failed to copy dotfile %s for sandbox %s: %w", dotfile, id, err)
-		}
-
-		p.messenger.Message(ctx, "cloned "+original)
 	}
 
 	return nil
+}
+
+func dotfileRules(policy sandtypes.DotfilePolicy) []sandtypes.DotfileRule {
+	switch policy.Mode {
+	case sandtypes.DotfileModeNone:
+		return nil
+	case sandtypes.DotfileModeAllowlist, sandtypes.DotfileModeMinimal, "":
+		return policy.Files
+	default:
+		return policy.Files
+	}
+}
+
+func normalizeDotfileRule(hostWorkDir string, rule sandtypes.DotfileRule) (string, string, error) {
+	source := expandHome(rule.Source)
+	if source == "" {
+		return "", "", fmt.Errorf("dotfile source is required")
+	}
+	if !filepath.IsAbs(source) {
+		source = filepath.Join(hostWorkDir, source)
+	}
+
+	target := rule.Target
+	if target == "" {
+		target = filepath.Base(source)
+	}
+	target = strings.TrimPrefix(target, "~/")
+	if filepath.IsAbs(target) {
+		home := os.Getenv("HOME")
+		rel, err := filepath.Rel(home, target)
+		if err != nil || strings.HasPrefix(rel, "..") || rel == "." {
+			return "", "", fmt.Errorf("dotfile target %q must be inside $HOME", rule.Target)
+		}
+		target = rel
+	}
+	target = filepath.Clean(target)
+	if target == "." || strings.HasPrefix(target, "..") {
+		return "", "", fmt.Errorf("dotfile target %q must be relative to $HOME", rule.Target)
+	}
+
+	return source, target, nil
+}
+
+func expandHome(path string) string {
+	if path == "~" {
+		return os.Getenv("HOME")
+	}
+	if strings.HasPrefix(path, "~/") {
+		return filepath.Join(os.Getenv("HOME"), strings.TrimPrefix(path, "~/"))
+	}
+	return path
+}
+
+func (p *BaseWorkspacePreparation) cloneDotfileRule(ctx context.Context, id string, pathRegistry PathRegistry, source, target string, rule sandtypes.DotfileRule) error {
+	original, err := p.resolveDotfileSource(ctx, source, rule)
+	if err != nil {
+		return fmt.Errorf("dotfile %s for sandbox %s: %w", source, id, err)
+	}
+
+	clone := filepath.Join(pathRegistry.DotfilesDir(), target)
+	cloneDir := filepath.Dir(clone)
+	if err := p.fileOps.MkdirAll(cloneDir, 0o750); err != nil {
+		slog.ErrorContext(ctx, "cloneDotfiles couldn't make clone dir", "sandbox", id, "target", target, "cloneDir", cloneDir, "error", err)
+		return fmt.Errorf("failed to create dotfile directory %s for sandbox %s: %w", cloneDir, id, err)
+	}
+
+	if err := p.fileOps.Copy(ctx, original, clone); err != nil {
+		return fmt.Errorf("failed to copy dotfile %s for sandbox %s: %w", target, id, err)
+	}
+
+	p.messenger.Message(ctx, "cloned "+original)
+	return nil
+}
+
+func (p *BaseWorkspacePreparation) resolveDotfileSource(ctx context.Context, source string, rule sandtypes.DotfileRule) (string, error) {
+	fi, err := p.fileOps.Lstat(source)
+	if errors.Is(err, os.ErrNotExist) {
+		return "", fmt.Errorf("source does not exist")
+	}
+	if err != nil {
+		return "", err
+	}
+
+	if fi.Mode()&os.ModeSymlink == 0 {
+		return source, nil
+	}
+	if !rule.AllowSymlink {
+		return "", fmt.Errorf("source is a symlink")
+	}
+
+	destination, err := p.fileOps.Readlink(source)
+	if err != nil {
+		slog.ErrorContext(ctx, "cloneDotfiles error reading symbolic link", "source", source, "error", err)
+		return "", err
+	}
+	if !filepath.IsAbs(destination) {
+		destination = filepath.Join(filepath.Dir(source), destination)
+	}
+	destination = filepath.Clean(destination)
+	if !rule.AllowOutsideHome && !pathInsideHome(destination) {
+		return "", fmt.Errorf("symlink target %q is outside $HOME", destination)
+	}
+	if _, err := p.fileOps.Lstat(destination); err != nil {
+		return "", err
+	}
+
+	slog.InfoContext(ctx, "cloneDotfiles resolved symbolic link", "source", source, "destination", destination)
+	return destination, nil
+}
+
+func pathInsideHome(path string) bool {
+	home := os.Getenv("HOME")
+	rel, err := filepath.Rel(home, path)
+	return err == nil && !strings.HasPrefix(rel, "..")
 }
