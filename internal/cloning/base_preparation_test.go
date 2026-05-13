@@ -171,14 +171,96 @@ func TestBaseWorkspacePreparationRejectsSymlinkOutsideHomeByDefault(t *testing.T
 	}
 }
 
+func TestBaseWorkspacePreparationSanitizesGitConfig(t *testing.T) {
+	ctx := context.Background()
+	hostWorkDir := t.TempDir()
+	cloneRoot := filepath.Join(t.TempDir(), "clones")
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	if err := os.WriteFile(filepath.Join(home, ".gitconfig"), []byte(`[user]
+	name = Ada Lovelace
+	email = ada@example.com
+[credential]
+	helper = osxkeychain
+	username = ada
+[alias]
+	co = checkout
+	leak = !cat ~/.ssh/id_ed25519
+[core]
+	editor = vim
+	sshCommand = ssh -i ~/.ssh/id_ed25519
+	hooksPath = ~/.githooks
+[includeIf "gitdir:~/work/"]
+	path = ~/.gitconfig-work
+[color]
+	ui = auto
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	prep := newDotfileTestPreparation(t, cloneRoot)
+	artifacts, err := prep.Prepare(ctx, CloneRequest{
+		ID:          "sandbox-gitconfig",
+		Name:        "sandbox-gitconfig",
+		HostWorkDir: hostWorkDir,
+		Profile: sandtypes.Profile{
+			Name: sandtypes.DefaultProfileName,
+			Dotfiles: sandtypes.DotfilePolicy{
+				Mode: sandtypes.DotfileModeAllowlist,
+				Files: []sandtypes.DotfileRule{{
+					Source: "~/.gitconfig",
+					Target: "~/.gitconfig",
+				}},
+			},
+			Git: sandtypes.GitPolicy{Config: sandtypes.GitConfigPolicySanitized},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Prepare() error = %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(artifacts.PathRegistry.DotfilesDir(), ".gitconfig"))
+	if err != nil {
+		t.Fatalf("ReadFile sanitized .gitconfig: %v", err)
+	}
+	got := string(data)
+	for _, want := range []string{
+		"name = Ada Lovelace",
+		"email = ada@example.com",
+		"co = checkout",
+		"editor = vim",
+		"ui = auto",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("sanitized .gitconfig missing %q:\n%s", want, got)
+		}
+	}
+	for _, forbidden := range []string{
+		"[credential]",
+		"helper = osxkeychain",
+		"username = ada",
+		"leak = !cat",
+		"sshCommand",
+		"hooksPath",
+		"[includeIf",
+		".gitconfig-work",
+	} {
+		if strings.Contains(got, forbidden) {
+			t.Fatalf("sanitized .gitconfig contains %q:\n%s", forbidden, got)
+		}
+	}
+}
+
 func newDotfileTestPreparation(t *testing.T, cloneRoot string) *BaseWorkspacePreparation {
 	t.Helper()
 	fileOps := &hostops.MockFileOps{
-		MkdirAllFunc: os.MkdirAll,
-		StatFunc:     os.Stat,
-		LstatFunc:    os.Lstat,
-		ReadlinkFunc: os.Readlink,
-		CreateFunc:   os.Create,
+		MkdirAllFunc:  os.MkdirAll,
+		StatFunc:      os.Stat,
+		LstatFunc:     os.Lstat,
+		ReadlinkFunc:  os.Readlink,
+		CreateFunc:    os.Create,
+		RemoveAllFunc: os.RemoveAll,
+		WriteFileFunc: os.WriteFile,
 		VolumeFunc: func(path string) (*hostops.VolumeInfo, error) {
 			return &hostops.VolumeInfo{DeviceID: 1, MountPoint: "/"}, nil
 		},

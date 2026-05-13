@@ -144,7 +144,7 @@ Persist only profile name and non-secret policy references in sandbox metadata. 
 4. [x] Move auth env resolution behind profile policy: intersect `AgentRequirements` with `Profile.Env` and return only the minimum required auth vars.
 5. [x] Separate project/shell env behavior: keep auth env out of plain shell/exec/git unless explicitly allowed, and keep `--project-env` scoped to project env.
 6. [x] Replace hard-coded dotfile copying: use `Profile.Dotfiles` instead of the current `.gitconfig`, `.ssh`, `.zshrc` list.
-7. Add sanitized git config handling: implement `GitPolicy.Config = sanitized` as a specialized git config transformation.
+7. [x] Add sanitized git config handling: implement `GitPolicy.Config = sanitized` as a specialized git config transformation.
 8. Finish docs, CLI help, and tests: update user-facing docs/help and cover the behavior matrix below.
 
 ## Test Plan

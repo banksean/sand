@@ -61,6 +61,10 @@ func (p *BaseWorkspacePreparation) Prepare(ctx context.Context, req CloneRequest
 		return nil, fmt.Errorf("failed to clone dotfiles for sandbox %s: %w", req.ID, err)
 	}
 
+	if err := p.prepareGitConfig(ctx, req, pathRegistry); err != nil {
+		return nil, fmt.Errorf("failed to prepare git config for sandbox %s: %w", req.ID, err)
+	}
+
 	return &CloneArtifacts{
 		HostWorkDir:       hostWorkDir,
 		HostGitMirrorDir:  hostGitMirrorDir,
@@ -252,4 +256,143 @@ func pathInsideHome(path string) bool {
 	home := os.Getenv("HOME")
 	rel, err := filepath.Rel(home, path)
 	return err == nil && !strings.HasPrefix(rel, "..")
+}
+
+func (p *BaseWorkspacePreparation) prepareGitConfig(ctx context.Context, req CloneRequest, pathRegistry PathRegistry) error {
+	switch req.Profile.Git.Config {
+	case "", sandtypes.GitConfigPolicyNone:
+		return nil
+	case sandtypes.GitConfigPolicyCopy:
+		rule := sandtypes.DotfileRule{
+			Source:       "~/.gitconfig",
+			Target:       "~/.gitconfig",
+			AllowSymlink: true,
+		}
+		source, target, err := normalizeDotfileRule(req.HostWorkDir, rule)
+		if err != nil {
+			return err
+		}
+		return p.cloneDotfileRule(ctx, req.ID, pathRegistry, source, target, rule)
+	case sandtypes.GitConfigPolicySanitized:
+		return p.writeSanitizedGitConfig(ctx, req, pathRegistry)
+	default:
+		return fmt.Errorf("unsupported git config policy %q", req.Profile.Git.Config)
+	}
+}
+
+func (p *BaseWorkspacePreparation) writeSanitizedGitConfig(ctx context.Context, req CloneRequest, pathRegistry PathRegistry) error {
+	source := expandHome("~/.gitconfig")
+	target := filepath.Join(pathRegistry.DotfilesDir(), ".gitconfig")
+
+	if _, err := p.fileOps.Lstat(source); errors.Is(err, os.ErrNotExist) {
+		p.messenger.Message(ctx, "skipping "+source)
+		return p.fileOps.RemoveAll(target)
+	} else if err != nil {
+		return err
+	}
+
+	data, err := os.ReadFile(source)
+	if err != nil {
+		return err
+	}
+	if err := p.fileOps.MkdirAll(filepath.Dir(target), 0o750); err != nil {
+		return err
+	}
+	if err := p.fileOps.WriteFile(target, sanitizeGitConfig(data), 0o640); err != nil {
+		return err
+	}
+	p.messenger.Message(ctx, "sanitized "+source)
+	return nil
+}
+
+func sanitizeGitConfig(data []byte) []byte {
+	var out strings.Builder
+	section := ""
+	skipSection := false
+
+	for _, line := range strings.SplitAfter(string(data), "\n") {
+		lineBody := strings.TrimSuffix(line, "\n")
+		trimmed := strings.TrimSpace(lineBody)
+
+		if name, ok := gitConfigSection(trimmed); ok {
+			section = name
+			skipSection = unsafeGitConfigSection(section)
+			if !skipSection {
+				out.WriteString(line)
+			}
+			continue
+		}
+
+		if skipSection {
+			continue
+		}
+		if unsafeGitConfigEntry(section, trimmed) {
+			continue
+		}
+		out.WriteString(line)
+	}
+
+	return []byte(out.String())
+}
+
+func gitConfigSection(line string) (string, bool) {
+	if !strings.HasPrefix(line, "[") || !strings.Contains(line, "]") {
+		return "", false
+	}
+	end := strings.Index(line, "]")
+	name := strings.TrimSpace(line[1:end])
+	if i := strings.IndexAny(name, " \t\""); i >= 0 {
+		name = name[:i]
+	}
+	return strings.ToLower(name), name != ""
+}
+
+func unsafeGitConfigSection(section string) bool {
+	switch section {
+	case "credential", "include", "includeif", "gpg":
+		return true
+	default:
+		return false
+	}
+}
+
+func unsafeGitConfigEntry(section, line string) bool {
+	if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, ";") {
+		return false
+	}
+
+	key, value, ok := gitConfigKeyValue(line)
+	if !ok {
+		return false
+	}
+
+	switch section {
+	case "alias":
+		return strings.HasPrefix(strings.Trim(value, `"'`), "!")
+	case "core":
+		switch key {
+		case "sshcommand", "hookspath", "fsmonitor":
+			return true
+		}
+	}
+	return false
+}
+
+func gitConfigKeyValue(line string) (string, string, bool) {
+	if i := strings.Index(line, "="); i >= 0 {
+		return normalizeGitConfigKey(line[:i]), strings.TrimSpace(line[i+1:]), true
+	}
+	fields := strings.Fields(line)
+	if len(fields) == 0 {
+		return "", "", false
+	}
+	value := ""
+	if len(fields) > 1 {
+		value = strings.Join(fields[1:], " ")
+	}
+	return normalizeGitConfigKey(fields[0]), value, true
+}
+
+func normalizeGitConfigKey(key string) string {
+	return strings.ReplaceAll(strings.ToLower(strings.TrimSpace(key)), "-", "")
 }
