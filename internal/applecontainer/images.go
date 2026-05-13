@@ -25,9 +25,9 @@ var Images ImagesSvc
 func (i *ImagesSvc) List(ctx context.Context) ([]types.ImageEntry, error) {
 	var images []types.ImageEntry
 
-	output, err := exec.CommandContext(ctx, "container", "image", "list", "--format", "json").Output()
+	output, err := exec.CommandContext(ctx, "container", "image", "list", "--format", "json").CombinedOutput()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %s", err, strings.TrimSpace(string(output)))
 	}
 	if err := json.Unmarshal(output, &images); err != nil {
 		return nil, err

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/user"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/alecthomas/kong"
+	"github.com/banksean/sand/internal/applecontainer"
 	"github.com/banksean/sand/internal/applecontainer/options"
 	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/cli/agentlaunch"
@@ -22,6 +24,8 @@ import (
 	"github.com/banksean/sand/internal/sshimmer"
 	"github.com/goombaio/namegenerator"
 )
+
+var newCmdContainerSystemStart = applecontainer.System.Start
 
 type NewCmd struct {
 	SandboxCreationFlags
@@ -105,7 +109,7 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 	if c.ImageName == "" {
 		c.ImageName = agentlaunch.DefaultImage(c.Agent, DefaultImageName)
 	}
-	if err := mc.EnsureImage(ctx, c.ImageName, os.Stdout); err != nil {
+	if err := ensureImageForNewCmd(ctx, c.ImageName, os.Stdout, os.Stdin, mc.EnsureImage, newCmdContainerSystemStart); err != nil {
 		return fmt.Errorf("ensuring image %s: %w", c.ImageName, err)
 	}
 
@@ -233,6 +237,38 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 			slog.ErrorContext(ctx, "RemoveSandbox", "error", err)
 		}
 		slog.InfoContext(ctx, "Cleanup complete. Exiting.")
+	}
+	return nil
+}
+
+type ensureImageFunc func(context.Context, string, io.Writer) error
+type startContainerSystemFunc func(context.Context, *options.SystemStart) (string, error)
+
+func ensureImageForNewCmd(ctx context.Context, imageName string, stdout io.Writer, stdin io.Reader, ensure ensureImageFunc, start startContainerSystemFunc) error {
+	if stdout == nil {
+		stdout = io.Discard
+	}
+	if err := ensure(ctx, imageName, stdout); err != nil {
+		if !runtimedeps.IsContainerSystemNotRunningError(err) {
+			return err
+		}
+		ok, promptErr := runtimedeps.PromptYesDefault(stdin, stdout, "Start container system now [Y/n]? ")
+		if promptErr != nil {
+			return promptErr
+		}
+		if !ok {
+			return err
+		}
+		out, startErr := start(ctx, &options.SystemStart{})
+		if strings.TrimSpace(out) != "" {
+			fmt.Fprintln(stdout, strings.TrimSpace(out))
+		}
+		if startErr != nil {
+			return fmt.Errorf("starting container system: %w", startErr)
+		}
+		if retryErr := ensure(ctx, imageName, stdout); retryErr != nil {
+			return retryErr
+		}
 	}
 	return nil
 }

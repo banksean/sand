@@ -271,13 +271,19 @@ func main() {
 
 	app.initSlog()
 
-	if err := runtimedeps.Verify(ctx,
+	if err := runtimedeps.VerifyWithOptions(ctx,
 		appBaseDir,
+		runtimedeps.VerifyOptions{
+			Stdin:            os.Stdin,
+			Stdout:           os.Stdout,
+			PromptRemedies:   true,
+			DefaultDNSDomain: runtimedeps.DefaultDNSDomain,
+		},
 		runtimedeps.MacOS,
 		runtimedeps.MacOSVersion,
 		runtimedeps.ContainerCommand,
 		runtimedeps.ContainerSystemDNSDomain); err != nil {
-		fmt.Fprintf(os.Stderr, "Prerequisite check(s) failed: %s\r\n", err)
+		fmt.Fprintf(os.Stderr, "error: %s\n", err)
 		os.Exit(1)
 	}
 

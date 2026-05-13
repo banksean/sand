@@ -895,6 +895,28 @@ func TestBoxer_EnsureImage(t *testing.T) {
 		}
 	})
 
+	t.Run("container system not running list error", func(t *testing.T) {
+		mockImage := &mockImageOps{
+			listFunc: func(ctx context.Context) ([]types.ImageEntry, error) {
+				return nil, errors.New("container system service is not running")
+			},
+		}
+
+		mockContainer := &hostops.MockContainerOps{}
+		boxer := newTestBoxer(t, mockContainer, mockImage)
+
+		err := boxer.EnsureImage(ctx, "test-image:latest", io.Discard)
+		if err == nil {
+			t.Fatal("Expected error from list, got nil")
+		}
+		if got := err.Error(); !strings.Contains(got, "container system start") {
+			t.Fatalf("EnsureImage() error = %q, want container system start remedy", got)
+		}
+		if got := err.Error(); strings.Contains(got, "failed to list images") {
+			t.Fatalf("EnsureImage() error = %q, should not obscure system service remedy", got)
+		}
+	})
+
 	t.Run("pull error", func(t *testing.T) {
 		expectedErr := errors.New("pull failed")
 		mockImage := &mockImageOps{

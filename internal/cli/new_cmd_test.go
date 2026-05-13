@@ -1,14 +1,18 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/banksean/sand/internal/applecontainer/options"
 	"github.com/banksean/sand/internal/hostops"
+	"github.com/banksean/sand/internal/runtimedeps"
 	"github.com/banksean/sand/internal/sandtypes"
 )
 
@@ -183,4 +187,85 @@ func TestValidateNewSandboxBranch(t *testing.T) {
 			t.Fatalf("validateNewSandboxBranch() error = %v", err)
 		}
 	})
+}
+
+func TestEnsureImageForNewCmdStartsContainerSystemAndRetries(t *testing.T) {
+	var attempts int
+	var startCalled bool
+	var stdout bytes.Buffer
+
+	err := ensureImageForNewCmd(
+		context.Background(),
+		"test-image:latest",
+		&stdout,
+		strings.NewReader("\n"),
+		func(ctx context.Context, image string, w io.Writer) error {
+			attempts++
+			if attempts == 1 {
+				return runtimedeps.ContainerSystemNotRunningError(errors.New("system service is not running"))
+			}
+			return nil
+		},
+		func(ctx context.Context, opts *options.SystemStart) (string, error) {
+			startCalled = true
+			return "started", nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("ensureImageForNewCmd() error = %v", err)
+	}
+	if attempts != 2 {
+		t.Fatalf("ensure attempts = %d, want 2", attempts)
+	}
+	if !startCalled {
+		t.Fatal("container system start was not called")
+	}
+	if got := stdout.String(); !strings.Contains(got, "Start container system now [Y/n]? ") || !strings.Contains(got, "started\n") {
+		t.Fatalf("stdout = %q, want prompt and start output", got)
+	}
+}
+
+func TestEnsureImageForNewCmdDeclineReturnsOriginalError(t *testing.T) {
+	wantErr := runtimedeps.ContainerSystemNotRunningError(errors.New("system service is not running"))
+
+	err := ensureImageForNewCmd(
+		context.Background(),
+		"test-image:latest",
+		io.Discard,
+		strings.NewReader("n\n"),
+		func(ctx context.Context, image string, w io.Writer) error {
+			return wantErr
+		},
+		func(ctx context.Context, opts *options.SystemStart) (string, error) {
+			t.Fatal("container system start should not be called")
+			return "", nil
+		},
+	)
+	if err == nil {
+		t.Fatal("ensureImageForNewCmd() error = nil, want error")
+	}
+	if err.Error() != wantErr.Error() {
+		t.Fatalf("ensureImageForNewCmd() error = %q, want %q", err, wantErr)
+	}
+}
+
+func TestEnsureImageForNewCmdReturnsStartError(t *testing.T) {
+	err := ensureImageForNewCmd(
+		context.Background(),
+		"test-image:latest",
+		io.Discard,
+		strings.NewReader("y\n"),
+		func(ctx context.Context, image string, w io.Writer) error {
+			return runtimedeps.ContainerSystemNotRunningError(errors.New("system service is not running"))
+		},
+		func(ctx context.Context, opts *options.SystemStart) (string, error) {
+			return "", fmt.Errorf("start failed")
+		},
+	)
+	if err == nil {
+		t.Fatal("ensureImageForNewCmd() error = nil, want error")
+	}
+	if !strings.Contains(err.Error(), "starting container system") {
+		t.Fatalf("ensureImageForNewCmd() error = %q, want start context", err)
+	}
 }

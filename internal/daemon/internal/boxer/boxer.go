@@ -1015,6 +1015,9 @@ func (sb *Boxer) EnsureImage(ctx context.Context, imageName string, w io.Writer)
 
 	images, err := sb.ImageService.List(ctx)
 	if err != nil {
+		if runtimedeps.IsContainerSystemNotRunningError(err) {
+			return runtimedeps.ContainerSystemNotRunningError(err)
+		}
 		return fmt.Errorf("failed to list images: %w", err)
 	}
 
