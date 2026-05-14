@@ -248,10 +248,7 @@ func (c *ContainerSvc) Export(ctx context.Context, opts *options.ExportContainer
 }
 
 func (c *ContainerSvc) Stats(ctx context.Context, id ...string) ([]types.ContainerStats, error) {
-	args := []string{"stats", "--format", "json"}
-	if len(id) > 0 {
-		args = append(args, id...)
-	}
+	args := statsArgs(id...)
 	cmd := exec.CommandContext(ctx, "container", args...)
 	slog.InfoContext(ctx, "ContainerSvc.Stats", "cmd", strings.Join(cmd.Args, " "), "ids", len(id))
 	out, err := cmd.CombinedOutput()
@@ -266,4 +263,12 @@ func (c *ContainerSvc) Stats(ctx context.Context, id ...string) ([]types.Contain
 	}
 
 	return ret, nil
+}
+
+func statsArgs(id ...string) []string {
+	args := []string{"stats", "--format", "json", "--no-stream"}
+	if len(id) > 0 {
+		args = append(args, id...)
+	}
+	return args
 }

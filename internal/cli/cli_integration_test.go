@@ -55,6 +55,35 @@ func TestLsCmd_WithSandboxes(t *testing.T) {
 	}
 }
 
+func TestLsCmd_RequestsStatsForRunningSandboxes(t *testing.T) {
+	var statsCalls []string
+	var statsCallsMu sync.Mutex
+	cctx := newCLIContext(t, daemontest.Deps{
+		ContainerService: &hostops.MockContainerOps{
+			StatsFunc: func(_ context.Context, containerID ...string) ([]types.ContainerStats, error) {
+				statsCallsMu.Lock()
+				defer statsCallsMu.Unlock()
+				statsCalls = append(statsCalls, containerID...)
+				return []types.ContainerStats{
+					{ID: "ctr-alpha", CPUUsageUsec: 1000},
+					{ID: "ctr-beta", CPUUsageUsec: 2000},
+				}, nil
+			},
+		},
+	}, func(ctx context.Context, s daemontest.SandboxStore) {
+		s.SaveSandbox(ctx, testBox("alpha"))
+		s.SaveSandbox(ctx, testBox("beta"))
+	})
+	if err := (&cli.LsCmd{}).Run(cctx); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	slices.Sort(statsCalls)
+	if !slices.Equal(statsCalls, []string{"ctr-alpha", "ctr-beta"}) {
+		t.Fatalf("Stats called with %v, want ctr-alpha and ctr-beta", statsCalls)
+	}
+}
+
 // --- RmCmd ---
 
 func TestRmCmd_Single(t *testing.T) {

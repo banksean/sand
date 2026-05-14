@@ -42,9 +42,9 @@ func (c *StatsCmd) Run(cctx *CLIContext) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	colHeadings := []string{
 		"SANDBOX NAME",
-		"CPU USAGE",
+		"CPU",
 		"PROCS",
-		"MEMORY USAGE/LIMIT",
+		"MEM",
 		"BLOCK R/W",
 		"NET TX/RX",
 	}
@@ -52,12 +52,8 @@ func (c *StatsCmd) Run(cctx *CLIContext) error {
 	for _, ctr := range list {
 		row := []string{
 			ctr.ID,
-			fmt.Sprintf("%d", ctr.CPUUsageUsec),
-			fmt.Sprintf("%d", ctr.NumProcesses),
-			fmt.Sprintf("%d/%d", ctr.MemoryUsageBytes, ctr.MemoryLimitBytes),
-			fmt.Sprintf("%d/%d", ctr.BlockReadBytes, ctr.BlockWriteBytes),
-			fmt.Sprintf("%d/%d", ctr.NetworkTxBytes, ctr.NetworkRxBytes),
 		}
+		row = append(row, formatStatsColumns(&ctr)...)
 		fmt.Fprintf(w, "%s\n", strings.Join(row, "\t"))
 	}
 	w.Flush()

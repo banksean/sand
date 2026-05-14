@@ -1,12 +1,16 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
-	"text/tabwriter"
 
+	"github.com/banksean/sand/internal/applecontainer/types"
+	"github.com/banksean/sand/internal/daemon"
+	"github.com/banksean/sand/internal/hostops"
 	"github.com/banksean/sand/internal/sandtypes"
 )
 
@@ -26,8 +30,10 @@ func (c *LsCmd) Run(cctx *CLIContext) error {
 		return nil
 	}
 
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "SANDBOX NAME\tSANDBOX ID\tSTATUS\tFROM DIR\tFROM GIT\tCURRENT GIT\tIMAGE NAME")
+	currentWorkspace := currentWorkspaceDir(ctx)
+	statsByContainerID := lsStatsByContainerID(ctx, mc, list)
+	userHomeDir, _ := os.UserHomeDir()
+	rows := make([]lsRow, 0, len(list))
 	for _, sbox := range list {
 		ctr := sbox.Container
 		status := []string{"dormant"}
@@ -40,20 +46,101 @@ func (c *LsCmd) Run(cctx *CLIContext) error {
 		if sbox.SandboxWorkDirError != "" {
 			status = append(status, sbox.SandboxWorkDirError)
 		}
-		hostOriginDir := sbox.HostOriginDir
-		userHomeDir, err := os.UserHomeDir()
-		if err == nil {
-			hostOriginDir = strings.Replace(hostOriginDir, userHomeDir, "~", 1)
-		}
 		imgName := strings.TrimPrefix(sbox.ImageName, "ghcr.io/banksean/sand/")
 
 		originalBranch := gitSummary(sbox.OriginalGitDetails)
 		currentBranch := gitSummary(sbox.CurrentGitDetails)
 
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", sbox.Name, sbox.ID, strings.Join(status, ", "), hostOriginDir, originalBranch, currentBranch, imgName)
+		rows = append(rows, lsRow{
+			Name:       sbox.Name,
+			ID:         sbox.ID,
+			Here:       samePath(currentWorkspace, sbox.HostOriginDir),
+			Status:     strings.Join(status, ", "),
+			FromDir:    displayPath(sbox.HostOriginDir, userHomeDir),
+			FromGit:    originalBranch,
+			CurrentGit: currentBranch,
+			ImageName:  imgName,
+			Stats:      statsByContainerID[sbox.ContainerID],
+		})
 	}
-	w.Flush()
-	return nil
+	rows = prioritizeHereRows(rows)
+	return renderLsTable(os.Stdout, rows)
+}
+
+func currentWorkspaceDir(ctx context.Context) string {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	gitTopLevel := hostops.NewDefaultGitOps().TopLevel(ctx, cwd)
+	if gitTopLevel != "" {
+		return canonicalPath(gitTopLevel)
+	}
+	return canonicalPath(cwd)
+}
+
+func canonicalPath(path string) string {
+	if path == "" {
+		return ""
+	}
+	abs, err := filepath.Abs(path)
+	if err == nil {
+		path = abs
+	}
+	resolved, err := filepath.EvalSymlinks(path)
+	if err == nil {
+		path = resolved
+	}
+	return filepath.Clean(path)
+}
+
+func samePath(a, b string) bool {
+	if a == "" || b == "" {
+		return false
+	}
+	return canonicalPath(a) == canonicalPath(b)
+}
+
+func prioritizeHereRows(rows []lsRow) []lsRow {
+	prioritized := make([]lsRow, 0, len(rows))
+	for _, row := range rows {
+		if row.Here {
+			prioritized = append(prioritized, row)
+		}
+	}
+	for _, row := range rows {
+		if !row.Here {
+			prioritized = append(prioritized, row)
+		}
+	}
+	return prioritized
+}
+
+func lsStatsByContainerID(ctx context.Context, mc daemon.Client, list []sandtypes.Box) map[string]*types.ContainerStats {
+	names := make([]string, 0, len(list))
+	for _, sbox := range list {
+		if sbox.Name == "" || sbox.ContainerID == "" || !isRunningContainer(sbox.Container) {
+			continue
+		}
+		names = append(names, sbox.Name)
+	}
+	if len(names) == 0 {
+		return nil
+	}
+	stats, err := mc.Stats(ctx, names...)
+	if err != nil {
+		slog.WarnContext(ctx, "Stats for sand ls", "error", err)
+		return nil
+	}
+	byID := make(map[string]*types.ContainerStats, len(stats))
+	for i := range stats {
+		byID[stats[i].ID] = &stats[i]
+	}
+	return byID
+}
+
+func isRunningContainer(ctr *types.Container) bool {
+	return ctr != nil && strings.EqualFold(ctr.Status, "running")
 }
 
 func gitSummary(details *sandtypes.GitDetails) string {
