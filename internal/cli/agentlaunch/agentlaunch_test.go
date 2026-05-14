@@ -79,10 +79,25 @@ func TestBuildInteractiveExec(t *testing.T) {
 			atch:      true,
 			wantShell: "/usr/local/bin/atch",
 			wantArgs: []string{
-				"opencode-sand-1",
+				"sand-1",
 				"/bin/zsh",
 				"-c",
 				"opencode",
+			},
+		},
+		{
+			name:      "atch wraps codex uses sandbox id as session name",
+			agent:     "codex",
+			shell:     "/bin/zsh",
+			sandboxID: "sand-1",
+			hostname:  "sand-1.test.",
+			atch:      true,
+			wantShell: "/usr/local/bin/atch",
+			wantArgs: []string{
+				"sand-1",
+				"/bin/zsh",
+				"-c",
+				"codex --dangerously-bypass-approvals-and-sandbox",
 			},
 		},
 		{

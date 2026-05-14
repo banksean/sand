@@ -41,7 +41,7 @@ func BuildInteractiveExec(agent, shell, sandboxID, hostname string, tmux, atch b
 		}
 
 		return "/usr/local/bin/atch", []string{
-			agent + "-" + sandboxID,
+			sandboxID,
 			shell,
 			"-c",
 			definition.InteractiveCommand,
