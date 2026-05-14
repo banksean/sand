@@ -46,13 +46,12 @@ func TestEnsureSharedCacheMounts_GoCachesUseMiseMount(t *testing.T) {
 	}
 }
 
-func TestGetCurrentGitDetailsSetsRelativeCountsFromHostBranch(t *testing.T) {
+func TestGetCurrentGitDetailsDoesNotFetchSandboxRefsIntoHostRepo(t *testing.T) {
 	const (
 		currentCommit = "2222222222222222222222222222222222222222"
 	)
 
-	var gotDir, gotBase, gotHead string
-	var fetchedDir, fetchedRemote string
+	var fetchCalled bool
 	b := &Boxer{
 		GitOps: &hostops.MockGitOps{
 			BranchFunc: func(ctx context.Context, dir string) string {
@@ -61,25 +60,9 @@ func TestGetCurrentGitDetailsSetsRelativeCountsFromHostBranch(t *testing.T) {
 			CommitFunc: func(ctx context.Context, dir string) string {
 				return currentCommit
 			},
-			TopLevelFunc: func(ctx context.Context, dir string) string {
-				if dir != "/host/repo" {
-					t.Fatalf("TopLevel called with dir=%q", dir)
-				}
-				return "/host/repo"
-			},
-			LocalBranchExistsFunc: func(ctx context.Context, dir, branch string) bool {
-				return dir == "/host/repo" && branch == "sandbox-branch"
-			},
 			FetchFunc: func(ctx context.Context, dir, remote string) error {
-				fetchedDir = dir
-				fetchedRemote = remote
+				fetchCalled = true
 				return nil
-			},
-			CommitDivergenceFunc: func(ctx context.Context, dir, base, head string) (ahead, behind int, ok bool) {
-				gotDir = dir
-				gotBase = base
-				gotHead = head
-				return 2, 1, true
 			},
 		},
 	}
@@ -91,14 +74,14 @@ func TestGetCurrentGitDetailsSetsRelativeCountsFromHostBranch(t *testing.T) {
 
 	current := b.getCurrentGitDetails(context.Background(), box)
 
-	if fetchedDir != "/host/repo" || fetchedRemote != "sand/box-id" {
-		t.Fatalf("Fetch called with dir=%q remote=%q", fetchedDir, fetchedRemote)
+	if fetchCalled {
+		t.Fatal("getCurrentGitDetails fetched sandbox refs into the host repo")
 	}
-	if gotDir != "/host/repo" || gotBase != "refs/heads/sandbox-branch" || gotHead != currentCommit {
-		t.Fatalf("CommitDivergence called with dir=%q base=%q head=%q", gotDir, gotBase, gotHead)
+	if current.Branch != "sandbox-branch" || current.Commit != currentCommit {
+		t.Fatalf("current git details = branch:%q commit:%q", current.Branch, current.Commit)
 	}
-	if !current.HasRelative || current.Ahead != 2 || current.Behind != 1 {
-		t.Fatalf("current relative = has:%v ahead:%d behind:%d", current.HasRelative, current.Ahead, current.Behind)
+	if current.HasRelative || current.Ahead != 0 || current.Behind != 0 {
+		t.Fatalf("current relative = has:%v ahead:%d behind:%d, want unset", current.HasRelative, current.Ahead, current.Behind)
 	}
 }
 

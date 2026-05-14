@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"os"
@@ -9,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/banksean/sand/internal/cloning"
 	"github.com/banksean/sand/internal/runtimedeps"
 )
 
@@ -58,19 +56,6 @@ func (c *DiffCmd) Run(cctx *CLIContext) error {
 		return fmt.Errorf("could not get current working directory: %w", err)
 	}
 
-	// Construct the remote name for the sandbox clone
-	remoteName := cloning.ClonedWorkDirGitRemotePrefix + sbox.Name
-
-	// First, fetch from the sandbox remote
-	gitFetch := exec.CommandContext(ctx, "git", "fetch", remoteName)
-	slog.InfoContext(ctx, "GitCmd.DiffCmd", "gitFetch", strings.Join(gitFetch.Args, " "))
-	gitFetch.Dir = cwd
-	gitFetch.Stdout = os.Stdout
-	gitFetch.Stderr = os.Stderr
-	if err := gitFetch.Run(); err != nil {
-		return fmt.Errorf("git fetch failed: %w", err)
-	}
-
 	if c.Branch == "" {
 		// get the active branch name in cwd.
 		cwdBranchCmd := exec.CommandContext(ctx, "git", "branch", "--show-current")
@@ -82,42 +67,56 @@ func (c *DiffCmd) Run(cctx *CLIContext) error {
 		c.Branch = strings.TrimSpace(string(out))
 	}
 
-	// If including uncommitted changes, create a temporary commit in the sandbox
-	var tempCommitCreated bool
-	if c.IncludeUncommitted {
-		if err := c.createTempCommit(ctx, sbox.SandboxWorkDir); err != nil {
-			return fmt.Errorf("failed to create temporary commit: %w", err)
-		}
-		tempCommitCreated = true
-		defer func() {
-			if err := c.cleanupTempCommit(ctx, sbox.SandboxWorkDir); err != nil {
-				slog.ErrorContext(ctx, "failed to cleanup temporary commit", "error", err)
-			}
-		}()
-
-		// Fetch again to get the temporary commit
-		gitFetch := exec.CommandContext(ctx, "git", "fetch", remoteName)
-		slog.InfoContext(ctx, "GitCmd.DiffCmd", "gitFetch (with temp commit)", strings.Join(gitFetch.Args, " "))
-		gitFetch.Dir = cwd
-		gitFetch.Stdout = os.Stdout
-		gitFetch.Stderr = os.Stderr
-		if err := gitFetch.Run(); err != nil {
-			return fmt.Errorf("git fetch failed: %w", err)
+	diffRoot, err := os.MkdirTemp("", "sand-diff-*")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(diffRoot)
+	sandboxSnapshot := filepath.Join(diffRoot, "sandbox")
+	hostSnapshot := filepath.Join(diffRoot, "host")
+	for _, dir := range []string{sandboxSnapshot, hostSnapshot} {
+		if err := os.MkdirAll(dir, 0o750); err != nil {
+			return err
 		}
 	}
 
-	// Now diff against the specified branch from the remote
-	remoteBranch := fmt.Sprintf("%s/%s", remoteName, c.Branch)
-	gitDiff := exec.CommandContext(ctx, "git", "diff", remoteBranch)
+	sandboxAppDir := filepath.Join(sbox.SandboxWorkDir, "app")
+	sandboxHadUncommittedChanges := false
+	if c.IncludeUncommitted {
+		var err error
+		sandboxHadUncommittedChanges, err = sandboxHasUncommittedChanges(ctx, sandboxAppDir)
+		if err != nil {
+			return fmt.Errorf("check sandbox worktree changes: %w", err)
+		}
+		if err := sandboxWorktreeSnapshot(ctx, sandboxAppDir, sandboxSnapshot); err != nil {
+			return fmt.Errorf("snapshot sandbox worktree: %w", err)
+		}
+	} else {
+		cache := newGitInspectionCache(ctx, cctx.AppBaseDir, sbox)
+		cacheDir, err := cache.ensureUpdated()
+		if err != nil {
+			return err
+		}
+		if err := cache.exportRef(cacheDir, cache.refForBranch(c.Branch), sandboxSnapshot); err != nil {
+			return err
+		}
+	}
+
+	if err := hostWorktreeSnapshot(ctx, cwd, hostSnapshot); err != nil {
+		return fmt.Errorf("snapshot host worktree: %w", err)
+	}
+
+	gitDiff := newHardenedGit(ctx).command(diffRoot, "diff", "--no-index", "--no-ext-diff", "--src-prefix=sandbox/", "--dst-prefix=host/", "sandbox", "host")
 	slog.InfoContext(ctx, "GitCmd.DiffCmd", "gitDiff", strings.Join(gitDiff.Args, " "))
-	gitDiff.Dir = cwd
 	gitDiff.Stdout = os.Stdout
 	gitDiff.Stderr = os.Stderr
 	if err := gitDiff.Run(); err != nil {
-		return fmt.Errorf("git diff failed: %w", err)
+		if exitErr, ok := err.(*exec.ExitError); !ok || exitErr.ExitCode() != 1 {
+			return fmt.Errorf("git diff failed: %w", err)
+		}
 	}
 
-	if tempCommitCreated {
+	if sandboxHadUncommittedChanges {
 		fmt.Fprintf(os.Stderr, "\nNote: Diff includes uncommitted changes from sandbox working tree\n")
 	}
 
@@ -144,59 +143,6 @@ func (c *DiffCmd) Run(cctx *CLIContext) error {
 	return nil
 }
 
-// createTempCommit creates a temporary commit in the sandbox working directory
-// that includes all uncommitted changes (staged and unstaged).
-func (c *DiffCmd) createTempCommit(ctx context.Context, sandboxWorkDir string) error {
-	sandboxAppDir := filepath.Join(sandboxWorkDir, "app")
-	slog.InfoContext(ctx, "createTempCommit", "dir", sandboxAppDir)
-
-	// Add all changes to the index
-	gitAdd := exec.CommandContext(ctx, "git", "add", "-A")
-	gitAdd.Dir = sandboxAppDir
-	slog.InfoContext(ctx, "createTempCommit gitAdd", "cmd", strings.Join(gitAdd.Args, " "))
-	if output, err := gitAdd.CombinedOutput(); err != nil {
-		slog.ErrorContext(ctx, "git add failed", "error", err, "output", string(output))
-		return fmt.Errorf("git add failed: %w", err)
-	}
-
-	// Create a temporary commit
-	gitCommit := exec.CommandContext(ctx, "git", "commit", "--allow-empty", "-m", "[TEMPORARY] sand git diff --include-uncommitted")
-	gitCommit.Dir = sandboxAppDir
-	slog.InfoContext(ctx, "createTempCommit gitCommit", "cmd", strings.Join(gitCommit.Args, " "))
-	if output, err := gitCommit.CombinedOutput(); err != nil {
-		slog.ErrorContext(ctx, "git commit failed", "error", err, "output", string(output))
-		return fmt.Errorf("git commit failed: %w", err)
-	}
-
-	return nil
-}
-
-// cleanupTempCommit removes the temporary commit created by createTempCommit.
-func (c *DiffCmd) cleanupTempCommit(ctx context.Context, sandboxWorkDir string) error {
-	sandboxAppDir := filepath.Join(sandboxWorkDir, "app")
-	slog.InfoContext(ctx, "cleanupTempCommit", "dir", sandboxAppDir)
-
-	// Reset to the previous commit, keeping working tree changes
-	gitReset := exec.CommandContext(ctx, "git", "reset", "--soft", "HEAD~1")
-	gitReset.Dir = sandboxAppDir
-	slog.InfoContext(ctx, "cleanupTempCommit gitReset", "cmd", strings.Join(gitReset.Args, " "))
-	if output, err := gitReset.CombinedOutput(); err != nil {
-		slog.ErrorContext(ctx, "git reset failed", "error", err, "output", string(output))
-		return fmt.Errorf("git reset failed: %w", err)
-	}
-
-	// Unstage all changes to restore the original state
-	gitResetFiles := exec.CommandContext(ctx, "git", "reset", "HEAD")
-	gitResetFiles.Dir = sandboxAppDir
-	slog.InfoContext(ctx, "cleanupTempCommit gitResetFiles", "cmd", strings.Join(gitResetFiles.Args, " "))
-	if output, err := gitResetFiles.CombinedOutput(); err != nil {
-		slog.ErrorContext(ctx, "git reset HEAD failed", "error", err, "output", string(output))
-		return fmt.Errorf("git reset HEAD failed: %w", err)
-	}
-
-	return nil
-}
-
 func (c *StatusCmd) Run(cctx *CLIContext) error {
 	ctx := cctx.Context
 	mc := cctx.Daemon
@@ -211,30 +157,10 @@ func (c *StatusCmd) Run(cctx *CLIContext) error {
 		return fmt.Errorf("could not find sandbox named %s: %w", c.SandboxName, err)
 	}
 
-	// Construct the remote name for the sandbox clone
-	remoteName := cloning.ClonedWorkDirGitRemotePrefix + sbox.Name
-
-	// Get current working directory
-	cwd, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("could not get current working directory: %w", err)
-	}
-
-	// First, fetch from the sandbox remote
-	gitFetch := exec.CommandContext(ctx, "git", "fetch", remoteName)
-	slog.InfoContext(ctx, "GitCmd.StatusCmd", "gitFetch", strings.Join(gitFetch.Args, " "))
-	gitFetch.Dir = cwd
-	gitFetch.Stdout = os.Stdout
-	gitFetch.Stderr = os.Stderr
-	if err := gitFetch.Run(); err != nil {
-		return fmt.Errorf("git fetch failed: %w", err)
-	}
-
 	// Run git status in the sandbox working directory
 	sandboxAppDir := filepath.Join(sbox.SandboxWorkDir, "app")
-	gitStatus := exec.CommandContext(ctx, "git", "status")
+	gitStatus := newHardenedGit(ctx).command(sandboxAppDir, "status")
 	slog.InfoContext(ctx, "GitCmd.StatusCmd", "gitStatus", strings.Join(gitStatus.Args, " "), "dir", sandboxAppDir)
-	gitStatus.Dir = sandboxAppDir
 	gitStatus.Stdout = os.Stdout
 	gitStatus.Stderr = os.Stderr
 	if err := gitStatus.Run(); err != nil {
@@ -267,30 +193,14 @@ func (c *LogCmd) Run(cctx *CLIContext) error {
 		return fmt.Errorf("could not find sandbox named %s: %w", c.SandboxName, err)
 	}
 
-	// Construct the remote name for the sandbox clone
-	remoteName := cloning.ClonedWorkDirGitRemotePrefix + sbox.Name
-
-	// Get current working directory
-	cwd, err := os.Getwd()
+	cache := newGitInspectionCache(ctx, cctx.AppBaseDir, sbox)
+	cacheDir, err := cache.ensureUpdated()
 	if err != nil {
-		return fmt.Errorf("could not get current working directory: %w", err)
+		return err
 	}
 
-	// First, fetch from the sandbox remote
-	gitFetch := exec.CommandContext(ctx, "git", "fetch", remoteName)
-	slog.InfoContext(ctx, "GitCmd.LogCmd", "gitFetch", strings.Join(gitFetch.Args, " "))
-	gitFetch.Dir = cwd
-	gitFetch.Stdout = os.Stdout
-	gitFetch.Stderr = os.Stderr
-	if err := gitFetch.Run(); err != nil {
-		return fmt.Errorf("git fetch failed: %w", err)
-	}
-
-	// Run git log in the sandbox working directory
-	sandboxAppDir := filepath.Join(sbox.SandboxWorkDir, "app")
-	gitLog := exec.CommandContext(ctx, "git", "log")
-	slog.InfoContext(ctx, "GitCmd.LogCmd", "gitLog", strings.Join(gitLog.Args, " "), "dir", sandboxAppDir)
-	gitLog.Dir = sandboxAppDir
+	gitLog := newHardenedGit(ctx).command("", "--git-dir", cacheDir, "log", inspectionHeadRef)
+	slog.InfoContext(ctx, "GitCmd.LogCmd", "gitLog", strings.Join(gitLog.Args, " "), "dir", cacheDir)
 	gitLog.Stdout = os.Stdout
 	gitLog.Stderr = os.Stderr
 	if err := gitLog.Run(); err != nil {

@@ -88,7 +88,7 @@ In short: update the shared host mirror with sandbox creation, sandbox start, or
 
 Because deleted sandbox names can be reused, creating a new active sandbox with the same name replaces the host-side `sand/<sandboxname>` remote so it points at the new sandbox clone.
 
-Sand does not migrate old sandbox containers across changes to this git mirror model. After upgrading across this change, remove and recreate existing sandboxes.
+Sand does not migrate old sandbox containers across changes to this git mirror and inspection-cache model. After upgrading across this change, remove and recreate existing sandboxes.
 
 ## Example: Comparing Original Working Directory to Sandbox
 
@@ -100,7 +100,7 @@ Let's say you have:
 
 ### Using the `sand git` Commands
 
-Sand provides some convenience sub-commands that wrap a few common git operations.
+Sand provides some convenience sub-commands that wrap a few common git operations. These commands use Sand-owned inspection state and do not fetch sandbox refs into your original checkout.
 
 #### Viewing Sandbox Status
 
@@ -111,7 +111,7 @@ To see the git status of a sandbox's working tree:
 sand git status my-sandbox
 ```
 
-This runs `git status` in the sandbox's working directory and shows you what files have been modified, staged, or are untracked.
+This runs a hardened `git status` against the sandbox's working directory and shows you what files have been modified, staged, or are untracked.
 
 #### Viewing Sandbox Log
 
@@ -122,7 +122,7 @@ To see the git commit log of a sandbox's working tree:
 sand git log my-sandbox
 ```
 
-This runs `git log` in the sandbox's working directory and shows you the commit history.
+This fetches sandbox refs into Sand's inspection cache and runs `git log` there, leaving your original checkout unchanged.
 
 #### Syncing Host Commits
 
@@ -155,7 +155,7 @@ sand git diff -u my-sandbox
 sand git diff -b main my-sandbox
 ```
 
-The `--include-uncommitted` flag is useful when you want to see all changes in the sandbox, including files that haven't been committed yet. This creates a temporary commit in the sandbox, fetches it, shows the diff, and then cleans up the temporary commit automatically.
+The `--include-uncommitted` flag is useful when you want to see all changes in the sandbox, including files that haven't been committed yet. Sand builds temporary snapshots for comparison without changing sandbox `HEAD`, the sandbox index, or your original checkout.
 
 ### Manual Git Operations
 
@@ -163,8 +163,8 @@ You can also diff manually from either side:
 
 #### Option 1: From the original working directory
 ```sh
-# First, fetch the latest from the sandbox clone
 cd /Users/yourname/myproject
+# First, explicitly fetch the latest from the sandbox clone
 git fetch sand/my-sandbox
 
 # Compare your current working tree to the sandbox's main branch

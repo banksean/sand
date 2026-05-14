@@ -77,12 +77,6 @@ func (g *GitSetup) SetupGitRemotes(ctx context.Context, sandboxID, sandboxName, 
 		}
 	}
 
-	// Fetch from clone into original workdir
-	if err := g.gitOps.Fetch(ctx, gitTopLevel, remoteName); err != nil {
-		return fmt.Errorf("failed to fetch git remote %s for sandbox %s (%s): %w",
-			remoteName, sandboxName, sandboxID, err)
-	}
-
 	return nil
 }
 

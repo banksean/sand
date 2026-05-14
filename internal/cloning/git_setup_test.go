@@ -125,3 +125,27 @@ func TestSetupGitRemotesPointsCloneOriginAtMirrorBeforeFetch(t *testing.T) {
 		t.Fatalf("first fetch = %v, want /clone:origin", fetches)
 	}
 }
+
+func TestSetupGitRemotesDoesNotFetchSandboxRefsIntoHostRepo(t *testing.T) {
+	var fetches []string
+	gitOps := &hostops.MockGitOps{
+		TopLevelFunc: func(ctx context.Context, dir string) string {
+			return "/repo"
+		},
+		FetchFunc: func(ctx context.Context, dir, remote string) error {
+			fetches = append(fetches, dir+":"+remote)
+			return nil
+		},
+	}
+
+	setup := NewGitSetup(gitOps)
+	if err := setup.SetupGitRemotes(context.Background(), "id-123", "friendly", "/repo", "/clone", "/mirror/repo.git"); err != nil {
+		t.Fatalf("SetupGitRemotes() error = %v", err)
+	}
+
+	for _, fetch := range fetches {
+		if fetch == "/repo:sand/friendly" {
+			t.Fatalf("SetupGitRemotes fetched sandbox refs into host repo: %v", fetches)
+		}
+	}
+}
