@@ -15,7 +15,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  SAND_CLI_VERSION: v0.0.12
+  SAND_CLI_VERSION: v0.0.13
 
 jobs:
   build-and-push-base:
