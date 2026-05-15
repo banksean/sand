@@ -145,6 +145,10 @@ list sandboxes
 sand ls
 ```
 
+**Flags:**
+
+- `-l, --long` - show resource usage columns
+
 ## `sand log`
 
 print sandbox lifecycle and daemon events

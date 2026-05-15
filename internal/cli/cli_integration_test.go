@@ -74,13 +74,39 @@ func TestLsCmd_RequestsStatsForRunningSandboxes(t *testing.T) {
 		s.SaveSandbox(ctx, testBox("alpha"))
 		s.SaveSandbox(ctx, testBox("beta"))
 	})
-	if err := (&cli.LsCmd{}).Run(cctx); err != nil {
+	if err := (&cli.LsCmd{Long: true}).Run(cctx); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
 	slices.Sort(statsCalls)
 	if !slices.Equal(statsCalls, []string{"ctr-alpha", "ctr-beta"}) {
 		t.Fatalf("Stats called with %v, want ctr-alpha and ctr-beta", statsCalls)
+	}
+}
+
+func TestLsCmd_DefaultDoesNotRequestStats(t *testing.T) {
+	var statsCalls int
+	var statsCallsMu sync.Mutex
+	cctx := newCLIContext(t, daemontest.Deps{
+		ContainerService: &hostops.MockContainerOps{
+			StatsFunc: func(_ context.Context, containerID ...string) ([]types.ContainerStats, error) {
+				statsCallsMu.Lock()
+				defer statsCallsMu.Unlock()
+				statsCalls++
+				return nil, nil
+			},
+		},
+	}, func(ctx context.Context, s daemontest.SandboxStore) {
+		s.SaveSandbox(ctx, testBox("alpha"))
+	})
+	if err := (&cli.LsCmd{}).Run(cctx); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	statsCallsMu.Lock()
+	defer statsCallsMu.Unlock()
+	if statsCalls != 0 {
+		t.Fatalf("Stats called %d times, want 0", statsCalls)
 	}
 }
 

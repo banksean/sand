@@ -14,7 +14,6 @@ import (
 type lsRow struct {
 	Name       string
 	ID         string
-	Here       bool
 	Status     string
 	FromDir    string
 	FromGit    string
@@ -23,47 +22,54 @@ type lsRow struct {
 	Stats      *types.ContainerStats
 }
 
-func renderLsTable(w io.Writer, rows []lsRow) error {
+func renderLsTable(w io.Writer, currentRows, otherRows []lsRow, long bool) error {
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	headings := []string{
 		"NAME",
 		"ID",
-		"HERE",
 		"STATUS",
 		"FROM DIR",
 		"FROM GIT",
 		"CURRENT GIT",
 		"IMAGE",
-		"CPU",
-		"PROCS",
-		"MEM",
-		"BLOCK R/W",
-		"NET TX/RX",
+	}
+	if long {
+		headings = append(headings, "CPU", "PROCS", "MEM", "BLOCK R/W", "NET TX/RX")
 	}
 	if _, err := fmt.Fprintln(tw, strings.Join(headings, "\t")); err != nil {
 		return err
 	}
+	if err := renderLsRows(tw, currentRows, long); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintln(tw, "--- other sandboxes ---"); err != nil {
+		return err
+	}
+	if err := renderLsRows(tw, otherRows, long); err != nil {
+		return err
+	}
+	return tw.Flush()
+}
+
+func renderLsRows(w io.Writer, rows []lsRow, long bool) error {
 	for _, row := range rows {
-		here := ""
-		if row.Here {
-			here = "*"
-		}
 		values := []string{
 			row.Name,
 			shortSandboxID(row.ID),
-			here,
 			row.Status,
 			row.FromDir,
 			row.FromGit,
 			row.CurrentGit,
 			row.ImageName,
 		}
-		values = append(values, formatStatsColumns(row.Stats)...)
-		if _, err := fmt.Fprintln(tw, strings.Join(values, "\t")); err != nil {
+		if long {
+			values = append(values, formatStatsColumns(row.Stats)...)
+		}
+		if _, err := fmt.Fprintln(w, strings.Join(values, "\t")); err != nil {
 			return err
 		}
 	}
-	return tw.Flush()
+	return nil
 }
 
 func formatStatsColumns(stats *types.ContainerStats) []string {

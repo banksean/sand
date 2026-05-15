@@ -87,24 +87,6 @@ func TestCurrentWorkspaceDirUsesGitTopLevelFromNestedDir(t *testing.T) {
 	}
 }
 
-func TestPrioritizeHereRowsKeepsRelativeOrder(t *testing.T) {
-	rows := []lsRow{
-		{Name: "old"},
-		{Name: "here-1", Here: true},
-		{Name: "other"},
-		{Name: "here-2", Here: true},
-	}
-	gotRows := prioritizeHereRows(rows)
-	got := []string{}
-	for _, row := range gotRows {
-		got = append(got, row.Name)
-	}
-	want := []string{"here-1", "here-2", "old", "other"}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("prioritizeHereRows() = %v, want %v", got, want)
-	}
-}
-
 func TestFormatStatsColumns(t *testing.T) {
 	stats := &types.ContainerStats{
 		CPUUsageUsec:     1500,
@@ -123,12 +105,33 @@ func TestFormatStatsColumns(t *testing.T) {
 	}
 }
 
-func TestRenderLsTableUsesShortIDAndStats(t *testing.T) {
+func TestRenderLsTableSplitsCurrentAndOtherRows(t *testing.T) {
+	var buf bytes.Buffer
+	currentRows := []lsRow{{Name: "current", ID: "3a9a0df8-3ad2-4b79-9a4f-0d7e41f1df1b", Status: "running"}}
+	otherRows := []lsRow{{Name: "other", ID: "sandbox-dev-1", Status: "dormant"}}
+	if err := renderLsTable(&buf, currentRows, otherRows, false); err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+	if strings.Contains(out, "HERE") || strings.Contains(out, "CPU") {
+		t.Fatalf("default renderLsTable output has unexpected columns:\n%s", out)
+	}
+	currentIndex := strings.Index(out, "current")
+	delimiterIndex := strings.Index(out, "--- other sandboxes ---")
+	otherIndex := strings.Index(out, "other")
+	if currentIndex < 0 || delimiterIndex < 0 || otherIndex < 0 {
+		t.Fatalf("renderLsTable output missing expected rows or delimiter:\n%s", out)
+	}
+	if !(currentIndex < delimiterIndex && delimiterIndex < otherIndex) {
+		t.Fatalf("renderLsTable did not split rows as expected:\n%s", out)
+	}
+}
+
+func TestRenderLsTableLongUsesShortIDAndStats(t *testing.T) {
 	var buf bytes.Buffer
 	rows := []lsRow{{
 		Name:      "box",
 		ID:        "3a9a0df8-3ad2-4b79-9a4f-0d7e41f1df1b",
-		Here:      true,
 		Status:    "running",
 		FromDir:   "~/project",
 		ImageName: "default:latest",
@@ -139,13 +142,16 @@ func TestRenderLsTableUsesShortIDAndStats(t *testing.T) {
 			MemoryLimitBytes: 1024 * 1024,
 		},
 	}}
-	if err := renderLsTable(&buf, rows); err != nil {
+	if err := renderLsTable(&buf, rows, nil, true); err != nil {
 		t.Fatal(err)
 	}
 	out := buf.String()
-	for _, want := range []string{"0d7e41f1df1b", "*", "1.5ms", "1.0KiB/1.0MiB"} {
+	for _, want := range []string{"CPU", "0d7e41f1df1b", "1.5ms", "1.0KiB/1.0MiB"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("renderLsTable output missing %q:\n%s", want, out)
 		}
+	}
+	if strings.Contains(out, "HERE") {
+		t.Fatalf("renderLsTable output includes removed HERE column:\n%s", out)
 	}
 }

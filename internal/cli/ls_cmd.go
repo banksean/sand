@@ -14,7 +14,9 @@ import (
 	"github.com/banksean/sand/internal/sandtypes"
 )
 
-type LsCmd struct{}
+type LsCmd struct {
+	Long bool `short:"l" help:"show resource usage columns"`
+}
 
 func (c *LsCmd) Run(cctx *CLIContext) error {
 	ctx := cctx.Context
@@ -31,9 +33,13 @@ func (c *LsCmd) Run(cctx *CLIContext) error {
 	}
 
 	currentWorkspace := currentWorkspaceDir(ctx)
-	statsByContainerID := lsStatsByContainerID(ctx, mc, list)
+	var statsByContainerID map[string]*types.ContainerStats
+	if c.Long {
+		statsByContainerID = lsStatsByContainerID(ctx, mc, list)
+	}
 	userHomeDir, _ := os.UserHomeDir()
-	rows := make([]lsRow, 0, len(list))
+	currentRows := make([]lsRow, 0, len(list))
+	otherRows := make([]lsRow, 0, len(list))
 	for _, sbox := range list {
 		ctr := sbox.Container
 		status := []string{"dormant"}
@@ -51,20 +57,23 @@ func (c *LsCmd) Run(cctx *CLIContext) error {
 		originalBranch := gitSummary(sbox.OriginalGitDetails)
 		currentBranch := gitSummary(sbox.CurrentGitDetails)
 
-		rows = append(rows, lsRow{
+		row := lsRow{
 			Name:       sbox.Name,
 			ID:         sbox.ID,
-			Here:       samePath(currentWorkspace, sbox.HostOriginDir),
 			Status:     strings.Join(status, ", "),
 			FromDir:    displayPath(sbox.HostOriginDir, userHomeDir),
 			FromGit:    originalBranch,
 			CurrentGit: currentBranch,
 			ImageName:  imgName,
 			Stats:      statsByContainerID[sbox.ContainerID],
-		})
+		}
+		if samePath(currentWorkspace, sbox.HostOriginDir) {
+			currentRows = append(currentRows, row)
+		} else {
+			otherRows = append(otherRows, row)
+		}
 	}
-	rows = prioritizeHereRows(rows)
-	return renderLsTable(os.Stdout, rows)
+	return renderLsTable(os.Stdout, currentRows, otherRows, c.Long)
 }
 
 func currentWorkspaceDir(ctx context.Context) string {
@@ -99,21 +108,6 @@ func samePath(a, b string) bool {
 		return false
 	}
 	return canonicalPath(a) == canonicalPath(b)
-}
-
-func prioritizeHereRows(rows []lsRow) []lsRow {
-	prioritized := make([]lsRow, 0, len(rows))
-	for _, row := range rows {
-		if row.Here {
-			prioritized = append(prioritized, row)
-		}
-	}
-	for _, row := range rows {
-		if !row.Here {
-			prioritized = append(prioritized, row)
-		}
-	}
-	return prioritized
 }
 
 func lsStatsByContainerID(ctx context.Context, mc daemon.Client, list []sandtypes.Box) map[string]*types.ContainerStats {
