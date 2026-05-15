@@ -42,11 +42,13 @@ func renderLsTable(w io.Writer, currentRows, otherRows []lsRow, long bool) error
 	if err := renderLsRows(tw, currentRows, long); err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintln(tw, "--- other sandboxes ---"); err != nil {
-		return err
-	}
-	if err := renderLsRows(tw, otherRows, long); err != nil {
-		return err
+	if len(otherRows) > 0 {
+		if _, err := fmt.Fprintln(tw, "--- other sandboxes ---"); err != nil {
+			return err
+		}
+		if err := renderLsRows(tw, otherRows, long); err != nil {
+			return err
+		}
 	}
 	return tw.Flush()
 }
