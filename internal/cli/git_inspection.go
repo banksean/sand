@@ -57,7 +57,8 @@ func hardenedGitEnv() []string {
 		}
 		env = append(env, kv)
 	}
-	return append(env,
+	return append(
+		env,
 		"HOME=/dev/null",
 		"XDG_CONFIG_HOME=/dev/null",
 		"GIT_CONFIG_NOSYSTEM=1",
@@ -115,7 +116,8 @@ func (c gitInspectionCache) ensureUpdated() (string, error) {
 	}
 
 	sandboxAppDir := filepath.Join(c.sandbox.SandboxWorkDir, "app")
-	cmd := c.git.command("", "--git-dir", cacheDir, "fetch", "--prune", sandboxAppDir,
+	cmd := c.git.command(
+		"", "--git-dir", cacheDir, "fetch", "--prune", sandboxAppDir,
 		"+refs/heads/*:"+inspectionRemoteRef+"*",
 		"+HEAD:"+inspectionHeadRef,
 	)
