@@ -1,7 +1,7 @@
 REGISTRY := ghcr.io/banksean/sand
 BUILD_CMD := container build
 PUSH_CMD := container image push
-SAND_CLI_VERSION ?= v0.0.13
+SAND_CLI_VERSION ?= v0.0.14
 SAND_CLI_BUILD_ARG := --build-arg SAND_CLI_VERSION=$(SAND_CLI_VERSION)
 
 .PHONY: all base claude codex default opencode push push-base push-claude push-codex push-default push-opencode sandless ubuntu-sand
