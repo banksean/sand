@@ -96,7 +96,8 @@ func createSandboxOptsToProto(opts CreateSandboxOpts) *daemonpb.CreateSandboxReq
 		Username:       opts.Username,
 		Uid:            opts.Uid,
 		AllowedDomains: append([]string(nil), opts.AllowedDomains...),
-		Volumes:        append([]string(nil), opts.Volumes...),
+		Mounts:         append([]string(nil), opts.Mounts...),
+		CloneMounts:    append([]string(nil), opts.CloneMounts...),
 		SharedCaches: &daemonpb.SharedCacheConfig{
 			Mise: opts.SharedCaches.Mise,
 			Apk:  opts.SharedCaches.APK,
@@ -118,7 +119,8 @@ func createSandboxOptsFromProto(req *daemonpb.CreateSandboxRequest) CreateSandbo
 		Username:       req.GetUsername(),
 		Uid:            req.GetUid(),
 		AllowedDomains: append([]string(nil), req.GetAllowedDomains()...),
-		Volumes:        append([]string(nil), req.GetVolumes()...),
+		Mounts:         append([]string(nil), req.GetMounts()...),
+		CloneMounts:    append([]string(nil), req.GetCloneMounts()...),
 		CPUs:           int(req.GetCpus()),
 		Memory:         int(req.GetMemory()),
 	}

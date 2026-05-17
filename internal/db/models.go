@@ -33,4 +33,5 @@ type Sandbox struct {
 	DeletedAt          sql.NullTime   `json:"deleted_at"`
 	TrashWorkDir       sql.NullString `json:"trash_work_dir"`
 	ProfileName        sql.NullString `json:"profile_name"`
+	MountSpecs         sql.NullString `json:"mount_specs"`
 }

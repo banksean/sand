@@ -103,7 +103,7 @@ func main() {
 
 	// connect to the sandd process running on the host via unix domain socket.
 	// The sandd.grpc.sock file in this directory should have been created by sandd
-	// and attached to this container via --volume flag.
+	// and attached to this container via --mount flag.
 	appBaseDir := "/run/host-services"
 
 	shutdownTracing, tracingEnabled, err := observability.InitTracing(ctx, "sand-innie")

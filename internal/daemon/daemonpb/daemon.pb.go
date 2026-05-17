@@ -1080,11 +1080,12 @@ type CreateSandboxRequest struct {
 	Username       string                 `protobuf:"bytes,7,opt,name=username,proto3" json:"username,omitempty"`
 	Uid            string                 `protobuf:"bytes,8,opt,name=uid,proto3" json:"uid,omitempty"`
 	AllowedDomains []string               `protobuf:"bytes,9,rep,name=allowed_domains,json=allowedDomains,proto3" json:"allowed_domains,omitempty"`
-	Volumes        []string               `protobuf:"bytes,10,rep,name=volumes,proto3" json:"volumes,omitempty"`
+	Mounts         []string               `protobuf:"bytes,10,rep,name=mounts,proto3" json:"mounts,omitempty"`
 	SharedCaches   *SharedCacheConfig     `protobuf:"bytes,11,opt,name=shared_caches,json=sharedCaches,proto3" json:"shared_caches,omitempty"`
 	Cpus           int32                  `protobuf:"varint,12,opt,name=cpus,proto3" json:"cpus,omitempty"`
 	Memory         int32                  `protobuf:"varint,13,opt,name=memory,proto3" json:"memory,omitempty"`
 	ProfileName    string                 `protobuf:"bytes,14,opt,name=profile_name,json=profileName,proto3" json:"profile_name,omitempty"`
+	CloneMounts    []string               `protobuf:"bytes,15,rep,name=clone_mounts,json=cloneMounts,proto3" json:"clone_mounts,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1182,9 +1183,9 @@ func (x *CreateSandboxRequest) GetAllowedDomains() []string {
 	return nil
 }
 
-func (x *CreateSandboxRequest) GetVolumes() []string {
+func (x *CreateSandboxRequest) GetMounts() []string {
 	if x != nil {
-		return x.Volumes
+		return x.Mounts
 	}
 	return nil
 }
@@ -1215,6 +1216,13 @@ func (x *CreateSandboxRequest) GetProfileName() string {
 		return x.ProfileName
 	}
 	return ""
+}
+
+func (x *CreateSandboxRequest) GetCloneMounts() []string {
+	if x != nil {
+		return x.CloneMounts
+	}
+	return nil
 }
 
 type CreateSandboxResponse struct {
@@ -1527,7 +1535,7 @@ const file_internal_daemon_daemonpb_daemon_proto_rawDesc = "" +
 	"stats_json\x18\x01 \x01(\fR\tstatsJson\"9\n" +
 	"\x11SharedCacheConfig\x12\x12\n" +
 	"\x04mise\x18\x01 \x01(\bR\x04mise\x12\x10\n" +
-	"\x03apk\x18\x02 \x01(\bR\x03apk\"\xc1\x03\n" +
+	"\x03apk\x18\x02 \x01(\bR\x03apk\"\xe2\x03\n" +
 	"\x14CreateSandboxRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12$\n" +
 	"\x0eclone_from_dir\x18\x02 \x01(\tR\fcloneFromDir\x12\x1d\n" +
@@ -1538,13 +1546,14 @@ const file_internal_daemon_daemonpb_daemon_proto_rawDesc = "" +
 	"\tssh_agent\x18\x06 \x01(\bR\bsshAgent\x12\x1a\n" +
 	"\busername\x18\a \x01(\tR\busername\x12\x10\n" +
 	"\x03uid\x18\b \x01(\tR\x03uid\x12'\n" +
-	"\x0fallowed_domains\x18\t \x03(\tR\x0eallowedDomains\x12\x18\n" +
-	"\avolumes\x18\n" +
-	" \x03(\tR\avolumes\x12F\n" +
+	"\x0fallowed_domains\x18\t \x03(\tR\x0eallowedDomains\x12\x16\n" +
+	"\x06mounts\x18\n" +
+	" \x03(\tR\x06mounts\x12F\n" +
 	"\rshared_caches\x18\v \x01(\v2!.sand.daemon.v1.SharedCacheConfigR\fsharedCaches\x12\x12\n" +
 	"\x04cpus\x18\f \x01(\x05R\x04cpus\x12\x16\n" +
 	"\x06memory\x18\r \x01(\x05R\x06memory\x12!\n" +
-	"\fprofile_name\x18\x0e \x01(\tR\vprofileName\"s\n" +
+	"\fprofile_name\x18\x0e \x01(\tR\vprofileName\x12!\n" +
+	"\fclone_mounts\x18\x0f \x03(\tR\vcloneMounts\"s\n" +
 	"\x15CreateSandboxResponse\x12\x1c\n" +
 	"\bprogress\x18\x01 \x01(\tH\x00R\bprogress\x12\x1b\n" +
 	"\bbox_json\x18\x02 \x01(\fH\x00R\aboxJson\x12\x16\n" +

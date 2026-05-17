@@ -248,7 +248,8 @@ func TestCreateSandboxOptsProtoRoundTrip(t *testing.T) {
 		Username:       "dev",
 		Uid:            "501",
 		AllowedDomains: []string{"example.com", "api.example.com"},
-		Volumes:        []string{"/host:/container"},
+		Mounts:         []string{"source=/host,target=/container,readonly"},
+		CloneMounts:    []string{"source=/src/data,target=/data,readonly"},
 		SharedCaches:   sandtypes.SharedCacheConfig{Mise: true, APK: true},
 		CPUs:           4,
 		Memory:         8192,
@@ -272,8 +273,11 @@ func TestCreateSandboxOptsProtoRoundTrip(t *testing.T) {
 	if strings.Join(got.AllowedDomains, ",") != strings.Join(opts.AllowedDomains, ",") {
 		t.Fatalf("round trip allowed domains = %+v, want %+v", got.AllowedDomains, opts.AllowedDomains)
 	}
-	if strings.Join(got.Volumes, ",") != strings.Join(opts.Volumes, ",") {
-		t.Fatalf("round trip volumes = %+v, want %+v", got.Volumes, opts.Volumes)
+	if strings.Join(got.Mounts, ",") != strings.Join(opts.Mounts, ",") {
+		t.Fatalf("round trip mounts = %+v, want %+v", got.Mounts, opts.Mounts)
+	}
+	if strings.Join(got.CloneMounts, ",") != strings.Join(opts.CloneMounts, ",") {
+		t.Fatalf("round trip clone mounts = %+v, want %+v", got.CloneMounts, opts.CloneMounts)
 	}
 }
 

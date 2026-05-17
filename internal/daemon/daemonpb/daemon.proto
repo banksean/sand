@@ -127,11 +127,12 @@ message CreateSandboxRequest {
   string username = 7;
   string uid = 8;
   repeated string allowed_domains = 9;
-  repeated string volumes = 10;
+  repeated string mounts = 10;
   SharedCacheConfig shared_caches = 11;
   int32 cpus = 12;
   int32 memory = 13;
   string profile_name = 14;
+  repeated string clone_mounts = 15;
 }
 
 message CreateSandboxResponse {

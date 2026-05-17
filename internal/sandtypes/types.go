@@ -31,6 +31,52 @@ func (m MountSpec) String() string {
 	return strings.Join(parts, ",")
 }
 
+const (
+	MountKindBind  = "bind"
+	MountKindClone = "clone"
+)
+
+// MountRequest records a user-requested bind mount and the effective runtime
+// mount argument passed to the container CLI.
+type MountRequest struct {
+	// Kind identifies how the mount source is handled. Supported values are
+	// MountKindBind and MountKindClone.
+	Kind string `json:"kind"`
+
+	// Original is the exact user-facing mount flag value, before sand resolves
+	// clone paths or rewrites anything for the container runtime.
+	Original string `json:"original"`
+
+	// Source is the host directory provided by the user. For MountKindClone,
+	// sand copies this directory before rendering Runtime.
+	Source string `json:"source,omitempty"`
+
+	// Clone is the sand-managed CoW clone path used as the runtime host source
+	// for MountKindClone. It is empty for MountKindBind.
+	Clone string `json:"clone,omitempty"`
+
+	// Target is the container path where the bind mount is attached.
+	Target string `json:"target,omitempty"`
+
+	// ReadOnly records whether the mount should be attached read-only.
+	ReadOnly bool `json:"readOnly,omitempty"`
+
+	// Runtime is the effective --mount argument passed to the container CLI. For
+	// MountKindBind it uses Source; for MountKindClone it uses Clone.
+	Runtime string `json:"runtime"`
+}
+
+func RuntimeMountRequests(requests []MountRequest) []string {
+	if len(requests) == 0 {
+		return nil
+	}
+	mounts := make([]string, 0, len(requests))
+	for _, request := range requests {
+		mounts = append(mounts, request.Runtime)
+	}
+	return mounts
+}
+
 type HookFunc func(ctx context.Context, shellCmd string, args ...string) (string, error)
 
 type HookStreamer interface {

@@ -19,6 +19,13 @@ func kongParse(t *testing.T, target any, args []string) *kong.Context {
 	return ctx
 }
 
+func kongParseError(t *testing.T, target any, args []string) error {
+	t.Helper()
+	k := kong.Must(target)
+	_, err := k.Parse(args)
+	return err
+}
+
 func TestShellFlagsDefaults(t *testing.T) {
 	var cli struct {
 		Shell ShellFlags `embed:""`
@@ -422,36 +429,60 @@ func TestRmCmdForceLong(t *testing.T) {
 	}
 }
 
-func TestSandboxCreationFlagsVolume(t *testing.T) {
+func TestSandboxCreationFlagsMount(t *testing.T) {
 	var cli struct {
 		SandboxCreationFlags `embed:""`
 	}
 	kongParse(t, &cli, []string{
-		"-v", "/host/path:/container/path",
+		"--mount", "source=/host/path,target=/container/path,readonly",
 	})
-	if len(cli.Volume) != 1 {
-		t.Fatalf("expected 1 volume, got %d", len(cli.Volume))
+	if len(cli.Mount) != 1 {
+		t.Fatalf("expected 1 mount, got %d", len(cli.Mount))
 	}
-	if cli.Volume[0] != "/host/path:/container/path" {
-		t.Errorf("expected Volume /host/path:/container/path, got %q", cli.Volume[0])
+	if cli.Mount[0] != "source=/host/path,target=/container/path,readonly" {
+		t.Errorf("expected Mount source=/host/path,target=/container/path,readonly, got %q", cli.Mount[0])
 	}
 }
 
-func TestSandboxCreationFlagsMultipleVolumes(t *testing.T) {
+func TestSandboxCreationFlagsCloneMount(t *testing.T) {
 	var cli struct {
 		SandboxCreationFlags `embed:""`
 	}
 	kongParse(t, &cli, []string{
-		"-v", "/path1:/mount1",
-		"--volume", "/path2:/mount2",
+		"--clone-mount", "source=/host/path,target=/container/path,readonly",
 	})
-	if len(cli.Volume) != 2 {
-		t.Fatalf("expected 2 volumes, got %d", len(cli.Volume))
+	if len(cli.CloneMount) != 1 {
+		t.Fatalf("expected 1 clone mount, got %d", len(cli.CloneMount))
 	}
-	if cli.Volume[0] != "/path1:/mount1" {
-		t.Errorf("expected first volume /path1:/mount1, got %q", cli.Volume[0])
+	if cli.CloneMount[0] != "source=/host/path,target=/container/path,readonly" {
+		t.Errorf("expected CloneMount source=/host/path,target=/container/path,readonly, got %q", cli.CloneMount[0])
 	}
-	if cli.Volume[1] != "/path2:/mount2" {
-		t.Errorf("expected second volume /path2:/mount2, got %q", cli.Volume[1])
+}
+
+func TestSandboxCreationFlagsMultipleMounts(t *testing.T) {
+	var cli struct {
+		SandboxCreationFlags `embed:""`
+	}
+	kongParse(t, &cli, []string{
+		"--mount", "source=/path1,target=/mount1",
+		"--mount", "source=/path2,target=/mount2",
+	})
+	if len(cli.Mount) != 2 {
+		t.Fatalf("expected 2 mounts, got %d", len(cli.Mount))
+	}
+	if cli.Mount[0] != "source=/path1,target=/mount1" {
+		t.Errorf("expected first mount source=/path1,target=/mount1, got %q", cli.Mount[0])
+	}
+	if cli.Mount[1] != "source=/path2,target=/mount2" {
+		t.Errorf("expected second mount source=/path2,target=/mount2, got %q", cli.Mount[1])
+	}
+}
+
+func TestSandboxCreationFlagsRejectsVolume(t *testing.T) {
+	var cli struct {
+		SandboxCreationFlags `embed:""`
+	}
+	if err := kongParseError(t, &cli, []string{"--volume", "/path:/mount"}); err == nil {
+		t.Fatal("expected --volume to be rejected")
 	}
 }

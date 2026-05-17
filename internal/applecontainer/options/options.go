@@ -161,7 +161,7 @@ type ManagementOptions struct {
 	SSH bool `flag:"--ssh"`
 	// TmpFS adds a tmpfs mount to the container at the given path
 	TmpFS string `flag:"--tmpfs"`
-	// Volume bind mounts a volume into the container
+	// Volume adds a --volume argument to the container runtime.
 	Volume []string `flag:"--volume"`
 	// Virtualization exposes virtualization capabilities to the container (requires host and guest support)
 	Virtualization bool `flag:"--virtualization"`

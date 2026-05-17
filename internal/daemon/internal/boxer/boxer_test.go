@@ -123,6 +123,14 @@ func TestSaveSandbox(t *testing.T) {
 		ImageName:      "test-image",
 		DNSDomain:      "test.local",
 		EnvFile:        "/tmp/.env",
+		MountRequests: []sandtypes.MountRequest{{
+			Kind:     sandtypes.MountKindBind,
+			Original: "source=/host,target=/container,readonly",
+			Source:   "/host",
+			Target:   "/container",
+			ReadOnly: true,
+			Runtime:  "type=bind,source=/host,target=/container,readonly",
+		}},
 	}
 
 	// Create the sandbox directory
@@ -169,6 +177,12 @@ func TestSaveSandbox(t *testing.T) {
 	}
 	if loadedSandbox.ProfileName != testSandbox.ProfileName {
 		t.Errorf("ProfileName mismatch: got %s, want %s", loadedSandbox.ProfileName, testSandbox.ProfileName)
+	}
+	if len(loadedSandbox.MountRequests) != 1 {
+		t.Fatalf("MountRequests length mismatch: got %d, want 1", len(loadedSandbox.MountRequests))
+	}
+	if loadedSandbox.MountRequests[0].Kind != sandtypes.MountKindBind || loadedSandbox.MountRequests[0].Runtime != "type=bind,source=/host,target=/container,readonly" {
+		t.Errorf("MountRequests[0] = %+v", loadedSandbox.MountRequests[0])
 	}
 
 	// Test that UpsertSandbox works (update existing)

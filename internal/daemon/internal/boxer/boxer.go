@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	_ "embed"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -306,7 +307,8 @@ type NewSandboxOpts struct {
 	Username       string
 	Uid            string
 	AllowedDomains []string
-	Volumes        []string
+	Mounts         []string
+	CloneMounts    []string
 	SharedCaches   sandtypes.SharedCacheConfig
 	CPUs           int
 	Memory         int
@@ -352,6 +354,10 @@ func (sb *Boxer) NewSandbox(ctx context.Context, opts NewSandboxOpts) (*sandtype
 
 	// Get mounts and hooks from configuration
 	mounts := agentConfig.Configuration.GetMounts(*artifacts)
+	mountRequests, err := sb.prepareMountRequests(ctx, artifacts.PathRegistry, opts.Mounts, opts.CloneMounts)
+	if err != nil {
+		return nil, err
+	}
 
 	// TODO: move this to .Hydrate? Or make it a startup hook?
 	keys, err := sb.SSHim.NewKeys(ctx, opts.Name+"."+opts.LocalDomain, opts.Username)
@@ -405,7 +411,7 @@ func (sb *Boxer) NewSandbox(ctx context.Context, opts NewSandboxOpts) (*sandtype
 		ImageName:         opts.ImageName,
 		EnvFile:           envFile,
 		AllowedDomains:    opts.AllowedDomains,
-		Volumes:           opts.Volumes,
+		MountRequests:     mountRequests,
 		SharedCacheMounts: sharedCacheMounts,
 		Mounts:            append(mounts, sshKeysMountSpec),
 		CPUs:              opts.CPUs,
@@ -649,6 +655,7 @@ func (sb *Boxer) sandboxFromDB(s *db.Sandbox) *sandtypes.Box {
 	if profileName == "" {
 		profileName = sandtypes.DefaultProfileName
 	}
+	mountRequests := mountRequestsFromNullString(s.MountSpecs)
 
 	return &sandtypes.Box{
 		ID:             s.ID,
@@ -663,6 +670,7 @@ func (sb *Boxer) sandboxFromDB(s *db.Sandbox) *sandtypes.Box {
 		DNSDomain:      fromNullString(s.DnsDomain),
 		EnvFile:        fromNullString(s.EnvFile),
 		AllowedDomains: domainsFromNullString(s.AllowedDomains),
+		MountRequests:  mountRequests,
 		OriginalGitDetails: &sandtypes.GitDetails{
 			RemoteOrigin: fromNullString(s.OriginalGitOrigin),
 			Branch:       fromNullString(s.OriginalGitBranch),
@@ -692,6 +700,30 @@ func fromNullString(ns sql.NullString) string {
 		return ns.String
 	}
 	return ""
+}
+
+func mountRequestsToNullString(requests []sandtypes.MountRequest) sql.NullString {
+	if len(requests) == 0 {
+		return sql.NullString{}
+	}
+	data, err := json.Marshal(requests)
+	if err != nil {
+		slog.Warn("failed to marshal mount requests", "error", err)
+		return sql.NullString{}
+	}
+	return sql.NullString{String: string(data), Valid: true}
+}
+
+func mountRequestsFromNullString(ns sql.NullString) []sandtypes.MountRequest {
+	if !ns.Valid || ns.String == "" {
+		return nil
+	}
+	var requests []sandtypes.MountRequest
+	if err := json.Unmarshal([]byte(ns.String), &requests); err != nil {
+		slog.Warn("failed to unmarshal mount requests", "error", err)
+		return nil
+	}
+	return requests
 }
 
 func toNullInt(s int) sql.NullInt64 {
@@ -803,7 +835,9 @@ func (sber *Boxer) CreateContainer(ctx context.Context, sb *sandtypes.Box, enabl
 		mountOpts = append(mountOpts, m.String())
 	}
 
-	volumeOpts := append([]string(nil), sb.Volumes...)
+	mountOpts = append(effectiveRuntimeMounts(sb), mountOpts...)
+
+	volumeOpts := []string{}
 	volumeOpts = append(volumeOpts, runtimepaths.ContainerHTTPSocketPath(sb.ID)+":/run/host-services/sandd.sock")
 	volumeOpts = append(volumeOpts, runtimepaths.ContainerGRPCSocketPath(sb.ID)+":/run/host-services/sandd.grpc.sock")
 
@@ -813,7 +847,9 @@ func (sber *Boxer) CreateContainer(ctx context.Context, sb *sandtypes.Box, enabl
 		DNSDomain: sb.DNSDomain,
 		Remove:    false,
 		Mount:     mountOpts,
-		Volume:    volumeOpts,
+		// We use Volume here because container won't let us use --mount flags to bind-mount single files,
+		// just directories. --volume (which we don't otherwise use here) does let us do this.
+		Volume: volumeOpts,
 	}
 	resOpts := options.ResourceOptions{
 		CPUs:   sb.CPUs,
@@ -845,6 +881,10 @@ func (sber *Boxer) CreateContainer(ctx context.Context, sb *sandtypes.Box, enabl
 
 	sb.ContainerID = containerID
 	return nil
+}
+
+func effectiveRuntimeMounts(sb *sandtypes.Box) []string {
+	return sandtypes.RuntimeMountRequests(sb.MountRequests)
 }
 
 func (sber *Boxer) RecreateContainer(ctx context.Context, sb *sandtypes.Box, enableSSHAgent bool) error {
@@ -1067,7 +1107,6 @@ func (sb *Boxer) SaveSandbox(ctx context.Context, sbox *sandtypes.Box) error {
 	if sbox.ProfileName == "" {
 		sbox.ProfileName = sandtypes.DefaultProfileName
 	}
-
 	upsertParams := db.UpsertSandboxParams{
 		ID:              sbox.ID,
 		Name:            sbox.Name,
@@ -1081,6 +1120,7 @@ func (sb *Boxer) SaveSandbox(ctx context.Context, sbox *sandtypes.Box) error {
 		AgentType:       toNullString(sbox.AgentType),
 		ProfileName:     toNullString(sbox.ProfileName),
 		AllowedDomains:  domainsToNullString(sbox.AllowedDomains),
+		MountSpecs:      mountRequestsToNullString(sbox.MountRequests),
 		Cpu:             toNullInt(sbox.CPUs),
 		MemoryMb:        toNullInt(sbox.MemoryMB),
 		DefaultUsername: toNullString(sbox.Username),

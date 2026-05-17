@@ -15,7 +15,6 @@ import (
 	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/cloning"
 	"github.com/banksean/sand/internal/hostops"
-	"github.com/banksean/sand/internal/runtimepaths"
 	"github.com/banksean/sand/internal/sandtypes"
 	"github.com/banksean/sand/internal/sshimmer"
 )
@@ -287,9 +286,12 @@ func TestBoxer_CreateContainerSSHAgentOptIn(t *testing.T) {
 		Name:      "friendly-name",
 		ImageName: "test-image:latest",
 		EnvFile:   "/tmp/test.env",
-		Volumes:   []string{"/host:/container"},
-		CPUs:      2,
-		MemoryMB:  1024,
+		MountRequests: []sandtypes.MountRequest{{
+			Kind:    sandtypes.MountKindBind,
+			Runtime: "type=bind,source=/host,target=/container",
+		}},
+		CPUs:     2,
+		MemoryMB: 1024,
 	}
 
 	if err := boxer.CreateContainer(ctx, sbox, false); err != nil {
@@ -308,21 +310,21 @@ func TestBoxer_CreateContainerSSHAgentOptIn(t *testing.T) {
 	if !createCalls[1].ManagementOptions.SSH {
 		t.Fatal("second create call did not enable ssh-agent forwarding")
 	}
-	if got := len(sbox.Volumes); got != 1 {
-		t.Fatalf("CreateContainer mutated sandbox volumes, len = %d, want 1", got)
+	if got := len(sbox.MountRequests); got != 1 {
+		t.Fatalf("CreateContainer mutated sandbox mount requests, len = %d, want 1", got)
 	}
 	for i, call := range createCalls {
 		if got := call.ManagementOptions.Name; got != "friendly-name" {
 			t.Fatalf("create call %d container name = %q, want friendly-name", i, got)
 		}
-		if got := len(call.ManagementOptions.Volume); got != 3 {
-			t.Fatalf("create call %d volume count = %d, want 3", i, got)
+		if got := len(call.ManagementOptions.Volume); got != 2 {
+			t.Fatalf("create call %d volume count = %d, want 2", i, got)
 		}
-		if got, want := call.ManagementOptions.Volume[1], runtimepaths.ContainerHTTPSocketPath("test-sandbox")+":/run/host-services/sandd.sock"; got != want {
-			t.Fatalf("create call %d HTTP socket volume = %q", i, got)
+		if got := len(call.ManagementOptions.Mount); got != 1 {
+			t.Fatalf("create call %d mount count = %d, want 1", i, got)
 		}
-		if got, want := call.ManagementOptions.Volume[2], runtimepaths.ContainerGRPCSocketPath("test-sandbox")+":/run/host-services/sandd.grpc.sock"; got != want {
-			t.Fatalf("create call %d gRPC socket volume = %q", i, got)
+		if got, want := call.ManagementOptions.Mount[0], "type=bind,source=/host,target=/container"; got != want {
+			t.Fatalf("create call %d user mount = %q, want %q", i, got, want)
 		}
 		if got := call.ProcessOptions.EnvFile; got != "" {
 			t.Fatalf("create call %d unexpectedly passed env file %q", i, got)

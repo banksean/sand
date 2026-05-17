@@ -48,8 +48,8 @@ type Box struct {
 	AllowedDomains []string
 	// Mounts defines bind mounts that should be attached when creating the container.
 	Mounts []MountSpec
-	// Volumes defines volume mounts in host:container format, passed directly to the container runtime.
-	Volumes []string
+	// MountRequests records user-requested direct and cloned bind mount metadata.
+	MountRequests []MountRequest
 	// SharedCacheMounts holds additional host-managed shared caches to mount into the container.
 	// This is runtime-only metadata; it is not currently persisted in the DB.
 	SharedCacheMounts SharedCacheMounts

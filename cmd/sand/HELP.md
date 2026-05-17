@@ -51,7 +51,8 @@ sand new [flags] [SANDBOX-NAME]
 - `-e, --env-file` _`<file-path>`_ - legacy env file path used when no default profile is configured (default: `.env`)
 - `--rm` - remove the sandbox after the command terminates
 - `--allowed-domains-file` _`<file-path>`_ - path to allowed-domains.txt file for DNS egress filtering (overrides the init image default)
-- `-v, --volume` _`<host-path:container-path>,...`_ - bind mount a volume (can be specified multiple times)
+- `--mount` _`<source=...,target=...[,readonly]>`_ - bind mount a host directory (can be specified multiple times)
+- `--clone-mount` _`<source=...,target=...[,readonly]>`_ - copy-on-write clone a host directory and bind mount the clone (can be specified multiple times)
 - `--cpu` _`2`_ - number of CPUs to allocate to the container (default: `2`)
 - `--memory` _`1024`_ - how much memory in MiB to allocate to the container (default: `1024`)
 - `--project-env` - pass project-scoped profile env to plain shell/exec/git commands
@@ -82,7 +83,8 @@ sand oneshot [flags] <PROMPT>
 - `-e, --env-file` _`<file-path>`_ - legacy env file path used when no default profile is configured (default: `.env`)
 - `--rm` - remove the sandbox after the command terminates
 - `--allowed-domains-file` _`<file-path>`_ - path to allowed-domains.txt file for DNS egress filtering (overrides the init image default)
-- `-v, --volume` _`<host-path:container-path>,...`_ - bind mount a volume (can be specified multiple times)
+- `--mount` _`<source=...,target=...[,readonly]>`_ - bind mount a host directory (can be specified multiple times)
+- `--clone-mount` _`<source=...,target=...[,readonly]>`_ - copy-on-write clone a host directory and bind mount the clone (can be specified multiple times)
 - `--cpu` _`2`_ - number of CPUs to allocate to the container (default: `2`)
 - `--memory` _`1024`_ - how much memory in MiB to allocate to the container (default: `1024`)
 - `-a, --agent` _`<claude|codex|gemini|opencode>`_ - coding agent to use
@@ -128,7 +130,8 @@ sand exec [flags] <SANDBOX-NAME> <ARG>...
 - `-e, --env-file` _`<file-path>`_ - legacy env file path used when no default profile is configured (default: `.env`)
 - `--rm` - remove the sandbox after the command terminates
 - `--allowed-domains-file` _`<file-path>`_ - path to allowed-domains.txt file for DNS egress filtering (overrides the init image default)
-- `-v, --volume` _`<host-path:container-path>,...`_ - bind mount a volume (can be specified multiple times)
+- `--mount` _`<source=...,target=...[,readonly]>`_ - bind mount a host directory (can be specified multiple times)
+- `--clone-mount` _`<source=...,target=...[,readonly]>`_ - copy-on-write clone a host directory and bind mount the clone (can be specified multiple times)
 - `--cpu` _`2`_ - number of CPUs to allocate to the container (default: `2`)
 - `--memory` _`1024`_ - how much memory in MiB to allocate to the container (default: `1024`)
 - `--project-env` - pass project-scoped profile env to plain shell/exec/git commands

@@ -18,6 +18,9 @@ type PathRegistry interface {
 
 	// SSHKeysDir returns the path to the SSH keys directory
 	SSHKeysDir() string
+
+	// BindMountsDir returns the path to cloned bind mount directories.
+	BindMountsDir() string
 }
 
 // StandardPathRegistry implements PathRegistry with the standard sandbox directory layout:
@@ -26,6 +29,7 @@ type PathRegistry interface {
 //	app/          - cloned workspace
 //	dotfiles/     - user dotfiles
 //	sshkeys/      - SSH keys for container access
+//	bind-mounts/  - cloned bind mount sources
 type StandardPathRegistry struct {
 	root string
 }
@@ -49,4 +53,8 @@ func (p *StandardPathRegistry) DotfilesDir() string {
 
 func (p *StandardPathRegistry) SSHKeysDir() string {
 	return filepath.Join(p.root, "sshkeys")
+}
+
+func (p *StandardPathRegistry) BindMountsDir() string {
+	return filepath.Join(p.root, "bind-mounts")
 }
