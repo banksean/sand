@@ -101,6 +101,12 @@ func TestSetupGitRemotesPointsCloneOriginAtMirrorBeforeFetch(t *testing.T) {
 		TopLevelFunc: func(ctx context.Context, dir string) string {
 			return "/repo"
 		},
+		RemoteURLFunc: func(ctx context.Context, dir, name string) string {
+			if dir == "/clone" && name == "origin" {
+				return "git@example.com:repo/project.git"
+			}
+			return ""
+		},
 		SetRemoteURLFunc: func(ctx context.Context, dir, name, url string) error {
 			gotSetRemoteURLDir = dir
 			gotSetRemoteURLName = name
@@ -123,6 +129,48 @@ func TestSetupGitRemotesPointsCloneOriginAtMirrorBeforeFetch(t *testing.T) {
 	}
 	if len(fetches) == 0 || fetches[0] != "/clone:origin" {
 		t.Fatalf("first fetch = %v, want /clone:origin", fetches)
+	}
+}
+
+func TestSetupGitRemotesAddsCloneOriginWhenMissing(t *testing.T) {
+	var gotAddRemoteDir, gotAddRemoteName, gotAddRemoteURL string
+	var setRemoteURLCalled bool
+	gitOps := &hostops.MockGitOps{
+		TopLevelFunc: func(ctx context.Context, dir string) string {
+			return "/repo"
+		},
+		RemoteURLFunc: func(ctx context.Context, dir, name string) string {
+			if dir == "/clone" && name == "origin" {
+				return ""
+			}
+			return ""
+		},
+		AddRemoteFunc: func(ctx context.Context, dir, name, url string) error {
+			if dir == "/clone" && name == "origin" {
+				gotAddRemoteDir = dir
+				gotAddRemoteName = name
+				gotAddRemoteURL = url
+			}
+			return nil
+		},
+		SetRemoteURLFunc: func(ctx context.Context, dir, name, url string) error {
+			if dir == "/clone" && name == "origin" {
+				setRemoteURLCalled = true
+			}
+			return nil
+		},
+	}
+
+	setup := NewGitSetup(gitOps)
+	if err := setup.SetupGitRemotes(context.Background(), "id-123", "friendly", "/repo", "/clone", "/mirror/repo.git"); err != nil {
+		t.Fatalf("SetupGitRemotes() error = %v", err)
+	}
+
+	if setRemoteURLCalled {
+		t.Fatal("SetRemoteURL called for missing clone origin")
+	}
+	if gotAddRemoteDir != "/clone" || gotAddRemoteName != "origin" || gotAddRemoteURL != "/mirror/repo.git" {
+		t.Fatalf("AddRemote args = (%q, %q, %q), want (/clone, origin, /mirror/repo.git)", gotAddRemoteDir, gotAddRemoteName, gotAddRemoteURL)
 	}
 }
 

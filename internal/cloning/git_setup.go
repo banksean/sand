@@ -58,9 +58,16 @@ func (g *GitSetup) SetupGitRemotes(ctx context.Context, sandboxID, sandboxName, 
 	}
 
 	if mirrorDir != "" {
-		if err := g.gitOps.SetRemoteURL(ctx, cloneDir, OriginalWorkDirRemoteName, mirrorDir); err != nil {
-			return fmt.Errorf("failed to set git remote %s to mirror for sandbox %s (%s): %w",
-				OriginalWorkDirRemoteName, sandboxName, sandboxID, err)
+		if existingURL := g.gitOps.RemoteURL(ctx, cloneDir, OriginalWorkDirRemoteName); existingURL != "" {
+			if err := g.gitOps.SetRemoteURL(ctx, cloneDir, OriginalWorkDirRemoteName, mirrorDir); err != nil {
+				return fmt.Errorf("failed to set git remote %s to mirror for sandbox %s (%s): %w",
+					OriginalWorkDirRemoteName, sandboxName, sandboxID, err)
+			}
+		} else {
+			if err := g.gitOps.AddRemote(ctx, cloneDir, OriginalWorkDirRemoteName, mirrorDir); err != nil {
+				return fmt.Errorf("failed to add git remote %s to mirror for sandbox %s (%s): %w",
+					OriginalWorkDirRemoteName, sandboxName, sandboxID, err)
+			}
 		}
 	}
 
