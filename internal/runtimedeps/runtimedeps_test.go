@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"os/exec"
 	"strings"
 	"testing"
 
@@ -79,6 +80,29 @@ func TestVerifyWithOptionsFailsFast(t *testing.T) {
 	}
 	if got := err.Error(); strings.Contains(got, string(ContainerSystemDNSDomain)) {
 		t.Fatalf("VerifyWithOptions() error includes later DNS check: %v", err)
+	}
+}
+
+func TestGitDirFailureIncludesDiagnosticDescription(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	t.Chdir(t.TempDir())
+	t.Setenv("GIT_DIR", "")
+	t.Setenv("GIT_WORK_TREE", "")
+
+	err := VerifyWithOptions(context.Background(), "", VerifyOptions{}, GitDir)
+	if err == nil {
+		t.Fatal("VerifyWithOptions() error = nil, want error")
+	}
+	for _, want := range []string{
+		"should be invoked from a git directory",
+		"exit status 128",
+		"not a git repository",
+	} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("VerifyWithOptions() error = %q, want substring %q", err, want)
+		}
 	}
 }
 

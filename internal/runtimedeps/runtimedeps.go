@@ -191,10 +191,10 @@ var (
 			ID:          GitDir,
 			Description: "should be invoked from a git directory",
 			Run: func(ctx context.Context, appBaseDir string, opts VerifyOptions) error {
-				gitCmd := exec.Command("git", "rev-parse", "--show-toplevel")
-				out, err := gitCmd.Output()
+				gitCmd := exec.CommandContext(ctx, "git", "rev-parse", "--show-toplevel")
+				out, err := gitCmd.CombinedOutput()
 				if err != nil {
-					return fmt.Errorf("%s: %s", err.Error(), string(out))
+					return fmt.Errorf("%s: %s", err.Error(), strings.TrimSpace(string(out)))
 				}
 				return nil
 			},
@@ -263,7 +263,7 @@ func VerifyWithOptions(ctx context.Context, appBaseDir string, opts VerifyOption
 		}
 		if err := check.Run(ctx, appBaseDir, opts); err != nil {
 			slog.ErrorContext(ctx, "diagnosticCheck failed", "name", check.Description, "error", err)
-			return err
+			return fmt.Errorf("%s: %w", check.Description, err)
 		} else {
 			slog.InfoContext(ctx, "diagnosticCheck passed", "name", check.Description)
 		}
