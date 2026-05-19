@@ -135,6 +135,31 @@ sand git sync-host my-sandbox
 
 After this succeeds, run `git pull` inside `/app` in the sandbox to fetch committed host changes from the refreshed mirror.
 
+#### Syncing Sandbox Commits
+
+To pull committed sandbox changes back into the original host checkout:
+
+```sh
+# From your original working directory
+sand git sync my-sandbox
+```
+
+By default this creates or updates a host branch named `my-sandbox` from the sandbox branch named `my-sandbox`, then runs `git pull sand/my-sandbox my-sandbox`.
+
+To use a different host branch name:
+
+```sh
+sand git sync my-sandbox feature-branch
+```
+
+To pull from a sandbox branch with a different name:
+
+```sh
+sand git sync my-sandbox host-branch --sandbox-branch sandbox-branch
+```
+
+If the host branch already exists, it must already track the requested sandbox remote branch. `sand git sync` does not stash, overwrite, or choose a merge strategy; dirty worktrees and merge/rebase behavior are handled by Git using your normal repository configuration.
+
 #### Comparing with Diff
 
 The easiest way to compare your working directory with a sandbox is to use the built-in diff command:

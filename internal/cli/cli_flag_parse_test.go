@@ -169,6 +169,38 @@ func TestSandboxNameFlagArg(t *testing.T) {
 	}
 }
 
+func TestGitSyncCmdDefaults(t *testing.T) {
+	var cli struct {
+		Git GitCmd `cmd:""`
+	}
+	kongParse(t, &cli, []string{"git", "sync", "my-sandbox"})
+	if cli.Git.Sync.SandboxName != "my-sandbox" {
+		t.Errorf("expected SandboxName my-sandbox, got %q", cli.Git.Sync.SandboxName)
+	}
+	if cli.Git.Sync.HostBranch != "" {
+		t.Errorf("expected empty HostBranch, got %q", cli.Git.Sync.HostBranch)
+	}
+	if cli.Git.Sync.SandboxBranch != "" {
+		t.Errorf("expected empty SandboxBranch, got %q", cli.Git.Sync.SandboxBranch)
+	}
+}
+
+func TestGitSyncCmdHostAndSandboxBranches(t *testing.T) {
+	var cli struct {
+		Git GitCmd `cmd:""`
+	}
+	kongParse(t, &cli, []string{"git", "sync", "my-sandbox", "host-branch", "--sandbox-branch", "sandbox-branch"})
+	if cli.Git.Sync.SandboxName != "my-sandbox" {
+		t.Errorf("expected SandboxName my-sandbox, got %q", cli.Git.Sync.SandboxName)
+	}
+	if cli.Git.Sync.HostBranch != "host-branch" {
+		t.Errorf("expected HostBranch host-branch, got %q", cli.Git.Sync.HostBranch)
+	}
+	if cli.Git.Sync.SandboxBranch != "sandbox-branch" {
+		t.Errorf("expected SandboxBranch sandbox-branch, got %q", cli.Git.Sync.SandboxBranch)
+	}
+}
+
 func TestMultiSandboxNameFlagsName(t *testing.T) {
 	var cli struct {
 		MultiSandboxNameFlags `embed:""`

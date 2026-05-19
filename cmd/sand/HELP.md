@@ -251,6 +251,20 @@ show git log of sandbox working tree
 sand git log <SANDBOX-NAME>
 ```
 
+### `sand git sync`
+
+pull committed sandbox changes into the host worktree
+
+**Usage:**
+
+```
+sand git sync [flags] <SANDBOX-NAME> [HOST-BRANCH]
+```
+
+**Flags:**
+
+- `--sandbox-branch` _`<branch name>`_ - sandbox branch to pull from (default: host branch)
+
 ### `sand git sync-host`
 
 update the shared mirror for a sandbox's original host repo
@@ -348,4 +362,3 @@ show effective configuration with sources
 ```
 sand config ls
 ```
-
