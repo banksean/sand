@@ -271,8 +271,52 @@ func TestLoadEnvFileValuesParsesExportAndQuotedValues(t *testing.T) {
 	}
 }
 
-func TestCreateSandboxAllowsMissingAuthBeforeAgentLaunch(t *testing.T) {
+func TestCreateSandboxRejectsMissingAuthBeforeSandboxCreation(t *testing.T) {
 	t.Setenv("OPENAI_API_KEY", "")
+	var createCalls int
+	d := newRequirementTestDaemon(t, requirementTestRegistry(), &hostops.MockContainerOps{
+		CreateFunc: func(ctx context.Context, _ *options.CreateContainer, image string, args []string) (string, error) {
+			createCalls++
+			return "mock-container-id", nil
+		},
+		InspectFunc: func(ctx context.Context, containerID string) ([]types.Container, error) {
+			return nil, nil
+		},
+	})
+
+	_, err := d.createSandbox(context.Background(), CreateSandboxOpts{
+		ID:    "test-box",
+		Agent: "codex",
+	}, io.Discard)
+	if err == nil {
+		t.Fatal("expected missing auth error")
+	}
+	if got := err.Error(); !strings.Contains(got, "OPENAI_API_KEY") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if createCalls != 0 {
+		t.Fatalf("container Create called %d times, want 0", createCalls)
+	}
+}
+
+func TestCreateSandboxUsesProfileAuthEnvFileBeforeCreation(t *testing.T) {
+	t.Setenv("OPENAI_API_KEY", "")
+	t.Setenv("HOME", t.TempDir())
+	projectDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(projectDir, "auth.env"), []byte("OPENAI_API_KEY=from-profile\n"), 0o644); err != nil {
+		t.Fatalf("os.WriteFile auth.env: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(projectDir, ".sand.yaml"), []byte(`
+profiles:
+  default:
+    env:
+      files:
+        - path: auth.env
+          scope: auth
+`), 0o644); err != nil {
+		t.Fatalf("os.WriteFile .sand.yaml: %v", err)
+	}
+
 	var createCalls int
 	var inspectCalls int
 	d := newRequirementTestDaemon(t, requirementTestRegistry(), &hostops.MockContainerOps{
@@ -290,14 +334,62 @@ func TestCreateSandboxAllowsMissingAuthBeforeAgentLaunch(t *testing.T) {
 	})
 
 	_, err := d.createSandbox(context.Background(), CreateSandboxOpts{
-		ID:    "test-box",
-		Agent: "codex",
+		ID:           "test-box",
+		Name:         "test-box",
+		CloneFromDir: projectDir,
+		Agent:        "codex",
 	}, io.Discard)
 	if err != nil {
 		t.Fatalf("createSandbox() error = %v, want nil", err)
 	}
 	if createCalls != 1 {
 		t.Fatalf("container Create called %d times, want 1", createCalls)
+	}
+}
+
+func TestCreateSandboxRejectsProjectOnlyProfileAuthBeforeCreation(t *testing.T) {
+	t.Setenv("OPENAI_API_KEY", "")
+	t.Setenv("HOME", t.TempDir())
+	projectDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(projectDir, "project.env"), []byte("OPENAI_API_KEY=project-only\n"), 0o644); err != nil {
+		t.Fatalf("os.WriteFile project.env: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(projectDir, ".sand.yaml"), []byte(`
+profiles:
+  default:
+    env:
+      files:
+        - path: project.env
+          scope: project
+`), 0o644); err != nil {
+		t.Fatalf("os.WriteFile .sand.yaml: %v", err)
+	}
+
+	var createCalls int
+	d := newRequirementTestDaemon(t, requirementTestRegistry(), &hostops.MockContainerOps{
+		CreateFunc: func(ctx context.Context, _ *options.CreateContainer, image string, args []string) (string, error) {
+			createCalls++
+			return "mock-container-id", nil
+		},
+		InspectFunc: func(ctx context.Context, containerID string) ([]types.Container, error) {
+			return nil, nil
+		},
+	})
+
+	_, err := d.createSandbox(context.Background(), CreateSandboxOpts{
+		ID:           "test-box",
+		Name:         "test-box",
+		CloneFromDir: projectDir,
+		Agent:        "codex",
+	}, io.Discard)
+	if err == nil {
+		t.Fatal("expected missing auth error")
+	}
+	if got := err.Error(); !strings.Contains(got, "OPENAI_API_KEY") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if createCalls != 0 {
+		t.Fatalf("container Create called %d times, want 0", createCalls)
 	}
 }
 

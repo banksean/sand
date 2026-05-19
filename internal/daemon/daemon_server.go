@@ -608,19 +608,43 @@ type StartSandboxOpts struct {
 	SSHAgent bool   `json:"sshAgent,omitempty"`
 }
 
-func loadSandboxProfile(projectDir, profileName string) (sandtypes.Profile, error) {
+func loadSandboxProfile(projectDir, profileName string) (sandtypes.Profile, bool, error) {
 	cfg, err := profiles.LoadConfigForDir(projectDir)
 	if err != nil {
-		return sandtypes.Profile{}, err
+		return sandtypes.Profile{}, false, err
 	}
 	profile, ok := cfg.Profiles[profileName]
 	if !ok {
 		if profileName == sandtypes.DefaultProfileName {
-			return sandtypes.Profile{Name: sandtypes.DefaultProfileName}, nil
+			return sandtypes.Profile{Name: sandtypes.DefaultProfileName}, false, nil
 		}
-		return sandtypes.Profile{}, fmt.Errorf("profile %q not found", profileName)
+		return sandtypes.Profile{}, false, fmt.Errorf("profile %q not found", profileName)
 	}
-	return profile, nil
+	return resolveSandboxProfilePaths(profile, projectDir), true, nil
+}
+
+func resolveSandboxProfilePaths(profile sandtypes.Profile, baseDir string) sandtypes.Profile {
+	if baseDir == "" {
+		return profile
+	}
+	profile.Env = resolveSandboxEnvPolicyPaths(profile.Env, baseDir)
+	if profile.Network.AllowedDomainsFile != "" && !filepath.IsAbs(profile.Network.AllowedDomainsFile) {
+		profile.Network.AllowedDomainsFile = filepath.Join(baseDir, profile.Network.AllowedDomainsFile)
+	}
+	return profile
+}
+
+func resolveSandboxEnvPolicyPaths(policy sandtypes.EnvPolicy, baseDir string) sandtypes.EnvPolicy {
+	if baseDir == "" {
+		return policy
+	}
+	for i := range policy.Files {
+		path := policy.Files[i].Path
+		if path != "" && !filepath.IsAbs(path) {
+			policy.Files[i].Path = filepath.Join(baseDir, path)
+		}
+	}
+	return policy
 }
 
 // createSandbox creates a new sandbox and starts its container.
@@ -641,14 +665,30 @@ func (d *Daemon) createSandbox(ctx context.Context, opts CreateSandboxOpts, prog
 		profileName = sandtypes.DefaultProfileName
 	}
 	profile := opts.Profile
+	profileConfigured := opts.ProfileEnvConfigured || envPolicyConfigured(opts.ProfileEnv)
 	if profile.Name == "" {
 		var err error
-		profile, err = loadSandboxProfile(opts.CloneFromDir, profileName)
+		profile, profileConfigured, err = loadSandboxProfile(opts.CloneFromDir, profileName)
 		if err != nil {
 			return nil, err
 		}
+	} else {
+		profileConfigured = true
+		profile = resolveSandboxProfilePaths(profile, opts.CloneFromDir)
+	}
+	if opts.ProfileEnvConfigured || envPolicyConfigured(opts.ProfileEnv) {
+		profile.Env = resolveSandboxEnvPolicyPaths(opts.ProfileEnv, opts.CloneFromDir)
+		profileConfigured = true
 	}
 	slog.InfoContext(ctx, "createSandbox", "agentType", agentType, "opts", opts)
+
+	requirementOpts := opts
+	requirementOpts.ProfileName = profileName
+	requirementOpts.ProfileEnv = profile.Env
+	requirementOpts.ProfileEnvConfigured = profileConfigured
+	if _, err := d.resolveCreateSandboxRequirements(requirementOpts); err != nil {
+		return nil, err
+	}
 
 	if err := d.validateSelectableAgent(opts.Agent); err != nil {
 		return nil, err
