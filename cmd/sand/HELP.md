@@ -58,7 +58,7 @@ sand new [flags] [SANDBOX-NAME]
 - `--project-env` - pass project-scoped profile env to plain shell/exec/git commands
 - `-s, --shell` _`<shell-command>`_ - shell command to exec in the container (default: `/bin/zsh`)
 - `-t, --tmux` - create or reconnect to a container-side tmux session
-- `--atch` - create or reconnect to a container-side atch session (session name is the sandbox name)
+- `--atch` - create or reconnect to a container-side atch session
 - `-a, --agent` _`<claude|codex|gemini|opencode>`_ - name of coding agent to use
 - `-b, --branch` - create a new git branch, with the same name as the sandbox, inside the sandbox _container_ (not on your host workdir) (default: `false`)
 - `--username` _`STRING`_ - name of default user to create (defaults to $USER)
@@ -107,7 +107,7 @@ sand shell [flags] <SANDBOX-NAME>
 
 - `-s, --shell` _`<shell-command>`_ - shell command to exec in the container (default: `/bin/zsh`)
 - `-t, --tmux` - create or reconnect to a container-side tmux session
-- `--atch` - create or reconnect to a container-side atch session (session name is the sandbox name)
+- `--atch` - create or reconnect to a container-side atch session
 - `--project-env` - pass project-scoped profile env to plain shell/exec/git commands
 - `--ssh-agent` - enable ssh-agent forwarding for the container
 
@@ -145,7 +145,7 @@ list sandboxes
 **Usage:**
 
 ```
-sand ls
+sand ls [flags]
 ```
 
 **Flags:**
@@ -164,7 +164,7 @@ sand log <SANDBOX-NAME>
 
 ## `sand rm`
 
-soft-delete sandbox container and move its clone directory to trash
+remove sandbox container and its clone directory
 
 **Usage:**
 
@@ -249,6 +249,16 @@ show git log of sandbox working tree
 
 ```
 sand git log <SANDBOX-NAME>
+```
+
+### `sand git sync-host`
+
+update the shared mirror for a sandbox's original host repo
+
+**Usage:**
+
+```
+sand git sync-host <SANDBOX-NAME>
 ```
 
 ## `sand doc`
@@ -338,3 +348,4 @@ show effective configuration with sources
 ```
 sand config ls
 ```
+
