@@ -15,7 +15,7 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
-const shutdownTimeout = 5 * time.Second
+const shutdownTimeout = 1 * time.Second
 
 // InitTracing configures OpenTelemetry trace export when the process has
 // explicit OTLP trace exporter configuration in its environment.
