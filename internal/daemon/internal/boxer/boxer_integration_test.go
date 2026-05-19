@@ -145,7 +145,7 @@ func TestBoxer_NewSandbox_EndToEnd(t *testing.T) {
 		})
 
 		hostWorkDir := t.TempDir()
-		result, err := boxer.NewSandbox(ctx, NewSandboxOpts{AgentType: "test-agent", ID: "test-sandbox", HostWorkDir: hostWorkDir, ImageName: "test-image:latest", CPUs: 2, Memory: 1024})
+		result, err := boxer.NewSandbox(ctx, NewSandboxOpts{AgentType: "test-agent", ID: "test-sandbox", HostWorkDir: hostWorkDir, ImageName: "test-image:latest", CPUs: 2, Memory: 1024, LocalDomain: "test.local"})
 		if err != nil {
 			t.Fatalf("NewSandbox() error = %v", err)
 		}
@@ -156,6 +156,10 @@ func TestBoxer_NewSandbox_EndToEnd(t *testing.T) {
 
 		if result.ImageName != "test-image:latest" {
 			t.Errorf("Expected ImageName 'test-image:latest', got %s", result.ImageName)
+		}
+
+		if result.DNSDomain != "test.local" {
+			t.Errorf("Expected DNSDomain 'test.local', got %s", result.DNSDomain)
 		}
 
 		if result.HostOriginDir != hostWorkDir {
@@ -172,6 +176,9 @@ func TestBoxer_NewSandbox_EndToEnd(t *testing.T) {
 		}
 		if loadedBox == nil {
 			t.Fatal("Expected sandbox to be saved in DB")
+		}
+		if loadedBox.DNSDomain != "test.local" {
+			t.Errorf("Expected loaded DNSDomain 'test.local', got %s", loadedBox.DNSDomain)
 		}
 		if loadedBox.ID != "test-sandbox" {
 			t.Errorf("DB sandbox ID = %s, want 'test-sandbox'", loadedBox.ID)

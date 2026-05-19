@@ -409,6 +409,7 @@ func (sb *Boxer) NewSandbox(ctx context.Context, opts NewSandboxOpts) (*sandtype
 		HostOriginDir:     hostWorkDir,
 		SandboxWorkDir:    artifacts.SandboxWorkDir,
 		ImageName:         opts.ImageName,
+		DNSDomain:         opts.LocalDomain,
 		EnvFile:           envFile,
 		AllowedDomains:    opts.AllowedDomains,
 		MountRequests:     mountRequests,

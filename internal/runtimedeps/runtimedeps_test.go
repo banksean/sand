@@ -201,6 +201,103 @@ func TestDNSDomainNonInteractiveReturnsManualCommand(t *testing.T) {
 	}
 }
 
+func TestDNSRegistrationPassesWhenDomainIsListed(t *testing.T) {
+	replaceSystemOps(t, &fakeContainerSystem{
+		propertyGetFunc: func(context.Context, string) (string, error) {
+			return "custom.local", nil
+		},
+		dnsListFunc: func(context.Context) ([]string, error) {
+			return []string{"dev.local", "custom.local"}, nil
+		},
+	})
+
+	err := VerifyWithOptions(context.Background(), "", VerifyOptions{}, ContainerSystemDNSRegistration)
+	if err != nil {
+		t.Fatalf("VerifyWithOptions() error = %v", err)
+	}
+}
+
+func TestDNSRegistrationFailsWithSudoCreateCommand(t *testing.T) {
+	replaceSystemOps(t, &fakeContainerSystem{
+		propertyGetFunc: func(context.Context, string) (string, error) {
+			return "custom.local", nil
+		},
+		dnsListFunc: func(context.Context) ([]string, error) {
+			return []string{"dev.local"}, nil
+		},
+	})
+
+	err := VerifyWithOptions(context.Background(), "", VerifyOptions{}, ContainerSystemDNSRegistration)
+	if err == nil {
+		t.Fatal("VerifyWithOptions() error = nil, want error")
+	}
+	got := err.Error()
+	for _, want := range []string{
+		"container system dns list does not include \"custom.local\"",
+		"sudo container system dns create custom.local",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("VerifyWithOptions() error = %q, want substring %q", got, want)
+		}
+	}
+}
+
+func TestDNSRegistrationUsesDefaultAfterPromptedSet(t *testing.T) {
+	domain := ""
+	replaceSystemOps(t, &fakeContainerSystem{
+		propertyGetFunc: func(context.Context, string) (string, error) {
+			return domain, nil
+		},
+		propertySetFunc: func(_ context.Context, id, value string) error {
+			if id != "dns.domain" {
+				t.Fatalf("PropertySet id = %q, want dns.domain", id)
+			}
+			domain = value
+			return nil
+		},
+		dnsListFunc: func(context.Context) ([]string, error) {
+			return []string{"other.local"}, nil
+		},
+	})
+
+	err := VerifyWithOptions(context.Background(), "", VerifyOptions{
+		Stdin:            strings.NewReader("\n"),
+		Stdout:           ioDiscard{},
+		PromptRemedies:   true,
+		DefaultDNSDomain: DefaultDNSDomain,
+	}, ContainerSystemDNSRegistration)
+	if err == nil {
+		t.Fatal("VerifyWithOptions() error = nil, want error")
+	}
+	if want := "sudo container system dns create dev.local"; !strings.Contains(err.Error(), want) {
+		t.Fatalf("VerifyWithOptions() error = %q, want command %q", err, want)
+	}
+}
+
+func TestDNSRegistrationListFailureIncludesContext(t *testing.T) {
+	replaceSystemOps(t, &fakeContainerSystem{
+		propertyGetFunc: func(context.Context, string) (string, error) {
+			return "dev.local", nil
+		},
+		dnsListFunc: func(context.Context) ([]string, error) {
+			return nil, errors.New("dns list failed")
+		},
+	})
+
+	err := VerifyWithOptions(context.Background(), "", VerifyOptions{}, ContainerSystemDNSRegistration)
+	if err == nil {
+		t.Fatal("VerifyWithOptions() error = nil, want error")
+	}
+	for _, want := range []string{
+		"could not get container system dns domain list",
+		"dns list failed",
+	} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("VerifyWithOptions() error = %q, want substring %q", err, want)
+		}
+	}
+}
+
 type ioDiscard struct{}
 
 func (ioDiscard) Write(p []byte) (int, error) {

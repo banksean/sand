@@ -14,10 +14,10 @@ import (
 
 	"github.com/alecthomas/kong"
 	kongyaml "github.com/alecthomas/kong-yaml"
-	"github.com/banksean/sand/internal/applecontainer"
 	"github.com/banksean/sand/internal/cli"
 	"github.com/banksean/sand/internal/daemon"
 	"github.com/banksean/sand/internal/observability"
+	"github.com/banksean/sand/internal/runtimedeps"
 	"github.com/banksean/sand/internal/sandboxlog"
 	"github.com/banksean/sand/internal/version"
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -54,9 +54,11 @@ type DaemonCmd struct {
 func (c *DaemonCmd) Run(cctx *App) error {
 	ctx := cctx.Context
 
-	localDomain, err := applecontainer.System.PropertyGet(ctx, "dns.domain")
+	localDomain, err := runtimedeps.EffectiveDNSDomain(ctx, runtimedeps.VerifyOptions{
+		DefaultDNSDomain: runtimedeps.DefaultDNSDomain,
+	})
 	if err != nil {
-		return fmt.Errorf("unable to get dns.domain from container system: %w", err)
+		return fmt.Errorf("unable to validate container system dns domain: %w", err)
 	}
 	slog.InfoContext(ctx, "DaemonCmd.Run", "localDomain", localDomain)
 	server := daemon.NewDaemon(cctx.AppBaseDir, localDomain)

@@ -38,16 +38,17 @@ type diagnosticCheck struct {
 type PrerequID string
 
 const (
-	GitRemoteIsSSH           PrerequID = "git-ssh-checkout"
-	GitDir                   PrerequID = "git-dir"
-	ContainerSystemDNSDomain PrerequID = "container-dns-domain-set"
-	ContainerSystemDNSName   PrerequID = "container-dns-name"
-	ContainerCommand         PrerequID = "container-runtime"
-	ContainerSystemRunning   PrerequID = "container-system-running"
-	MacOSVersion             PrerequID = "macos-version"
-	MacOS                    PrerequID = "macos"
-	CustomInitImagePulled    PrerequID = "custom-init-image-pulled"
-	CustomKernelInstalled    PrerequID = "custom-kernel-installed"
+	GitRemoteIsSSH                 PrerequID = "git-ssh-checkout"
+	GitDir                         PrerequID = "git-dir"
+	ContainerSystemDNSDomain       PrerequID = "container-dns-domain-set"
+	ContainerSystemDNSRegistration PrerequID = "container-dns-domain-registered"
+	ContainerSystemDNSName         PrerequID = "container-dns-name"
+	ContainerCommand               PrerequID = "container-runtime"
+	ContainerSystemRunning         PrerequID = "container-system-running"
+	MacOSVersion                   PrerequID = "macos-version"
+	MacOS                          PrerequID = "macos"
+	CustomInitImagePulled          PrerequID = "custom-init-image-pulled"
+	CustomKernelInstalled          PrerequID = "custom-kernel-installed"
 )
 
 const DefaultDNSDomain = "dev.local"
@@ -159,32 +160,16 @@ var (
 			ID:          ContainerSystemDNSDomain,
 			Description: "Container system has dns.domain property set",
 			Run: func(ctx context.Context, appBaseDir string, opts VerifyOptions) error {
-				domain, err := systemOps.PropertyGet(ctx, "dns.domain")
-				if err != nil {
-					return fmt.Errorf("could not get container system properties: %w", err)
-				}
-				if domain == "" {
-					domain := opts.DefaultDNSDomain
-					if domain == "" {
-						domain = DefaultDNSDomain
-					}
-					command := fmt.Sprintf("container system property set dns.domain %s", domain)
-					if !opts.PromptRemedies {
-						return fmt.Errorf("container system property dns.domain is not set. Run: %s", command)
-					}
-					ok, err := PromptYesDefault(opts.Stdin, opts.Stdout, fmt.Sprintf("Set dns.domain to %s [Y/n]? ", domain))
-					if err != nil {
-						return err
-					}
-					if !ok {
-						return fmt.Errorf("container system property dns.domain is not set. Run: %s", command)
-					}
-					if err := systemOps.PropertySet(ctx, "dns.domain", domain); err != nil {
-						return fmt.Errorf("setting container system property dns.domain: %w", err)
-					}
-				}
-
-				return nil
+				_, err := ensureDNSDomain(ctx, opts)
+				return err
+			},
+		},
+		{
+			ID:          ContainerSystemDNSRegistration,
+			Description: "Container system dns list includes dns.domain",
+			Run: func(ctx context.Context, appBaseDir string, opts VerifyOptions) error {
+				_, err := EffectiveDNSDomain(ctx, opts)
+				return err
 			},
 		},
 		{
@@ -253,6 +238,63 @@ func init() {
 
 func Verify(ctx context.Context, appBaseDir string, checkIDs ...PrerequID) error {
 	return VerifyWithOptions(ctx, appBaseDir, VerifyOptions{}, checkIDs...)
+}
+
+// EffectiveDNSDomain returns the dns.domain value after validating that the
+// container DNS subsystem has registered the same domain.
+func EffectiveDNSDomain(ctx context.Context, opts VerifyOptions) (string, error) {
+	domain, err := ensureDNSDomain(ctx, opts)
+	if err != nil {
+		return "", err
+	}
+	if err := ensureDNSDomainRegistered(ctx, domain); err != nil {
+		return "", err
+	}
+	return domain, nil
+}
+
+func ensureDNSDomain(ctx context.Context, opts VerifyOptions) (string, error) {
+	domain, err := systemOps.PropertyGet(ctx, "dns.domain")
+	if err != nil {
+		return "", fmt.Errorf("could not get container system properties: %w", err)
+	}
+	if domain != "" {
+		return domain, nil
+	}
+
+	domain = opts.DefaultDNSDomain
+	if domain == "" {
+		domain = DefaultDNSDomain
+	}
+	command := fmt.Sprintf("container system property set dns.domain %s", domain)
+	if !opts.PromptRemedies {
+		return "", fmt.Errorf("container system property dns.domain is not set. Run: %s", command)
+	}
+	ok, err := PromptYesDefault(opts.Stdin, opts.Stdout, fmt.Sprintf("Set dns.domain to %s [Y/n]? ", domain))
+	if err != nil {
+		return "", err
+	}
+	if !ok {
+		return "", fmt.Errorf("container system property dns.domain is not set. Run: %s", command)
+	}
+	if err := systemOps.PropertySet(ctx, "dns.domain", domain); err != nil {
+		return "", fmt.Errorf("setting container system property dns.domain: %w", err)
+	}
+	return domain, nil
+}
+
+func ensureDNSDomainRegistered(ctx context.Context, domain string) error {
+	domains, err := systemOps.DNSList(ctx)
+	if err != nil {
+		return fmt.Errorf("could not get container system dns domain list: %w", err)
+	}
+	for _, registered := range domains {
+		if registered == domain {
+			slog.InfoContext(ctx, "container dns domain is registered", "domain", domain)
+			return nil
+		}
+	}
+	return fmt.Errorf("container system dns list does not include %q. Run: sudo container system dns create %s", domain, domain)
 }
 
 func VerifyWithOptions(ctx context.Context, appBaseDir string, opts VerifyOptions, checkIDs ...PrerequID) error {
