@@ -7,4 +7,5 @@ RUN apk add --no-cache \
     libc6-compat \
     libstdc++
 
-RUN curl -fsSL https://opencode.ai/install | bash
+ENV OPENCODE_VERSION=1.14.48
+RUN curl -fsSL https://opencode.ai/install | bash -s -- --version ${OPENCODE_VERSION}
