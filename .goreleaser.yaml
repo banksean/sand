@@ -79,6 +79,9 @@ brews:
     homepage: "https://github.com/banksean/sand"
     description: "Local development sandbox containers"
     license: "Apache"
+    dependencies:
+      - name: container
+        version: 0.12.3
     install: |
       bin.install "sand"
       bin.install "sandd"
