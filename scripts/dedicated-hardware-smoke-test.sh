@@ -21,31 +21,7 @@ set -euo pipefail
 CONTAINER_DNS_DOMAIN=dev.local
 container system property set dns.domain $CONTAINER_DNS_DOMAIN
 
-# Stop and uninstall everything
-
-if command -v sand &> /dev/null; then
-	echo "Removing sandboxes"
-	sand rm -af
-	echo "Stopping daemon"
-	sandd stop
-
-	if brew list "banksean/tap/sand" &>/dev/null; then
-		echo "Uninstalling brew package"
-		brew uninstall banksean/tap/sand
-	else
-		echo "Removing non-brew binary installation"
-		rm $(which sand)
-		rm $(which sandd)
-	fi
-fi
-
-rm -rf ~/.config/sand
-if [ -f "~/Library/Application\ Support/Sand" ]; then
-	chmod -R u+w ~/Library/Application\ Support/Sand
-	rm -rf ~/Library/Application\ Support/Sand
-fi
-
-rm -rf /tmp/sand
+export SMOKE_TEST=TRUE
 
 # Install sand and sandd from source
 task install

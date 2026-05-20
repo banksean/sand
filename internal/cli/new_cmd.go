@@ -186,15 +186,18 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 		slog.ErrorContext(ctx, "sshimmer.CheckSSHReachability", "error", err)
 	}
 	if updateSSHConfFunc != nil {
-		stdinReader := *bufio.NewReader(os.Stdin)
-		fmt.Printf("\nTo enable you to use ssh to connect to local sand containers, we need to add one line to the top of your ssh config. Proceed [y/N]? ")
-		text, err := stdinReader.ReadString('\n')
-		if err != nil {
-			return fmt.Errorf("couldn't read from stdin: %w", err)
-		}
-		text = strings.TrimSpace(strings.ToLower(text))
-		if text != "y" && text != "Y" {
-			return fmt.Errorf("User declined to edit ssh config file")
+		if os.Getenv("SMOKE_TEST") == "" {
+			// Only confirm interactively for this if *aren't* running a smoke test.
+			stdinReader := *bufio.NewReader(os.Stdin)
+			fmt.Printf("\nTo enable you to use ssh to connect to local sand containers, we need to add one line to the top of your ssh config. Proceed [y/N]? ")
+			text, err := stdinReader.ReadString('\n')
+			if err != nil {
+				return fmt.Errorf("couldn't read from stdin: %w", err)
+			}
+			text = strings.TrimSpace(strings.ToLower(text))
+			if text != "y" && text != "Y" {
+				return fmt.Errorf("User declined to edit ssh config file")
+			}
 		}
 		if err := updateSSHConfFunc(); err != nil {
 			return err
