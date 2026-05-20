@@ -109,6 +109,10 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 		c.ImageName = agentlaunch.DefaultImage(c.Agent, DefaultImageName)
 	}
 
+	if err := mc.EnsureImage(ctx, c.ImageName, os.Stdout); err != nil {
+		return fmt.Errorf("ensuring image %s: %w", c.ImageName, err)
+	}
+
 	var allowedDomains []string
 	if c.AllowedDomainsFile != "" {
 		if err := runtimedeps.Verify(ctx, cctx.AppBaseDir, runtimedeps.CustomInitImagePulled, runtimedeps.CustomKernelInstalled); err != nil {
