@@ -128,11 +128,15 @@ func boxerStartHooks(hooks []sandtypes.ContainerHook) []sandtypes.ContainerHook 
 
 // setupHostPorts, for each host-loopback port requested for this sandbox,
 // starts a daemon-side TCP forwarder on the sandbox's bridge gateway IP and
-// installs an iptables DNAT rule inside the sandbox redirecting
-// 127.0.0.1:<port> there. We use ContainerService.Exec directly rather than
-// the container hook abstraction because iptables and sysctl require root,
-// and the container's default user has typically been changed away from root
-// by agent bootstrap by the time this runs.
+// then attempts (best-effort) to install an iptables DNAT rule inside the
+// sandbox redirecting 127.0.0.1:<port> to <gateway>:<port>. A `host.sand`
+// /etc/hosts entry is always added so reaching the service works regardless
+// of iptables availability.
+//
+// We use ContainerService.Exec directly rather than the container hook
+// abstraction so we can request uid 0. Apple's container runtime typically
+// does not grant CAP_NET_ADMIN, so the iptables step will often fail even
+// as root; that is logged but not fatal.
 func (sber *Boxer) setupHostPorts(ctx context.Context, sb *sandtypes.Box) error {
 	if len(sb.HostPorts) == 0 || sber.HostPortManager == nil {
 		return nil
@@ -152,22 +156,41 @@ func (sber *Boxer) setupHostPorts(ctx context.Context, sb *sandtypes.Box) error 
 		return fmt.Errorf("host port setup: %w", err)
 	}
 
+	// Always add /etc/hosts entry — this is the reliable fallback path.
+	// We invoke via `doas` because sand no longer execs as root by default;
+	// the sandbox user is in the wheel group with passwordless doas.
+	if _, err := sber.ContainerService.Exec(ctx,
+		&options.ExecContainer{},
+		sb.ContainerID, "doas", os.Environ(), "sh", "-c",
+		buildHostSandEtcHostsScript(gateway),
+	); err != nil {
+		slog.WarnContext(ctx, "setupHostPorts: failed to update /etc/hosts", "sandbox", sb.ID, "error", err)
+	}
+
+	// Best-effort iptables DNAT so 127.0.0.1:<port> resolves transparently.
+	// Many Apple container setups lack CAP_NET_ADMIN; in that case we just
+	// log and continue. The host.sand hostname still works.
 	script := buildHostPortIptablesScript(gateway, sb.HostPorts)
 	out, execErr := sber.ContainerService.Exec(ctx,
-		&options.ExecContainer{
-			ProcessOptions: options.ProcessOptions{
-				User: "0",
-			},
-		}, sb.ContainerID, "sh", os.Environ(), "-c", script)
+		&options.ExecContainer{},
+		sb.ContainerID, "doas", os.Environ(), "sh", "-c", script)
 	if execErr != nil {
-		sber.HostPortManager.StopForSandbox(sb.ID)
-		if out != "" {
-			return fmt.Errorf("host port setup iptables: %w: %s", execErr, strings.TrimSpace(out))
-		}
-		return fmt.Errorf("host port setup iptables: %w", execErr)
+		slog.WarnContext(ctx, "setupHostPorts: iptables DNAT unavailable; falling back to host.sand",
+			"sandbox", sb.ID, "error", execErr, "output", strings.TrimSpace(out))
+		fmt.Printf("[sand] note: in-sandbox iptables redirect not available; "+
+			"reach host services as http://host.sand:<port>/ (e.g. http://host.sand:%d/)\n",
+			sb.HostPorts[0])
+	} else {
+		slog.InfoContext(ctx, "setupHostPorts: iptables installed", "sandbox", sb.ID, "gateway", gateway, "ports", sb.HostPorts)
 	}
-	slog.InfoContext(ctx, "Boxer.setupHostPorts done", "sandbox", sb.ID, "gateway", gateway, "ports", sb.HostPorts)
 	return nil
+}
+
+// buildHostSandEtcHostsScript returns a shell snippet that, idempotently,
+// inserts/refreshes a `<gateway>\thost.sand` line in /etc/hosts.
+func buildHostSandEtcHostsScript(gatewayIP string) string {
+	return "sed -i.bak '/[[:space:]]host\\.sand$/d' /etc/hosts 2>/dev/null || true; " +
+		"printf '%s\\thost.sand\\n' " + gatewayIP + " >> /etc/hosts"
 }
 
 func buildHostPortIptablesScript(gatewayIP string, ports []int) string {
