@@ -596,6 +596,7 @@ type CreateSandboxOpts struct {
 	Uid                  string              `json:"uid,omitempty"`
 
 	AllowedDomains []string                    `json:"allowedDomains,omitempty"`
+	HostPorts      []int                       `json:"hostPorts,omitempty"`
 	Mounts         []string                    `json:"mounts,omitempty"`
 	CloneMounts    []string                    `json:"cloneMounts,omitempty"`
 	SharedCaches   sandtypes.SharedCacheConfig `json:"sharedCaches,omitempty"`
@@ -707,6 +708,7 @@ func (d *Daemon) createSandbox(ctx context.Context, opts CreateSandboxOpts, prog
 		Username:       opts.Username,
 		Uid:            opts.Uid,
 		AllowedDomains: opts.AllowedDomains,
+		HostPorts:      opts.HostPorts,
 		Mounts:         opts.Mounts,
 		CloneMounts:    opts.CloneMounts,
 		SharedCaches:   opts.SharedCaches,

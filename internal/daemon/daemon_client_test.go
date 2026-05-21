@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
@@ -248,6 +249,7 @@ func TestCreateSandboxOptsProtoRoundTrip(t *testing.T) {
 		Username:       "dev",
 		Uid:            "501",
 		AllowedDomains: []string{"example.com", "api.example.com"},
+		HostPorts:      []int{3845, 5173},
 		Mounts:         []string{"source=/host,target=/container,readonly"},
 		CloneMounts:    []string{"source=/src/data,target=/data,readonly"},
 		SharedCaches:   sandtypes.SharedCacheConfig{Mise: true, APK: true},
@@ -272,6 +274,9 @@ func TestCreateSandboxOptsProtoRoundTrip(t *testing.T) {
 	}
 	if strings.Join(got.AllowedDomains, ",") != strings.Join(opts.AllowedDomains, ",") {
 		t.Fatalf("round trip allowed domains = %+v, want %+v", got.AllowedDomains, opts.AllowedDomains)
+	}
+	if fmt.Sprintf("%v", got.HostPorts) != fmt.Sprintf("%v", opts.HostPorts) {
+		t.Fatalf("round trip host ports = %+v, want %+v", got.HostPorts, opts.HostPorts)
 	}
 	if strings.Join(got.Mounts, ",") != strings.Join(opts.Mounts, ",") {
 		t.Fatalf("round trip mounts = %+v, want %+v", got.Mounts, opts.Mounts)

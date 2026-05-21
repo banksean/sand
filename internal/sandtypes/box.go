@@ -46,6 +46,11 @@ type Box struct {
 	// AllowedDomains is the list of domains the sandbox container is permitted to contact.
 	// When non-empty, this overrides the default allowlist baked into the init image.
 	AllowedDomains []string
+	// HostPorts is the list of host-loopback TCP ports to expose to the sandbox
+	// as if they were running on the sandbox's own loopback. Each port spawns a
+	// daemon-side forwarder bound to the sandbox's bridge gateway IP, and an
+	// iptables DNAT rule inside the sandbox redirecting 127.0.0.1:<port> there.
+	HostPorts []int
 	// Mounts defines bind mounts that should be attached when creating the container.
 	Mounts []MountSpec
 	// MountRequests records user-requested direct and cloned bind mount metadata.

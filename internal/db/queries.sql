@@ -18,10 +18,10 @@ INSERT INTO sandboxes (
     id, name, state, container_id, host_origin_dir, sandbox_work_dir,
     image_name, dns_domain, env_file, agent_type, profile_name,
     original_git_origin, original_git_branch, original_git_commit,
-    original_git_is_dirty, allowed_domains, mount_specs,
+    original_git_is_dirty, allowed_domains, host_ports, mount_specs,
     cpu, memory_mb, default_username, default_uid,
     deleted_at, trash_work_dir
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(id) DO UPDATE SET
     name = excluded.name,
     state = excluded.state,
@@ -39,6 +39,7 @@ ON CONFLICT(id) DO UPDATE SET
     original_git_commit = excluded.original_git_commit,
     original_git_is_dirty = excluded.original_git_is_dirty,
     allowed_domains = excluded.allowed_domains,
+    host_ports = excluded.host_ports,
     mount_specs = excluded.mount_specs,
     cpu = excluded.cpu,
     memory_mb = excluded.memory_mb,
