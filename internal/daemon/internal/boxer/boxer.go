@@ -126,43 +126,48 @@ func boxerStartHooks(hooks []sandtypes.ContainerHook) []sandtypes.ContainerHook 
 	return append(systemHooks, hooks...)
 }
 
-// hostPortSetupHook returns a hook that, for each host-loopback port requested
-// for this sandbox, starts a daemon-side TCP forwarder on the sandbox's bridge
-// gateway IP and installs an iptables DNAT rule inside the sandbox redirecting
-// 127.0.0.1:<port> there. The net effect: the agent can reach host services on
-// 127.0.0.1:<port> as if they were running on the sandbox itself.
-func hostPortSetupHook(sb *sandtypes.Box, mgr *hostport.Manager) sandtypes.ContainerHook {
-	return sandtypes.NewContainerHook("set up host port forwards", func(ctx context.Context, ctr *types.Container, exec sandtypes.HookStreamer) error {
-		if len(sb.HostPorts) == 0 || mgr == nil {
-			return nil
-		}
-		if ctr == nil || len(ctr.Networks) == 0 {
-			return fmt.Errorf("host port setup: container has no network info")
-		}
-		gateway := ctr.Networks[0].IPv4Gateway
-		if gateway == "" {
-			return fmt.Errorf("host port setup: container has no IPv4 gateway")
-		}
-		if err := mgr.StartForSandbox(sb.ID, gateway, sb.HostPorts); err != nil {
-			return fmt.Errorf("host port setup: %w", err)
-		}
-
-		// Install in-sandbox DNAT so 127.0.0.1:<port> -> <gateway>:<port>.
-		// We also need route_localnet=1 because the destination of a DNAT'd
-		// loopback packet would otherwise be considered martian.
-		script := buildHostPortIptablesScript(gateway, sb.HostPorts)
-		out, err := exec.Exec(ctx, "sh", "-c", script)
-		if err != nil {
-			// If iptables fails, tear down the host-side listeners so we don't
-			// leave a half-configured forward in place.
-			mgr.StopForSandbox(sb.ID)
-			if out != "" {
-				return fmt.Errorf("host port setup iptables: %w: %s", err, strings.TrimSpace(out))
-			}
-			return fmt.Errorf("host port setup iptables: %w", err)
-		}
+// setupHostPorts, for each host-loopback port requested for this sandbox,
+// starts a daemon-side TCP forwarder on the sandbox's bridge gateway IP and
+// installs an iptables DNAT rule inside the sandbox redirecting
+// 127.0.0.1:<port> there. We use ContainerService.Exec directly rather than
+// the container hook abstraction because iptables and sysctl require root,
+// and the container's default user has typically been changed away from root
+// by agent bootstrap by the time this runs.
+func (sber *Boxer) setupHostPorts(ctx context.Context, sb *sandtypes.Box) error {
+	if len(sb.HostPorts) == 0 || sber.HostPortManager == nil {
 		return nil
-	})
+	}
+	ctr, err := sber.GetContainer(ctx, sb.ContainerID)
+	if err != nil {
+		return fmt.Errorf("host port setup: %w", err)
+	}
+	if ctr == nil || len(ctr.Networks) == 0 {
+		return fmt.Errorf("host port setup: container has no network info")
+	}
+	gateway := ctr.Networks[0].IPv4Gateway
+	if gateway == "" {
+		return fmt.Errorf("host port setup: container has no IPv4 gateway")
+	}
+	if err := sber.HostPortManager.StartForSandbox(sb.ID, gateway, sb.HostPorts); err != nil {
+		return fmt.Errorf("host port setup: %w", err)
+	}
+
+	script := buildHostPortIptablesScript(gateway, sb.HostPorts)
+	out, execErr := sber.ContainerService.Exec(ctx,
+		&options.ExecContainer{
+			ProcessOptions: options.ProcessOptions{
+				User: "0",
+			},
+		}, sb.ContainerID, "sh", os.Environ(), "-c", script)
+	if execErr != nil {
+		sber.HostPortManager.StopForSandbox(sb.ID)
+		if out != "" {
+			return fmt.Errorf("host port setup iptables: %w: %s", execErr, strings.TrimSpace(out))
+		}
+		return fmt.Errorf("host port setup iptables: %w", execErr)
+	}
+	slog.InfoContext(ctx, "Boxer.setupHostPorts done", "sandbox", sb.ID, "gateway", gateway, "ports", sb.HostPorts)
+	return nil
 }
 
 func buildHostPortIptablesScript(gatewayIP string, ports []int) string {
@@ -1054,14 +1059,16 @@ func (sber *Boxer) StartNewContainer(ctx context.Context, sb *sandtypes.Box, pro
 	// Get agent config to reconstruct hooks
 	agentConfig := sber.AgentRegistry.Get(sb.AgentType)
 	hooks := boxerStartHooks(agentConfig.Configuration.GetFirstStartHooks(artifacts))
-	hooks = append(hooks, hostPortSetupHook(sb, sber.HostPortManager))
 
 	slog.InfoContext(ctx, "Boxer.StartNewContainer", "box", *sb, "ContainerHooks", len(hooks))
 	if err := sber.startContainerProcess(ctx, sb.ID, sb.ContainerID); err != nil {
 		return err
 	}
 
-	return sber.executeHooks(ctx, sb, hooks, progress)
+	if err := sber.executeHooks(ctx, sb, hooks, progress); err != nil {
+		return err
+	}
+	return sber.setupHostPorts(ctx, sb)
 }
 
 // StartExistingContainer starts an existing (previously-started) container instance.
@@ -1082,14 +1089,16 @@ func (sber *Boxer) StartExistingContainer(ctx context.Context, sb *sandtypes.Box
 	// Get agent config to reconstruct hooks
 	agentConfig := sber.AgentRegistry.Get(sb.AgentType)
 	hooks := boxerStartHooks(agentConfig.Configuration.GetStartHooks(artifacts))
-	hooks = append(hooks, hostPortSetupHook(sb, sber.HostPortManager))
 
 	slog.InfoContext(ctx, "Boxer.StartExistingContainer", "box", *sb, "ContainerHooks", len(hooks))
 	if err := sber.startContainerProcess(ctx, sb.ID, sb.ContainerID); err != nil {
 		return err
 	}
 
-	return sber.executeHooks(ctx, sb, hooks, nil)
+	if err := sber.executeHooks(ctx, sb, hooks, nil); err != nil {
+		return err
+	}
+	return sber.setupHostPorts(ctx, sb)
 }
 
 func (sb *Boxer) startContainerProcess(ctx context.Context, sandboxID, containerID string) error {
