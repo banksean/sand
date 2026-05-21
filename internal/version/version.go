@@ -10,6 +10,7 @@ var (
 	GitBranch string
 	GitCommit string
 	BuildTime string
+	DevBuild  string
 )
 
 // Info returns a struct containing all version information
@@ -19,6 +20,7 @@ type Info struct {
 	GitCommit string           `json:"gitCommit,omitempty"`
 	BuildTime string           `json:"buildTime,omitempty"`
 	BuildInfo *debug.BuildInfo `json:"buildInfo,omitempty"`
+	DevBuild  bool             `json:"devBuild,omitempty"`
 }
 
 // Get returns the version information
@@ -29,6 +31,7 @@ func Get() Info {
 		GitBranch: GitBranch,
 		GitCommit: GitCommit,
 		BuildTime: BuildTime,
+		DevBuild:  DevBuild == "true",
 	}
 	if ok {
 		ret.BuildInfo = buildInfo
@@ -48,7 +51,8 @@ func (v Info) Equal(other Info) bool {
 	if v.BuildTime != other.BuildTime ||
 		v.GitBranch != other.GitBranch ||
 		v.GitCommit != other.GitCommit ||
-		v.GitRepo != other.GitRepo {
+		v.GitRepo != other.GitRepo ||
+		v.DevBuild != other.DevBuild {
 		return false
 	}
 	if other.BuildInfo != nil && v.BuildInfo == nil ||

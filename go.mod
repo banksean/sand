@@ -8,6 +8,7 @@ require (
 	github.com/creack/pty v1.1.24
 	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/google/go-containerregistry v0.21.3
+	github.com/google/uuid v1.6.0
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
 	github.com/jotaen/kong-completion v0.0.12
 	github.com/kevinburke/ssh_config v1.4.0
@@ -16,6 +17,7 @@ require (
 	go.opentelemetry.io/otel v1.43.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.43.0
 	go.opentelemetry.io/otel/sdk v1.43.0
+	go.opentelemetry.io/otel/trace v1.43.0
 	golang.org/x/crypto v0.49.0
 	golang.org/x/sync v0.20.0
 	golang.org/x/term v0.41.0
@@ -36,7 +38,6 @@ require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
@@ -53,7 +54,6 @@ require (
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.43.0 // indirect
 	go.opentelemetry.io/otel/metric v1.43.0 // indirect
-	go.opentelemetry.io/otel/trace v1.43.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.10.0 // indirect
 	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b // indirect
 	golang.org/x/net v0.52.0 // indirect

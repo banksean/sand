@@ -65,6 +65,7 @@ func (c *GRPCClient) Version(ctx context.Context) (version.Info, error) {
 		GitBranch: resp.GetGitBranch(),
 		GitCommit: resp.GetGitCommit(),
 		BuildTime: resp.GetBuildTime(),
+		DevBuild:  resp.GetDevBuild(),
 	}
 	if len(resp.GetBuildInfoJson()) > 0 {
 		var buildInfo debug.BuildInfo

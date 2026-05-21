@@ -228,6 +228,7 @@ func versionInfoToProto(info version.Info) *daemonpb.VersionResponse {
 		GitBranch: info.GitBranch,
 		GitCommit: info.GitCommit,
 		BuildTime: info.BuildTime,
+		DevBuild:  info.DevBuild,
 	}
 	if info.BuildInfo != nil {
 		buildInfoJSON, err := json.Marshal(info.BuildInfo)

@@ -144,6 +144,7 @@ type VersionResponse struct {
 	GitCommit     string                 `protobuf:"bytes,3,opt,name=git_commit,json=gitCommit,proto3" json:"git_commit,omitempty"`
 	BuildTime     string                 `protobuf:"bytes,4,opt,name=build_time,json=buildTime,proto3" json:"build_time,omitempty"`
 	BuildInfoJson []byte                 `protobuf:"bytes,5,opt,name=build_info_json,json=buildInfoJson,proto3" json:"build_info_json,omitempty"`
+	DevBuild      bool                   `protobuf:"varint,6,opt,name=dev_build,json=devBuild,proto3" json:"dev_build,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -211,6 +212,13 @@ func (x *VersionResponse) GetBuildInfoJson() []byte {
 		return x.BuildInfoJson
 	}
 	return nil
+}
+
+func (x *VersionResponse) GetDevBuild() bool {
+	if x != nil {
+		return x.DevBuild
+	}
+	return false
 }
 
 type StatusResponse struct {
@@ -1473,7 +1481,7 @@ const file_internal_daemon_daemonpb_daemon_proto_rawDesc = "" +
 	"\vPingRequest\"&\n" +
 	"\fPingResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\tR\x06status\"\x10\n" +
-	"\x0eVersionRequest\"\xb1\x01\n" +
+	"\x0eVersionRequest\"\xce\x01\n" +
 	"\x0fVersionResponse\x12\x19\n" +
 	"\bgit_repo\x18\x01 \x01(\tR\agitRepo\x12\x1d\n" +
 	"\n" +
@@ -1482,7 +1490,8 @@ const file_internal_daemon_daemonpb_daemon_proto_rawDesc = "" +
 	"git_commit\x18\x03 \x01(\tR\tgitCommit\x12\x1d\n" +
 	"\n" +
 	"build_time\x18\x04 \x01(\tR\tbuildTime\x12&\n" +
-	"\x0fbuild_info_json\x18\x05 \x01(\fR\rbuildInfoJson\"(\n" +
+	"\x0fbuild_info_json\x18\x05 \x01(\fR\rbuildInfoJson\x12\x1b\n" +
+	"\tdev_build\x18\x06 \x01(\bR\bdevBuild\"(\n" +
 	"\x0eStatusResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\tR\x06status\"\x11\n" +
 	"\x0fShutdownRequest\"\x1b\n" +

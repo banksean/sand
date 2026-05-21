@@ -9,14 +9,23 @@ import (
 type BuildInfoCmd struct{}
 
 func (c *BuildInfoCmd) Run(cctx *CLIContext) error {
+	printBuildInfo()
+	return nil
+}
+
+func printBuildInfo() {
 	versionInfo := version.Get()
+	if versionInfo.DevBuild {
+		fmt.Printf("DEV BUILD\n")
+	}
 	fmt.Printf("Git Repository: %s\n", versionInfo.GitRepo)
 	fmt.Printf("Git Branch: %s\n", versionInfo.GitBranch)
 	fmt.Printf("Git Commit: %s\n", versionInfo.GitCommit)
 	fmt.Printf("Build Time: %s\n", versionInfo.BuildTime)
+
 	buildInfo := versionInfo.BuildInfo
 	if buildInfo == nil {
-		return nil
+		return
 	}
 	for _, setting := range buildInfo.Settings {
 		if setting.Key == "vcs.revision" && versionInfo.GitCommit == "" {
@@ -29,5 +38,5 @@ func (c *BuildInfoCmd) Run(cctx *CLIContext) error {
 			fmt.Printf("Modified: %s\n", setting.Value)
 		}
 	}
-	return nil
+	return
 }

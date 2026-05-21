@@ -37,6 +37,7 @@ message VersionResponse {
   string git_commit = 3;
   string build_time = 4;
   bytes build_info_json = 5;
+  bool dev_build = 6;
 }
 
 message StatusResponse {

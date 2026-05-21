@@ -7,6 +7,21 @@ vars:
   DAEMON_PROTO_OUT_DIR: .
   OBSERVABILITY_DATA_DIR: '{{.TASKFILE_DIR}}/.observability-data'
   CONTAINER_DNS_DOMAIN: '{{.CONTAINER_DNS_DOMAIN | default "dev.local"}}'
+  GIT_REPO:
+    sh: git remote get-url origin
+  GIT_BRANCH:
+    sh: git branch --show-current
+  GIT_COMMIT:
+    sh: git rev-parse HEAD
+  BUILD_TIME:
+    sh: TZ=America/Los_Angeles date -Iseconds
+  VERSION_PACKAGE: github.com/banksean/sand/internal/version
+  LDFLAGS: >-
+    -X '{{.VERSION_PACKAGE}}.GitRepo={{.GIT_REPO}}'
+    -X '{{.VERSION_PACKAGE}}.GitBranch={{.GIT_BRANCH}}'
+    -X '{{.VERSION_PACKAGE}}.GitCommit={{.GIT_COMMIT}}'
+    -X '{{.VERSION_PACKAGE}}.BuildTime={{.BUILD_TIME}}'
+    -X '{{.VERSION_PACKAGE}}.DevBuild="true"'
   MISE_EXEC: >-
     if command -v mise >/dev/null 2>&1; then
       exec mise exec -- "$@";
@@ -46,7 +61,10 @@ tasks:
     deps:
       - generate
     cmds:
-      - go build -v ./...
+      - >-
+        go build -v
+        -ldflags "{{.LDFLAGS}}"
+        ./...
 
   test:
     desc: Run Go tests
@@ -61,7 +79,10 @@ tasks:
       - stopdaemon
       - generate
     cmds:
-      - go install ./cmd/...
+      - >-
+        go install -v
+        -ldflags "{{.LDFLAGS}}"
+        ./cmd/...
 
   stopdaemon:
     ignore_error: true
