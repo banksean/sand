@@ -1094,6 +1094,7 @@ type CreateSandboxRequest struct {
 	Memory         int32                  `protobuf:"varint,13,opt,name=memory,proto3" json:"memory,omitempty"`
 	ProfileName    string                 `protobuf:"bytes,14,opt,name=profile_name,json=profileName,proto3" json:"profile_name,omitempty"`
 	CloneMounts    []string               `protobuf:"bytes,15,rep,name=clone_mounts,json=cloneMounts,proto3" json:"clone_mounts,omitempty"`
+	HostPorts      []int32                `protobuf:"varint,16,rep,packed,name=host_ports,json=hostPorts,proto3" json:"host_ports,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1229,6 +1230,13 @@ func (x *CreateSandboxRequest) GetProfileName() string {
 func (x *CreateSandboxRequest) GetCloneMounts() []string {
 	if x != nil {
 		return x.CloneMounts
+	}
+	return nil
+}
+
+func (x *CreateSandboxRequest) GetHostPorts() []int32 {
+	if x != nil {
+		return x.HostPorts
 	}
 	return nil
 }
@@ -1544,7 +1552,7 @@ const file_internal_daemon_daemonpb_daemon_proto_rawDesc = "" +
 	"stats_json\x18\x01 \x01(\fR\tstatsJson\"9\n" +
 	"\x11SharedCacheConfig\x12\x12\n" +
 	"\x04mise\x18\x01 \x01(\bR\x04mise\x12\x10\n" +
-	"\x03apk\x18\x02 \x01(\bR\x03apk\"\xe2\x03\n" +
+	"\x03apk\x18\x02 \x01(\bR\x03apk\"\x81\x04\n" +
 	"\x14CreateSandboxRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12$\n" +
 	"\x0eclone_from_dir\x18\x02 \x01(\tR\fcloneFromDir\x12\x1d\n" +
@@ -1562,7 +1570,9 @@ const file_internal_daemon_daemonpb_daemon_proto_rawDesc = "" +
 	"\x04cpus\x18\f \x01(\x05R\x04cpus\x12\x16\n" +
 	"\x06memory\x18\r \x01(\x05R\x06memory\x12!\n" +
 	"\fprofile_name\x18\x0e \x01(\tR\vprofileName\x12!\n" +
-	"\fclone_mounts\x18\x0f \x03(\tR\vcloneMounts\"s\n" +
+	"\fclone_mounts\x18\x0f \x03(\tR\vcloneMounts\x12\x1d\n" +
+	"\n" +
+	"host_ports\x18\x10 \x03(\x05R\thostPorts\"s\n" +
 	"\x15CreateSandboxResponse\x12\x1c\n" +
 	"\bprogress\x18\x01 \x01(\tH\x00R\bprogress\x12\x1b\n" +
 	"\bbox_json\x18\x02 \x01(\fH\x00R\aboxJson\x12\x16\n" +

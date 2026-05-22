@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	"github.com/banksean/sand/internal/cloning"
 	"github.com/banksean/sand/internal/db"
 	"github.com/banksean/sand/internal/hostops"
+	"github.com/banksean/sand/internal/hostport"
 	"github.com/banksean/sand/internal/runtimedeps"
 	"github.com/banksean/sand/internal/runtimepaths"
 	"github.com/banksean/sand/internal/sandboxlog"
@@ -57,6 +59,7 @@ type Boxer struct {
 	FileOps          hostops.FileOps
 	SSHim            SSHimmer
 	AgentRegistry    *cloning.AgentRegistry
+	HostPortManager  *hostport.Manager
 }
 
 type hookExecutor struct {
@@ -123,6 +126,97 @@ func boxerStartHooks(hooks []sandtypes.ContainerHook) []sandtypes.ContainerHook 
 	return append(systemHooks, hooks...)
 }
 
+// setupHostPorts, for each host-loopback port requested for this sandbox,
+// starts a daemon-side TCP forwarder on the sandbox's bridge gateway IP and
+// then attempts (best-effort) to install an iptables DNAT rule inside the
+// sandbox redirecting 127.0.0.1:<port> to <gateway>:<port>. A `host.sand`
+// /etc/hosts entry is always added so reaching the service works regardless
+// of iptables availability.
+//
+// We use ContainerService.Exec directly rather than the container hook
+// abstraction so we can request uid 0. Apple's container runtime typically
+// does not grant CAP_NET_ADMIN, so the iptables step will often fail even
+// as root; that is logged but not fatal.
+func (sber *Boxer) setupHostPorts(ctx context.Context, sb *sandtypes.Box) error {
+	if len(sb.HostPorts) == 0 || sber.HostPortManager == nil {
+		return nil
+	}
+	ctr, err := sber.GetContainer(ctx, sb.ContainerID)
+	if err != nil {
+		return fmt.Errorf("host port setup: %w", err)
+	}
+	if ctr == nil || len(ctr.Networks) == 0 {
+		return fmt.Errorf("host port setup: container has no network info")
+	}
+	gateway := ctr.Networks[0].IPv4Gateway
+	if gateway == "" {
+		return fmt.Errorf("host port setup: container has no IPv4 gateway")
+	}
+	if err := sber.HostPortManager.StartForSandbox(sb.ID, gateway, sb.HostPorts); err != nil {
+		return fmt.Errorf("host port setup: %w", err)
+	}
+
+	// Always add /etc/hosts entry — this is the reliable fallback path.
+	// We invoke via `doas` because sand no longer execs as root by default;
+	// the sandbox user is in the wheel group with passwordless doas.
+	if _, err := sber.ContainerService.Exec(ctx,
+		&options.ExecContainer{},
+		sb.ContainerID, "doas", os.Environ(), "sh", "-c",
+		buildHostSandEtcHostsScript(gateway),
+	); err != nil {
+		slog.WarnContext(ctx, "setupHostPorts: failed to update /etc/hosts", "sandbox", sb.ID, "error", err)
+	}
+
+	// Best-effort iptables DNAT so 127.0.0.1:<port> resolves transparently.
+	// Apple's container runtime typically does not grant CAP_NET_ADMIN to
+	// containers, in which case this fails and we silently use the
+	// host.sand hostname path instead. The forwarder also HTTP-rewrites the
+	// Host header, so most clients work via host.sand:<port> without any
+	// further configuration.
+	script := buildHostPortIptablesScript(gateway, sb.HostPorts)
+	out, execErr := sber.ContainerService.Exec(ctx,
+		&options.ExecContainer{},
+		sb.ContainerID, "doas", os.Environ(), "sh", "-c", script)
+	if execErr != nil {
+		slog.InfoContext(ctx, "setupHostPorts: in-sandbox iptables unavailable; using host.sand fallback",
+			"sandbox", sb.ID, "error", execErr, "output", strings.TrimSpace(out))
+	} else {
+		slog.InfoContext(ctx, "setupHostPorts: iptables installed", "sandbox", sb.ID, "gateway", gateway, "ports", sb.HostPorts)
+	}
+	fmt.Printf("[sand] host services exposed at http://host.sand:<port>/ (ports: %v)\n", sb.HostPorts)
+	return nil
+}
+
+// buildHostSandEtcHostsScript returns a shell snippet that, idempotently,
+// inserts/refreshes a `<gateway>\thost.sand` line in /etc/hosts.
+func buildHostSandEtcHostsScript(gatewayIP string) string {
+	return "sed -i.bak '/[[:space:]]host\\.sand$/d' /etc/hosts 2>/dev/null || true; " +
+		"printf '%s\\thost.sand\\n' " + gatewayIP + " >> /etc/hosts"
+}
+
+func buildHostPortIptablesScript(gatewayIP string, ports []int) string {
+	var b strings.Builder
+	b.WriteString("set -e\n")
+	// Enable redirecting loopback-destined packets via DNAT.
+	b.WriteString("sysctl -w net.ipv4.conf.all.route_localnet=1 >/dev/null\n")
+	b.WriteString("sysctl -w net.ipv4.conf.lo.route_localnet=1 >/dev/null\n")
+	for _, p := range ports {
+		ps := strconv.Itoa(p)
+		// Output chain handles locally-generated traffic to 127.0.0.1:<port>.
+		b.WriteString("iptables -t nat -C OUTPUT -p tcp -d 127.0.0.1 --dport " + ps +
+			" -j DNAT --to-destination " + gatewayIP + ":" + ps +
+			" 2>/dev/null || iptables -t nat -A OUTPUT -p tcp -d 127.0.0.1 --dport " + ps +
+			" -j DNAT --to-destination " + gatewayIP + ":" + ps + "\n")
+		// SNAT the return path so connections sourced from loopback get the
+		// correct source IP when reaching the host.
+		b.WriteString("iptables -t nat -C POSTROUTING -p tcp -d " + gatewayIP +
+			" --dport " + ps + " -j MASQUERADE" +
+			" 2>/dev/null || iptables -t nat -A POSTROUTING -p tcp -d " + gatewayIP +
+			" --dport " + ps + " -j MASQUERADE\n")
+	}
+	return b.String()
+}
+
 func innieSocketPermissionHook() sandtypes.ContainerHook {
 	return sandtypes.NewContainerHook("repair host service socket permissions", func(ctx context.Context, ctr *types.Container, exec sandtypes.HookStreamer) error {
 		out, err := exec.Exec(ctx, "sh", "-c", innieSocketPermissionScript)
@@ -176,6 +270,7 @@ func NewBoxerWithDeps(appRoot string, deps BoxerDeps) (*Boxer, error) {
 		FileOps:          deps.FileOps,
 		SSHim:            deps.SSHim,
 		AgentRegistry:    deps.AgentRegistry,
+		HostPortManager:  hostport.NewManager(),
 	}, nil
 }
 
@@ -210,11 +305,15 @@ func NewBoxer(appRoot, localDomain string, terminalWriter io.Writer) (*Boxer, er
 		FileOps:          fileOps,
 		SSHim:            sshim,
 		AgentRegistry:    agentRegistry,
+		HostPortManager:  hostport.NewManager(),
 	}
 	return sb, nil
 }
 
 func (sb *Boxer) Close() error {
+	if sb.HostPortManager != nil {
+		sb.HostPortManager.StopAll()
+	}
 	if sb.sqlDB != nil {
 		return sb.sqlDB.Close()
 	}
@@ -307,6 +406,7 @@ type NewSandboxOpts struct {
 	Username       string
 	Uid            string
 	AllowedDomains []string
+	HostPorts      []int
 	Mounts         []string
 	CloneMounts    []string
 	SharedCaches   sandtypes.SharedCacheConfig
@@ -412,6 +512,7 @@ func (sb *Boxer) NewSandbox(ctx context.Context, opts NewSandboxOpts) (*sandtype
 		DNSDomain:         opts.LocalDomain,
 		EnvFile:           envFile,
 		AllowedDomains:    opts.AllowedDomains,
+		HostPorts:         append([]int(nil), opts.HostPorts...),
 		MountRequests:     mountRequests,
 		SharedCacheMounts: sharedCacheMounts,
 		Mounts:            append(mounts, sshKeysMountSpec),
@@ -554,6 +655,10 @@ func (sb *Boxer) SoftDelete(ctx context.Context, sbox *sandtypes.Box) error {
 	ctx = sandboxlog.WithSandboxID(ctx, sbox.ID)
 	slog.InfoContext(ctx, "Boxer.SoftDelete", "id", sbox.ID, "name", sbox.Name)
 
+	if sb.HostPortManager != nil {
+		sb.HostPortManager.StopForSandbox(sbox.ID)
+	}
+
 	out, err := sb.ContainerService.Stop(ctx, nil, sbox.ContainerID)
 	if err != nil {
 		slog.ErrorContext(ctx, "Boxer Containers.Stop", "error", err, "out", out)
@@ -671,6 +776,7 @@ func (sb *Boxer) sandboxFromDB(s *db.Sandbox) *sandtypes.Box {
 		DNSDomain:      fromNullString(s.DnsDomain),
 		EnvFile:        fromNullString(s.EnvFile),
 		AllowedDomains: domainsFromNullString(s.AllowedDomains),
+		HostPorts:      hostPortsFromNullString(s.HostPorts),
 		MountRequests:  mountRequests,
 		OriginalGitDetails: &sandtypes.GitDetails{
 			RemoteOrigin: fromNullString(s.OriginalGitOrigin),
@@ -756,6 +862,37 @@ func domainsFromNullString(ns sql.NullString) []string {
 		}
 	}
 	return domains
+}
+
+func hostPortsToNullString(ports []int) sql.NullString {
+	if len(ports) == 0 {
+		return sql.NullString{}
+	}
+	parts := make([]string, 0, len(ports))
+	for _, p := range ports {
+		parts = append(parts, strconv.Itoa(p))
+	}
+	return sql.NullString{String: strings.Join(parts, ","), Valid: true}
+}
+
+func hostPortsFromNullString(ns sql.NullString) []int {
+	if !ns.Valid || ns.String == "" {
+		return nil
+	}
+	var out []int
+	for _, s := range strings.Split(ns.String, ",") {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
+		n, err := strconv.Atoi(s)
+		if err != nil {
+			slog.Warn("failed to parse host port", "value", s, "error", err)
+			continue
+		}
+		out = append(out, n)
+	}
+	return out
 }
 
 func (sb *Boxer) getContainer(ctx context.Context, containerID string) (interface{}, error) {
@@ -952,7 +1089,10 @@ func (sber *Boxer) StartNewContainer(ctx context.Context, sb *sandtypes.Box, pro
 		return err
 	}
 
-	return sber.executeHooks(ctx, sb, hooks, progress)
+	if err := sber.executeHooks(ctx, sb, hooks, progress); err != nil {
+		return err
+	}
+	return sber.setupHostPorts(ctx, sb)
 }
 
 // StartExistingContainer starts an existing (previously-started) container instance.
@@ -979,7 +1119,10 @@ func (sber *Boxer) StartExistingContainer(ctx context.Context, sb *sandtypes.Box
 		return err
 	}
 
-	return sber.executeHooks(ctx, sb, hooks, nil)
+	if err := sber.executeHooks(ctx, sb, hooks, nil); err != nil {
+		return err
+	}
+	return sber.setupHostPorts(ctx, sb)
 }
 
 func (sb *Boxer) startContainerProcess(ctx context.Context, sandboxID, containerID string) error {
@@ -1121,6 +1264,7 @@ func (sb *Boxer) SaveSandbox(ctx context.Context, sbox *sandtypes.Box) error {
 		AgentType:       toNullString(sbox.AgentType),
 		ProfileName:     toNullString(sbox.ProfileName),
 		AllowedDomains:  domainsToNullString(sbox.AllowedDomains),
+		HostPorts:       hostPortsToNullString(sbox.HostPorts),
 		MountSpecs:      mountRequestsToNullString(sbox.MountRequests),
 		Cpu:             toNullInt(sbox.CPUs),
 		MemoryMb:        toNullInt(sbox.MemoryMB),
@@ -1160,6 +1304,10 @@ func (sb *Boxer) StopContainer(ctx context.Context, sbox *sandtypes.Box) error {
 	ctx = sandboxlog.WithSandboxID(ctx, sbox.ID)
 	if sbox.ContainerID == "" {
 		return fmt.Errorf("sandbox %s has no container ID", sbox.ID)
+	}
+
+	if sb.HostPortManager != nil {
+		sb.HostPortManager.StopForSandbox(sbox.ID)
 	}
 
 	out, err := sb.ContainerService.Stop(ctx, nil, sbox.ContainerID)

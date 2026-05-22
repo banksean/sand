@@ -88,6 +88,7 @@ See [Git remotes between host and sandbox](doc/GIT_REMOTES.md) for the full work
 - [Sandbox profiles](doc/CONFIGURATION.md#profiles)
 - [Non-interactive oneshot runs](doc/ONESHOT.md)
 - [Network filtering](doc/NETWORK_FILTERING.md)
+- [Exposing host services to a sandbox](doc/HOST_SERVICES.md)
 - [Architecture and trade-offs](doc/ARCHITECTURE.md)
 - [Claude Code setup](doc/CLAUDE_CODE_HOWTO.md)
 - [Troubleshooting](doc/TROUBLESHOOTING.md)

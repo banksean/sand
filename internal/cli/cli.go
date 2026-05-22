@@ -54,6 +54,7 @@ type SandboxCreationFlags struct {
 	EnvFile            string   `short:"e" default:".env" placeholder:"<file-path>" help:"legacy env file path used when no default profile is configured"`
 	Rm                 bool     `help:"remove the sandbox after the command terminates"`
 	AllowedDomainsFile string   `placeholder:"<file-path>" help:"path to allowed-domains.txt file for DNS egress filtering (overrides the init image default)"`
+	HostPort           []int    `name:"host-port" placeholder:"<port>" help:"expose a host-loopback TCP port to the sandbox at 127.0.0.1:<port> (repeatable)"`
 	Mount              []string `sep:"none" placeholder:"<source=...,target=...[,readonly]>" help:"bind mount a host directory (can be specified multiple times)"`
 	CloneMount         []string `sep:"none" placeholder:"<source=...,target=...[,readonly]>" help:"copy-on-write clone a host directory and bind mount the clone (can be specified multiple times)"`
 	CPU                int      `help:"number of CPUs to allocate to the container" default:"2"`
