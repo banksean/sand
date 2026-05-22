@@ -1,27 +1,31 @@
 # Exposing host services to a sandbox
 
-The `--host-port` flag exposes a TCP service bound to your Mac's loopback
-(`127.0.0.1:<port>`) to a sandbox at the *same* address inside the container.
-An agent running in the sandbox can talk to the service using exactly the
-configuration it would use on the host — no MCP/client reconfiguration
-required.
+The `--host-port` flag on `sand new` (repeatable) makes a TCP service bound to
+your Mac's loopback (`127.0.0.1:<port>`) reachable from inside a sandbox at
+`http://host.sand:<port>/`.
 
 ## Example: Figma MCP
 
 The Figma desktop app exposes an MCP server at `http://127.0.0.1:3845/mcp` on
-your Mac. To make it reachable from inside a sandbox:
+your Mac. Expose it to a sandbox:
 
 ```sh
 sand new --host-port 3845 -a claude
 ```
 
-Inside the sandbox, point any MCP client at the usual URL:
+Inside the sandbox:
 
-```
-http://127.0.0.1:3845/mcp
+```sh
+curl -v http://host.sand:3845/mcp
 ```
 
-The flag is repeatable:
+Configure the agent's MCP client to use the same URL. For Claude Code:
+
+```sh
+claude mcp add --transport http figma http://host.sand:3845/mcp
+```
+
+Multiple ports:
 
 ```sh
 sand new --host-port 3845 --host-port 5173
@@ -30,30 +34,37 @@ sand new --host-port 3845 --host-port 5173
 ## How it works
 
 Apple's `container` CLI puts each sandbox on a vmnet bridge with its own IP.
-Inside the sandbox, `127.0.0.1` is the sandbox itself, not your Mac. The Mac
-is the bridge gateway (typically `192.168.64.1`).
+From inside the sandbox, `127.0.0.1` is the sandbox itself, not your Mac;
+your Mac is the bridge gateway (typically `192.168.64.1`).
 
-For each requested port `--host-port` does two things:
+For each requested port `--host-port` does the following:
 
-1. The `sand` daemon spawns a TCP forwarder bound to the sandbox's bridge
-   gateway IP on the host. The listener forwards to `127.0.0.1:<port>` on the
-   host. The listener is scoped to the bridge interface — it is **not** bound
-   to `0.0.0.0`, so other machines on your LAN cannot reach it.
-2. The daemon installs an `iptables` DNAT rule inside the sandbox that
-   rewrites `127.0.0.1:<port>` to `<gateway>:<port>` and a matching
-   `MASQUERADE` rule for the return path. `net.ipv4.conf.{all,lo}.route_localnet`
-   is set to `1` so the kernel will route the redirected packet out of the
-   loopback interface.
+1. The `sand` daemon starts a TCP forwarder listening on the sandbox's
+   bridge gateway IP. The listener is scoped to the bridge interface only
+   (not `0.0.0.0`), so other machines on your LAN cannot reach it. The
+   forwarder targets `127.0.0.1:<port>` on the Mac.
+2. The forwarder is HTTP-aware: when a client speaks HTTP/1.x it rewrites
+   the `Host:` header to `127.0.0.1:<port>` on the way to the upstream.
+   That keeps servers that validate `Host` (Figma's MCP among them) happy
+   without any client-side workarounds. Non-HTTP traffic is forwarded as
+   plain TCP.
+3. An `/etc/hosts` entry is added inside the sandbox mapping `host.sand`
+   to the gateway IP, so `http://host.sand:<port>/` Just Works.
+4. Optionally, a best-effort `iptables` DNAT is installed inside the
+   sandbox so `127.0.0.1:<port>` is transparently redirected to
+   `host.sand:<port>`. Apple's container runtime currently does not grant
+   `CAP_NET_ADMIN`, so this step usually fails silently; the host.sand
+   path remains the supported entry point.
 
-Both the forwarder and the iptables rule are torn down when the sandbox
-stops or is removed.
+Forwarders, the `/etc/hosts` entry, and any iptables rules are torn down
+when the sandbox stops or is removed.
 
-## Security notes
+## Security
 
 `--host-port` is opt-in per port, per sandbox. It does, by design, punch a
-hole in the sandbox's network isolation — comparable to `--ssh-agent`
-forwarding. Only forward ports you would already trust the sandbox to reach
-on your own machine.
+hole in the sandbox's network isolation — comparable in trust to
+`--ssh-agent` forwarding. Only forward ports you would already trust the
+sandbox to reach on your machine.
 
 ## Interaction with `--allowed-domains-file`
 

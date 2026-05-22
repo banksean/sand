@@ -168,21 +168,22 @@ func (sber *Boxer) setupHostPorts(ctx context.Context, sb *sandtypes.Box) error 
 	}
 
 	// Best-effort iptables DNAT so 127.0.0.1:<port> resolves transparently.
-	// Many Apple container setups lack CAP_NET_ADMIN; in that case we just
-	// log and continue. The host.sand hostname still works.
+	// Apple's container runtime typically does not grant CAP_NET_ADMIN to
+	// containers, in which case this fails and we silently use the
+	// host.sand hostname path instead. The forwarder also HTTP-rewrites the
+	// Host header, so most clients work via host.sand:<port> without any
+	// further configuration.
 	script := buildHostPortIptablesScript(gateway, sb.HostPorts)
 	out, execErr := sber.ContainerService.Exec(ctx,
 		&options.ExecContainer{},
 		sb.ContainerID, "doas", os.Environ(), "sh", "-c", script)
 	if execErr != nil {
-		slog.WarnContext(ctx, "setupHostPorts: iptables DNAT unavailable; falling back to host.sand",
+		slog.InfoContext(ctx, "setupHostPorts: in-sandbox iptables unavailable; using host.sand fallback",
 			"sandbox", sb.ID, "error", execErr, "output", strings.TrimSpace(out))
-		fmt.Printf("[sand] note: in-sandbox iptables redirect not available; "+
-			"reach host services as http://host.sand:<port>/ (e.g. http://host.sand:%d/)\n",
-			sb.HostPorts[0])
 	} else {
 		slog.InfoContext(ctx, "setupHostPorts: iptables installed", "sandbox", sb.ID, "gateway", gateway, "ports", sb.HostPorts)
 	}
+	fmt.Printf("[sand] host services exposed at http://host.sand:<port>/ (ports: %v)\n", sb.HostPorts)
 	return nil
 }
 

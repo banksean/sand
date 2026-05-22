@@ -13,19 +13,29 @@
 package hostport
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"log/slog"
 	"net"
+	"net/http"
 	"strconv"
 	"sync"
 )
 
 // Forwarder is a single TCP listener that accepts connections on ListenAddr
 // and proxies each one to TargetAddr.
+//
+// If RewriteHTTPHost is non-empty and the client speaks HTTP/1.x, the Host
+// header on each request is rewritten to RewriteHTTPHost before being
+// forwarded upstream. This lets a sandbox client say it's talking to
+// host.sand:3845 while the upstream service (which only accepts
+// 127.0.0.1:3845) sees the Host header it expects.
 type Forwarder struct {
-	ListenAddr string
-	TargetAddr string
+	ListenAddr      string
+	TargetAddr      string
+	RewriteHTTPHost string
 
 	listener net.Listener
 	wg       sync.WaitGroup
@@ -77,11 +87,27 @@ func (f *Forwarder) handle(client net.Conn) {
 	}
 	defer upstream.Close()
 
+	// Peek the first few bytes from the client. If they look like an HTTP
+	// request line and Host rewriting is enabled, run an HTTP-aware loop.
+	// Otherwise fall through to a plain bidirectional pipe.
+	br := bufio.NewReader(client)
+	httpMode := false
+	if f.RewriteHTTPHost != "" {
+		peek, _ := br.Peek(8)
+		httpMode = looksLikeHTTPRequest(peek)
+	}
+
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		_, _ = io.Copy(upstream, client)
+		if httpMode {
+			if err := proxyHTTPRequests(br, upstream, f.RewriteHTTPHost); err != nil && err != io.EOF {
+				slog.Debug("hostport: http proxy ended", "target", f.TargetAddr, "error", err)
+			}
+		} else {
+			_, _ = io.Copy(upstream, br)
+		}
 		if tc, ok := upstream.(*net.TCPConn); ok {
 			_ = tc.CloseWrite()
 		}
@@ -94,6 +120,67 @@ func (f *Forwarder) handle(client net.Conn) {
 		}
 	}()
 	wg.Wait()
+}
+
+var httpMethods = [][]byte{
+	[]byte("GET "), []byte("HEAD "), []byte("POST "), []byte("PUT "),
+	[]byte("DELETE "), []byte("OPTIONS "), []byte("PATCH "), []byte("CONNECT "),
+	[]byte("TRACE "),
+}
+
+func looksLikeHTTPRequest(b []byte) bool {
+	for _, m := range httpMethods {
+		if bytes.HasPrefix(b, m) {
+			return true
+		}
+	}
+	return false
+}
+
+// proxyHTTPRequests reads HTTP/1.x requests from br, rewrites the Host header
+// to host, and writes them to w. It runs until the connection closes or an
+// unrecoverable error occurs. WebSocket and other Upgrade requests are
+// forwarded with Host rewritten and the remaining stream is copied raw.
+func proxyHTTPRequests(br *bufio.Reader, w io.Writer, host string) error {
+	for {
+		req, err := http.ReadRequest(br)
+		if err != nil {
+			return err
+		}
+		req.Host = host
+		// http.Request.Write uses req.Host for the Host header and
+		// req.URL.RequestURI() for the request line. RequestURI is
+		// preserved unchanged.
+		if err := req.Write(w); err != nil {
+			return err
+		}
+		if isUpgrade(req) {
+			// Drain remaining client bytes raw — the protocol has switched.
+			_, err := io.Copy(w, br)
+			return err
+		}
+	}
+}
+
+func isUpgrade(r *http.Request) bool {
+	if r == nil {
+		return false
+	}
+	for _, v := range r.Header.Values("Connection") {
+		if containsToken(v, "upgrade") {
+			return true
+		}
+	}
+	return false
+}
+
+func containsToken(headerValue, token string) bool {
+	for _, part := range bytes.Split([]byte(headerValue), []byte{','}) {
+		if string(bytes.ToLower(bytes.TrimSpace(part))) == token {
+			return true
+		}
+	}
+	return false
 }
 
 // Close stops accepting new connections and waits for in-flight connections
@@ -126,6 +213,10 @@ func NewManager() *Manager {
 // StartForSandbox starts one forwarder per port. ListenIP is the bridge-facing
 // host IP (gateway IP of the sandbox's network); ports are the host-loopback
 // ports to expose. Already-running forwarders for sandboxID are stopped first.
+//
+// Each forwarder rewrites the HTTP Host header on incoming requests to
+// 127.0.0.1:<port>, so clients pointed at host.sand:<port> (or another
+// gateway-resolved name) reach upstreams that expect a loopback Host header.
 func (m *Manager) StartForSandbox(sandboxID, listenIP string, ports []int) error {
 	return m.startForSandbox(sandboxID, listenIP, "127.0.0.1", ports)
 }
@@ -137,9 +228,11 @@ func (m *Manager) startForSandbox(sandboxID, listenIP, targetIP string, ports []
 	}
 	var started []*Forwarder
 	for _, p := range ports {
+		targetAddr := net.JoinHostPort(targetIP, strconv.Itoa(p))
 		f := &Forwarder{
-			ListenAddr: net.JoinHostPort(listenIP, strconv.Itoa(p)),
-			TargetAddr: net.JoinHostPort(targetIP, strconv.Itoa(p)),
+			ListenAddr:      net.JoinHostPort(listenIP, strconv.Itoa(p)),
+			TargetAddr:      targetAddr,
+			RewriteHTTPHost: targetAddr,
 		}
 		if err := f.Start(); err != nil {
 			for _, x := range started {

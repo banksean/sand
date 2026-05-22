@@ -140,3 +140,86 @@ func TestManagerRejectsBadIP(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestForwarderRewritesHTTPHost(t *testing.T) {
+	// Upstream HTTP server that echoes back the Host header it saw.
+	up, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen upstream: %v", err)
+	}
+	defer up.Close()
+	go func() {
+		for {
+			c, err := up.Accept()
+			if err != nil {
+				return
+			}
+			go func(c net.Conn) {
+				defer c.Close()
+				buf := make([]byte, 4096)
+				n, _ := c.Read(buf)
+				got := string(buf[:n])
+				host := ""
+				for _, line := range strings.Split(got, "\r\n") {
+					if strings.HasPrefix(strings.ToLower(line), "host:") {
+						host = strings.TrimSpace(line[5:])
+					}
+				}
+				body := "host=" + host
+				resp := "HTTP/1.1 200 OK\r\nContent-Length: " + strconv.Itoa(len(body)) +
+					"\r\nConnection: close\r\n\r\n" + body
+				_, _ = c.Write([]byte(resp))
+			}(c)
+		}
+	}()
+
+	upAddr := up.Addr().String()
+	f := &Forwarder{
+		ListenAddr:      "127.0.0.1:0",
+		TargetAddr:      upAddr,
+		RewriteHTTPHost: upAddr,
+	}
+	// Bind a real port.
+	probe, _ := net.Listen("tcp", "127.0.0.1:0")
+	fwdAddr := probe.Addr().String()
+	_ = probe.Close()
+	f.ListenAddr = fwdAddr
+	if err := f.Start(); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	defer f.Close()
+
+	c, err := net.DialTimeout("tcp", fwdAddr, 2*time.Second)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer c.Close()
+	// Send a request with Host: host.sand.
+	req := "GET /mcp HTTP/1.1\r\nHost: host.sand:3845\r\nUser-Agent: t\r\n\r\n"
+	if _, err := c.Write([]byte(req)); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	_ = c.SetReadDeadline(time.Now().Add(2 * time.Second))
+	resp, err := io.ReadAll(c)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	want := "host=" + upAddr
+	if !strings.Contains(string(resp), want) {
+		t.Fatalf("upstream saw wrong host. response:\n%s\nwant body containing %q", resp, want)
+	}
+}
+
+func TestLooksLikeHTTPRequest(t *testing.T) {
+	cases := map[string]bool{
+		"GET / HTTP":  true,
+		"POST /x":     true,
+		"HELLO":       false,
+		"\x00\x01\x02": false,
+	}
+	for in, want := range cases {
+		if got := looksLikeHTTPRequest([]byte(in)); got != want {
+			t.Errorf("looksLikeHTTPRequest(%q) = %v, want %v", in, got, want)
+		}
+	}
+}
