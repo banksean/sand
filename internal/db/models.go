@@ -34,4 +34,5 @@ type Sandbox struct {
 	TrashWorkDir       sql.NullString `json:"trash_work_dir"`
 	ProfileName        sql.NullString `json:"profile_name"`
 	MountSpecs         sql.NullString `json:"mount_specs"`
+	HostPorts          sql.NullString `json:"host_ports"`
 }

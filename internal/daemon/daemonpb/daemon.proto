@@ -134,6 +134,7 @@ message CreateSandboxRequest {
   int32 memory = 13;
   string profile_name = 14;
   repeated string clone_mounts = 15;
+  repeated int32 host_ports = 16;
 }
 
 message CreateSandboxResponse {
