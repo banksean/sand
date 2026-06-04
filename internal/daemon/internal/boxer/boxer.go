@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -865,6 +866,12 @@ func (sber *Boxer) CreateContainer(ctx context.Context, sb *sandtypes.Box, enabl
 		mgmtOpts.Entrypoint = "/bin/sh"
 	}
 
+	if platform, err := sber.selectImagePlatform(ctx, sb.ImageName); err != nil {
+		slog.WarnContext(ctx, "selectImagePlatform", "image", sb.ImageName, "error", err)
+	} else if platform != "" {
+		mgmtOpts.Platform = platform
+	}
+
 	containerID, err := sber.ContainerService.Create(ctx,
 		&options.CreateContainer{
 			ProcessOptions: options.ProcessOptions{
@@ -909,6 +916,39 @@ func (sber *Boxer) RecreateContainer(ctx context.Context, sb *sandtypes.Box, ena
 		return err
 	}
 	return nil
+}
+
+// selectImagePlatform inspects imageName and returns a non-empty "<os>/<arch>"
+// string to pass to `container --platform` when the image lacks a variant
+// matching the host's default (linux + runtime.GOARCH). Returns "" when the
+// default arm64/amd64 selection will work.
+//
+// The Apple `container` CLI defaults to --arch arm64; pulling/creating a
+// container from an image that only ships e.g. linux/amd64 variants fails with
+// `Error: platform linux/arm64` unless --platform is supplied explicitly.
+func (sber *Boxer) selectImagePlatform(ctx context.Context, imageName string) (string, error) {
+	if imageName == "" {
+		return "", nil
+	}
+	imgs, err := sber.ImageService.Inspect(ctx, imageName)
+	if err != nil {
+		return "", err
+	}
+	if len(imgs) == 0 || len(imgs[0].Variants) == 0 {
+		return "", nil
+	}
+	hostArch := runtime.GOARCH // "arm64" or "amd64"
+	for _, v := range imgs[0].Variants {
+		if v.Platform.OS == "linux" && v.Platform.Architecture == hostArch {
+			return "", nil // default selection works
+		}
+	}
+	// No variant matches host arch; pick the first available variant and pin it.
+	v := imgs[0].Variants[0]
+	if v.Platform.OS == "" || v.Platform.Architecture == "" {
+		return "", nil
+	}
+	return v.Platform.OS + "/" + v.Platform.Architecture, nil
 }
 
 func (sber *Boxer) checkImageHasEntrypoint(ctx context.Context, imageName string) error {
