@@ -18,7 +18,9 @@ func TestCacheFlagsSharedCacheConfig(t *testing.T) {
 		name  string
 		flags CacheFlags
 		want  struct {
-			mise bool
+			mise   bool
+			apk    bool
+			agents bool
 		}
 	}{
 		{
@@ -27,8 +29,23 @@ func TestCacheFlagsSharedCacheConfig(t *testing.T) {
 				Mise: boolPtr(true),
 			},
 			want: struct {
-				mise bool
+				mise   bool
+				apk    bool
+				agents bool
 			}{mise: true},
+		},
+		{
+			name: "all caches can be enabled directly",
+			flags: CacheFlags{
+				Mise:   boolPtr(true),
+				APK:    boolPtr(true),
+				Agents: boolPtr(true),
+			},
+			want: struct {
+				mise   bool
+				apk    bool
+				agents bool
+			}{mise: true, apk: true, agents: true},
 		},
 	}
 
@@ -37,6 +54,12 @@ func TestCacheFlagsSharedCacheConfig(t *testing.T) {
 			got := tt.flags.SharedCacheConfig()
 			if got.Mise != tt.want.mise {
 				t.Fatalf("got mise=%v, want mise=%v", got.Mise, tt.want.mise)
+			}
+			if got.APK != tt.want.apk {
+				t.Fatalf("got apk=%v, want apk=%v", got.APK, tt.want.apk)
+			}
+			if got.Agents != tt.want.agents {
+				t.Fatalf("got agents=%v, want agents=%v", got.Agents, tt.want.agents)
 			}
 		})
 	}

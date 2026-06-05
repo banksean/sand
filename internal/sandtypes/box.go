@@ -76,13 +76,15 @@ type Box struct {
 }
 
 type SharedCacheConfig struct {
-	Mise bool `json:"mise,omitempty"`
-	APK  bool `json:"apk,omitempty"`
+	Mise   bool `json:"mise,omitempty"`
+	APK    bool `json:"apk,omitempty"`
+	Agents bool `json:"agents,omitempty"`
 }
 
 type SharedCacheMounts struct {
-	MiseCacheHostDir string
-	APKCacheHostDir  string
+	MiseCacheHostDir  string
+	APKCacheHostDir   string
+	AgentCacheHostDir string
 }
 
 type GitDetails struct {

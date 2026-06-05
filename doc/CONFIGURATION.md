@@ -80,11 +80,14 @@ For shared runtime caches across sandboxes, including the Go module cache and Go
 caches:
   mise: true
   apk: true
+  agents: true
 ```
 
 `mise: true` makes new sandboxes mount a sand-managed host cache directory for mise and for Go's `GOMODCACHE` and `GOCACHE`, so repeated `mise install`, `go mod download`, `go test`, and `go build` work can be reused across containers.
 
 `apk: true` allows `apk add ...` commands to re-use `apk` packages that have already been downloaded by other sandbox instances. 
+
+`agents: true` makes new sandboxes mount a sand-managed host cache directory for pinned agent installer artifacts, so repeated `sand new -a <agent>` invocations can install from the host cache instead of downloading the same agent package again.
 
 ## Network filtering config
 

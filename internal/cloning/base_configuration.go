@@ -22,6 +22,7 @@ const (
 	goModCachePath   = miseCachePath + "/go/mod"
 	goBuildCachePath = miseCachePath + "/go/build"
 	apkCachePath     = "/var/cache/apk"
+	agentCachePath   = "/opt/sand-agent-cache"
 )
 
 type containerBootstrapFlavor struct {
@@ -174,6 +175,12 @@ func (c *BaseContainerConfiguration) GetMounts(artifacts CloneArtifacts) []sandt
 		mounts = append(mounts, sandtypes.MountSpec{
 			Source: artifacts.SharedCacheMounts.APKCacheHostDir,
 			Target: apkCachePath,
+		})
+	}
+	if artifacts.SharedCacheMounts.AgentCacheHostDir != "" {
+		mounts = append(mounts, sandtypes.MountSpec{
+			Source: artifacts.SharedCacheMounts.AgentCacheHostDir,
+			Target: agentCachePath,
 		})
 	}
 	return mounts

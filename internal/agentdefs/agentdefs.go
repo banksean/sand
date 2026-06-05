@@ -4,6 +4,9 @@ import "sort"
 
 const (
 	HookOpenCodeTunnel = "opencode-ssh-tunnel"
+
+	InstallerNPM      = "npm"
+	InstallerOpenCode = "opencode"
 )
 
 // Definition is the shared declaration for a built-in agent.
@@ -14,7 +17,7 @@ type Definition struct {
 	InteractiveCommand string
 	OneShotCommand     string
 	GeneratedFiles     []GeneratedFile
-	FirstStartScript   string
+	Install            *InstallSpec
 	StartHooks         []string
 }
 
@@ -24,6 +27,13 @@ type GeneratedFile struct {
 	Path    string
 	Content string
 	Mode    uint32
+}
+
+type InstallSpec struct {
+	Kind    string
+	Package string
+	Version string
+	Command string
 }
 
 var definitions = []Definition{
@@ -45,16 +55,12 @@ var definitions = []Definition{
 			Content: `{"hasCompletedOnboarding":true,"projects":{"/app":{}}}`,
 			Mode:    0o700,
 		}},
-		FirstStartScript: `set -eu
-if ! command -v claude >/dev/null 2>&1; then
-	if command -v apk >/dev/null 2>&1; then
-		apk add --no-cache nodejs npm
-	elif command -v apt-get >/dev/null 2>&1; then
-		apt-get update
-		apt-get install -y --no-install-recommends nodejs npm
-	fi
-	npm install -g @anthropic-ai/claude-code@latest
-fi`,
+		Install: &InstallSpec{
+			Kind:    InstallerNPM,
+			Package: "@anthropic-ai/claude-code",
+			Version: "2.1.165",
+			Command: "claude",
+		},
 	},
 	{
 		Name:       "codex",
@@ -63,16 +69,12 @@ fi`,
 			{"OPENAI_API_KEY"},
 		},
 		InteractiveCommand: "codex --dangerously-bypass-approvals-and-sandbox",
-		FirstStartScript: `set -eu
-if ! command -v codex >/dev/null 2>&1; then
-	if command -v apk >/dev/null 2>&1; then
-		apk add --no-cache nodejs npm
-	elif command -v apt-get >/dev/null 2>&1; then
-		apt-get update
-		apt-get install -y --no-install-recommends nodejs npm
-	fi
-	npm install -g @openai/codex
-fi`,
+		Install: &InstallSpec{
+			Kind:    InstallerNPM,
+			Package: "@openai/codex",
+			Version: "0.137.0",
+			Command: "codex",
+		},
 	},
 	{
 		Name:       "gemini",
@@ -83,16 +85,12 @@ fi`,
 		},
 		InteractiveCommand: "gemini --approval-mode=yolo",
 		OneShotCommand:     `gemini --approval-mode=yolo -p "$SAND_ONESHOT_PROMPT"`,
-		FirstStartScript: `set -eu
-if ! command -v gemini >/dev/null 2>&1; then
-	if command -v apk >/dev/null 2>&1; then
-		apk add --no-cache nodejs npm
-	elif command -v apt-get >/dev/null 2>&1; then
-		apt-get update
-		apt-get install -y --no-install-recommends nodejs npm
-	fi
-	npm install -g @google/gemini-cli@latest
-fi`,
+		Install: &InstallSpec{
+			Kind:    InstallerNPM,
+			Package: "@google/gemini-cli",
+			Version: "0.45.2",
+			Command: "gemini",
+		},
 	},
 	{
 		Name:       "opencode",
@@ -115,20 +113,11 @@ fi`,
 }`,
 			Mode: 0o700,
 		}},
-		FirstStartScript: `set -eu
-if ! command -v opencode >/dev/null 2>&1; then
-	if command -v apk >/dev/null 2>&1; then
-		apk add --no-cache curl bash git libc6-compat libstdc++
-	elif command -v apt-get >/dev/null 2>&1; then
-		apt-get update
-		apt-get install -y --no-install-recommends curl bash git libc6 libstdc++6
-	fi
-	OPENCODE_VERSION=1.14.48
-	curl -fsSL https://opencode.ai/install | bash -s -- --version "$OPENCODE_VERSION"
-	if [ -x /root/.opencode/bin/opencode ] && [ ! -x /usr/local/bin/opencode ]; then
-		cp /root/.opencode/bin/opencode /usr/local/bin/opencode
-	fi
-fi`,
+		Install: &InstallSpec{
+			Kind:    InstallerOpenCode,
+			Version: "1.14.48",
+			Command: "opencode",
+		},
 		StartHooks: []string{HookOpenCodeTunnel},
 	},
 }
@@ -171,6 +160,10 @@ func cloneDefinitions(src []Definition) []Definition {
 func cloneDefinition(src Definition) Definition {
 	src.AuthEnvAnyOf = cloneEnvGroups(src.AuthEnvAnyOf)
 	src.GeneratedFiles = append([]GeneratedFile(nil), src.GeneratedFiles...)
+	if src.Install != nil {
+		install := *src.Install
+		src.Install = &install
+	}
 	src.StartHooks = append([]string(nil), src.StartHooks...)
 	return src
 }

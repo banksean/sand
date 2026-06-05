@@ -23,7 +23,7 @@ func TestEnsureSharedCacheMounts_GoCachesUseMiseMount(t *testing.T) {
 		},
 	}
 
-	mounts, err := b.ensureSharedCacheMounts(sandtypes.SharedCacheConfig{Mise: true})
+	mounts, err := b.ensureSharedCacheMounts(sandtypes.SharedCacheConfig{Mise: true, Agents: true})
 	if err != nil {
 		t.Fatalf("ensureSharedCacheMounts: %v", err)
 	}
@@ -31,9 +31,13 @@ func TestEnsureSharedCacheMounts_GoCachesUseMiseMount(t *testing.T) {
 	if mounts.MiseCacheHostDir != "/tmp/sand-app/caches/mise" {
 		t.Fatalf("unexpected mise cache dir: %q", mounts.MiseCacheHostDir)
 	}
+	if mounts.AgentCacheHostDir != "/tmp/sand-app/caches/agents" {
+		t.Fatalf("unexpected agent cache dir: %q", mounts.AgentCacheHostDir)
+	}
 
 	sort.Strings(mkdirs)
 	want := []string{
+		"/tmp/sand-app/caches/agents",
 		"/tmp/sand-app/caches/mise",
 	}
 	if len(mkdirs) != len(want) {

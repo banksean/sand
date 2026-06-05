@@ -99,8 +99,9 @@ func createSandboxOptsToProto(opts CreateSandboxOpts) *daemonpb.CreateSandboxReq
 		Mounts:         append([]string(nil), opts.Mounts...),
 		CloneMounts:    append([]string(nil), opts.CloneMounts...),
 		SharedCaches: &daemonpb.SharedCacheConfig{
-			Mise: opts.SharedCaches.Mise,
-			Apk:  opts.SharedCaches.APK,
+			Mise:   opts.SharedCaches.Mise,
+			Apk:    opts.SharedCaches.APK,
+			Agents: opts.SharedCaches.Agents,
 		},
 		Cpus:   int32(opts.CPUs),
 		Memory: int32(opts.Memory),
@@ -126,8 +127,9 @@ func createSandboxOptsFromProto(req *daemonpb.CreateSandboxRequest) CreateSandbo
 	}
 	if sharedCaches := req.GetSharedCaches(); sharedCaches != nil {
 		opts.SharedCaches = sandtypes.SharedCacheConfig{
-			Mise: sharedCaches.GetMise(),
-			APK:  sharedCaches.GetApk(),
+			Mise:   sharedCaches.GetMise(),
+			APK:    sharedCaches.GetApk(),
+			Agents: sharedCaches.GetAgents(),
 		}
 	}
 	return opts

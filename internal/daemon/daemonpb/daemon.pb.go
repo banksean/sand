@@ -1029,6 +1029,7 @@ type SharedCacheConfig struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Mise          bool                   `protobuf:"varint,1,opt,name=mise,proto3" json:"mise,omitempty"`
 	Apk           bool                   `protobuf:"varint,2,opt,name=apk,proto3" json:"apk,omitempty"`
+	Agents        bool                   `protobuf:"varint,3,opt,name=agents,proto3" json:"agents,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1073,6 +1074,13 @@ func (x *SharedCacheConfig) GetMise() bool {
 func (x *SharedCacheConfig) GetApk() bool {
 	if x != nil {
 		return x.Apk
+	}
+	return false
+}
+
+func (x *SharedCacheConfig) GetAgents() bool {
+	if x != nil {
+		return x.Agents
 	}
 	return false
 }
@@ -1541,10 +1549,11 @@ const file_internal_daemon_daemonpb_daemon_proto_rawDesc = "" +
 	"\x03ids\x18\x01 \x03(\tR\x03ids\".\n" +
 	"\rStatsResponse\x12\x1d\n" +
 	"\n" +
-	"stats_json\x18\x01 \x01(\fR\tstatsJson\"9\n" +
+	"stats_json\x18\x01 \x01(\fR\tstatsJson\"Q\n" +
 	"\x11SharedCacheConfig\x12\x12\n" +
 	"\x04mise\x18\x01 \x01(\bR\x04mise\x12\x10\n" +
-	"\x03apk\x18\x02 \x01(\bR\x03apk\"\xe2\x03\n" +
+	"\x03apk\x18\x02 \x01(\bR\x03apk\x12\x16\n" +
+	"\x06agents\x18\x03 \x01(\bR\x06agents\"\xe2\x03\n" +
 	"\x14CreateSandboxRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12$\n" +
 	"\x0eclone_from_dir\x18\x02 \x01(\tR\fcloneFromDir\x12\x1d\n" +

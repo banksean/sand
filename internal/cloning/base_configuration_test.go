@@ -141,6 +141,33 @@ func TestBaseContainerConfigurationSkipsOriginMountWithoutGitMirror(t *testing.T
 	}
 }
 
+func TestBaseContainerConfigurationMountsAgentCache(t *testing.T) {
+	cfg := NewBaseContainerConfiguration()
+	mounts := cfg.GetMounts(CloneArtifacts{
+		SandboxWorkDir: "/host/sandboxes/one",
+		PathRegistry:   NewStandardPathRegistry("/host/sandboxes/one"),
+		SharedCacheMounts: sandtypes.SharedCacheMounts{
+			AgentCacheHostDir: "/host/caches/agents",
+		},
+	})
+
+	var found bool
+	for _, mount := range mounts {
+		if mount.Target == agentCachePath {
+			found = true
+			if mount.Source != "/host/caches/agents" {
+				t.Fatalf("agent cache source = %q", mount.Source)
+			}
+			if mount.ReadOnly {
+				t.Fatal("agent cache mount is read-only")
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("missing %s mount in %#v", agentCachePath, mounts)
+	}
+}
+
 func TestDefaultContainerHook_UsesUbuntuFlavorWhenAPKUnavailable(t *testing.T) {
 	cfg := NewBaseContainerConfiguration()
 	exec := &fakeHookStreamer{

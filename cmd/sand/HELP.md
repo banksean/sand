@@ -15,6 +15,7 @@ Requires apple container CLI: https://github.com/apple/container/releases/tag/0.
 - `--dry-run` - just print out the operations instead of executing them (default: `false`)
 - `--caches-mise` - enable mise cache (default: `true`)
 - `--caches-apk` - enable apk cache (default: `true`)
+- `--caches-agents` - enable agent installer cache (default: `true`)
 
 ## Subcommands
 

@@ -825,6 +825,13 @@ func (sb *Boxer) ensureSharedCacheMounts(cfg sandtypes.SharedCacheConfig) (sandt
 		}
 	}
 
+	if cfg.Agents {
+		mounts.AgentCacheHostDir = filepath.Join(sb.appRoot, "caches", "agents")
+		if err := sb.FileOps.MkdirAll(mounts.AgentCacheHostDir, 0o755); err != nil {
+			return sandtypes.SharedCacheMounts{}, fmt.Errorf("create shared agent cache dir: %w", err)
+		}
+	}
+
 	return mounts, nil
 }
 

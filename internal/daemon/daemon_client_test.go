@@ -250,7 +250,7 @@ func TestCreateSandboxOptsProtoRoundTrip(t *testing.T) {
 		AllowedDomains: []string{"example.com", "api.example.com"},
 		Mounts:         []string{"source=/host,target=/container,readonly"},
 		CloneMounts:    []string{"source=/src/data,target=/data,readonly"},
-		SharedCaches:   sandtypes.SharedCacheConfig{Mise: true, APK: true},
+		SharedCaches:   sandtypes.SharedCacheConfig{Mise: true, APK: true, Agents: true},
 		CPUs:           4,
 		Memory:         8192,
 	}

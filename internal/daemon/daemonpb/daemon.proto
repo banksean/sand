@@ -116,6 +116,7 @@ message StatsResponse {
 message SharedCacheConfig {
   bool mise = 1;
   bool apk = 2;
+  bool agents = 3;
 }
 
 message CreateSandboxRequest {
