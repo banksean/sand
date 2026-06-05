@@ -45,7 +45,7 @@ sand new [flags] [SANDBOX-NAME]
 **Flags:**
 
 - `--ssh-agent` - enable ssh-agent forwarding for the container
-- `-i, --image` _`<container-image-name>`_ - name of container image to use
+- `-i, --image` _`<container-image-name>`_ - name of base container image to use
 - `-d, --clone-from-dir` _`<project-dir>`_ - directory to clone into the sandbox. Defaults to current working directory, if unset.
 - `--profile` _`<profile-name>`_ - profile policy from .sand.yaml to associate with the sandbox (default: `default`)
 - `-e, --env-file` _`<file-path>`_ - legacy env file path used when no default profile is configured (default: `.env`)
@@ -77,7 +77,7 @@ sand oneshot [flags] <PROMPT>
 **Flags:**
 
 - `--ssh-agent` - enable ssh-agent forwarding for the container
-- `-i, --image` _`<container-image-name>`_ - name of container image to use
+- `-i, --image` _`<container-image-name>`_ - name of base container image to use
 - `-d, --clone-from-dir` _`<project-dir>`_ - directory to clone into the sandbox. Defaults to current working directory, if unset.
 - `--profile` _`<profile-name>`_ - profile policy from .sand.yaml to associate with the sandbox (default: `default`)
 - `-e, --env-file` _`<file-path>`_ - legacy env file path used when no default profile is configured (default: `.env`)
@@ -124,7 +124,7 @@ sand exec [flags] <SANDBOX-NAME> <ARG>...
 **Flags:**
 
 - `--ssh-agent` - enable ssh-agent forwarding for the container
-- `-i, --image` _`<container-image-name>`_ - name of container image to use
+- `-i, --image` _`<container-image-name>`_ - name of base container image to use
 - `-d, --clone-from-dir` _`<project-dir>`_ - directory to clone into the sandbox. Defaults to current working directory, if unset.
 - `--profile` _`<profile-name>`_ - profile policy from .sand.yaml to associate with the sandbox (default: `default`)
 - `-e, --env-file` _`<file-path>`_ - legacy env file path used when no default profile is configured (default: `.env`)

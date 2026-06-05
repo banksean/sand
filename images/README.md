@@ -1,35 +1,26 @@
-# Sandbox Container Images
+# Sandbox Container Image
 
-[`base`](./base) contains the shared Alpine foundation used by the default and agent-specific images.
-- common apk packages (zsh, git, ssh, iptables, etc.)
+[`base`](./base) contains the shared Alpine foundation used by all new sandboxes.
+- common apk packages (zsh, git, ssh, iptables, make, gh, etc.)
 - zsh + oh-my-posh shell setup
 - GitHub SSH known_hosts configuration
 - sshd_config
-- [mise](https://mise.jdx.dev/) auto-detection and initialization script (enables cross-container tool, dependency and build caching) 
-- a [cross-compiled `sand` linux cli](../cmd/sand/main_linux.go) binary for use from inside the container
+- [mise](https://mise.jdx.dev/) auto-detection and initialization script (enables cross-container tool, dependency and build caching)
+- a cross-compiled `sand` linux cli binary for use from inside the container
 
-Images that extend `base` (you can use these with `sand new --image`):
-- **[claude](./claude/)** — Claude Code
-- **[codex](./codex/)** — OpenAI Codex
-- **[default](./default/)** — no coding agent
-- **[gemini](./gemini/)** - Google Gemini
-- **[opencode](./opencode/)** - OpenCode
+Agent CLIs are not baked into separate images. `sand new --agent ...` uses the base image, then installs the selected agent during the container's first-start hooks.
 
-## Building and debugging images locally
+## Building and debugging locally
 
-To build images locally:
-```sh
-# build all images (in parallel)
-make -j all
-
-# or individual images
-make opencode
-```
-
-To use these locally-built images instead of images from ghcr.io, specify `-i` or `--image` with `:local` tags like so:
+To build the base image locally:
 
 ```sh
-sand new -i default:local
-sand new --image opencode:local
+make
 ```
 
+To use a locally-built base image instead of the image from ghcr.io, specify `-i` or `--image`:
+
+```sh
+sand new --image base:local
+sand new --agent codex --image base:local
+```

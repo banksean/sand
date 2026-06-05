@@ -68,14 +68,6 @@ func BuildOneShotExec(agent string) (string, error) {
 	return definition.OneShotCommand, nil
 }
 
-func DefaultImage(agent, fallback string) string {
-	definition, ok := agentdefs.Lookup(agent)
-	if !ok || definition.DefaultImage == "" {
-		return fallback
-	}
-	return definition.DefaultImage
-}
-
 func HasAgent(agent string) bool {
 	definition, ok := agentdefs.Lookup(agent)
 	return ok && definition.InteractiveCommand != ""

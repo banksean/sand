@@ -10,6 +10,8 @@ RUN apk add --no-cache \
   doas \
   fzf \
   git \
+  github-cli \
+  gnupg \
   htop \
   iproute2 \
   ipset \
@@ -19,6 +21,7 @@ RUN apk add --no-cache \
   libgcc \
   libstdc++ \
   man-db \
+  make \
   nano \
   openssh-client \
   openssh-server \
@@ -41,6 +44,10 @@ ENV DEVCONTAINER=true
 RUN mkdir -p /workspace
 WORKDIR /workspace
 USER root
+
+RUN mkdir -p /commandhistory && \
+  touch /commandhistory/.bash_history && \
+  chown -R root /commandhistory
 
 ENV SHELL=/bin/zsh
 ENV EDITOR=nano

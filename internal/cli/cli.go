@@ -27,7 +27,7 @@ type CLIContext struct {
 }
 
 const (
-	DefaultImageName = "ghcr.io/banksean/sand/default:latest"
+	DefaultImageName = "ghcr.io/banksean/sand/base:latest"
 )
 
 // ShellFlags are shared by commands that exec a shell inside a container.
@@ -48,7 +48,7 @@ type ProjectEnvFlag struct {
 // SandboxCreationFlags are shared by commands that create a sandbox.
 type SandboxCreationFlags struct {
 	SSHAgentFlag
-	ImageName          string   `name:"image" short:"i" placeholder:"<container-image-name>" help:"name of container image to use"`
+	ImageName          string   `name:"image" short:"i" placeholder:"<container-image-name>" help:"name of base container image to use"`
 	CloneFromDir       string   `short:"d" placeholder:"<project-dir>" help:"directory to clone into the sandbox. Defaults to current working directory, if unset."`
 	ProfileName        string   `name:"profile" default:"default" placeholder:"<profile-name>" help:"profile policy from .sand.yaml to associate with the sandbox"`
 	EnvFile            string   `short:"e" default:".env" placeholder:"<file-path>" help:"legacy env file path used when no default profile is configured"`

@@ -1,7 +1,6 @@
 package agentlaunch
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 )
@@ -182,30 +181,6 @@ func TestBuildOneShotExec(t *testing.T) {
 			if err != nil {
 				t.Fatalf("BuildOneShotExec() error = %v", err)
 			}
-			if got != tt.want {
-				t.Fatalf("expected %q, got %q", tt.want, got)
-			}
-		})
-	}
-}
-
-func TestDefaultImage(t *testing.T) {
-	tests := []struct {
-		agent    string
-		fallback string
-		want     string
-	}{
-		{agent: "", fallback: "fallback:latest", want: "fallback:latest"},
-		{agent: "claude", fallback: "fallback:latest", want: "ghcr.io/banksean/sand/claude:latest"},
-		{agent: "codex", fallback: "fallback:latest", want: "ghcr.io/banksean/sand/codex:latest"},
-		{agent: "gemini", fallback: "fallback:latest", want: "ghcr.io/banksean/sand/gemini:latest"},
-		{agent: "opencode", fallback: "fallback:latest", want: "ghcr.io/banksean/sand/opencode:latest"},
-		{agent: "unknown", fallback: "fallback:latest", want: "fallback:latest"},
-	}
-
-	for _, tt := range tests {
-		t.Run(fmt.Sprintf("%s/%s", tt.agent, tt.fallback), func(t *testing.T) {
-			got := DefaultImage(tt.agent, tt.fallback)
 			if got != tt.want {
 				t.Fatalf("expected %q, got %q", tt.want, got)
 			}

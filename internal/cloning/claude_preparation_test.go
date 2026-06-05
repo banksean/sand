@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/banksean/sand/internal/agentdefs"
 	"github.com/banksean/sand/internal/hostops"
 )
 
@@ -30,7 +31,11 @@ func TestClaudeWorkspacePreparationWritesOnlyNonSecretStartupState(t *testing.T)
 	}
 	t.Setenv("HOME", home)
 
-	prep := NewClaudeWorkspacePreparation(cloneRoot, hostops.NewNullMessenger(), &hostops.MockGitOps{}, newPreparationTestFileOps(t))
+	definition, ok := agentdefs.Lookup("claude")
+	if !ok {
+		t.Fatal("missing claude definition")
+	}
+	prep := NewDefinitionWorkspacePreparation(definition, cloneRoot, hostops.NewNullMessenger(), &hostops.MockGitOps{}, newPreparationTestFileOps(t))
 	artifacts, err := prep.Prepare(context.Background(), CloneRequest{
 		ID:          "box",
 		HostWorkDir: work,

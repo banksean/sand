@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/banksean/sand/internal/agentdefs"
 	"github.com/banksean/sand/internal/hostops"
 )
 
@@ -32,7 +33,11 @@ func TestOpenCodeWorkspacePreparationDoesNotCopyHostAuthState(t *testing.T) {
 	}
 	t.Setenv("HOME", home)
 
-	prep := NewOpenCodeWorkspacePreparation(cloneRoot, hostops.NewNullMessenger(), &hostops.MockGitOps{}, newPreparationTestFileOps(t))
+	definition, ok := agentdefs.Lookup("opencode")
+	if !ok {
+		t.Fatal("missing opencode definition")
+	}
+	prep := NewDefinitionWorkspacePreparation(definition, cloneRoot, hostops.NewNullMessenger(), &hostops.MockGitOps{}, newPreparationTestFileOps(t))
 	artifacts, err := prep.Prepare(context.Background(), CloneRequest{
 		ID:          "box",
 		HostWorkDir: work,

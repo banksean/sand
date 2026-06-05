@@ -134,7 +134,7 @@ func TestRenderLsTableLongUsesShortIDAndStats(t *testing.T) {
 		ID:        "3a9a0df8-3ad2-4b79-9a4f-0d7e41f1df1b",
 		Status:    "running",
 		FromDir:   "~/project",
-		ImageName: "default:latest",
+		ImageName: "base:latest",
 		Stats: &types.ContainerStats{
 			CPUUsageUsec:     1500,
 			NumProcesses:     3,

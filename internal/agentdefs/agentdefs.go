@@ -2,50 +2,37 @@ package agentdefs
 
 import "sort"
 
-// PreparationKind identifies the Go workspace-preparation strategy for an agent.
-type PreparationKind string
-
 const (
-	PreparationBase     PreparationKind = "base"
-	PreparationClaude   PreparationKind = "claude"
-	PreparationOpenCode PreparationKind = "opencode"
-)
-
-// ContainerKind identifies the Go container-configuration strategy for an agent.
-type ContainerKind string
-
-const (
-	ContainerBase     ContainerKind = "base"
-	ContainerClaude   ContainerKind = "claude"
-	ContainerOpenCode ContainerKind = "opencode"
+	HookOpenCodeTunnel = "opencode-ssh-tunnel"
 )
 
 // Definition is the shared declaration for a built-in agent.
-//
-// Behavioral fields intentionally stay as typed strategy keys. The concrete
-// workspace preparation and container hooks remain implemented in Go.
 type Definition struct {
 	Name               string
 	Selectable         bool
-	Preparation        PreparationKind
-	Container          ContainerKind
 	AuthEnvAnyOf       [][]string
 	InteractiveCommand string
 	OneShotCommand     string
-	DefaultImage       string
+	GeneratedFiles     []GeneratedFile
+	FirstStartScript   string
+	StartHooks         []string
+}
+
+// GeneratedFile is non-secret startup state written below the sandbox dotfiles
+// mount and copied into the container user's home directory during bootstrap.
+type GeneratedFile struct {
+	Path    string
+	Content string
+	Mode    uint32
 }
 
 var definitions = []Definition{
 	{
-		Name:        "default",
-		Preparation: PreparationBase,
-		Container:   ContainerBase,
+		Name: "default",
 	},
 	{
-		Name:        "claude",
-		Selectable:  true,
-		Preparation: PreparationClaude,
-		Container:   ContainerClaude,
+		Name:       "claude",
+		Selectable: true,
 		AuthEnvAnyOf: [][]string{
 			{"CLAUDE_CODE_OAUTH_TOKEN"},
 			{"ANTHROPIC_API_KEY"},
@@ -53,37 +40,63 @@ var definitions = []Definition{
 		},
 		InteractiveCommand: "claude --permission-mode=bypassPermissions",
 		OneShotCommand:     `claude --permission-mode=bypassPermissions --print "$SAND_ONESHOT_PROMPT"`,
-		DefaultImage:       "ghcr.io/banksean/sand/claude:latest",
+		GeneratedFiles: []GeneratedFile{{
+			Path:    ".claude.json",
+			Content: `{"hasCompletedOnboarding":true,"projects":{"/app":{}}}`,
+			Mode:    0o700,
+		}},
+		FirstStartScript: `set -eu
+if ! command -v claude >/dev/null 2>&1; then
+	if command -v apk >/dev/null 2>&1; then
+		apk add --no-cache nodejs npm
+	elif command -v apt-get >/dev/null 2>&1; then
+		apt-get update
+		apt-get install -y --no-install-recommends nodejs npm
+	fi
+	npm install -g @anthropic-ai/claude-code@latest
+fi`,
 	},
 	{
-		Name:        "codex",
-		Selectable:  true,
-		Preparation: PreparationBase,
-		Container:   ContainerBase,
+		Name:       "codex",
+		Selectable: true,
 		AuthEnvAnyOf: [][]string{
 			{"OPENAI_API_KEY"},
 		},
 		InteractiveCommand: "codex --dangerously-bypass-approvals-and-sandbox",
-		DefaultImage:       "ghcr.io/banksean/sand/codex:latest",
+		FirstStartScript: `set -eu
+if ! command -v codex >/dev/null 2>&1; then
+	if command -v apk >/dev/null 2>&1; then
+		apk add --no-cache nodejs npm
+	elif command -v apt-get >/dev/null 2>&1; then
+		apt-get update
+		apt-get install -y --no-install-recommends nodejs npm
+	fi
+	npm install -g @openai/codex
+fi`,
 	},
 	{
-		Name:        "gemini",
-		Selectable:  true,
-		Preparation: PreparationBase,
-		Container:   ContainerBase,
+		Name:       "gemini",
+		Selectable: true,
 		AuthEnvAnyOf: [][]string{
 			{"GEMINI_API_KEY"},
 			{"GOOGLE_API_KEY"},
 		},
 		InteractiveCommand: "gemini --approval-mode=yolo",
 		OneShotCommand:     `gemini --approval-mode=yolo -p "$SAND_ONESHOT_PROMPT"`,
-		DefaultImage:       "ghcr.io/banksean/sand/gemini:latest",
+		FirstStartScript: `set -eu
+if ! command -v gemini >/dev/null 2>&1; then
+	if command -v apk >/dev/null 2>&1; then
+		apk add --no-cache nodejs npm
+	elif command -v apt-get >/dev/null 2>&1; then
+		apt-get update
+		apt-get install -y --no-install-recommends nodejs npm
+	fi
+	npm install -g @google/gemini-cli@latest
+fi`,
 	},
 	{
-		Name:        "opencode",
-		Selectable:  true,
-		Preparation: PreparationOpenCode,
-		Container:   ContainerOpenCode,
+		Name:       "opencode",
+		Selectable: true,
 		AuthEnvAnyOf: [][]string{
 			{"ANTHROPIC_API_KEY"},
 			{"OPENAI_API_KEY"},
@@ -95,7 +108,28 @@ var definitions = []Definition{
 		},
 		InteractiveCommand: "opencode",
 		OneShotCommand:     `opencode run "$SAND_ONESHOT_PROMPT"`,
-		DefaultImage:       "ghcr.io/banksean/sand/opencode:latest",
+		GeneratedFiles: []GeneratedFile{{
+			Path: ".config/opencode/opencode.json",
+			Content: `{
+  "$schema": "https://opencode.ai/config.json"
+}`,
+			Mode: 0o700,
+		}},
+		FirstStartScript: `set -eu
+if ! command -v opencode >/dev/null 2>&1; then
+	if command -v apk >/dev/null 2>&1; then
+		apk add --no-cache curl bash git libc6-compat libstdc++
+	elif command -v apt-get >/dev/null 2>&1; then
+		apt-get update
+		apt-get install -y --no-install-recommends curl bash git libc6 libstdc++6
+	fi
+	OPENCODE_VERSION=1.14.48
+	curl -fsSL https://opencode.ai/install | bash -s -- --version "$OPENCODE_VERSION"
+	if [ -x /root/.opencode/bin/opencode ] && [ ! -x /usr/local/bin/opencode ]; then
+		cp /root/.opencode/bin/opencode /usr/local/bin/opencode
+	fi
+fi`,
+		StartHooks: []string{HookOpenCodeTunnel},
 	},
 }
 
@@ -136,6 +170,8 @@ func cloneDefinitions(src []Definition) []Definition {
 
 func cloneDefinition(src Definition) Definition {
 	src.AuthEnvAnyOf = cloneEnvGroups(src.AuthEnvAnyOf)
+	src.GeneratedFiles = append([]GeneratedFile(nil), src.GeneratedFiles...)
+	src.StartHooks = append([]string(nil), src.StartHooks...)
 	return src
 }
 

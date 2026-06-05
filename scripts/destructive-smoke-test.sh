@@ -44,8 +44,8 @@ rm -rf /tmp/sand
 # Install sand and sandd from source
 task install
 
-# Build default:local image we'll use for testing
-pushd . && cd images && make default && popd
+# Build base:local image we'll use for testing
+pushd . && cd images && make base && popd
 
 # Re-evaluate where the sand binary is located in $PATH
 # Without this, the script will continue to try to use the
@@ -62,7 +62,7 @@ sand config ls
 
 # Create a new sandox and exit back to this smoke test.
 # Use the `script` command here to avoid tty errors.
-echo "exit" | script -q /dev/null sand new -i default:local --tmux=false --caches-mise --caches-apk --ssh-agent smoke
+echo "exit" | script -q /dev/null sand new -i base:local --tmux=false --caches-mise --caches-apk --ssh-agent smoke
 sand ls
 
 # TODO: Automate verification for the output of these commands
@@ -72,11 +72,11 @@ sand exec smoke whoami
 time sand exec smoke zsh -c "go test ./..."
 
 # Create a new sandbox to test out shared go mod/build caching
-echo "exit" | script -q /dev/null sand new -i default:local --tmux=false --caches-mise --caches-apk --ssh-agent smoke-2
+echo "exit" | script -q /dev/null sand new -i base:local --tmux=false --caches-mise --caches-apk --ssh-agent smoke-2
 # Warm chache, should be much faster this time
 time sand exec smoke-2 zsh -c "go test ./..."
 
-# Try to use the packaged sand innie binary from the default image
+# Try to use the packaged sand innie binary from the base image
 sand exec smoke sand --version
 sand exec smoke sand build-info
 

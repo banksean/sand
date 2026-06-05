@@ -66,7 +66,7 @@ func (c *OneshotCmd) Run(cctx *CLIContext) error {
 	}
 
 	if c.ImageName == "" {
-		c.ImageName = agentlaunch.DefaultImage(c.Agent, DefaultImageName)
+		c.ImageName = DefaultImageName
 	}
 
 	if err := mc.EnsureImage(ctx, c.ImageName, os.Stdout); err != nil {
