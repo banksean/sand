@@ -181,7 +181,7 @@ func (s *daemonGRPCServer) VSC(ctx context.Context, req *daemonpb.IDRequest) (*d
 	if err != nil {
 		return nil, err
 	}
-	if sbox == nil || sbox.Container == nil || sbox.Container.Status != "running" {
+	if sbox == nil || sbox.Container == nil || sbox.Container.Status.State != "running" {
 		return nil, fmt.Errorf("cannot connect to sandbox %q becacuse it is not currently running", id)
 	}
 

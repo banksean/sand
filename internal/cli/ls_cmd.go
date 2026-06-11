@@ -44,7 +44,7 @@ func (c *LsCmd) Run(cctx *CLIContext) error {
 		ctr := sbox.Container
 		status := []string{"dormant"}
 		if ctr != nil {
-			status[0] = ctr.Status
+			status[0] = ctr.Status.State
 		}
 		if sbox.SandboxContainerError != "" {
 			status = append(status, sbox.SandboxContainerError)
@@ -134,7 +134,7 @@ func lsStatsByContainerID(ctx context.Context, mc daemon.Client, list []sandtype
 }
 
 func isRunningContainer(ctr *types.Container) bool {
-	return ctr != nil && strings.EqualFold(ctr.Status, "running")
+	return ctr != nil && strings.EqualFold(ctr.Status.State, "running")
 }
 
 func gitSummary(details *sandtypes.GitDetails) string {

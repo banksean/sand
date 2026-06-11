@@ -15,8 +15,13 @@ type Container struct {
 		IPv6Address string `json:"ipv6Address"`
 		IPv6Gateway string `json:"ipv6Gateway"`
 	} `json:"networks"`
-	Status        string          `json:"status"`
+	Status        ContainerStatus `json:"status"`
 	Configuration ContainerConfig `json:"configuration"`
+}
+
+type ContainerStatus struct {
+	// Networks []struct{} `json:"networks"`
+	State string `json:"state"`
 }
 
 type ContainerConfig struct {

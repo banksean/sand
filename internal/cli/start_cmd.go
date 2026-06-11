@@ -50,7 +50,7 @@ func (c *StartCmd) Run(cctx *CLIContext) error {
 				fmt.Printf("%s has no container\n", name)
 				return
 			}
-			if sb.Container.Status == "running" {
+			if sb.Container.Status.State == "running" {
 				if c.SSHAgent && !sb.Container.Configuration.SSH {
 					errChan <- fmt.Errorf("%s is already running without ssh-agent forwarding; stop it first and restart with --ssh-agent", name)
 					return

@@ -42,7 +42,7 @@ func (c *ShellCmd) Run(cctx *CLIContext) error {
 
 	// sbox.Container is populated by GetSandbox; its Status is fresh enough to
 	// decide whether to start the container without a redundant Inspect call.
-	if sbox.Container == nil || sbox.Container.Status != "running" {
+	if sbox.Container == nil || sbox.Container.Status.State != "running" {
 		if err := mc.StartSandbox(ctx, daemon.StartSandboxOpts{
 			Name:     sbox.Name,
 			SSHAgent: c.SSHAgent,

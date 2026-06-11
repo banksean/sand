@@ -2,7 +2,6 @@ package applecontainer
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -11,7 +10,6 @@ import (
 	"syscall"
 
 	"github.com/banksean/sand/internal/applecontainer/options"
-	"github.com/banksean/sand/internal/applecontainer/types"
 )
 
 type SystemSvc struct{}
@@ -89,40 +87,14 @@ func (s *SystemSvc) DNSCreate(ctx context.Context, domain string) error {
 }
 
 // PropertyList returns a slice of system property values, or an error.
-func (s *SystemSvc) PropertyList(ctx context.Context) ([]types.SystemProperty, error) {
-	cmd := exec.CommandContext(ctx, "container", "system", "property", "list", "--format", "json")
+func (s *SystemSvc) GetConfig(ctx context.Context) (*ContainerSystemConfig, error) {
+	cmd := exec.CommandContext(ctx, "container", "system", "property", "ls")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, err
 	}
-	var ret []types.SystemProperty
-	if err := json.Unmarshal(output, &ret); err != nil {
-		slog.ErrorContext(ctx, "SystemSvc.PropertyList", "output", string(output), "error", err)
-		return nil, err
-	}
-	return ret, nil
-}
-
-// PropertySet sets a container system property value.
-func (s *SystemSvc) PropertySet(ctx context.Context, id, value string) error {
-	cmd := exec.CommandContext(ctx, "container", "system", "property", "set", id, value)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		slog.ErrorContext(ctx, "SystemSvc.PropertySet", "output", string(output), "error", err)
-		return err
-	}
-	return nil
-}
-
-// PropertyGet gets a container system property value.
-func (s *SystemSvc) PropertyGet(ctx context.Context, id string) (string, error) {
-	cmd := exec.CommandContext(ctx, "container", "system", "property", "get", id)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		slog.ErrorContext(ctx, "SystemSvc.PropertyGet", "output", string(output), "error", err)
-		return "", err
-	}
-	return strings.TrimSpace(string(output)), nil
+	cfg, err := ParseContainerSystemConfig(output)
+	return cfg, err
 }
 
 // Logs returns an io.ReadCloser for streaming log output and a wait func that blocks on the command's completion, or an error.

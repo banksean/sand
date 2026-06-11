@@ -29,7 +29,7 @@ func (c *VscCmd) Run(cctx *CLIContext) error {
 
 	ctr := sbox.Container
 
-	if ctr == nil || ctr.Status != "running" {
+	if ctr == nil || ctr.Status.State != "running" {
 		return fmt.Errorf("cannot connect to sandbox %q becacuse it is not currently running", c.SandboxName)
 	}
 

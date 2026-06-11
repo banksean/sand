@@ -287,7 +287,7 @@ func TestStartCmd_AlreadyRunning(t *testing.T) {
 		ContainerService: &hostops.MockContainerOps{
 			// Default Inspect returns Status="running"
 			InspectFunc: func(_ context.Context, containerID string) ([]types.Container, error) {
-				return []types.Container{{Status: "running"}}, nil
+				return []types.Container{{Status: types.ContainerStatus{State: "running"}}}, nil
 			},
 			StartFunc: func(_ context.Context, _ *options.StartContainer, containerID string) (string, error) {
 				startCallsMu.Lock()
@@ -316,7 +316,7 @@ func TestStartCmd_StartsStopped(t *testing.T) {
 	cctx := newCLIContext(t, daemontest.Deps{
 		ContainerService: &hostops.MockContainerOps{
 			InspectFunc: func(_ context.Context, containerID string) ([]types.Container, error) {
-				return []types.Container{{Status: "stopped"}}, nil
+				return []types.Container{{Status: types.ContainerStatus{State: "stopped"}}}, nil
 			},
 			StartFunc: func(_ context.Context, _ *options.StartContainer, containerID string) (string, error) {
 				startCallsMu.Lock()
@@ -345,7 +345,7 @@ func TestStartCmd_Multiple(t *testing.T) {
 	cctx := newCLIContext(t, daemontest.Deps{
 		ContainerService: &hostops.MockContainerOps{
 			InspectFunc: func(_ context.Context, containerID string) ([]types.Container, error) {
-				return []types.Container{{Status: "stopped"}}, nil
+				return []types.Container{{Status: types.ContainerStatus{State: "stopped"}}}, nil
 			},
 			StartFunc: func(_ context.Context, _ *options.StartContainer, containerID string) (string, error) {
 				startCallsMu.Lock()
@@ -377,7 +377,7 @@ func TestStartCmd_All(t *testing.T) {
 	cctx := newCLIContext(t, daemontest.Deps{
 		ContainerService: &hostops.MockContainerOps{
 			InspectFunc: func(_ context.Context, containerID string) ([]types.Container, error) {
-				return []types.Container{{Status: "stopped"}}, nil
+				return []types.Container{{Status: types.ContainerStatus{State: "stopped"}}}, nil
 			},
 			StartFunc: func(_ context.Context, _ *options.StartContainer, containerID string) (string, error) {
 				startCallsMu.Lock()

@@ -238,14 +238,14 @@ func TestStartSandboxRecreatesStoppedContainerAfterSocketCreation(t *testing.T) 
 			switch containerID {
 			case oldContainerID:
 				return []types.Container{{
-					Status: "stopped",
+					Status: types.ContainerStatus{State: "stopped"},
 					Configuration: types.ContainerConfig{
 						SSH: false,
 					},
 				}}, nil
 			case newContainerID:
 				return []types.Container{{
-					Status: "stopped",
+					Status: types.ContainerStatus{State: "stopped"},
 					Configuration: types.ContainerConfig{
 						SSH: true,
 					},

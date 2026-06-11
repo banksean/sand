@@ -505,7 +505,7 @@ func TestBoxer_Sync(t *testing.T) {
 		mockContainer := &hostops.MockContainerOps{
 			InspectFunc: func(ctx context.Context, containerID string) ([]types.Container, error) {
 				inspectCalls = append(inspectCalls, containerID)
-				return []types.Container{{Status: "running"}}, nil
+				return []types.Container{{Status: types.ContainerStatus{State: "running"}}}, nil
 			},
 		}
 		mockImage := &mockImageOps{}
@@ -976,7 +976,7 @@ func TestBoxer_ExecuteHooks_StreamsProgress(t *testing.T) {
 	var execStreamEnvFiles []string
 	mockContainer := &hostops.MockContainerOps{
 		InspectFunc: func(ctx context.Context, containerID string) ([]types.Container, error) {
-			return []types.Container{{Status: "running"}}, nil
+			return []types.Container{{Status: types.ContainerStatus{State: "running"}}}, nil
 		},
 		ExecStreamFunc: func(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, stdin io.Reader, stdout, stderr io.Writer, cmdArgs ...string) (func() error, error) {
 			execStreamCalls = append(execStreamCalls, cmd)
@@ -1028,7 +1028,7 @@ func TestBoxer_ExecuteHooks_DoesNotPassEnvFileToExec(t *testing.T) {
 	var execEnvFiles []string
 	mockContainer := &hostops.MockContainerOps{
 		InspectFunc: func(ctx context.Context, containerID string) ([]types.Container, error) {
-			return []types.Container{{Status: "running"}}, nil
+			return []types.Container{{Status: types.ContainerStatus{State: "running"}}}, nil
 		},
 		ExecFunc: func(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, args ...string) (string, error) {
 			execEnvFiles = append(execEnvFiles, opts.ProcessOptions.EnvFile)

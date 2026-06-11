@@ -7,11 +7,13 @@ require (
 	github.com/alecthomas/kong-yaml v0.2.0
 	github.com/creack/pty v1.1.24
 	github.com/golang-migrate/migrate/v4 v4.19.1
+	github.com/google/go-cmp v0.7.0
 	github.com/google/go-containerregistry v0.21.3
 	github.com/google/uuid v1.6.0
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
 	github.com/jotaen/kong-completion v0.0.12
 	github.com/kevinburke/ssh_config v1.4.0
+	github.com/pelletier/go-toml/v2 v2.3.1
 	github.com/posener/complete v1.2.3
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.68.0
 	go.opentelemetry.io/otel v1.43.0

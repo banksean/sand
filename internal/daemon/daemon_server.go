@@ -531,7 +531,7 @@ func (d *Daemon) StartSandbox(ctx context.Context, opts StartSandboxOpts) error 
 	sbox.Container = ctr
 	if opts.SSHAgent {
 		if ctr != nil && !ctr.Configuration.SSH {
-			if ctr.Status == "running" {
+			if ctr.Status.State == "running" {
 				return fmt.Errorf("sandbox %s is already running without ssh-agent forwarding", sbox.ID)
 			}
 			needsRecreate = true
@@ -739,11 +739,11 @@ func (d *Daemon) createSandbox(ctx context.Context, opts CreateSandboxOpts, prog
 		}
 		ctr, err = d.boxer.GetContainer(ctx, sbox.ContainerID)
 		if err != nil || ctr == nil {
-			return nil, fmt.Errorf("failed to get container after creation")
+			return nil, fmt.Errorf("failed to get container after creation: %w", err)
 		}
 	}
 
-	if ctr.Status != "running" {
+	if ctr.Status.State != "running" {
 		err := d.boxer.StartNewContainer(ctx, sbox, progress)
 		if err != nil {
 			return nil, err

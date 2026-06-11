@@ -58,8 +58,7 @@ var ErrContainerSystemNotRunning = errors.New("container system service is not r
 type containerSystem interface {
 	Version(context.Context) (string, error)
 	DNSList(context.Context) ([]string, error)
-	PropertyGet(context.Context, string) (string, error)
-	PropertySet(context.Context, string, string) error
+	GetConfig(ctx context.Context) (*applecontainer.ContainerSystemConfig, error)
 	Status(ctx context.Context, opts *options.SystemStatus) (string, error)
 	Start(ctx context.Context, opts *options.SystemStart) (string, error)
 }
@@ -254,33 +253,16 @@ func EffectiveDNSDomain(ctx context.Context, opts VerifyOptions) (string, error)
 }
 
 func ensureDNSDomain(ctx context.Context, opts VerifyOptions) (string, error) {
-	domain, err := systemOps.PropertyGet(ctx, "dns.domain")
+	cfg, err := systemOps.GetConfig(ctx)
 	if err != nil {
 		return "", fmt.Errorf("could not get container system properties: %w", err)
 	}
-	if domain != "" {
-		return domain, nil
+	if cfg.DNSConfig.Domain != "" {
+		return cfg.DNSConfig.Domain, nil
 	}
-
-	domain = opts.DefaultDNSDomain
-	if domain == "" {
-		domain = DefaultDNSDomain
-	}
-	command := fmt.Sprintf("container system property set dns.domain %s", domain)
-	if !opts.PromptRemedies {
-		return "", fmt.Errorf("container system property dns.domain is not set. Run: %s", command)
-	}
-	ok, err := PromptYesDefault(opts.Stdin, opts.Stdout, fmt.Sprintf("Set dns.domain to %s [Y/n]? ", domain))
-	if err != nil {
-		return "", err
-	}
-	if !ok {
-		return "", fmt.Errorf("container system property dns.domain is not set. Run: %s", command)
-	}
-	if err := systemOps.PropertySet(ctx, "dns.domain", domain); err != nil {
-		return "", fmt.Errorf("setting container system property dns.domain: %w", err)
-	}
-	return domain, nil
+	// TODO: offer to set it for them, with
+	// PromptYesDefault(opts.Stdin, opts.Stdout, fmt.Sprintf("Set dns.domain to %s [Y/n]? ", domain))
+	return "", fmt.Errorf("dns.domain not set in config - edit your ~/.config/container/config.toml to set it")
 }
 
 func ensureDNSDomainRegistered(ctx context.Context, domain string) error {

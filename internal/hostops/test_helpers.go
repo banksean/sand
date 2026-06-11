@@ -72,7 +72,11 @@ func (m *MockContainerOps) Inspect(ctx context.Context, containerID string) ([]t
 	if m.InspectFunc != nil {
 		return m.InspectFunc(ctx, containerID)
 	}
-	return []types.Container{{Status: "running"}}, nil
+	return []types.Container{{
+		Status: types.ContainerStatus{
+			State: "running"},
+	},
+	}, nil
 }
 
 func (m *MockContainerOps) Stats(ctx context.Context, containerID ...string) ([]types.ContainerStats, error) {

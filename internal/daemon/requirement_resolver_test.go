@@ -329,7 +329,7 @@ profiles:
 			if inspectCalls == 1 {
 				return nil, nil
 			}
-			return []types.Container{{Status: "running"}}, nil
+			return []types.Container{{Status: types.ContainerStatus{State: "running"}}}, nil
 		},
 	})
 
