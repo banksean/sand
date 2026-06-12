@@ -1086,8 +1086,10 @@ func (sb *Boxer) EnsureImage(ctx context.Context, imageName string, w io.Writer)
 	}
 
 	imagePresent := false
+	slog.InfoContext(ctx, "Boxer.EnsureImage", "image count", len(images))
 	for _, image := range images {
-		if image.Reference == imageName {
+		slog.InfoContext(ctx, "Boxer.EnsureImage", "image.Name", image.Configuration.Name)
+		if image.Configuration.Name == imageName {
 			slog.InfoContext(ctx, "Boxer.EnsureImage", "status", "already-present", "imageName", imageName)
 			imagePresent = true
 			break

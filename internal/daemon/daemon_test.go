@@ -27,7 +27,7 @@ func newDaemonForTest(t *testing.T, appDir string) *Daemon {
 		ContainerService: &hostops.MockContainerOps{},
 		ImageService: &testImageOps{
 			ListFunc: func(context.Context) ([]types.ImageEntry, error) {
-				return []types.ImageEntry{{Reference: "test-image:latest"}}, nil
+				return []types.ImageEntry{{Configuration: types.ImageConfiguration{Name: "test-image:latest"}}}, nil
 			},
 		},
 	})

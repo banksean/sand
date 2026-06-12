@@ -126,8 +126,15 @@ type Resources struct {
 }
 
 type ImageEntry struct {
-	Reference  string          `json:"reference"`
-	Descriptor ImageDescriptor `json:"descriptor"`
+	Configuration ImageConfiguration `json:"configuration"`
+	ID            string             `json:"id"`
+	Variants      []ImageVariant     `json:"variants"`
+}
+
+type ImageConfiguration struct {
+	CreationDate time.Time       `json:"creationTime"`
+	Descriptor   ImageDescriptor `json:"descriptor"`
+	Name         string          `json:"name"`
 }
 
 type ImageDescriptor struct {

@@ -834,8 +834,8 @@ func TestBoxer_EnsureImage(t *testing.T) {
 		mockImage := &mockImageOps{
 			listFunc: func(ctx context.Context) ([]types.ImageEntry, error) {
 				return []types.ImageEntry{
-					{Reference: "test-image:latest"},
-					{Reference: "other-image:v1"},
+					{Configuration: types.ImageConfiguration{Name: "test-image:latest"}},
+					{Configuration: types.ImageConfiguration{Name: "other-image:v1"}},
 				}, nil
 			},
 		}
@@ -856,7 +856,7 @@ func TestBoxer_EnsureImage(t *testing.T) {
 		mockImage := &mockImageOps{
 			listFunc: func(ctx context.Context) ([]types.ImageEntry, error) {
 				return []types.ImageEntry{
-					{Reference: "other-image:v1"},
+					{Configuration: types.ImageConfiguration{Name: "other-image:v1"}},
 				}, nil
 			},
 			pullFunc: func(ctx context.Context, image string, w io.Writer) (func() error, error) {
