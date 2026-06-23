@@ -84,6 +84,17 @@ tasks:
         -ldflags "{{.LDFLAGS}}"
         ./cmd/...
 
+  install-global:
+    desc: Install Go commands (globally)
+    deps:
+      - stopdaemon
+      - generate
+    cmds:
+      - >-
+        go install -v
+        -ldflags "{{.LDFLAGS}}"
+        ./cmd/...
+
   stopdaemon:
     ignore_error: true
     cmds:
