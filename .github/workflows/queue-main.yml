@@ -40,6 +40,51 @@ jobs:
       ref: ${{ needs.formatting.outputs.commit_sha }}
       include-slow-tests: false
 
+  coverage-report:
+    runs-on: macos-26
+    needs: [formatting, go-test]
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.formatting.outputs.commit_sha }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Download coverage profile
+        uses: actions/download-artifact@v4
+        with:
+          name: code-coverage
+          path: coverage
+
+      - name: Generate coverage reports
+        run: |
+          go tool cover -func=coverage/coverage.txt > coverage/coverage-summary.txt
+          go tool cover -html=coverage/coverage.txt -o coverage/coverage.html
+
+          {
+            echo "## Go test coverage"
+            echo
+            echo '```'
+            cat coverage/coverage-summary.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            coverage/coverage.txt
+            coverage/coverage-summary.txt
+            coverage/coverage.html
+          retention-days: 30
+
   # Uncomment to enable smoke tests as part of the queue
   # smoke-test:
   #   needs: [formatting]
@@ -53,6 +98,7 @@ jobs:
     runs-on: macos-26
     needs:
       [
+        coverage-report,
         go-test,
         formatting,
       ]
