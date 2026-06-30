@@ -758,6 +758,11 @@ func (d *Daemon) ListSandboxes(ctx context.Context) ([]sandtypes.Box, error) {
 	return d.boxer.List(ctx)
 }
 
+// ListDeletedSandboxes returns soft-deleted sandboxes.
+func (d *Daemon) ListDeletedSandboxes(ctx context.Context) ([]sandtypes.Box, error) {
+	return d.boxer.ListDeleted(ctx)
+}
+
 // GetSandbox retrieves an active sandbox by user-facing name.
 func (d *Daemon) GetSandbox(ctx context.Context, name string) (*sandtypes.Box, error) {
 	return d.boxer.Get(ctx, name)
@@ -802,4 +807,10 @@ func (d *Daemon) RemoveSandbox(ctx context.Context, name string) error {
 		}
 	}
 	return d.boxer.SoftDelete(ctx, sbox)
+}
+
+// ExpungeSandbox hard-deletes a single soft-deleted sandbox by ID.
+func (d *Daemon) ExpungeSandbox(ctx context.Context, id string) error {
+	ctx = sandboxlog.WithSandboxID(ctx, id)
+	return d.boxer.Expunge(ctx, id)
 }

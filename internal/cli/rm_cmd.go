@@ -112,10 +112,14 @@ func confirmSandboxRemoval(id string, reader *bufio.Reader, stdout io.Writer) (b
 		return false, fmt.Errorf("couldn't read from stdin: %w", err)
 	}
 
+	return isYes(text), nil
+}
+
+func isYes(text string) bool {
 	switch strings.TrimSpace(strings.ToLower(text)) {
 	case "y", "yes":
-		return true, nil
+		return true
 	default:
-		return false, nil
+		return false
 	}
 }

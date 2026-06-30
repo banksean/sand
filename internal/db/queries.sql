@@ -13,6 +13,11 @@ SELECT * FROM sandboxes
 WHERE state = 'active'
 ORDER BY created_at DESC;
 
+-- name: ListDeletedSandboxes :many
+SELECT * FROM sandboxes
+WHERE state = 'deleted'
+ORDER BY deleted_at DESC, created_at DESC;
+
 -- name: UpsertSandbox :exec
 INSERT INTO sandboxes (
     id, name, state, container_id, host_origin_dir, sandbox_work_dir,

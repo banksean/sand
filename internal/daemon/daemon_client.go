@@ -17,8 +17,10 @@ type Client interface {
 	Shutdown(ctx context.Context) error
 	LogSandbox(ctx context.Context, name string, w io.Writer) error
 	ListSandboxes(ctx context.Context) ([]sandtypes.Box, error)
+	ListDeletedSandboxes(ctx context.Context) ([]sandtypes.Box, error)
 	GetSandbox(ctx context.Context, name string) (*sandtypes.Box, error)
 	RemoveSandbox(ctx context.Context, name string) error
+	ExpungeSandbox(ctx context.Context, id string) error
 	StopSandbox(ctx context.Context, name string) error
 	StartSandbox(ctx context.Context, opts StartSandboxOpts) error
 	SyncHostGitMirror(ctx context.Context, name string) (string, error)

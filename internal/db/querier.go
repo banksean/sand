@@ -13,6 +13,7 @@ type Querier interface {
 	GetActiveSandboxByName(ctx context.Context, name string) (Sandbox, error)
 	GetSandboxByID(ctx context.Context, id string) (Sandbox, error)
 	GetSandboxesByImage(ctx context.Context, imageName string) ([]Sandbox, error)
+	ListDeletedSandboxes(ctx context.Context) ([]Sandbox, error)
 	ListSandboxes(ctx context.Context) ([]Sandbox, error)
 	SoftDeleteSandbox(ctx context.Context, arg SoftDeleteSandboxParams) error
 	UpdateContainerID(ctx context.Context, arg UpdateContainerIDParams) error

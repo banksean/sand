@@ -584,6 +584,44 @@ func (sb *Boxer) SoftDelete(ctx context.Context, sbox *sandtypes.Box) error {
 	return nil
 }
 
+func (sb *Boxer) ListDeleted(ctx context.Context) ([]sandtypes.Box, error) {
+	sandboxes, err := sb.queries.ListDeletedSandboxes(ctx)
+	if err != nil {
+		return nil, err
+	}
+	ret := make([]sandtypes.Box, 0, len(sandboxes))
+	for _, sandbox := range sandboxes {
+		ret = append(ret, *sb.sandboxFromDB(&sandbox))
+	}
+	return ret, nil
+}
+
+func (sb *Boxer) Expunge(ctx context.Context, id string) error {
+	ctx = sandboxlog.WithSandboxID(ctx, id)
+	slog.InfoContext(ctx, "Boxer.Expunge", "id", id)
+
+	sandbox, err := sb.queries.GetSandboxByID(ctx, id)
+	if err == sql.ErrNoRows {
+		return fmt.Errorf("sandbox not found: %s", id)
+	}
+	if err != nil {
+		return fmt.Errorf("failed to get sandbox by id: %w", err)
+	}
+	sbox := sb.sandboxFromDB(&sandbox)
+	if sbox.State != "deleted" {
+		return fmt.Errorf("sandbox %s is %s, not deleted", id, sbox.State)
+	}
+	if sbox.TrashWorkDir != "" {
+		if err := sb.FileOps.RemoveAll(sbox.TrashWorkDir); err != nil {
+			return fmt.Errorf("remove trashed sandbox workdir %s: %w", sbox.TrashWorkDir, err)
+		}
+	}
+	if err := sb.queries.DeleteSandbox(ctx, id); err != nil {
+		return fmt.Errorf("delete sandbox %s from database: %w", id, err)
+	}
+	return nil
+}
+
 func (sb *Boxer) Cleanup(ctx context.Context, sbox *sandtypes.Box) error {
 	return sb.SoftDelete(ctx, sbox)
 }

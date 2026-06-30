@@ -315,6 +315,13 @@ func TestGRPCUnary(t *testing.T) {
 			}
 			return &daemonpb.ListSandboxesResponse{BoxesJson: boxesJSON}, nil
 		},
+		ListDeletedSandboxesFunc: func(ctx context.Context, req *daemonpb.ListSandboxesRequest) (*daemonpb.ListSandboxesResponse, error) {
+			boxesJSON, err := json.Marshal([]sandtypes.Box{{ID: "deleted-box", State: "deleted"}})
+			if err != nil {
+				return nil, err
+			}
+			return &daemonpb.ListSandboxesResponse{BoxesJson: boxesJSON}, nil
+		},
 		GetSandboxFunc: func(ctx context.Context, req *daemonpb.IDRequest) (*daemonpb.GetSandboxResponse, error) {
 			if req.GetId() != "test-box" {
 				t.Fatalf("GetSandbox request ID = %q, want test-box", req.GetId())
@@ -368,6 +375,12 @@ func TestGRPCUnary(t *testing.T) {
 			}
 			return &daemonpb.StatusResponse{Status: "ok"}, nil
 		},
+		ExpungeSandboxFunc: func(ctx context.Context, req *daemonpb.IDRequest) (*daemonpb.StatusResponse, error) {
+			if req.GetId() != "test-box" {
+				t.Fatalf("ExpungeSandbox request ID = %q, want test-box", req.GetId())
+			}
+			return &daemonpb.StatusResponse{Status: "ok"}, nil
+		},
 		StopSandboxFunc: func(ctx context.Context, req *daemonpb.IDRequest) (*daemonpb.StatusResponse, error) {
 			if req.GetId() != "test-box" {
 				t.Fatalf("StopSandbox request ID = %q, want test-box", req.GetId())
@@ -415,6 +428,14 @@ func TestGRPCUnary(t *testing.T) {
 		t.Fatalf("ListSandboxes() = %+v, want test-box", boxes)
 	}
 
+	deletedBoxes, err := client.ListDeletedSandboxes(context.Background())
+	if err != nil {
+		t.Fatalf("ListDeletedSandboxes() error = %v", err)
+	}
+	if len(deletedBoxes) != 1 || deletedBoxes[0].ID != "deleted-box" {
+		t.Fatalf("ListDeletedSandboxes() = %+v, want deleted-box", deletedBoxes)
+	}
+
 	box, err := client.GetSandbox(context.Background(), "test-box")
 	if err != nil {
 		t.Fatalf("GetSandbox() error = %v", err)
@@ -451,6 +472,9 @@ func TestGRPCUnary(t *testing.T) {
 	if err := client.RemoveSandbox(context.Background(), "test-box"); err != nil {
 		t.Fatalf("RemoveSandbox() error = %v", err)
 	}
+	if err := client.ExpungeSandbox(context.Background(), "test-box"); err != nil {
+		t.Fatalf("ExpungeSandbox() error = %v", err)
+	}
 	if err := client.StopSandbox(context.Background(), "test-box"); err != nil {
 		t.Fatalf("StopSandbox() error = %v", err)
 	}
@@ -476,8 +500,10 @@ type testGRPCDaemonService struct {
 	daemonpb.UnimplementedDaemonServiceServer
 	LogSandboxFunc            func(context.Context, *daemonpb.IDRequest) (*daemonpb.LogSandboxResponse, error)
 	ListSandboxesFunc         func(context.Context, *daemonpb.ListSandboxesRequest) (*daemonpb.ListSandboxesResponse, error)
+	ListDeletedSandboxesFunc  func(context.Context, *daemonpb.ListSandboxesRequest) (*daemonpb.ListSandboxesResponse, error)
 	GetSandboxFunc            func(context.Context, *daemonpb.IDRequest) (*daemonpb.GetSandboxResponse, error)
 	RemoveSandboxFunc         func(context.Context, *daemonpb.IDRequest) (*daemonpb.StatusResponse, error)
+	ExpungeSandboxFunc        func(context.Context, *daemonpb.IDRequest) (*daemonpb.StatusResponse, error)
 	StopSandboxFunc           func(context.Context, *daemonpb.IDRequest) (*daemonpb.StatusResponse, error)
 	StartSandboxFunc          func(context.Context, *daemonpb.StartSandboxRequest) (*daemonpb.StatusResponse, error)
 	SyncHostGitMirrorFunc     func(context.Context, *daemonpb.IDRequest) (*daemonpb.SyncHostGitMirrorResponse, error)
@@ -497,12 +523,20 @@ func (s *testGRPCDaemonService) ListSandboxes(ctx context.Context, req *daemonpb
 	return s.ListSandboxesFunc(ctx, req)
 }
 
+func (s *testGRPCDaemonService) ListDeletedSandboxes(ctx context.Context, req *daemonpb.ListSandboxesRequest) (*daemonpb.ListSandboxesResponse, error) {
+	return s.ListDeletedSandboxesFunc(ctx, req)
+}
+
 func (s *testGRPCDaemonService) GetSandbox(ctx context.Context, req *daemonpb.IDRequest) (*daemonpb.GetSandboxResponse, error) {
 	return s.GetSandboxFunc(ctx, req)
 }
 
 func (s *testGRPCDaemonService) RemoveSandbox(ctx context.Context, req *daemonpb.IDRequest) (*daemonpb.StatusResponse, error) {
 	return s.RemoveSandboxFunc(ctx, req)
+}
+
+func (s *testGRPCDaemonService) ExpungeSandbox(ctx context.Context, req *daemonpb.IDRequest) (*daemonpb.StatusResponse, error) {
+	return s.ExpungeSandboxFunc(ctx, req)
 }
 
 func (s *testGRPCDaemonService) StopSandbox(ctx context.Context, req *daemonpb.IDRequest) (*daemonpb.StatusResponse, error) {

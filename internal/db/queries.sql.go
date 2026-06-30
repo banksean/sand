@@ -153,6 +153,61 @@ func (q *Queries) GetSandboxesByImage(ctx context.Context, imageName string) ([]
 	return items, nil
 }
 
+const listDeletedSandboxes = `-- name: ListDeletedSandboxes :many
+SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains, cpu, memory_mb, default_username, default_uid, name, state, deleted_at, trash_work_dir, profile_name, mount_specs FROM sandboxes
+WHERE state = 'deleted'
+ORDER BY deleted_at DESC, created_at DESC
+`
+
+func (q *Queries) ListDeletedSandboxes(ctx context.Context) ([]Sandbox, error) {
+	rows, err := q.db.QueryContext(ctx, listDeletedSandboxes)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Sandbox
+	for rows.Next() {
+		var i Sandbox
+		if err := rows.Scan(
+			&i.ID,
+			&i.ContainerID,
+			&i.HostOriginDir,
+			&i.SandboxWorkDir,
+			&i.ImageName,
+			&i.DnsDomain,
+			&i.EnvFile,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.AgentType,
+			&i.OriginalGitOrigin,
+			&i.OriginalGitBranch,
+			&i.OriginalGitCommit,
+			&i.OriginalGitIsDirty,
+			&i.AllowedDomains,
+			&i.Cpu,
+			&i.MemoryMb,
+			&i.DefaultUsername,
+			&i.DefaultUid,
+			&i.Name,
+			&i.State,
+			&i.DeletedAt,
+			&i.TrashWorkDir,
+			&i.ProfileName,
+			&i.MountSpecs,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSandboxes = `-- name: ListSandboxes :many
 SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains, cpu, memory_mb, default_username, default_uid, name, state, deleted_at, trash_work_dir, profile_name, mount_specs FROM sandboxes
 WHERE state = 'active'

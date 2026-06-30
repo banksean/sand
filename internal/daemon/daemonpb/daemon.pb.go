@@ -1584,18 +1584,19 @@ const file_internal_daemon_daemonpb_daemon_proto_rawDesc = "" +
 	"\bprogress\x18\x01 \x01(\fH\x00R\bprogress\x12\x16\n" +
 	"\x05error\x18\x02 \x01(\tH\x00R\x05error\x12\x10\n" +
 	"\x02ok\x18\x03 \x01(\bH\x00R\x02okB\a\n" +
-	"\x05event2\xb4\n" +
-	"\n" +
+	"\x05event2\xe6\v\n" +
 	"\rDaemonService\x12A\n" +
 	"\x04Ping\x12\x1b.sand.daemon.v1.PingRequest\x1a\x1c.sand.daemon.v1.PingResponse\x12J\n" +
 	"\aVersion\x12\x1e.sand.daemon.v1.VersionRequest\x1a\x1f.sand.daemon.v1.VersionResponse\x12K\n" +
 	"\bShutdown\x12\x1f.sand.daemon.v1.ShutdownRequest\x1a\x1e.sand.daemon.v1.StatusResponse\x12K\n" +
 	"\n" +
 	"LogSandbox\x12\x19.sand.daemon.v1.IDRequest\x1a\".sand.daemon.v1.LogSandboxResponse\x12\\\n" +
-	"\rListSandboxes\x12$.sand.daemon.v1.ListSandboxesRequest\x1a%.sand.daemon.v1.ListSandboxesResponse\x12K\n" +
+	"\rListSandboxes\x12$.sand.daemon.v1.ListSandboxesRequest\x1a%.sand.daemon.v1.ListSandboxesResponse\x12c\n" +
+	"\x14ListDeletedSandboxes\x12$.sand.daemon.v1.ListSandboxesRequest\x1a%.sand.daemon.v1.ListSandboxesResponse\x12K\n" +
 	"\n" +
 	"GetSandbox\x12\x19.sand.daemon.v1.IDRequest\x1a\".sand.daemon.v1.GetSandboxResponse\x12J\n" +
-	"\rRemoveSandbox\x12\x19.sand.daemon.v1.IDRequest\x1a\x1e.sand.daemon.v1.StatusResponse\x12H\n" +
+	"\rRemoveSandbox\x12\x19.sand.daemon.v1.IDRequest\x1a\x1e.sand.daemon.v1.StatusResponse\x12K\n" +
+	"\x0eExpungeSandbox\x12\x19.sand.daemon.v1.IDRequest\x1a\x1e.sand.daemon.v1.StatusResponse\x12H\n" +
 	"\vStopSandbox\x12\x19.sand.daemon.v1.IDRequest\x1a\x1e.sand.daemon.v1.StatusResponse\x12S\n" +
 	"\fStartSandbox\x12#.sand.daemon.v1.StartSandboxRequest\x1a\x1e.sand.daemon.v1.StatusResponse\x12Y\n" +
 	"\x11SyncHostGitMirror\x12\x19.sand.daemon.v1.IDRequest\x1a).sand.daemon.v1.SyncHostGitMirrorResponse\x12t\n" +
@@ -1659,35 +1660,39 @@ var file_internal_daemon_daemonpb_daemon_proto_depIdxs = []int32{
 	5,  // 7: sand.daemon.v1.DaemonService.Shutdown:input_type -> sand.daemon.v1.ShutdownRequest
 	6,  // 8: sand.daemon.v1.DaemonService.LogSandbox:input_type -> sand.daemon.v1.IDRequest
 	8,  // 9: sand.daemon.v1.DaemonService.ListSandboxes:input_type -> sand.daemon.v1.ListSandboxesRequest
-	6,  // 10: sand.daemon.v1.DaemonService.GetSandbox:input_type -> sand.daemon.v1.IDRequest
-	6,  // 11: sand.daemon.v1.DaemonService.RemoveSandbox:input_type -> sand.daemon.v1.IDRequest
-	6,  // 12: sand.daemon.v1.DaemonService.StopSandbox:input_type -> sand.daemon.v1.IDRequest
-	11, // 13: sand.daemon.v1.DaemonService.StartSandbox:input_type -> sand.daemon.v1.StartSandboxRequest
-	6,  // 14: sand.daemon.v1.DaemonService.SyncHostGitMirror:input_type -> sand.daemon.v1.IDRequest
-	13, // 15: sand.daemon.v1.DaemonService.ResolveAgentLaunchEnv:input_type -> sand.daemon.v1.ResolveAgentLaunchEnvRequest
-	18, // 16: sand.daemon.v1.DaemonService.ExportImage:input_type -> sand.daemon.v1.ExportImageRequest
-	19, // 17: sand.daemon.v1.DaemonService.Stats:input_type -> sand.daemon.v1.StatsRequest
-	6,  // 18: sand.daemon.v1.DaemonService.VSC:input_type -> sand.daemon.v1.IDRequest
-	22, // 19: sand.daemon.v1.DaemonService.CreateSandbox:input_type -> sand.daemon.v1.CreateSandboxRequest
-	24, // 20: sand.daemon.v1.DaemonService.EnsureImage:input_type -> sand.daemon.v1.EnsureImageRequest
-	1,  // 21: sand.daemon.v1.DaemonService.Ping:output_type -> sand.daemon.v1.PingResponse
-	3,  // 22: sand.daemon.v1.DaemonService.Version:output_type -> sand.daemon.v1.VersionResponse
-	4,  // 23: sand.daemon.v1.DaemonService.Shutdown:output_type -> sand.daemon.v1.StatusResponse
-	7,  // 24: sand.daemon.v1.DaemonService.LogSandbox:output_type -> sand.daemon.v1.LogSandboxResponse
-	9,  // 25: sand.daemon.v1.DaemonService.ListSandboxes:output_type -> sand.daemon.v1.ListSandboxesResponse
-	10, // 26: sand.daemon.v1.DaemonService.GetSandbox:output_type -> sand.daemon.v1.GetSandboxResponse
-	4,  // 27: sand.daemon.v1.DaemonService.RemoveSandbox:output_type -> sand.daemon.v1.StatusResponse
-	4,  // 28: sand.daemon.v1.DaemonService.StopSandbox:output_type -> sand.daemon.v1.StatusResponse
-	4,  // 29: sand.daemon.v1.DaemonService.StartSandbox:output_type -> sand.daemon.v1.StatusResponse
-	12, // 30: sand.daemon.v1.DaemonService.SyncHostGitMirror:output_type -> sand.daemon.v1.SyncHostGitMirrorResponse
-	14, // 31: sand.daemon.v1.DaemonService.ResolveAgentLaunchEnv:output_type -> sand.daemon.v1.ResolveAgentLaunchEnvResponse
-	4,  // 32: sand.daemon.v1.DaemonService.ExportImage:output_type -> sand.daemon.v1.StatusResponse
-	20, // 33: sand.daemon.v1.DaemonService.Stats:output_type -> sand.daemon.v1.StatsResponse
-	4,  // 34: sand.daemon.v1.DaemonService.VSC:output_type -> sand.daemon.v1.StatusResponse
-	23, // 35: sand.daemon.v1.DaemonService.CreateSandbox:output_type -> sand.daemon.v1.CreateSandboxResponse
-	25, // 36: sand.daemon.v1.DaemonService.EnsureImage:output_type -> sand.daemon.v1.EnsureImageResponse
-	21, // [21:37] is the sub-list for method output_type
-	5,  // [5:21] is the sub-list for method input_type
+	8,  // 10: sand.daemon.v1.DaemonService.ListDeletedSandboxes:input_type -> sand.daemon.v1.ListSandboxesRequest
+	6,  // 11: sand.daemon.v1.DaemonService.GetSandbox:input_type -> sand.daemon.v1.IDRequest
+	6,  // 12: sand.daemon.v1.DaemonService.RemoveSandbox:input_type -> sand.daemon.v1.IDRequest
+	6,  // 13: sand.daemon.v1.DaemonService.ExpungeSandbox:input_type -> sand.daemon.v1.IDRequest
+	6,  // 14: sand.daemon.v1.DaemonService.StopSandbox:input_type -> sand.daemon.v1.IDRequest
+	11, // 15: sand.daemon.v1.DaemonService.StartSandbox:input_type -> sand.daemon.v1.StartSandboxRequest
+	6,  // 16: sand.daemon.v1.DaemonService.SyncHostGitMirror:input_type -> sand.daemon.v1.IDRequest
+	13, // 17: sand.daemon.v1.DaemonService.ResolveAgentLaunchEnv:input_type -> sand.daemon.v1.ResolveAgentLaunchEnvRequest
+	18, // 18: sand.daemon.v1.DaemonService.ExportImage:input_type -> sand.daemon.v1.ExportImageRequest
+	19, // 19: sand.daemon.v1.DaemonService.Stats:input_type -> sand.daemon.v1.StatsRequest
+	6,  // 20: sand.daemon.v1.DaemonService.VSC:input_type -> sand.daemon.v1.IDRequest
+	22, // 21: sand.daemon.v1.DaemonService.CreateSandbox:input_type -> sand.daemon.v1.CreateSandboxRequest
+	24, // 22: sand.daemon.v1.DaemonService.EnsureImage:input_type -> sand.daemon.v1.EnsureImageRequest
+	1,  // 23: sand.daemon.v1.DaemonService.Ping:output_type -> sand.daemon.v1.PingResponse
+	3,  // 24: sand.daemon.v1.DaemonService.Version:output_type -> sand.daemon.v1.VersionResponse
+	4,  // 25: sand.daemon.v1.DaemonService.Shutdown:output_type -> sand.daemon.v1.StatusResponse
+	7,  // 26: sand.daemon.v1.DaemonService.LogSandbox:output_type -> sand.daemon.v1.LogSandboxResponse
+	9,  // 27: sand.daemon.v1.DaemonService.ListSandboxes:output_type -> sand.daemon.v1.ListSandboxesResponse
+	9,  // 28: sand.daemon.v1.DaemonService.ListDeletedSandboxes:output_type -> sand.daemon.v1.ListSandboxesResponse
+	10, // 29: sand.daemon.v1.DaemonService.GetSandbox:output_type -> sand.daemon.v1.GetSandboxResponse
+	4,  // 30: sand.daemon.v1.DaemonService.RemoveSandbox:output_type -> sand.daemon.v1.StatusResponse
+	4,  // 31: sand.daemon.v1.DaemonService.ExpungeSandbox:output_type -> sand.daemon.v1.StatusResponse
+	4,  // 32: sand.daemon.v1.DaemonService.StopSandbox:output_type -> sand.daemon.v1.StatusResponse
+	4,  // 33: sand.daemon.v1.DaemonService.StartSandbox:output_type -> sand.daemon.v1.StatusResponse
+	12, // 34: sand.daemon.v1.DaemonService.SyncHostGitMirror:output_type -> sand.daemon.v1.SyncHostGitMirrorResponse
+	14, // 35: sand.daemon.v1.DaemonService.ResolveAgentLaunchEnv:output_type -> sand.daemon.v1.ResolveAgentLaunchEnvResponse
+	4,  // 36: sand.daemon.v1.DaemonService.ExportImage:output_type -> sand.daemon.v1.StatusResponse
+	20, // 37: sand.daemon.v1.DaemonService.Stats:output_type -> sand.daemon.v1.StatsResponse
+	4,  // 38: sand.daemon.v1.DaemonService.VSC:output_type -> sand.daemon.v1.StatusResponse
+	23, // 39: sand.daemon.v1.DaemonService.CreateSandbox:output_type -> sand.daemon.v1.CreateSandboxResponse
+	25, // 40: sand.daemon.v1.DaemonService.EnsureImage:output_type -> sand.daemon.v1.EnsureImageResponse
+	23, // [23:41] is the sub-list for method output_type
+	5,  // [5:23] is the sub-list for method input_type
 	5,  // [5:5] is the sub-list for extension type_name
 	5,  // [5:5] is the sub-list for extension extendee
 	0,  // [0:5] is the sub-list for field type_name

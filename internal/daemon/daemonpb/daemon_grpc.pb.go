@@ -24,8 +24,10 @@ const (
 	DaemonService_Shutdown_FullMethodName              = "/sand.daemon.v1.DaemonService/Shutdown"
 	DaemonService_LogSandbox_FullMethodName            = "/sand.daemon.v1.DaemonService/LogSandbox"
 	DaemonService_ListSandboxes_FullMethodName         = "/sand.daemon.v1.DaemonService/ListSandboxes"
+	DaemonService_ListDeletedSandboxes_FullMethodName  = "/sand.daemon.v1.DaemonService/ListDeletedSandboxes"
 	DaemonService_GetSandbox_FullMethodName            = "/sand.daemon.v1.DaemonService/GetSandbox"
 	DaemonService_RemoveSandbox_FullMethodName         = "/sand.daemon.v1.DaemonService/RemoveSandbox"
+	DaemonService_ExpungeSandbox_FullMethodName        = "/sand.daemon.v1.DaemonService/ExpungeSandbox"
 	DaemonService_StopSandbox_FullMethodName           = "/sand.daemon.v1.DaemonService/StopSandbox"
 	DaemonService_StartSandbox_FullMethodName          = "/sand.daemon.v1.DaemonService/StartSandbox"
 	DaemonService_SyncHostGitMirror_FullMethodName     = "/sand.daemon.v1.DaemonService/SyncHostGitMirror"
@@ -46,8 +48,10 @@ type DaemonServiceClient interface {
 	Shutdown(ctx context.Context, in *ShutdownRequest, opts ...grpc.CallOption) (*StatusResponse, error)
 	LogSandbox(ctx context.Context, in *IDRequest, opts ...grpc.CallOption) (*LogSandboxResponse, error)
 	ListSandboxes(ctx context.Context, in *ListSandboxesRequest, opts ...grpc.CallOption) (*ListSandboxesResponse, error)
+	ListDeletedSandboxes(ctx context.Context, in *ListSandboxesRequest, opts ...grpc.CallOption) (*ListSandboxesResponse, error)
 	GetSandbox(ctx context.Context, in *IDRequest, opts ...grpc.CallOption) (*GetSandboxResponse, error)
 	RemoveSandbox(ctx context.Context, in *IDRequest, opts ...grpc.CallOption) (*StatusResponse, error)
+	ExpungeSandbox(ctx context.Context, in *IDRequest, opts ...grpc.CallOption) (*StatusResponse, error)
 	StopSandbox(ctx context.Context, in *IDRequest, opts ...grpc.CallOption) (*StatusResponse, error)
 	StartSandbox(ctx context.Context, in *StartSandboxRequest, opts ...grpc.CallOption) (*StatusResponse, error)
 	SyncHostGitMirror(ctx context.Context, in *IDRequest, opts ...grpc.CallOption) (*SyncHostGitMirrorResponse, error)
@@ -117,6 +121,16 @@ func (c *daemonServiceClient) ListSandboxes(ctx context.Context, in *ListSandbox
 	return out, nil
 }
 
+func (c *daemonServiceClient) ListDeletedSandboxes(ctx context.Context, in *ListSandboxesRequest, opts ...grpc.CallOption) (*ListSandboxesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListSandboxesResponse)
+	err := c.cc.Invoke(ctx, DaemonService_ListDeletedSandboxes_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *daemonServiceClient) GetSandbox(ctx context.Context, in *IDRequest, opts ...grpc.CallOption) (*GetSandboxResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetSandboxResponse)
@@ -131,6 +145,16 @@ func (c *daemonServiceClient) RemoveSandbox(ctx context.Context, in *IDRequest, 
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(StatusResponse)
 	err := c.cc.Invoke(ctx, DaemonService_RemoveSandbox_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *daemonServiceClient) ExpungeSandbox(ctx context.Context, in *IDRequest, opts ...grpc.CallOption) (*StatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StatusResponse)
+	err := c.cc.Invoke(ctx, DaemonService_ExpungeSandbox_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -254,8 +278,10 @@ type DaemonServiceServer interface {
 	Shutdown(context.Context, *ShutdownRequest) (*StatusResponse, error)
 	LogSandbox(context.Context, *IDRequest) (*LogSandboxResponse, error)
 	ListSandboxes(context.Context, *ListSandboxesRequest) (*ListSandboxesResponse, error)
+	ListDeletedSandboxes(context.Context, *ListSandboxesRequest) (*ListSandboxesResponse, error)
 	GetSandbox(context.Context, *IDRequest) (*GetSandboxResponse, error)
 	RemoveSandbox(context.Context, *IDRequest) (*StatusResponse, error)
+	ExpungeSandbox(context.Context, *IDRequest) (*StatusResponse, error)
 	StopSandbox(context.Context, *IDRequest) (*StatusResponse, error)
 	StartSandbox(context.Context, *StartSandboxRequest) (*StatusResponse, error)
 	SyncHostGitMirror(context.Context, *IDRequest) (*SyncHostGitMirrorResponse, error)
@@ -290,11 +316,17 @@ func (UnimplementedDaemonServiceServer) LogSandbox(context.Context, *IDRequest) 
 func (UnimplementedDaemonServiceServer) ListSandboxes(context.Context, *ListSandboxesRequest) (*ListSandboxesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListSandboxes not implemented")
 }
+func (UnimplementedDaemonServiceServer) ListDeletedSandboxes(context.Context, *ListSandboxesRequest) (*ListSandboxesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListDeletedSandboxes not implemented")
+}
 func (UnimplementedDaemonServiceServer) GetSandbox(context.Context, *IDRequest) (*GetSandboxResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetSandbox not implemented")
 }
 func (UnimplementedDaemonServiceServer) RemoveSandbox(context.Context, *IDRequest) (*StatusResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RemoveSandbox not implemented")
+}
+func (UnimplementedDaemonServiceServer) ExpungeSandbox(context.Context, *IDRequest) (*StatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ExpungeSandbox not implemented")
 }
 func (UnimplementedDaemonServiceServer) StopSandbox(context.Context, *IDRequest) (*StatusResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method StopSandbox not implemented")
@@ -434,6 +466,24 @@ func _DaemonService_ListSandboxes_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DaemonService_ListDeletedSandboxes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListSandboxesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DaemonServiceServer).ListDeletedSandboxes(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DaemonService_ListDeletedSandboxes_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DaemonServiceServer).ListDeletedSandboxes(ctx, req.(*ListSandboxesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _DaemonService_GetSandbox_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(IDRequest)
 	if err := dec(in); err != nil {
@@ -466,6 +516,24 @@ func _DaemonService_RemoveSandbox_Handler(srv interface{}, ctx context.Context, 
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(DaemonServiceServer).RemoveSandbox(ctx, req.(*IDRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DaemonService_ExpungeSandbox_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(IDRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DaemonServiceServer).ExpungeSandbox(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DaemonService_ExpungeSandbox_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DaemonServiceServer).ExpungeSandbox(ctx, req.(*IDRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -646,12 +714,20 @@ var DaemonService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _DaemonService_ListSandboxes_Handler,
 		},
 		{
+			MethodName: "ListDeletedSandboxes",
+			Handler:    _DaemonService_ListDeletedSandboxes_Handler,
+		},
+		{
 			MethodName: "GetSandbox",
 			Handler:    _DaemonService_GetSandbox_Handler,
 		},
 		{
 			MethodName: "RemoveSandbox",
 			Handler:    _DaemonService_RemoveSandbox_Handler,
+		},
+		{
+			MethodName: "ExpungeSandbox",
+			Handler:    _DaemonService_ExpungeSandbox_Handler,
 		},
 		{
 			MethodName: "StopSandbox",

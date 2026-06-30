@@ -10,8 +10,10 @@ service DaemonService {
   rpc Shutdown(ShutdownRequest) returns (StatusResponse);
   rpc LogSandbox(IDRequest) returns (LogSandboxResponse);
   rpc ListSandboxes(ListSandboxesRequest) returns (ListSandboxesResponse);
+  rpc ListDeletedSandboxes(ListSandboxesRequest) returns (ListSandboxesResponse);
   rpc GetSandbox(IDRequest) returns (GetSandboxResponse);
   rpc RemoveSandbox(IDRequest) returns (StatusResponse);
+  rpc ExpungeSandbox(IDRequest) returns (StatusResponse);
   rpc StopSandbox(IDRequest) returns (StatusResponse);
   rpc StartSandbox(StartSandboxRequest) returns (StatusResponse);
   rpc SyncHostGitMirror(IDRequest) returns (SyncHostGitMirrorResponse);

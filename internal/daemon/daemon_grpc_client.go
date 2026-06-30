@@ -106,6 +106,18 @@ func (c *GRPCClient) ListSandboxes(ctx context.Context) ([]sandtypes.Box, error)
 	return boxes, nil
 }
 
+func (c *GRPCClient) ListDeletedSandboxes(ctx context.Context) ([]sandtypes.Box, error) {
+	resp, err := c.client.ListDeletedSandboxes(ctx, &daemonpb.ListSandboxesRequest{})
+	if err != nil {
+		return nil, err
+	}
+	var boxes []sandtypes.Box
+	if err := json.Unmarshal(resp.GetBoxesJson(), &boxes); err != nil {
+		return nil, fmt.Errorf("decode deleted sandbox list: %w", err)
+	}
+	return boxes, nil
+}
+
 func (c *GRPCClient) GetSandbox(ctx context.Context, name string) (*sandtypes.Box, error) {
 	resp, err := c.client.GetSandbox(ctx, &daemonpb.IDRequest{Id: name})
 	if err != nil {
@@ -120,6 +132,11 @@ func (c *GRPCClient) GetSandbox(ctx context.Context, name string) (*sandtypes.Bo
 
 func (c *GRPCClient) RemoveSandbox(ctx context.Context, name string) error {
 	_, err := c.client.RemoveSandbox(ctx, &daemonpb.IDRequest{Id: name})
+	return err
+}
+
+func (c *GRPCClient) ExpungeSandbox(ctx context.Context, id string) error {
+	_, err := c.client.ExpungeSandbox(ctx, &daemonpb.IDRequest{Id: id})
 	return err
 }
 

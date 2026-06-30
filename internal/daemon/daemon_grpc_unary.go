@@ -47,6 +47,18 @@ func (s *daemonGRPCServer) ListSandboxes(ctx context.Context, _ *daemonpb.ListSa
 	return &daemonpb.ListSandboxesResponse{BoxesJson: boxesJSON}, nil
 }
 
+func (s *daemonGRPCServer) ListDeletedSandboxes(ctx context.Context, _ *daemonpb.ListSandboxesRequest) (*daemonpb.ListSandboxesResponse, error) {
+	boxes, err := s.daemon.ListDeletedSandboxes(ctx)
+	if err != nil {
+		return nil, err
+	}
+	boxesJSON, err := json.Marshal(boxes)
+	if err != nil {
+		return nil, fmt.Errorf("marshal deleted sandboxes: %w", err)
+	}
+	return &daemonpb.ListSandboxesResponse{BoxesJson: boxesJSON}, nil
+}
+
 func (s *daemonGRPCServer) GetSandbox(ctx context.Context, req *daemonpb.IDRequest) (*daemonpb.GetSandboxResponse, error) {
 	id := req.GetId()
 	ctx = sandboxlog.WithSandboxID(ctx, id)
@@ -68,6 +80,15 @@ func (s *daemonGRPCServer) RemoveSandbox(ctx context.Context, req *daemonpb.IDRe
 	id := req.GetId()
 	ctx = sandboxlog.WithSandboxID(ctx, id)
 	if err := s.daemon.RemoveSandbox(ctx, id); err != nil {
+		return nil, err
+	}
+	return okStatus(), nil
+}
+
+func (s *daemonGRPCServer) ExpungeSandbox(ctx context.Context, req *daemonpb.IDRequest) (*daemonpb.StatusResponse, error) {
+	id := req.GetId()
+	ctx = sandboxlog.WithSandboxID(ctx, id)
+	if err := s.daemon.ExpungeSandbox(ctx, id); err != nil {
 		return nil, err
 	}
 	return okStatus(), nil
