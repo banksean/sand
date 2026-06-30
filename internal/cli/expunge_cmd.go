@@ -114,7 +114,8 @@ func confirmSandboxExpunge(row lsRow, reader *bufio.Reader, stdout io.Writer) (b
 }
 
 func formatExpungeSummary(row lsRow) string {
-	return fmt.Sprintf("%s\t%s\t%s\t%s\t%s",
+	return fmt.Sprintf(
+		"%s\t%s\t%s\t%s\t%s",
 		row.Name,
 		shortSandboxID(row.ID),
 		row.FromDir,
