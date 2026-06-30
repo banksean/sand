@@ -22,7 +22,7 @@ type lsRow struct {
 	Stats      *types.ContainerStats
 }
 
-func renderLsTable(w io.Writer, currentRows, otherRows []lsRow, long bool) error {
+func renderLsTable(w io.Writer, currentRows, otherRows, deletedRows []lsRow, long bool) error {
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	headings := []string{
 		"NAME",
@@ -47,6 +47,14 @@ func renderLsTable(w io.Writer, currentRows, otherRows []lsRow, long bool) error
 			return err
 		}
 		if err := renderLsRows(tw, otherRows, long); err != nil {
+			return err
+		}
+	}
+	if len(deletedRows) > 0 {
+		if _, err := fmt.Fprintln(tw, "--- deleted sandboxes ---"); err != nil {
+			return err
+		}
+		if err := renderLsRows(tw, deletedRows, long); err != nil {
 			return err
 		}
 	}

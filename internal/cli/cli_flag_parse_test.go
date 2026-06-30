@@ -260,6 +260,18 @@ func TestMultiSandboxNameFlagsNoArgs(t *testing.T) {
 	}
 }
 
+func TestLsCmdAllFlags(t *testing.T) {
+	for _, args := range [][]string{{"--all"}, {"-a"}} {
+		var cli struct {
+			Ls LsCmd `cmd:""`
+		}
+		kongParse(t, &cli, append([]string{"ls"}, args...))
+		if !cli.Ls.All {
+			t.Fatalf("expected Ls.All=true for args %v", args)
+		}
+	}
+}
+
 func TestNewCmdDefaults(t *testing.T) {
 	var cli struct {
 		New NewCmd `cmd:""`

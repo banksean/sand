@@ -109,7 +109,7 @@ func TestRenderLsTableSplitsCurrentAndOtherRows(t *testing.T) {
 	var buf bytes.Buffer
 	currentRows := []lsRow{{Name: "current", ID: "3a9a0df8-3ad2-4b79-9a4f-0d7e41f1df1b", Status: "running"}}
 	otherRows := []lsRow{{Name: "other", ID: "sandbox-dev-1", Status: "dormant"}}
-	if err := renderLsTable(&buf, currentRows, otherRows, false); err != nil {
+	if err := renderLsTable(&buf, currentRows, otherRows, nil, false); err != nil {
 		t.Fatal(err)
 	}
 	out := buf.String()
@@ -142,7 +142,7 @@ func TestRenderLsTableLongUsesShortIDAndStats(t *testing.T) {
 			MemoryLimitBytes: 1024 * 1024,
 		},
 	}}
-	if err := renderLsTable(&buf, rows, nil, true); err != nil {
+	if err := renderLsTable(&buf, rows, nil, nil, true); err != nil {
 		t.Fatal(err)
 	}
 	out := buf.String()
@@ -153,5 +153,46 @@ func TestRenderLsTableLongUsesShortIDAndStats(t *testing.T) {
 	}
 	if strings.Contains(out, "HERE") {
 		t.Fatalf("renderLsTable output includes removed HERE column:\n%s", out)
+	}
+}
+
+func TestRenderLsTableIncludesDeletedSectionAfterActiveRows(t *testing.T) {
+	var buf bytes.Buffer
+	currentRows := []lsRow{{Name: "current", ID: "current-id", Status: "running"}}
+	otherRows := []lsRow{{Name: "other", ID: "other-id", Status: "dormant"}}
+	deletedRows := []lsRow{{Name: "deleted", ID: "deleted-id", Status: "deleted"}}
+	if err := renderLsTable(&buf, currentRows, otherRows, deletedRows, false); err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+	currentIndex := strings.Index(out, "current")
+	otherDelimiterIndex := strings.Index(out, "--- other sandboxes ---")
+	otherIndex := strings.Index(out, "other")
+	deletedDelimiterIndex := strings.Index(out, "--- deleted sandboxes ---")
+	deletedIndex := strings.Index(out, "deleted-id")
+	if currentIndex < 0 || otherDelimiterIndex < 0 || otherIndex < 0 || deletedDelimiterIndex < 0 || deletedIndex < 0 {
+		t.Fatalf("renderLsTable output missing expected rows or delimiters:\n%s", out)
+	}
+	if !(currentIndex < otherDelimiterIndex && otherDelimiterIndex < otherIndex && otherIndex < deletedDelimiterIndex && deletedDelimiterIndex < deletedIndex) {
+		t.Fatalf("renderLsTable did not order deleted section after active rows:\n%s", out)
+	}
+}
+
+func TestRowFromSandboxUsesDeletedStatus(t *testing.T) {
+	row := rowFromSandbox(sandtypes.Box{
+		ID:            "deleted-id",
+		Name:          "deleted-name",
+		State:         "deleted",
+		HostOriginDir: "/home/user/project",
+		ImageName:     "ghcr.io/banksean/sand/base:latest",
+	}, "/home/user", nil)
+	if row.Status != "deleted" {
+		t.Fatalf("row status = %q, want deleted", row.Status)
+	}
+	if row.FromDir != "~/project" {
+		t.Fatalf("row FromDir = %q, want ~/project", row.FromDir)
+	}
+	if row.ImageName != "base:latest" {
+		t.Fatalf("row ImageName = %q, want base:latest", row.ImageName)
 	}
 }

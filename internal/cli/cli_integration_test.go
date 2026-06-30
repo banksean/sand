@@ -5,6 +5,7 @@ import (
 	"slices"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/banksean/sand/internal/applecontainer/options"
 	"github.com/banksean/sand/internal/applecontainer/types"
@@ -51,6 +52,21 @@ func TestLsCmd_WithSandboxes(t *testing.T) {
 		s.SaveSandbox(ctx, testBox("beta"))
 	})
 	if err := (&cli.LsCmd{}).Run(cctx); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+}
+
+func TestLsCmd_AllIncludesDeletedSandboxes(t *testing.T) {
+	cctx := newCLIContext(t, daemontest.Deps{}, func(ctx context.Context, s daemontest.SandboxStore) {
+		s.SaveSandbox(ctx, testBox("active"))
+		deleted := testBox("deleted")
+		deleted.State = "deleted"
+		deleted.ContainerID = ""
+		deleted.DeletedAt = time.Now()
+		deleted.TrashWorkDir = "/tmp/trash/deleted"
+		s.SaveSandbox(ctx, deleted)
+	})
+	if err := (&cli.LsCmd{All: true}).Run(cctx); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 }

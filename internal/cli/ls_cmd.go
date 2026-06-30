@@ -16,6 +16,7 @@ import (
 
 type LsCmd struct {
 	Long bool `short:"l" help:"show resource usage columns"`
+	All  bool `short:"a" help:"include soft-deleted sandboxes"`
 }
 
 func (c *LsCmd) Run(cctx *CLIContext) error {
@@ -28,7 +29,16 @@ func (c *LsCmd) Run(cctx *CLIContext) error {
 		return err
 	}
 
-	if len(list) == 0 {
+	var deleted []sandtypes.Box
+	if c.All {
+		deleted, err = mc.ListDeletedSandboxes(ctx)
+		if err != nil {
+			slog.ErrorContext(ctx, "ListDeletedSandboxes", "error", err)
+			return err
+		}
+	}
+
+	if len(list) == 0 && len(deleted) == 0 {
 		return nil
 	}
 
@@ -41,39 +51,46 @@ func (c *LsCmd) Run(cctx *CLIContext) error {
 	currentRows := make([]lsRow, 0, len(list))
 	otherRows := make([]lsRow, 0, len(list))
 	for _, sbox := range list {
-		ctr := sbox.Container
-		status := []string{"dormant"}
-		if ctr != nil {
-			status[0] = ctr.Status.State
-		}
-		if sbox.SandboxContainerError != "" {
-			status = append(status, sbox.SandboxContainerError)
-		}
-		if sbox.SandboxWorkDirError != "" {
-			status = append(status, sbox.SandboxWorkDirError)
-		}
-		imgName := strings.TrimPrefix(sbox.ImageName, "ghcr.io/banksean/sand/")
-
-		originalBranch := gitSummary(sbox.OriginalGitDetails)
-		currentBranch := gitSummary(sbox.CurrentGitDetails)
-
-		row := lsRow{
-			Name:       sbox.Name,
-			ID:         sbox.ID,
-			Status:     strings.Join(status, ", "),
-			FromDir:    displayPath(sbox.HostOriginDir, userHomeDir),
-			FromGit:    originalBranch,
-			CurrentGit: currentBranch,
-			ImageName:  imgName,
-			Stats:      statsByContainerID[sbox.ContainerID],
-		}
+		row := rowFromSandbox(sbox, userHomeDir, statsByContainerID[sbox.ContainerID])
 		if samePath(currentWorkspace, sbox.HostOriginDir) {
 			currentRows = append(currentRows, row)
 		} else {
 			otherRows = append(otherRows, row)
 		}
 	}
-	return renderLsTable(os.Stdout, currentRows, otherRows, c.Long)
+	deletedRows := make([]lsRow, 0, len(deleted))
+	for _, sbox := range deleted {
+		deletedRows = append(deletedRows, rowFromSandbox(sbox, userHomeDir, nil))
+	}
+	return renderLsTable(os.Stdout, currentRows, otherRows, deletedRows, c.Long)
+}
+
+func rowFromSandbox(sbox sandtypes.Box, userHomeDir string, stats *types.ContainerStats) lsRow {
+	ctr := sbox.Container
+	status := []string{"dormant"}
+	if sbox.State == "deleted" {
+		status[0] = "deleted"
+	} else if ctr != nil {
+		status[0] = ctr.Status.State
+	}
+	if sbox.SandboxContainerError != "" {
+		status = append(status, sbox.SandboxContainerError)
+	}
+	if sbox.SandboxWorkDirError != "" {
+		status = append(status, sbox.SandboxWorkDirError)
+	}
+	imgName := strings.TrimPrefix(sbox.ImageName, "ghcr.io/banksean/sand/")
+
+	return lsRow{
+		Name:       sbox.Name,
+		ID:         sbox.ID,
+		Status:     strings.Join(status, ", "),
+		FromDir:    displayPath(sbox.HostOriginDir, userHomeDir),
+		FromGit:    gitSummary(sbox.OriginalGitDetails),
+		CurrentGit: gitSummary(sbox.CurrentGitDetails),
+		ImageName:  imgName,
+		Stats:      stats,
+	}
 }
 
 func currentWorkspaceDir(ctx context.Context) string {
