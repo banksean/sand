@@ -42,14 +42,23 @@ func TestExpungeCmd_DefaultsToAllDeletedSandboxes(t *testing.T) {
 }
 
 func TestExpungeCmd_DeclinedConfirmationSkipsExpunge(t *testing.T) {
+	const sandboxID = "3a9a0df8-3ad2-4b79-9a4f-0d7e41f1df1b"
 	cctx := newTestCLIContext(t, func(ctx context.Context, s daemontest.SandboxStore) {
-		s.SaveSandbox(ctx, newDeletedTestBox("deleted"))
+		box := newDeletedTestBox(sandboxID)
+		box.Name = "deleted-name"
+		box.ImageName = "ghcr.io/banksean/sand/base:latest"
+		box.OriginalGitDetails = &sandtypes.GitDetails{
+			Branch:  "main",
+			Commit:  "abcdef1234567890",
+			IsDirty: false,
+		}
+		s.SaveSandbox(ctx, box)
 	})
 
 	var stdout bytes.Buffer
 	restoreExpungeCmdIO(t, bytes.NewBufferString("n\n"), &stdout)
 
-	cmd := &ExpungeCmd{SandboxIDs: []string{"deleted"}}
+	cmd := &ExpungeCmd{SandboxIDs: []string{sandboxID}}
 	if err := cmd.Run(cctx); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
@@ -58,10 +67,11 @@ func TestExpungeCmd_DeclinedConfirmationSkipsExpunge(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListDeletedSandboxes() error = %v", err)
 	}
-	if len(deleted) != 1 || deleted[0].ID != "deleted" {
+	if len(deleted) != 1 || deleted[0].ID != sandboxID {
 		t.Fatalf("expected deleted sandbox to remain, got %v", testBoxIDs(deleted))
 	}
-	if got := stdout.String(); got != "expunge deleted [y/N]? " {
+	wantPrompt := "expunge deleted-name\t0d7e41f1df1b\t/home/user/project\t abcdef12 main\tbase:latest [y/N]? "
+	if got := stdout.String(); got != wantPrompt {
 		t.Fatalf("unexpected prompt output: %q", got)
 	}
 }

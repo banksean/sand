@@ -26,28 +26,52 @@ func (c *ExpungeCmd) Run(cctx *CLIContext) error {
 
 	slog.InfoContext(ctx, "ExpungeCmd", "run", *c)
 
-	targets := c.SandboxIDs
-	if len(targets) == 0 {
+	type expungeTarget struct {
+		id  string
+		row lsRow
+	}
+
+	var deletedByID map[string]lsRow
+	var deletedTargets []expungeTarget
+	if len(c.SandboxIDs) == 0 || !c.Force {
 		boxes, err := mc.ListDeletedSandboxes(ctx)
 		if err != nil {
 			return err
 		}
-		targets = make([]string, 0, len(boxes))
+		userHomeDir, _ := os.UserHomeDir()
+		deletedByID = make(map[string]lsRow, len(boxes))
 		for _, box := range boxes {
-			targets = append(targets, box.ID)
+			row := rowFromSandbox(box, userHomeDir, nil)
+			deletedByID[box.ID] = row
+			deletedTargets = append(deletedTargets, expungeTarget{id: box.ID, row: row})
+		}
+	}
+
+	targets := make([]expungeTarget, 0, len(c.SandboxIDs))
+	if len(c.SandboxIDs) == 0 {
+		targets = deletedTargets
+	} else {
+		for _, id := range c.SandboxIDs {
+			target := expungeTarget{id: id}
+			if row, ok := deletedByID[id]; ok {
+				target.row = row
+			} else {
+				target.row = lsRow{ID: id}
+			}
+			targets = append(targets, target)
 		}
 	}
 
 	if !c.Force {
 		reader := bufio.NewReader(expungeCmdStdin)
-		confirmed := make([]string, 0, len(targets))
-		for _, id := range targets {
-			ok, err := confirmSandboxExpunge(id, reader, expungeCmdStdout)
+		confirmed := make([]expungeTarget, 0, len(targets))
+		for _, target := range targets {
+			ok, err := confirmSandboxExpunge(target.row, reader, expungeCmdStdout)
 			if err != nil {
 				return err
 			}
 			if ok {
-				confirmed = append(confirmed, id)
+				confirmed = append(confirmed, target)
 			}
 		}
 		targets = confirmed
@@ -56,7 +80,7 @@ func (c *ExpungeCmd) Run(cctx *CLIContext) error {
 	var wg sync.WaitGroup
 	errChan := make(chan error, len(targets))
 
-	for _, id := range targets {
+	for _, target := range targets {
 		wg.Add(1)
 		go func(id string) {
 			defer wg.Done()
@@ -65,7 +89,7 @@ func (c *ExpungeCmd) Run(cctx *CLIContext) error {
 				return
 			}
 			fmt.Fprintf(expungeCmdStdout, "%s\n", id)
-		}(id)
+		}(target.id)
 	}
 
 	wg.Wait()
@@ -78,8 +102,8 @@ func (c *ExpungeCmd) Run(cctx *CLIContext) error {
 	return nil
 }
 
-func confirmSandboxExpunge(id string, reader *bufio.Reader, stdout io.Writer) (bool, error) {
-	fmt.Fprintf(stdout, "expunge %s [y/N]? ", id)
+func confirmSandboxExpunge(row lsRow, reader *bufio.Reader, stdout io.Writer) (bool, error) {
+	fmt.Fprintf(stdout, "expunge %s [y/N]? ", formatExpungeSummary(row))
 
 	text, err := reader.ReadString('\n')
 	if err != nil && !errors.Is(err, io.EOF) {
@@ -87,4 +111,14 @@ func confirmSandboxExpunge(id string, reader *bufio.Reader, stdout io.Writer) (b
 	}
 
 	return isYes(text), nil
+}
+
+func formatExpungeSummary(row lsRow) string {
+	return fmt.Sprintf("%s\t%s\t%s\t%s\t%s",
+		row.Name,
+		shortSandboxID(row.ID),
+		row.FromDir,
+		row.FromGit,
+		row.ImageName,
+	)
 }
