@@ -17,7 +17,6 @@ import (
 	"sync"
 	"syscall"
 
-	ac "github.com/banksean/sand/internal/applecontainer"
 	"github.com/banksean/sand/internal/applecontainer/options"
 	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/applecontainer/xpc"
@@ -26,8 +25,8 @@ import (
 )
 
 type xpcContainerOps struct {
-	client      *xpc.Client
-	imageClient *xpc.Client
+	client   *xpc.Client
+	imageOps *xpcImageOps
 }
 
 func NewXPCContainerOps() (ContainerOps, error) {
@@ -40,7 +39,7 @@ func NewXPCContainerOps() (ContainerOps, error) {
 		client.Close()
 		return nil, err
 	}
-	return &xpcContainerOps{client: client, imageClient: imageClient}, nil
+	return &xpcContainerOps{client: client, imageOps: &xpcImageOps{client: imageClient}}, nil
 }
 
 func (o *xpcContainerOps) Create(ctx context.Context, opts *options.CreateContainer, imageName string, initArgs []string) (string, error) {
@@ -274,34 +273,24 @@ func (o *xpcContainerOps) Export(ctx context.Context, opts *options.ExportContai
 }
 
 func (o *xpcContainerOps) imageDescription(ctx context.Context, imageName string, platform xpc.Platform) (xpc.ImageDescription, *types.ImageVariantContainerConfig, error) {
-	images, err := o.imageClient.ListImages(ctx)
+	desc, err := o.imageOps.findImage(ctx, imageName)
 	if err != nil {
 		return xpc.ImageDescription{}, nil, err
 	}
-	var desc *xpc.ImageDescription
-	for i := range images {
-		if images[i].Reference == imageName {
-			desc = &images[i]
-			break
-		}
-	}
-	if desc == nil {
-		return xpc.ImageDescription{}, nil, fmt.Errorf("image %q not found", imageName)
-	}
 
-	manifests, err := ac.Images.Inspect(ctx, imageName)
-	if err != nil || len(manifests) == 0 {
-		return *desc, nil, nil
+	manifest, err := o.imageOps.inspectImage(ctx, desc)
+	if err != nil {
+		return desc, nil, nil
 	}
-	for _, variant := range manifests[0].Variants {
+	for _, variant := range manifest.Variants {
 		if variant.Platform.OS == platform.OS && variant.Platform.Architecture == platform.Architecture {
-			return *desc, &variant.Config.Config, nil
+			return desc, &variant.Config.Config, nil
 		}
 	}
-	if len(manifests[0].Variants) > 0 {
-		return *desc, &manifests[0].Variants[0].Config.Config, nil
+	if len(manifest.Variants) > 0 {
+		return desc, &manifest.Variants[0].Config.Config, nil
 	}
-	return *desc, nil, nil
+	return desc, nil, nil
 }
 
 func (o *xpcContainerOps) kernel(ctx context.Context, customPath string, platform xpc.SystemPlatform) (xpc.Kernel, error) {

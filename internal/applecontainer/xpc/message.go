@@ -22,6 +22,7 @@ const (
 	messageKindData
 	messageKindDate
 	messageKindFD
+	messageKindEndpoint
 )
 
 type messageValue struct {
@@ -33,6 +34,7 @@ type messageValue struct {
 	data []byte
 	t    time.Time
 	fd   int
+	ptr  uintptr
 }
 
 // Message is a Go representation of the XPC dictionary protocol used by
@@ -141,6 +143,13 @@ func (m *Message) FD(key XPCKey) (int, bool) {
 		return 0, false
 	}
 	return v.fd, true
+}
+
+func (m *Message) SetEndpoint(key XPCKey, endpoint uintptr) {
+	if endpoint == 0 {
+		return
+	}
+	m.set(string(key), messageValue{kind: messageKindEndpoint, ptr: endpoint})
 }
 
 func (m *Message) SetData(key XPCKey, value []byte) {
@@ -256,6 +265,29 @@ func knownXPCDictionaryKeys() []string {
 		string(XPCKeyArchive),
 		string(XPCKeySystemPlatform),
 		string(XPCKeyImageDescriptions),
+		string(XPCKeyImageDescription),
+		string(XPCKeyImageReference),
+		string(XPCKeyOCIPlatform),
+		string(XPCKeyInsecureFlag),
+		string(XPCKeyMaxConcurrentDownloads),
+		string(XPCKeyDigest),
+		string(XPCKeyContentPath),
+		string(XPCKeyProgressUpdateEndpoint),
+		string(XPCKeyProgressUpdateSetDescription),
+		string(XPCKeyProgressUpdateSetSubDescription),
+		string(XPCKeyProgressUpdateSetItemsName),
+		string(XPCKeyProgressUpdateAddTasks),
+		string(XPCKeyProgressUpdateSetTasks),
+		string(XPCKeyProgressUpdateAddTotalTasks),
+		string(XPCKeyProgressUpdateSetTotalTasks),
+		string(XPCKeyProgressUpdateAddItems),
+		string(XPCKeyProgressUpdateSetItems),
+		string(XPCKeyProgressUpdateAddTotalItems),
+		string(XPCKeyProgressUpdateSetTotalItems),
+		string(XPCKeyProgressUpdateAddSize),
+		string(XPCKeyProgressUpdateSetSize),
+		string(XPCKeyProgressUpdateAddTotalSize),
+		string(XPCKeyProgressUpdateSetTotalSize),
 		string(XPCKeyNetworkID),
 		string(XPCKeyNetworkConfig),
 		string(XPCKeyNetworkResource),

@@ -498,6 +498,73 @@ func (c *Client) ListImages(ctx context.Context) ([]ImageDescription, error) {
 	return images, nil
 }
 
+type ImagePullOptions struct {
+	Platform               *Platform
+	Insecure               bool
+	MaxConcurrentDownloads int64
+}
+
+func (o ImagePullOptions) withDefaults() ImagePullOptions {
+	if o.MaxConcurrentDownloads <= 0 {
+		o.MaxConcurrentDownloads = 3
+	}
+	return o
+}
+
+func (c *Client) PullImage(ctx context.Context, reference string, opts ImagePullOptions, progress ProgressHandler) (ImageDescription, error) {
+	if reference == "" {
+		return ImageDescription{}, fmt.Errorf("image reference cannot be empty")
+	}
+	opts = opts.withDefaults()
+	progressEndpoint, err := newProgressEndpoint(progress)
+	if err != nil {
+		return ImageDescription{}, err
+	}
+	if progressEndpoint != nil {
+		defer progressEndpoint.Close()
+	}
+	reply, err := c.send(ctx, XPCRouteImagePull, func(message *Message) error {
+		message.SetString(XPCKeyImageReference, reference)
+		if opts.Platform != nil {
+			if err := message.SetJSON(XPCKeyOCIPlatform, opts.Platform); err != nil {
+				return err
+			}
+		}
+		message.SetBool(XPCKeyInsecureFlag, opts.Insecure)
+		message.SetInt64(XPCKeyMaxConcurrentDownloads, opts.MaxConcurrentDownloads)
+		if progressEndpoint != nil {
+			message.SetEndpoint(XPCKeyProgressUpdateEndpoint, progressEndpoint.Handle())
+		}
+		return nil
+	}, false)
+	if err != nil {
+		return ImageDescription{}, fmt.Errorf("pull image %q: %w", reference, err)
+	}
+	var image ImageDescription
+	if err := reply.DecodeJSON(XPCKeyImageDescription, &image); err != nil {
+		return ImageDescription{}, err
+	}
+	return image, nil
+}
+
+func (c *Client) GetContentPath(ctx context.Context, digest string) (string, error) {
+	if digest == "" {
+		return "", fmt.Errorf("digest cannot be empty")
+	}
+	reply, err := c.Send(ctx, XPCRouteContentGet, func(message *Message) error {
+		message.SetString(XPCKeyDigest, digest)
+		return nil
+	})
+	if err != nil {
+		return "", fmt.Errorf("get content %q: %w", digest, err)
+	}
+	path, ok := reply.String(XPCKeyContentPath)
+	if !ok || path == "" {
+		return "", fmt.Errorf("content path not received for digest %q", digest)
+	}
+	return path, nil
+}
+
 func setStdio(message *Message, stdio [3]*os.File) {
 	keys := [3]XPCKey{XPCKeyStdin, XPCKeyStdout, XPCKeyStderr}
 	for i, file := range stdio {

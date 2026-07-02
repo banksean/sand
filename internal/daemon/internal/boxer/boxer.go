@@ -1141,7 +1141,12 @@ func (sb *Boxer) EnsureImage(ctx context.Context, imageName string, w io.Writer)
 
 	// Image is present locally; for remote registry images, check for a newer digest.
 	if strings.HasPrefix(imageName, "ghcr.io") || strings.HasPrefix(imageName, "docker.io") {
-		isLatest, err := runtimedeps.CheckImageIsLatest(ctx, imageName)
+		localDigest, err := sb.localImageDigest(ctx, imageName)
+		if err != nil {
+			fmt.Fprintf(w, "Failed to inspect local image %s, continuing with local version: %s\n", imageName, err)
+			return nil
+		}
+		isLatest, err := runtimedeps.CheckImageDigestIsLatest(ctx, imageName, localDigest)
 		if err != nil {
 			fmt.Fprintf(w, "Failed to check remote registry for latest version of %s, continuing with local version: %s\n", imageName, err)
 		} else if !isLatest {
@@ -1151,6 +1156,17 @@ func (sb *Boxer) EnsureImage(ctx context.Context, imageName string, w io.Writer)
 	}
 
 	return nil
+}
+
+func (sb *Boxer) localImageDigest(ctx context.Context, imageName string) (string, error) {
+	imgs, err := sb.ImageService.Inspect(ctx, imageName)
+	if err != nil {
+		return "", err
+	}
+	if len(imgs) == 0 {
+		return "", fmt.Errorf("not found in local registry: %s", imageName)
+	}
+	return imgs[0].Index.Digest, nil
 }
 
 // pullImage pulls imageName and writes progress messages to w.

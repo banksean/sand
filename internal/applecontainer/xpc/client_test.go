@@ -148,6 +148,74 @@ func TestWaitProcessPreservesCallerDeadline(t *testing.T) {
 	}
 }
 
+func TestPullImageSendsRequestAndDoesNotApplyDefaultTimeout(t *testing.T) {
+	sender := &fakeSender{handler: func(request *Message) (*Message, error) {
+		if request.Route() != XPCRouteImagePull {
+			t.Fatalf("route = %q", request.Route())
+		}
+		assertStringKey(t, request, XPCKeyImageReference, "registry.example/image:latest")
+		if !request.Bool(XPCKeyInsecureFlag) {
+			t.Fatal("insecureFlag not set")
+		}
+		if request.Int64(XPCKeyMaxConcurrentDownloads) != 4 {
+			t.Fatalf("maxConcurrentDownloads = %d", request.Int64(XPCKeyMaxConcurrentDownloads))
+		}
+		var platform Platform
+		if err := request.DecodeJSON(XPCKeyOCIPlatform, &platform); err != nil {
+			t.Fatal(err)
+		}
+		if platform.OS != "linux" || platform.Architecture != "arm64" {
+			t.Fatalf("platform = %#v", platform)
+		}
+		reply := newEmptyMessage()
+		mustSetJSON(t, reply, XPCKeyImageDescription, ImageDescription{
+			Reference:  "registry.example/image:latest",
+			Descriptor: Descriptor{Digest: "sha256:abc", MediaType: "application/vnd.oci.image.index.v1+json"},
+		})
+		return reply, nil
+	}}
+	client := newFakeClient(t, sender)
+
+	image, err := client.PullImage(context.Background(), "registry.example/image:latest", ImagePullOptions{
+		Platform:               &Platform{OS: "linux", Architecture: "arm64"},
+		Insecure:               true,
+		MaxConcurrentDownloads: 4,
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if image.Descriptor.Digest != "sha256:abc" {
+		t.Fatalf("image = %#v", image)
+	}
+	if deadline, ok := sender.contexts[0].Deadline(); ok {
+		t.Fatalf("PullImage applied default timeout deadline %s", deadline)
+	}
+}
+
+func TestGetContentPath(t *testing.T) {
+	sender := &fakeSender{handler: func(request *Message) (*Message, error) {
+		if request.Route() != XPCRouteContentGet {
+			t.Fatalf("route = %q", request.Route())
+		}
+		assertStringKey(t, request, XPCKeyDigest, "sha256:abc")
+		reply := newEmptyMessage()
+		reply.SetString(XPCKeyContentPath, "/tmp/blob")
+		return reply, nil
+	}}
+	client := newFakeClient(t, sender)
+
+	path, err := client.GetContentPath(context.Background(), "sha256:abc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if path != "/tmp/blob" {
+		t.Fatalf("path = %q", path)
+	}
+	if _, ok := sender.contexts[0].Deadline(); !ok {
+		t.Fatal("GetContentPath did not apply default timeout")
+	}
+}
+
 func TestContainerScalarRoutes(t *testing.T) {
 	tests := []struct {
 		name  string

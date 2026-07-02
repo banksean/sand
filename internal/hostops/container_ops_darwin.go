@@ -9,3 +9,11 @@ func newAppleContainerOps() ContainerOps {
 	}
 	return ops
 }
+
+func newAppleImageOps() ImageOps {
+	ops, err := NewXPCImageOps()
+	if err != nil {
+		return &appleImageOps{}
+	}
+	return ops
+}

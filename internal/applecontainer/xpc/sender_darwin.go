@@ -115,6 +115,8 @@ func messageToXPC(message *Message) (C.xpc_object_t, error) {
 			C.xpc_dictionary_set_date(obj, cKey, C.int64_t(ns))
 		case messageKindFD:
 			C.xpc_dictionary_set_fd(obj, cKey, C.int(value.fd))
+		case messageKindEndpoint:
+			C.xpc_dictionary_set_value(obj, cKey, C.xpc_object_t(unsafe.Pointer(value.ptr)))
 		default:
 			C.free(unsafe.Pointer(cKey))
 			C.xpc_release(obj)

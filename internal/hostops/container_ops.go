@@ -74,7 +74,7 @@ func (a *appleContainerOps) Inspect(ctx context.Context, containerID string) ([]
 type appleImageOps struct{}
 
 func NewAppleImageOps() ImageOps {
-	return &appleImageOps{}
+	return newAppleImageOps()
 }
 
 func (a *appleImageOps) List(ctx context.Context) ([]types.ImageEntry, error) {
