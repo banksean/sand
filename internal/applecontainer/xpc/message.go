@@ -3,6 +3,7 @@ package xpc
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"time"
 )
 
@@ -20,6 +21,7 @@ const (
 	messageKindUint64
 	messageKindData
 	messageKindDate
+	messageKindFD
 )
 
 type messageValue struct {
@@ -30,6 +32,7 @@ type messageValue struct {
 	u    uint64
 	data []byte
 	t    time.Time
+	fd   int
 }
 
 // Message is a Go representation of the XPC dictionary protocol used by
@@ -121,6 +124,25 @@ func (m *Message) Date(key XPCKey) time.Time {
 	return v.t
 }
 
+func (m *Message) SetFile(key XPCKey, file *os.File) {
+	if file == nil {
+		return
+	}
+	m.set(string(key), messageValue{kind: messageKindFD, fd: int(file.Fd())})
+}
+
+func (m *Message) SetFDRaw(key string, fd int) {
+	m.set(key, messageValue{kind: messageKindFD, fd: fd})
+}
+
+func (m *Message) FD(key XPCKey) (int, bool) {
+	v, ok := m.values[string(key)]
+	if !ok || v.kind != messageKindFD {
+		return 0, false
+	}
+	return v.fd, true
+}
+
 func (m *Message) SetData(key XPCKey, value []byte) {
 	copied := append([]byte(nil), value...)
 	m.set(string(key), messageValue{kind: messageKindData, data: copied})
@@ -210,6 +232,9 @@ func knownXPCDictionaryKeys() []string {
 		string(XPCKeyPort),
 		string(XPCKeyExitCode),
 		string(XPCKeyExitedAt),
+		string(XPCKeyStdin),
+		string(XPCKeyStdout),
+		string(XPCKeyStderr),
 		string(XPCKeyFD),
 		string(XPCKeyLogs),
 		string(XPCKeyStopOptions),
@@ -226,6 +251,11 @@ func knownXPCDictionaryKeys() []string {
 		string(XPCKeyWidth),
 		string(XPCKeyHeight),
 		string(XPCKeyProcessConfig),
+		string(XPCKeyKernel),
+		string(XPCKeyInitImage),
+		string(XPCKeyArchive),
+		string(XPCKeySystemPlatform),
+		string(XPCKeyImageDescriptions),
 		string(XPCKeyNetworkID),
 		string(XPCKeyNetworkConfig),
 		string(XPCKeyNetworkResource),

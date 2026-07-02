@@ -844,6 +844,43 @@ type Platform struct {
 	Variant      string   `json:"variant,omitempty"`
 }
 
+type SystemPlatform struct {
+	OS           string `json:"os"`
+	Architecture string `json:"architecture"`
+}
+
+func CurrentSystemPlatform(goarch string) SystemPlatform {
+	if goarch == "amd64" {
+		return SystemPlatform{OS: "linux", Architecture: "amd64"}
+	}
+	return SystemPlatform{OS: "linux", Architecture: "arm64"}
+}
+
+type Kernel struct {
+	Path        string            `json:"path"`
+	Platform    SystemPlatform    `json:"platform"`
+	CommandLine KernelCommandLine `json:"commandLine"`
+}
+
+type KernelCommandLine struct {
+	KernelArgs []string `json:"kernelArgs"`
+	InitArgs   []string `json:"initArgs"`
+}
+
+func NewKernel(path string, platform SystemPlatform) Kernel {
+	if !strings.HasPrefix(path, "file:") {
+		path = (&url.URL{Scheme: "file", Path: path}).String()
+	}
+	return Kernel{
+		Path:     path,
+		Platform: platform,
+		CommandLine: KernelCommandLine{
+			KernelArgs: []string{"console=hvc0", "tsc=reliable", "panic=0"},
+			InitArgs:   []string{},
+		},
+	}
+}
+
 type OCIImage struct {
 	Created      *string      `json:"created,omitempty"`
 	Author       *string      `json:"author,omitempty"`
@@ -993,6 +1030,9 @@ const (
 	XPCKeyPort              XPCKey = "port"
 	XPCKeyExitCode          XPCKey = "exitCode"
 	XPCKeyExitedAt          XPCKey = "exitedAt"
+	XPCKeyStdin             XPCKey = "stdin"
+	XPCKeyStdout            XPCKey = "stdout"
+	XPCKeyStderr            XPCKey = "stderr"
 	XPCKeyFD                XPCKey = "fd"
 	XPCKeyLogs              XPCKey = "logs"
 	XPCKeyStopOptions       XPCKey = "stopOptions"
@@ -1009,6 +1049,11 @@ const (
 	XPCKeyWidth             XPCKey = "width"
 	XPCKeyHeight            XPCKey = "height"
 	XPCKeyProcessConfig     XPCKey = "processConfig"
+	XPCKeyKernel            XPCKey = "kernel"
+	XPCKeyInitImage         XPCKey = "initImage"
+	XPCKeyArchive           XPCKey = "archive"
+	XPCKeySystemPlatform    XPCKey = "systemPlatform"
+	XPCKeyImageDescriptions XPCKey = "imageDescriptions"
 	XPCKeyNetworkID         XPCKey = "networkId"
 	XPCKeyNetworkConfig     XPCKey = "networkConfig"
 	XPCKeyNetworkResource   XPCKey = "networkResource"
@@ -1050,6 +1095,7 @@ const (
 	XPCRouteContainerCopyIn        XPCRoute = "containerCopyIn"
 	XPCRouteContainerCopyOut       XPCRoute = "containerCopyOut"
 	XPCRouteContainerExport        XPCRoute = "containerExport"
+	XPCRouteImageList              XPCRoute = "imageList"
 	XPCRouteNetworkCreate          XPCRoute = "networkCreate"
 	XPCRouteNetworkDelete          XPCRoute = "networkDelete"
 	XPCRouteNetworkList            XPCRoute = "networkList"
@@ -1060,6 +1106,7 @@ const (
 	XPCRouteVolumeDiskUsage        XPCRoute = "volumeDiskUsage"
 	XPCRouteSystemDiskUsage        XPCRoute = "systemDiskUsage"
 	XPCRoutePing                   XPCRoute = "ping"
+	XPCRouteGetDefaultKernel       XPCRoute = "getDefaultKernel"
 )
 
 func defaultString(value, fallback string) string {

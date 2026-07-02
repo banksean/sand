@@ -113,6 +113,8 @@ func messageToXPC(message *Message) (C.xpc_object_t, error) {
 		case messageKindDate:
 			ns := value.t.UnixNano()
 			C.xpc_dictionary_set_date(obj, cKey, C.int64_t(ns))
+		case messageKindFD:
+			C.xpc_dictionary_set_fd(obj, cKey, C.int(value.fd))
 		default:
 			C.free(unsafe.Pointer(cKey))
 			C.xpc_release(obj)
@@ -168,6 +170,11 @@ func readXPCValue(message *Message, key string, value C.xpc_object_t) {
 			return
 		}
 		message.SetDataRaw(key, C.GoBytes(C.xpc_data_get_bytes_ptr(value), C.int(length)))
+	case C.XPC_TYPE_FD:
+		fd := C.xpc_fd_dup(value)
+		if fd >= 0 {
+			message.SetFDRaw(key, int(fd))
+		}
 	}
 }
 

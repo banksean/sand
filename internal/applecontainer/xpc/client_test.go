@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
 	"testing"
 )
 
@@ -165,6 +166,77 @@ func TestContainerScalarRoutes(t *testing.T) {
 				reply.SetUint64(XPCKeyContainerSize, 42)
 			},
 		},
+		{
+			name: "start process",
+			call: func(c *Client) error {
+				return c.StartProcess(context.Background(), "ctr", "proc")
+			},
+			route: XPCRouteContainerStartProcess,
+			check: func(t *testing.T, request *Message) {
+				assertStringKey(t, request, XPCKeyID, "ctr")
+				assertStringKey(t, request, XPCKeyProcessIdentifier, "proc")
+			},
+		},
+		{
+			name: "resize process",
+			call: func(c *Client) error {
+				return c.ResizeProcess(context.Background(), "ctr", "proc", 120, 40)
+			},
+			route: XPCRouteContainerResize,
+			check: func(t *testing.T, request *Message) {
+				assertStringKey(t, request, XPCKeyID, "ctr")
+				assertStringKey(t, request, XPCKeyProcessIdentifier, "proc")
+				if request.Uint64(XPCKeyWidth) != 120 || request.Uint64(XPCKeyHeight) != 40 {
+					t.Fatalf("size = %dx%d", request.Uint64(XPCKeyWidth), request.Uint64(XPCKeyHeight))
+				}
+			},
+		},
+		{
+			name: "kill process",
+			call: func(c *Client) error {
+				return c.KillProcess(context.Background(), "ctr", "proc", 2)
+			},
+			route: XPCRouteContainerKill,
+			check: func(t *testing.T, request *Message) {
+				assertStringKey(t, request, XPCKeyID, "ctr")
+				assertStringKey(t, request, XPCKeyProcessIdentifier, "proc")
+				if request.Int64(XPCKeySignal) != 2 {
+					t.Fatalf("signal = %d", request.Int64(XPCKeySignal))
+				}
+			},
+		},
+		{
+			name: "wait process",
+			call: func(c *Client) error {
+				code, err := c.WaitProcess(context.Background(), "ctr", "proc")
+				if err != nil {
+					return err
+				}
+				if code != 7 {
+					return errors.New("wrong exit code")
+				}
+				return nil
+			},
+			route: XPCRouteContainerWait,
+			check: func(t *testing.T, request *Message) {
+				assertStringKey(t, request, XPCKeyID, "ctr")
+				assertStringKey(t, request, XPCKeyProcessIdentifier, "proc")
+			},
+			reply: func(reply *Message) {
+				reply.SetInt64(XPCKeyExitCode, 7)
+			},
+		},
+		{
+			name: "export",
+			call: func(c *Client) error {
+				return c.ExportContainer(context.Background(), "ctr", "/tmp/ctr.tar")
+			},
+			route: XPCRouteContainerExport,
+			check: func(t *testing.T, request *Message) {
+				assertStringKey(t, request, XPCKeyID, "ctr")
+				assertStringKey(t, request, XPCKeyArchive, "/tmp/ctr.tar")
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -185,6 +257,77 @@ func TestContainerScalarRoutes(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
+	}
+}
+
+func TestContainerCreateBootstrapAndProcessCreateRoutes(t *testing.T) {
+	sender := &fakeSender{handler: func(request *Message) (*Message, error) {
+		switch request.Route() {
+		case XPCRouteContainerCreate:
+			var cfg ContainerConfiguration
+			if err := request.DecodeJSON(XPCKeyContainerConfig, &cfg); err != nil {
+				t.Fatal(err)
+			}
+			if cfg.ID != "ctr" {
+				t.Fatalf("create cfg = %#v", cfg)
+			}
+			var kernel Kernel
+			if err := request.DecodeJSON(XPCKeyKernel, &kernel); err != nil {
+				t.Fatal(err)
+			}
+			if kernel.Platform.Architecture != "arm64" {
+				t.Fatalf("kernel = %#v", kernel)
+			}
+			var opts ContainerCreateOptions
+			if err := request.DecodeJSON(XPCKeyContainerOptions, &opts); err != nil {
+				t.Fatal(err)
+			}
+			if opts.AutoRemove {
+				t.Fatal("autoRemove unexpectedly set")
+			}
+			assertStringKey(t, request, XPCKeyInitImage, "init")
+		case XPCRouteContainerBootstrap:
+			assertStringKey(t, request, XPCKeyID, "ctr")
+			var env map[string]string
+			if err := request.DecodeJSON(XPCKeyDynamicEnv, &env); err != nil {
+				t.Fatal(err)
+			}
+			if env["A"] != "B" {
+				t.Fatalf("dynamic env = %#v", env)
+			}
+		case XPCRouteContainerCreateProcess:
+			assertStringKey(t, request, XPCKeyID, "ctr")
+			assertStringKey(t, request, XPCKeyProcessIdentifier, "proc")
+			var cfg ProcessConfiguration
+			if err := request.DecodeJSON(XPCKeyProcessConfig, &cfg); err != nil {
+				t.Fatal(err)
+			}
+			if cfg.Executable != "sh" {
+				t.Fatalf("process cfg = %#v", cfg)
+			}
+		default:
+			t.Fatalf("unexpected route %q", request.Route())
+		}
+		return newEmptyMessage(), nil
+	}}
+	client := newFakeClient(t, sender)
+	cfg := ContainerConfiguration{
+		ID: "ctr",
+		Image: ImageDescription{
+			Reference:  "image",
+			Descriptor: Descriptor{Digest: "sha256:abc", MediaType: "application/vnd.oci.image.index.v1+json"},
+		},
+		InitProcess: ProcessConfiguration{Executable: "sh"},
+	}
+	kernel := NewKernel("/kernel", SystemPlatform{OS: "linux", Architecture: "arm64"})
+	if err := client.CreateContainer(context.Background(), cfg, ContainerCreateOptions{}, kernel, "init", nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.BootstrapContainer(context.Background(), "ctr", [3]*os.File{}, map[string]string{"A": "B"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.CreateProcess(context.Background(), "ctr", "proc", ProcessConfiguration{Executable: "sh"}, [3]*os.File{}); err != nil {
+		t.Fatal(err)
 	}
 }
 

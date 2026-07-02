@@ -30,7 +30,7 @@ type ImageOps interface {
 type appleContainerOps struct{}
 
 func NewAppleContainerOps() ContainerOps {
-	return &appleContainerOps{}
+	return newAppleContainerOps()
 }
 
 // Stats implements [ContainerOps].
