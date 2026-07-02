@@ -170,7 +170,7 @@ func (o *xpcContainerOps) ExecStream(ctx context.Context, opts *options.ExecCont
 		return nil, err
 	}
 
-	stdio, cleanup, err := processFiles(stdin, stdout, stderr)
+	stdio, cleanup, err := processFiles(stdin, stdout, stderr, cfg.Terminal)
 	if err != nil {
 		return nil, err
 	}
@@ -484,7 +484,7 @@ func parseVolumeFilesystem(spec string) (xpc.Filesystem, error) {
 	}, nil
 }
 
-func processFiles(stdin io.Reader, stdout, stderr io.Writer) ([3]*os.File, func(), error) {
+func processFiles(stdin io.Reader, stdout, stderr io.Writer, tty bool) ([3]*os.File, func(), error) {
 	var files [3]*os.File
 	var cleanups []func()
 	addCleanup := func(fn func()) { cleanups = append(cleanups, fn) }
@@ -515,13 +515,15 @@ func processFiles(stdin io.Reader, stdout, stderr io.Writer) ([3]*os.File, func(
 	}
 	files[1] = outFile
 	addCleanup(outCleanup)
-	errFile, errCleanup, err := writerFile(stderr)
-	if err != nil {
-		cleanup()
-		return files, cleanup, err
+	if !tty {
+		errFile, errCleanup, err := writerFile(stderr)
+		if err != nil {
+			cleanup()
+			return files, cleanup, err
+		}
+		files[2] = errFile
+		addCleanup(errCleanup)
 	}
-	files[2] = errFile
-	addCleanup(errCleanup)
 	return files, cleanup, nil
 }
 
