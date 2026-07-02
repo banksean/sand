@@ -284,6 +284,10 @@ func newXPCPullProgressRenderer(w io.Writer) *xpcPullProgressRenderer {
 		w = io.Discard
 	}
 	renderer := &xpcPullProgressRenderer{w: w}
+	// TODO: fix this, because the "is a terminal" determination can only be done
+	// by the sand CLI, which makes the gRPC call to the daemon, which calls this.
+	// The gRPC call should probably return a stream of structured responses, it *it* should
+	// determine whether or not to print control characters.
 	if file, ok := w.(*os.File); ok && term.IsTerminal(int(file.Fd())) {
 		renderer.terminal = true
 	}

@@ -294,6 +294,11 @@ func (c *GRPCClient) EnsureImage(ctx context.Context, imageName string, w io.Wri
 
 		switch e := event.GetEvent().(type) {
 		case *daemonpb.EnsureImageResponse_Progress:
+			// TODO: check if w is terminal *here*, instead of inside image_ops._xpc_darwin.go:
+			// if file, ok := w.(*os.File); ok && term.IsTerminal(int(file.Fd())) {
+			// renderer.terminal = true // or whatever; if it's a termninal then print control
+			// 													// characters to overwrite the previous update line.
+			// }
 			if _, err := w.Write(e.Progress); err != nil {
 				return err
 			}
