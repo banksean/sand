@@ -81,16 +81,22 @@ func (c *Client) Close() error {
 }
 
 func (c *Client) Send(ctx context.Context, route XPCRoute, build func(*Message) error) (*Message, error) {
+	return c.send(ctx, route, build, true)
+}
+
+func (c *Client) send(ctx context.Context, route XPCRoute, build func(*Message) error, applyDefaultTimeout bool) (*Message, error) {
 	if c == nil || c.sender == nil {
 		return nil, fmt.Errorf("xpc client is not initialized")
 	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	if _, ok := ctx.Deadline(); !ok && c.timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, c.timeout)
-		defer cancel()
+	var cancel context.CancelFunc
+	if applyDefaultTimeout {
+		ctx, cancel = c.withDefaultTimeout(ctx)
+		if cancel != nil {
+			defer cancel()
+		}
 	}
 	message := NewMessage(route)
 	if build != nil {
@@ -109,6 +115,13 @@ func (c *Client) Send(ctx context.Context, route XPCRoute, build func(*Message) 
 		return nil, err
 	}
 	return reply, nil
+}
+
+func (c *Client) withDefaultTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
+	if _, ok := ctx.Deadline(); !ok && c.timeout > 0 {
+		return context.WithTimeout(ctx, c.timeout)
+	}
+	return ctx, nil
 }
 
 func (c *Client) ListContainers(ctx context.Context, filters ContainerListFilters) ([]ContainerSnapshot, error) {
@@ -217,11 +230,11 @@ func (c *Client) StartProcess(ctx context.Context, containerID, processID string
 }
 
 func (c *Client) WaitProcess(ctx context.Context, containerID, processID string) (int32, error) {
-	reply, err := c.Send(ctx, XPCRouteContainerWait, func(message *Message) error {
+	reply, err := c.send(ctx, XPCRouteContainerWait, func(message *Message) error {
 		message.SetString(XPCKeyID, containerID)
 		message.SetString(XPCKeyProcessIdentifier, processID)
 		return nil
-	})
+	}, false)
 	if err != nil {
 		return 0, fmt.Errorf("wait process %q in container %q: %w", processID, containerID, err)
 	}

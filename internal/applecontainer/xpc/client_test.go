@@ -6,15 +6,18 @@ import (
 	"errors"
 	"os"
 	"testing"
+	"time"
 )
 
 type fakeSender struct {
 	requests []*Message
+	contexts []context.Context
 	handler  func(*Message) (*Message, error)
 }
 
-func (s *fakeSender) Send(_ context.Context, message *Message) (*Message, error) {
+func (s *fakeSender) Send(ctx context.Context, message *Message) (*Message, error) {
 	s.requests = append(s.requests, message)
+	s.contexts = append(s.contexts, ctx)
 	if s.handler == nil {
 		return newEmptyMessage(), nil
 	}
@@ -85,6 +88,63 @@ func TestListMethodsReturnEmptySlicesWhenResponseDataMissing(t *testing.T) {
 	}
 	if volumes == nil || len(volumes) != 0 {
 		t.Fatalf("volumes = %#v", volumes)
+	}
+}
+
+func TestSendAppliesDefaultTimeout(t *testing.T) {
+	sender := &fakeSender{}
+	client := newFakeClient(t, sender)
+
+	if _, err := client.Send(context.Background(), XPCRoutePing, nil); err != nil {
+		t.Fatal(err)
+	}
+	if len(sender.contexts) != 1 {
+		t.Fatalf("contexts = %d, want 1", len(sender.contexts))
+	}
+	if _, ok := sender.contexts[0].Deadline(); !ok {
+		t.Fatal("Send did not apply default timeout")
+	}
+}
+
+func TestWaitProcessDoesNotApplyDefaultTimeout(t *testing.T) {
+	sender := &fakeSender{handler: func(_ *Message) (*Message, error) {
+		reply := newEmptyMessage()
+		reply.SetInt64(XPCKeyExitCode, 0)
+		return reply, nil
+	}}
+	client := newFakeClient(t, sender)
+
+	if _, err := client.WaitProcess(context.Background(), "ctr", "proc"); err != nil {
+		t.Fatal(err)
+	}
+	if len(sender.contexts) != 1 {
+		t.Fatalf("contexts = %d, want 1", len(sender.contexts))
+	}
+	if deadline, ok := sender.contexts[0].Deadline(); ok {
+		t.Fatalf("WaitProcess applied default timeout deadline %s", deadline)
+	}
+}
+
+func TestWaitProcessPreservesCallerDeadline(t *testing.T) {
+	sender := &fakeSender{handler: func(_ *Message) (*Message, error) {
+		reply := newEmptyMessage()
+		reply.SetInt64(XPCKeyExitCode, 0)
+		return reply, nil
+	}}
+	client := newFakeClient(t, sender)
+	wantDeadline := time.Now().Add(time.Hour).Round(0)
+	ctx, cancel := context.WithDeadline(context.Background(), wantDeadline)
+	defer cancel()
+
+	if _, err := client.WaitProcess(ctx, "ctr", "proc"); err != nil {
+		t.Fatal(err)
+	}
+	gotDeadline, ok := sender.contexts[0].Deadline()
+	if !ok {
+		t.Fatal("WaitProcess dropped caller deadline")
+	}
+	if !gotDeadline.Equal(wantDeadline) {
+		t.Fatalf("deadline = %s, want %s", gotDeadline, wantDeadline)
 	}
 }
 
