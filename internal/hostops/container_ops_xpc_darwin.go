@@ -587,6 +587,10 @@ func xpcSnapshotToContainer(snapshot xpc.ContainerSnapshot) types.Container {
 		Configuration: types.ContainerConfig{
 			ID:  snapshot.Configuration.ID,
 			SSH: snapshot.Configuration.SSH,
+			Resources: types.Resources{
+				CPUs:          snapshot.Configuration.Resources.CPUs,
+				MemoryInBytes: int64(snapshot.Configuration.Resources.MemoryInBytes),
+			},
 		},
 	}
 	for _, network := range snapshot.Networks {

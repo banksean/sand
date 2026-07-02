@@ -62,7 +62,7 @@ sand config ls
 
 # Create a new sandox and exit back to this smoke test.
 # Use the `script` command here to avoid tty errors.
-echo "exit" | script -q /dev/null sand new -i base:local --tmux=false --caches-mise --caches-apk --ssh-agent smoke
+echo "exit" | script -q /dev/null sand new -i base:local --tmux=false --atch=false --caches-mise --caches-apk --ssh-agent smoke
 sand ls
 
 # TODO: Automate verification for the output of these commands
