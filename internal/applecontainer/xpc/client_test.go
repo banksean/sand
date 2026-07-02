@@ -264,6 +264,7 @@ func TestContainerCreateBootstrapAndProcessCreateRoutes(t *testing.T) {
 	sender := &fakeSender{handler: func(request *Message) (*Message, error) {
 		switch request.Route() {
 		case XPCRouteContainerCreate:
+			assertProcessArraysAreEmptyArrays(t, request, XPCKeyContainerConfig)
 			var cfg ContainerConfiguration
 			if err := request.DecodeJSON(XPCKeyContainerConfig, &cfg); err != nil {
 				t.Fatal(err)
@@ -298,6 +299,7 @@ func TestContainerCreateBootstrapAndProcessCreateRoutes(t *testing.T) {
 		case XPCRouteContainerCreateProcess:
 			assertStringKey(t, request, XPCKeyID, "ctr")
 			assertStringKey(t, request, XPCKeyProcessIdentifier, "proc")
+			assertProcessArraysAreEmptyArrays(t, request, XPCKeyProcessConfig)
 			var cfg ProcessConfiguration
 			if err := request.DecodeJSON(XPCKeyProcessConfig, &cfg); err != nil {
 				t.Fatal(err)
@@ -424,5 +426,26 @@ func assertStringKey(t *testing.T, message *Message, key XPCKey, want string) {
 	}
 	if got != want {
 		t.Fatalf("%s = %q, want %q", key, got, want)
+	}
+}
+
+func assertProcessArraysAreEmptyArrays(t *testing.T, message *Message, key XPCKey) {
+	t.Helper()
+	data, ok := message.Data(key)
+	if !ok {
+		t.Fatalf("missing data key %s", key)
+	}
+	var root map[string]any
+	if err := json.Unmarshal(data, &root); err != nil {
+		t.Fatal(err)
+	}
+	process := root
+	if nested, ok := root["initProcess"].(map[string]any); ok {
+		process = nested
+	}
+	for _, name := range []string{"arguments", "environment", "supplementalGroups", "rlimits"} {
+		if _, ok := process[name].([]any); !ok {
+			t.Fatalf("%s encoded as %T (%[2]v), want array in %s", name, process[name], string(key))
+		}
 	}
 }

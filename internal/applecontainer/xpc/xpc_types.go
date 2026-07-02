@@ -267,6 +267,46 @@ type ProcessConfiguration struct {
 	Rlimits            []ProcessRlimit `json:"rlimits"`
 }
 
+func (p ProcessConfiguration) MarshalJSON() ([]byte, error) {
+	type wire ProcessConfiguration
+	v := wire(p)
+	if v.Arguments == nil {
+		v.Arguments = []string{}
+	}
+	if v.Environment == nil {
+		v.Environment = []string{}
+	}
+	if v.SupplementalGroups == nil {
+		v.SupplementalGroups = []uint32{}
+	}
+	if v.Rlimits == nil {
+		v.Rlimits = []ProcessRlimit{}
+	}
+	return json.Marshal(v)
+}
+
+func (p *ProcessConfiguration) UnmarshalJSON(data []byte) error {
+	type wire ProcessConfiguration
+	var v wire
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	if v.Arguments == nil {
+		v.Arguments = []string{}
+	}
+	if v.Environment == nil {
+		v.Environment = []string{}
+	}
+	if v.SupplementalGroups == nil {
+		v.SupplementalGroups = []uint32{}
+	}
+	if v.Rlimits == nil {
+		v.Rlimits = []ProcessRlimit{}
+	}
+	*p = ProcessConfiguration(v)
+	return nil
+}
+
 type ProcessRlimit struct {
 	Limit string `json:"limit"`
 	Soft  uint64 `json:"soft"`
