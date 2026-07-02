@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/banksean/sand/internal/daemon/daemonpb"
+	"github.com/banksean/sand/internal/imageprogress"
 	"github.com/banksean/sand/internal/sandtypes"
 )
 
@@ -29,17 +30,63 @@ func (w *grpcCreateSandboxProgressWriter) Write(p []byte) (int, error) {
 type grpcEnsureImageProgressWriter struct {
 	stream daemonpb.DaemonService_EnsureImageServer
 	mu     sync.Mutex
+	err    error
 }
 
 func (w *grpcEnsureImageProgressWriter) Write(p []byte) (int, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	if w.err != nil {
+		return 0, w.err
+	}
 	if err := w.stream.Send(&daemonpb.EnsureImageResponse{
 		Event: &daemonpb.EnsureImageResponse_Progress{Progress: append([]byte(nil), p...)},
 	}); err != nil {
+		w.err = err
 		return 0, err
 	}
 	return len(p), nil
+}
+
+func (w *grpcEnsureImageProgressWriter) Update(update imageprogress.Update) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.err != nil {
+		return
+	}
+	if err := w.stream.Send(&daemonpb.EnsureImageResponse{
+		Event: &daemonpb.EnsureImageResponse_PullProgress{
+			PullProgress: imageProgressUpdateToProto(update),
+		},
+	}); err != nil {
+		w.err = err
+	}
+}
+
+func (w *grpcEnsureImageProgressWriter) Err() error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.err
+}
+
+func imageProgressUpdateToProto(update imageprogress.Update) *daemonpb.ImagePullProgressUpdate {
+	return &daemonpb.ImagePullProgressUpdate{
+		Description:    update.Description,
+		SubDescription: update.SubDescription,
+		ItemsName:      update.ItemsName,
+		AddTasks:       update.AddTasks,
+		SetTasks:       update.SetTasks,
+		AddTotalTasks:  update.AddTotalTasks,
+		SetTotalTasks:  update.SetTotalTasks,
+		AddItems:       update.AddItems,
+		SetItems:       update.SetItems,
+		AddTotalItems:  update.AddTotalItems,
+		SetTotalItems:  update.SetTotalItems,
+		AddSize:        update.AddSize,
+		SetSize:        update.SetSize,
+		AddTotalSize:   update.AddTotalSize,
+		SetTotalSize:   update.SetTotalSize,
+	}
 }
 
 func (s *daemonGRPCServer) CreateSandbox(req *daemonpb.CreateSandboxRequest, stream daemonpb.DaemonService_CreateSandboxServer) error {
@@ -74,6 +121,9 @@ func (s *daemonGRPCServer) EnsureImage(req *daemonpb.EnsureImageRequest, stream 
 		return stream.Send(&daemonpb.EnsureImageResponse{
 			Event: &daemonpb.EnsureImageResponse_Error{Error: err.Error()},
 		})
+	}
+	if err := writer.Err(); err != nil {
+		return err
 	}
 	return stream.Send(&daemonpb.EnsureImageResponse{
 		Event: &daemonpb.EnsureImageResponse_Ok{Ok: true},

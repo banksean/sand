@@ -14,6 +14,7 @@ import (
 	"github.com/creack/pty"
 
 	"github.com/banksean/sand/internal/applecontainer/types"
+	"github.com/banksean/sand/internal/imageprogress"
 )
 
 type ImagesSvc struct{}
@@ -55,7 +56,10 @@ func (i *ImagesSvc) Inspect(ctx context.Context, name string) ([]*types.ImageMan
 // Pull pulls the image with the given name and returns a wait func to release the cmd resources, or returns an error.
 // It runs the command under a PTY so the 'container' subprocess sees a TTY and emits live progress output.
 // All subprocess output is copied to w. The returned wait func is idempotent.
-func (i *ImagesSvc) Pull(ctx context.Context, name string, w io.Writer) (func() error, error) {
+func (i *ImagesSvc) Pull(ctx context.Context, name string, progress imageprogress.Sink) (func() error, error) {
+	if progress == nil {
+		progress = imageprogress.NewTextSink(io.Discard)
+	}
 	cmd := exec.CommandContext(ctx, "container", "image", "pull", name)
 	slog.InfoContext(ctx, "ImagesSvc.Pull", "cmd.Dir", cmd.Dir, "cmd", strings.Join(cmd.Args, " "))
 
@@ -94,7 +98,7 @@ func (i *ImagesSvc) Pull(ctx context.Context, name string, w io.Writer) (func() 
 	copyDone := make(chan struct{})
 	go func() {
 		defer close(copyDone)
-		io.Copy(w, ptmx) //nolint:errcheck // EIO/EOF on process exit is expected
+		io.Copy(progress, ptmx) //nolint:errcheck // EIO/EOF on process exit is expected
 	}()
 
 	// The wait func is idempotent via sync.Once: boxer.pullImage has both a

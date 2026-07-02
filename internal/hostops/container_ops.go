@@ -7,6 +7,7 @@ import (
 	ac "github.com/banksean/sand/internal/applecontainer"
 	"github.com/banksean/sand/internal/applecontainer/options"
 	"github.com/banksean/sand/internal/applecontainer/types"
+	"github.com/banksean/sand/internal/imageprogress"
 )
 
 type ContainerOps interface {
@@ -23,7 +24,7 @@ type ContainerOps interface {
 
 type ImageOps interface {
 	List(ctx context.Context) ([]types.ImageEntry, error)
-	Pull(ctx context.Context, image string, w io.Writer) (func() error, error)
+	Pull(ctx context.Context, image string, progress imageprogress.Sink) (func() error, error)
 	Inspect(ctx context.Context, name string) ([]*types.ImageManifest, error)
 }
 
@@ -81,8 +82,8 @@ func (a *appleImageOps) List(ctx context.Context) ([]types.ImageEntry, error) {
 	return ac.Images.List(ctx)
 }
 
-func (a *appleImageOps) Pull(ctx context.Context, image string, w io.Writer) (func() error, error) {
-	return ac.Images.Pull(ctx, image, w)
+func (a *appleImageOps) Pull(ctx context.Context, image string, progress imageprogress.Sink) (func() error, error) {
+	return ac.Images.Pull(ctx, image, progress)
 }
 
 func (a *appleImageOps) Inspect(ctx context.Context, name string) ([]*types.ImageManifest, error) {

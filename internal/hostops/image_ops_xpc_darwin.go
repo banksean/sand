@@ -6,15 +6,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/applecontainer/xpc"
-	"golang.org/x/term"
+	"github.com/banksean/sand/internal/imageprogress"
 )
 
 type xpcImageOps struct {
@@ -41,10 +39,29 @@ func (o *xpcImageOps) List(ctx context.Context) ([]types.ImageEntry, error) {
 	return ret, nil
 }
 
-func (o *xpcImageOps) Pull(ctx context.Context, image string, w io.Writer) (func() error, error) {
-	renderer := newXPCPullProgressRenderer(w)
-	_, err := o.client.PullImage(ctx, image, xpc.ImagePullOptions{}, renderer.Handle)
-	renderer.Finish()
+func (o *xpcImageOps) Pull(ctx context.Context, image string, progress imageprogress.Sink) (func() error, error) {
+	if progress == nil {
+		progress = imageprogress.NewTextSink(nil)
+	}
+	_, err := o.client.PullImage(ctx, image, xpc.ImagePullOptions{}, func(update xpc.ProgressUpdate) {
+		progress.Update(imageprogress.Update{
+			Description:    update.Description,
+			SubDescription: update.SubDescription,
+			ItemsName:      update.ItemsName,
+			AddTasks:       update.AddTasks,
+			SetTasks:       update.SetTasks,
+			AddTotalTasks:  update.AddTotalTasks,
+			SetTotalTasks:  update.SetTotalTasks,
+			AddItems:       update.AddItems,
+			SetItems:       update.SetItems,
+			AddTotalItems:  update.AddTotalItems,
+			SetTotalItems:  update.SetTotalItems,
+			AddSize:        update.AddSize,
+			SetSize:        update.SetSize,
+			AddTotalSize:   update.AddTotalSize,
+			SetTotalSize:   update.SetTotalSize,
+		})
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -261,130 +278,4 @@ func historyToTypes(history []xpc.History) []types.HistoryEntry {
 		ret = append(ret, entry)
 	}
 	return ret
-}
-
-type xpcPullProgressRenderer struct {
-	mu          sync.Mutex
-	w           io.Writer
-	terminal    bool
-	description string
-	sub         string
-	itemsName   string
-	tasks       int64
-	totalTasks  int64
-	items       int64
-	totalItems  int64
-	size        int64
-	totalSize   int64
-	last        string
-}
-
-func newXPCPullProgressRenderer(w io.Writer) *xpcPullProgressRenderer {
-	if w == nil {
-		w = io.Discard
-	}
-	renderer := &xpcPullProgressRenderer{w: w}
-	// TODO: fix this, because the "is a terminal" determination can only be done
-	// by the sand CLI, which makes the gRPC call to the daemon, which calls this.
-	// The gRPC call should probably return a stream of structured responses, it *it* should
-	// determine whether or not to print control characters.
-	if file, ok := w.(*os.File); ok && term.IsTerminal(int(file.Fd())) {
-		renderer.terminal = true
-	}
-	return renderer
-}
-
-func (r *xpcPullProgressRenderer) Handle(update xpc.ProgressUpdate) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if update.Description != nil {
-		r.description = *update.Description
-	}
-	if update.SubDescription != nil {
-		r.sub = *update.SubDescription
-	}
-	if update.ItemsName != nil {
-		r.itemsName = *update.ItemsName
-	}
-	applyCounter(&r.tasks, update.AddTasks, update.SetTasks)
-	applyCounter(&r.totalTasks, update.AddTotalTasks, update.SetTotalTasks)
-	applyCounter(&r.items, update.AddItems, update.SetItems)
-	applyCounter(&r.totalItems, update.AddTotalItems, update.SetTotalItems)
-	applyCounter(&r.size, update.AddSize, update.SetSize)
-	applyCounter(&r.totalSize, update.AddTotalSize, update.SetTotalSize)
-	r.renderLocked(false)
-}
-
-func (r *xpcPullProgressRenderer) Finish() {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.renderLocked(true)
-}
-
-func (r *xpcPullProgressRenderer) renderLocked(final bool) {
-	line := r.line()
-	if line == "" {
-		return
-	}
-	if line == r.last {
-		if final && r.terminal {
-			fmt.Fprintln(r.w)
-		}
-		return
-	}
-	if r.terminal {
-		fmt.Fprintf(r.w, "\r\033[2K%s", line)
-		if final {
-			fmt.Fprintln(r.w)
-		}
-	} else {
-		fmt.Fprintln(r.w, line)
-	}
-	r.last = line
-}
-
-func (r *xpcPullProgressRenderer) line() string {
-	parts := make([]string, 0, 5)
-	if r.description != "" {
-		parts = append(parts, r.description)
-	}
-	if r.sub != "" {
-		parts = append(parts, r.sub)
-	}
-	if r.totalTasks > 0 {
-		parts = append(parts, fmt.Sprintf("tasks %d/%d", r.tasks, r.totalTasks))
-	}
-	if r.totalItems > 0 {
-		name := r.itemsName
-		if name == "" {
-			name = "items"
-		}
-		parts = append(parts, fmt.Sprintf("%s %d/%d", name, r.items, r.totalItems))
-	}
-	if r.totalSize > 0 {
-		parts = append(parts, fmt.Sprintf("%s/%s", formatBytes(r.size), formatBytes(r.totalSize)))
-	}
-	return strings.Join(parts, " ")
-}
-
-func applyCounter(value *int64, add, set *int64) {
-	if set != nil {
-		*value = *set
-	}
-	if add != nil {
-		*value += *add
-	}
-}
-
-func formatBytes(value int64) string {
-	const unit = 1024
-	if value < unit {
-		return fmt.Sprintf("%dB", value)
-	}
-	div, exp := int64(unit), 0
-	for n := value / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f%ciB", float64(value)/float64(div), "KMGTPE"[exp])
 }

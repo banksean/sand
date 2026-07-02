@@ -12,6 +12,7 @@ import (
 
 	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/daemon/daemonpb"
+	"github.com/banksean/sand/internal/imageprogress"
 	"github.com/banksean/sand/internal/sandtypes"
 	"github.com/banksean/sand/internal/version"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
@@ -280,9 +281,8 @@ func (c *GRPCClient) EnsureImage(ctx context.Context, imageName string, w io.Wri
 	if err != nil {
 		return err
 	}
-	if w == nil {
-		w = io.Discard
-	}
+	renderer := imageprogress.NewRenderer(w)
+	defer renderer.Finish()
 	for {
 		event, err := stream.Recv()
 		if err != nil {
@@ -294,14 +294,11 @@ func (c *GRPCClient) EnsureImage(ctx context.Context, imageName string, w io.Wri
 
 		switch e := event.GetEvent().(type) {
 		case *daemonpb.EnsureImageResponse_Progress:
-			// TODO: check if w is terminal *here*, instead of inside image_ops._xpc_darwin.go:
-			// if file, ok := w.(*os.File); ok && term.IsTerminal(int(file.Fd())) {
-			// renderer.terminal = true // or whatever; if it's a termninal then print control
-			// 													// characters to overwrite the previous update line.
-			// }
-			if _, err := w.Write(e.Progress); err != nil {
+			if _, err := renderer.Write(e.Progress); err != nil {
 				return err
 			}
+		case *daemonpb.EnsureImageResponse_PullProgress:
+			renderer.Update(imageProgressUpdateFromProto(e.PullProgress))
 		case *daemonpb.EnsureImageResponse_Error:
 			if err := drainEnsureImageStream(stream); err != nil {
 				return err
@@ -318,6 +315,29 @@ func (c *GRPCClient) EnsureImage(ctx context.Context, imageName string, w io.Wri
 		default:
 			return fmt.Errorf("unknown ensure image stream event %T", e)
 		}
+	}
+}
+
+func imageProgressUpdateFromProto(update *daemonpb.ImagePullProgressUpdate) imageprogress.Update {
+	if update == nil {
+		return imageprogress.Update{}
+	}
+	return imageprogress.Update{
+		Description:    update.Description,
+		SubDescription: update.SubDescription,
+		ItemsName:      update.ItemsName,
+		AddTasks:       update.AddTasks,
+		SetTasks:       update.SetTasks,
+		AddTotalTasks:  update.AddTotalTasks,
+		SetTotalTasks:  update.SetTotalTasks,
+		AddItems:       update.AddItems,
+		SetItems:       update.SetItems,
+		AddTotalItems:  update.AddTotalItems,
+		SetTotalItems:  update.SetTotalItems,
+		AddSize:        update.AddSize,
+		SetSize:        update.SetSize,
+		AddTotalSize:   update.AddTotalSize,
+		SetTotalSize:   update.SetTotalSize,
 	}
 }
 

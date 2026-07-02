@@ -156,5 +156,24 @@ message EnsureImageResponse {
     bytes progress = 1;
     string error = 2;
     bool ok = 3;
+    ImagePullProgressUpdate pull_progress = 4;
   }
+}
+
+message ImagePullProgressUpdate {
+  optional string description = 1;
+  optional string sub_description = 2;
+  optional string items_name = 3;
+  optional int64 add_tasks = 4;
+  optional int64 set_tasks = 5;
+  optional int64 add_total_tasks = 6;
+  optional int64 set_total_tasks = 7;
+  optional int64 add_items = 8;
+  optional int64 set_items = 9;
+  optional int64 add_total_items = 10;
+  optional int64 set_total_items = 11;
+  optional int64 add_size = 12;
+  optional int64 set_size = 13;
+  optional int64 add_total_size = 14;
+  optional int64 set_total_size = 15;
 }

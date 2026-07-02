@@ -15,13 +15,14 @@ import (
 	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/cloning"
 	"github.com/banksean/sand/internal/hostops"
+	"github.com/banksean/sand/internal/imageprogress"
 	"github.com/banksean/sand/internal/sandtypes"
 	"github.com/banksean/sand/internal/sshimmer"
 )
 
 type mockImageOps struct {
 	listFunc    func(ctx context.Context) ([]types.ImageEntry, error)
-	pullFunc    func(ctx context.Context, image string, w io.Writer) (func() error, error)
+	pullFunc    func(ctx context.Context, image string, progress imageprogress.Sink) (func() error, error)
 	inspectFunc func(ctx context.Context, name string) ([]*types.ImageManifest, error)
 }
 
@@ -40,9 +41,9 @@ func (m *mockImageOps) List(ctx context.Context) ([]types.ImageEntry, error) {
 	return []types.ImageEntry{}, nil
 }
 
-func (m *mockImageOps) Pull(ctx context.Context, image string, w io.Writer) (func() error, error) {
+func (m *mockImageOps) Pull(ctx context.Context, image string, progress imageprogress.Sink) (func() error, error) {
 	if m.pullFunc != nil {
-		return m.pullFunc(ctx, image, w)
+		return m.pullFunc(ctx, image, progress)
 	}
 	return func() error { return nil }, nil
 }
@@ -859,7 +860,7 @@ func TestBoxer_EnsureImage(t *testing.T) {
 					{Configuration: types.ImageConfiguration{Name: "other-image:v1"}},
 				}, nil
 			},
-			pullFunc: func(ctx context.Context, image string, w io.Writer) (func() error, error) {
+			pullFunc: func(ctx context.Context, image string, progress imageprogress.Sink) (func() error, error) {
 				pullCalled = true
 				if image != "new-image:latest" {
 					t.Errorf("Expected pull 'new-image:latest', got %s", image)
@@ -932,7 +933,7 @@ func TestBoxer_EnsureImage(t *testing.T) {
 			listFunc: func(ctx context.Context) ([]types.ImageEntry, error) {
 				return []types.ImageEntry{}, nil
 			},
-			pullFunc: func(ctx context.Context, image string, w io.Writer) (func() error, error) {
+			pullFunc: func(ctx context.Context, image string, progress imageprogress.Sink) (func() error, error) {
 				return nil, expectedErr
 			},
 		}
@@ -952,7 +953,7 @@ func TestBoxer_EnsureImage(t *testing.T) {
 			listFunc: func(ctx context.Context) ([]types.ImageEntry, error) {
 				return []types.ImageEntry{}, nil
 			},
-			pullFunc: func(ctx context.Context, image string, w io.Writer) (func() error, error) {
+			pullFunc: func(ctx context.Context, image string, progress imageprogress.Sink) (func() error, error) {
 				return func() error {
 					return expectedErr
 				}, nil

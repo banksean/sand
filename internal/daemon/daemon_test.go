@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"github.com/banksean/sand/internal/cloning"
 	"github.com/banksean/sand/internal/daemon/internal/boxer"
 	"github.com/banksean/sand/internal/hostops"
+	"github.com/banksean/sand/internal/imageprogress"
 	"github.com/banksean/sand/internal/runtimepaths"
 	"github.com/banksean/sand/internal/sandtypes"
 	"github.com/banksean/sand/internal/version"
@@ -40,7 +42,7 @@ func newDaemonForTest(t *testing.T, appDir string) *Daemon {
 
 type testImageOps struct {
 	ListFunc    func(context.Context) ([]types.ImageEntry, error)
-	PullFunc    func(context.Context, string, io.Writer) (func() error, error)
+	PullFunc    func(context.Context, string, imageprogress.Sink) (func() error, error)
 	InspectFunc func(context.Context, string) ([]*types.ImageManifest, error)
 }
 
@@ -51,9 +53,9 @@ func (m *testImageOps) List(ctx context.Context) ([]types.ImageEntry, error) {
 	return nil, nil
 }
 
-func (m *testImageOps) Pull(ctx context.Context, image string, w io.Writer) (func() error, error) {
+func (m *testImageOps) Pull(ctx context.Context, image string, progress imageprogress.Sink) (func() error, error) {
 	if m.PullFunc != nil {
-		return m.PullFunc(ctx, image, w)
+		return m.PullFunc(ctx, image, progress)
 	}
 	return func() error { return nil }, nil
 }
@@ -136,6 +138,66 @@ func TestDaemonGRPCEnsureImage(t *testing.T) {
 
 	if err := client.EnsureImage(ctx, "test-image:latest", io.Discard); err != nil {
 		t.Fatalf("gRPC EnsureImage() failed: %v", err)
+	}
+
+	dmn.Shutdown(ctx)
+}
+
+func TestDaemonGRPCEnsureImageStreamsStructuredProgress(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "sand-*")
+	if err != nil {
+		t.Fatalf("MkdirTemp: %v", err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(tmpDir) })
+	description := "Pulling"
+	one := int64(1)
+	two := int64(2)
+
+	b, err := boxer.NewBoxerWithDeps(tmpDir, boxer.BoxerDeps{
+		ContainerService: &hostops.MockContainerOps{},
+		ImageService: &testImageOps{
+			ListFunc: func(context.Context) ([]types.ImageEntry, error) {
+				return []types.ImageEntry{}, nil
+			},
+			PullFunc: func(ctx context.Context, image string, progress imageprogress.Sink) (func() error, error) {
+				progress.Update(imageprogress.Update{
+					Description:   &description,
+					SetTasks:      &one,
+					SetTotalTasks: &two,
+				})
+				progress.Update(imageprogress.Update{SetTasks: &two})
+				return func() error { return nil }, nil
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("NewBoxerWithDeps: %v", err)
+	}
+	t.Cleanup(func() { b.Close() })
+	dmn := NewDaemonWithBoxer(tmpDir, "test", b)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	go func() {
+		if err := dmn.ServeUnixSocket(ctx); err != nil {
+			t.Logf("Mux serve error: %v", err)
+		}
+	}()
+	waitForSocket(t, filepath.Join(tmpDir, DefaultGRPCSocketFile))
+
+	client, err := NewUnixSocketGRPCClient(ctx, tmpDir)
+	if err != nil {
+		t.Fatalf("Failed to create gRPC client: %v", err)
+	}
+	defer client.Close()
+
+	var progress bytes.Buffer
+	if err := client.EnsureImage(ctx, "test-image:latest", &progress); err != nil {
+		t.Fatalf("gRPC EnsureImage() failed: %v", err)
+	}
+	got := progress.String()
+	if !strings.Contains(got, "Pulling tasks 1/2\nPulling tasks 2/2\n") {
+		t.Fatalf("EnsureImage() progress = %q, want structured progress lines", got)
 	}
 
 	dmn.Shutdown(ctx)

@@ -20,6 +20,7 @@ import (
 	"github.com/banksean/sand/internal/cloning"
 	"github.com/banksean/sand/internal/db"
 	"github.com/banksean/sand/internal/hostops"
+	"github.com/banksean/sand/internal/imageprogress"
 	"github.com/banksean/sand/internal/runtimedeps"
 	"github.com/banksean/sand/internal/runtimepaths"
 	"github.com/banksean/sand/internal/sandboxlog"
@@ -1114,6 +1115,7 @@ func (sber *Boxer) executeHooks(ctx context.Context, sb *sandtypes.Box, hooks []
 // pulling it if required. Progress messages are written to w.
 func (sb *Boxer) EnsureImage(ctx context.Context, imageName string, w io.Writer) error {
 	slog.InfoContext(ctx, "Boxer.EnsureImage", "imageName", imageName)
+	progress := imageProgressSink(w)
 
 	images, err := sb.ImageService.List(ctx)
 	if err != nil {
@@ -1143,14 +1145,14 @@ func (sb *Boxer) EnsureImage(ctx context.Context, imageName string, w io.Writer)
 	if strings.HasPrefix(imageName, "ghcr.io") || strings.HasPrefix(imageName, "docker.io") {
 		localDigest, err := sb.localImageDigest(ctx, imageName)
 		if err != nil {
-			fmt.Fprintf(w, "Failed to inspect local image %s, continuing with local version: %s\n", imageName, err)
+			fmt.Fprintf(progress, "Failed to inspect local image %s, continuing with local version: %s\n", imageName, err)
 			return nil
 		}
 		isLatest, err := runtimedeps.CheckImageDigestIsLatest(ctx, imageName, localDigest)
 		if err != nil {
-			fmt.Fprintf(w, "Failed to check remote registry for latest version of %s, continuing with local version: %s\n", imageName, err)
+			fmt.Fprintf(progress, "Failed to check remote registry for latest version of %s, continuing with local version: %s\n", imageName, err)
 		} else if !isLatest {
-			fmt.Fprintf(w, "Local image digest doesn't match latest remote digest, pulling %s\n", imageName)
+			fmt.Fprintf(progress, "Local image digest doesn't match latest remote digest, pulling %s\n", imageName)
 			return sb.pullImage(ctx, imageName, w)
 		}
 	}
@@ -1172,11 +1174,12 @@ func (sb *Boxer) localImageDigest(ctx context.Context, imageName string) (string
 // pullImage pulls imageName and writes progress messages to w.
 func (sb *Boxer) pullImage(ctx context.Context, imageName string, w io.Writer) error {
 	slog.InfoContext(ctx, "Boxer.pullImage", "imageName", imageName)
+	progress := imageProgressSink(w)
 
-	fmt.Fprintf(w, "Pulling image %s...\n", imageName)
+	fmt.Fprintf(progress, "Pulling image %s...\n", imageName)
 	start := time.Now()
 
-	waitFn, err := sb.ImageService.Pull(ctx, imageName, w)
+	waitFn, err := sb.ImageService.Pull(ctx, imageName, progress)
 	defer func() {
 		if waitFn != nil {
 			waitFn()
@@ -1194,8 +1197,15 @@ func (sb *Boxer) pullImage(ctx context.Context, imageName string, w io.Writer) e
 		}
 	}
 
-	fmt.Fprintf(w, "Done pulling image. Took %v.\n", time.Since(start))
+	fmt.Fprintf(progress, "Done pulling image. Took %v.\n", time.Since(start))
 	return nil
+}
+
+func imageProgressSink(w io.Writer) imageprogress.Sink {
+	if progress, ok := w.(imageprogress.Sink); ok {
+		return progress
+	}
+	return imageprogress.NewTextSink(w)
 }
 
 // SaveSandbox persists the Sandbox to the database.

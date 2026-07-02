@@ -71,6 +71,55 @@ func TestGRPCSB(t *testing.T) {
 		}
 	})
 
+	t.Run("structured stream", func(t *testing.T) {
+		appDir, err := os.MkdirTemp("", "sand-*")
+		if err != nil {
+			t.Fatalf("MkdirTemp: %v", err)
+		}
+		t.Cleanup(func() { _ = os.RemoveAll(appDir) })
+		description := "Pulling"
+		one := int64(1)
+		two := int64(2)
+		srv := startTestGRPCDaemon(t, appDir, &testGRPCDaemonService{
+			EnsureImageFunc: func(req *daemonpb.EnsureImageRequest, stream daemonpb.DaemonService_EnsureImageServer) error {
+				if err := stream.Send(&daemonpb.EnsureImageResponse{
+					Event: &daemonpb.EnsureImageResponse_PullProgress{PullProgress: &daemonpb.ImagePullProgressUpdate{
+						Description:   &description,
+						SetTasks:      &one,
+						SetTotalTasks: &two,
+					}},
+				}); err != nil {
+					return err
+				}
+				if err := stream.Send(&daemonpb.EnsureImageResponse{
+					Event: &daemonpb.EnsureImageResponse_PullProgress{PullProgress: &daemonpb.ImagePullProgressUpdate{
+						SetTasks: &two,
+					}},
+				}); err != nil {
+					return err
+				}
+				return stream.Send(&daemonpb.EnsureImageResponse{
+					Event: &daemonpb.EnsureImageResponse_Ok{Ok: true},
+				})
+			},
+		})
+		defer srv.Stop()
+
+		client, err := NewUnixSocketGRPCClient(context.Background(), appDir)
+		if err != nil {
+			t.Fatalf("NewUnixSocketGRPCClient() error = %v", err)
+		}
+		defer client.Close()
+
+		var progress bytes.Buffer
+		if err := client.EnsureImage(context.Background(), "test-image:latest", &progress); err != nil {
+			t.Fatalf("EnsureImage() error = %v", err)
+		}
+		if got := progress.String(); got != "Pulling tasks 1/2\nPulling tasks 2/2\n" {
+			t.Fatalf("EnsureImage() progress = %q, want structured progress lines", got)
+		}
+	})
+
 	t.Run("stream err", func(t *testing.T) {
 		appDir := t.TempDir()
 		srv := startTestGRPCDaemon(t, appDir, &testGRPCDaemonService{

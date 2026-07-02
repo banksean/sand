@@ -1390,6 +1390,7 @@ type EnsureImageResponse struct {
 	//	*EnsureImageResponse_Progress
 	//	*EnsureImageResponse_Error
 	//	*EnsureImageResponse_Ok
+	//	*EnsureImageResponse_PullProgress
 	Event         isEnsureImageResponse_Event `protobuf_oneof:"event"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1459,6 +1460,15 @@ func (x *EnsureImageResponse) GetOk() bool {
 	return false
 }
 
+func (x *EnsureImageResponse) GetPullProgress() *ImagePullProgressUpdate {
+	if x != nil {
+		if x, ok := x.Event.(*EnsureImageResponse_PullProgress); ok {
+			return x.PullProgress
+		}
+	}
+	return nil
+}
+
 type isEnsureImageResponse_Event interface {
 	isEnsureImageResponse_Event()
 }
@@ -1475,11 +1485,173 @@ type EnsureImageResponse_Ok struct {
 	Ok bool `protobuf:"varint,3,opt,name=ok,proto3,oneof"`
 }
 
+type EnsureImageResponse_PullProgress struct {
+	PullProgress *ImagePullProgressUpdate `protobuf:"bytes,4,opt,name=pull_progress,json=pullProgress,proto3,oneof"`
+}
+
 func (*EnsureImageResponse_Progress) isEnsureImageResponse_Event() {}
 
 func (*EnsureImageResponse_Error) isEnsureImageResponse_Event() {}
 
 func (*EnsureImageResponse_Ok) isEnsureImageResponse_Event() {}
+
+func (*EnsureImageResponse_PullProgress) isEnsureImageResponse_Event() {}
+
+type ImagePullProgressUpdate struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Description    *string                `protobuf:"bytes,1,opt,name=description,proto3,oneof" json:"description,omitempty"`
+	SubDescription *string                `protobuf:"bytes,2,opt,name=sub_description,json=subDescription,proto3,oneof" json:"sub_description,omitempty"`
+	ItemsName      *string                `protobuf:"bytes,3,opt,name=items_name,json=itemsName,proto3,oneof" json:"items_name,omitempty"`
+	AddTasks       *int64                 `protobuf:"varint,4,opt,name=add_tasks,json=addTasks,proto3,oneof" json:"add_tasks,omitempty"`
+	SetTasks       *int64                 `protobuf:"varint,5,opt,name=set_tasks,json=setTasks,proto3,oneof" json:"set_tasks,omitempty"`
+	AddTotalTasks  *int64                 `protobuf:"varint,6,opt,name=add_total_tasks,json=addTotalTasks,proto3,oneof" json:"add_total_tasks,omitempty"`
+	SetTotalTasks  *int64                 `protobuf:"varint,7,opt,name=set_total_tasks,json=setTotalTasks,proto3,oneof" json:"set_total_tasks,omitempty"`
+	AddItems       *int64                 `protobuf:"varint,8,opt,name=add_items,json=addItems,proto3,oneof" json:"add_items,omitempty"`
+	SetItems       *int64                 `protobuf:"varint,9,opt,name=set_items,json=setItems,proto3,oneof" json:"set_items,omitempty"`
+	AddTotalItems  *int64                 `protobuf:"varint,10,opt,name=add_total_items,json=addTotalItems,proto3,oneof" json:"add_total_items,omitempty"`
+	SetTotalItems  *int64                 `protobuf:"varint,11,opt,name=set_total_items,json=setTotalItems,proto3,oneof" json:"set_total_items,omitempty"`
+	AddSize        *int64                 `protobuf:"varint,12,opt,name=add_size,json=addSize,proto3,oneof" json:"add_size,omitempty"`
+	SetSize        *int64                 `protobuf:"varint,13,opt,name=set_size,json=setSize,proto3,oneof" json:"set_size,omitempty"`
+	AddTotalSize   *int64                 `protobuf:"varint,14,opt,name=add_total_size,json=addTotalSize,proto3,oneof" json:"add_total_size,omitempty"`
+	SetTotalSize   *int64                 `protobuf:"varint,15,opt,name=set_total_size,json=setTotalSize,proto3,oneof" json:"set_total_size,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ImagePullProgressUpdate) Reset() {
+	*x = ImagePullProgressUpdate{}
+	mi := &file_internal_daemon_daemonpb_daemon_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ImagePullProgressUpdate) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ImagePullProgressUpdate) ProtoMessage() {}
+
+func (x *ImagePullProgressUpdate) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_daemon_daemonpb_daemon_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ImagePullProgressUpdate.ProtoReflect.Descriptor instead.
+func (*ImagePullProgressUpdate) Descriptor() ([]byte, []int) {
+	return file_internal_daemon_daemonpb_daemon_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *ImagePullProgressUpdate) GetDescription() string {
+	if x != nil && x.Description != nil {
+		return *x.Description
+	}
+	return ""
+}
+
+func (x *ImagePullProgressUpdate) GetSubDescription() string {
+	if x != nil && x.SubDescription != nil {
+		return *x.SubDescription
+	}
+	return ""
+}
+
+func (x *ImagePullProgressUpdate) GetItemsName() string {
+	if x != nil && x.ItemsName != nil {
+		return *x.ItemsName
+	}
+	return ""
+}
+
+func (x *ImagePullProgressUpdate) GetAddTasks() int64 {
+	if x != nil && x.AddTasks != nil {
+		return *x.AddTasks
+	}
+	return 0
+}
+
+func (x *ImagePullProgressUpdate) GetSetTasks() int64 {
+	if x != nil && x.SetTasks != nil {
+		return *x.SetTasks
+	}
+	return 0
+}
+
+func (x *ImagePullProgressUpdate) GetAddTotalTasks() int64 {
+	if x != nil && x.AddTotalTasks != nil {
+		return *x.AddTotalTasks
+	}
+	return 0
+}
+
+func (x *ImagePullProgressUpdate) GetSetTotalTasks() int64 {
+	if x != nil && x.SetTotalTasks != nil {
+		return *x.SetTotalTasks
+	}
+	return 0
+}
+
+func (x *ImagePullProgressUpdate) GetAddItems() int64 {
+	if x != nil && x.AddItems != nil {
+		return *x.AddItems
+	}
+	return 0
+}
+
+func (x *ImagePullProgressUpdate) GetSetItems() int64 {
+	if x != nil && x.SetItems != nil {
+		return *x.SetItems
+	}
+	return 0
+}
+
+func (x *ImagePullProgressUpdate) GetAddTotalItems() int64 {
+	if x != nil && x.AddTotalItems != nil {
+		return *x.AddTotalItems
+	}
+	return 0
+}
+
+func (x *ImagePullProgressUpdate) GetSetTotalItems() int64 {
+	if x != nil && x.SetTotalItems != nil {
+		return *x.SetTotalItems
+	}
+	return 0
+}
+
+func (x *ImagePullProgressUpdate) GetAddSize() int64 {
+	if x != nil && x.AddSize != nil {
+		return *x.AddSize
+	}
+	return 0
+}
+
+func (x *ImagePullProgressUpdate) GetSetSize() int64 {
+	if x != nil && x.SetSize != nil {
+		return *x.SetSize
+	}
+	return 0
+}
+
+func (x *ImagePullProgressUpdate) GetAddTotalSize() int64 {
+	if x != nil && x.AddTotalSize != nil {
+		return *x.AddTotalSize
+	}
+	return 0
+}
+
+func (x *ImagePullProgressUpdate) GetSetTotalSize() int64 {
+	if x != nil && x.SetTotalSize != nil {
+		return *x.SetTotalSize
+	}
+	return 0
+}
 
 var File_internal_daemon_daemonpb_daemon_proto protoreflect.FileDescriptor
 
@@ -1579,12 +1751,51 @@ const file_internal_daemon_daemonpb_daemon_proto_rawDesc = "" +
 	"\x05event\"3\n" +
 	"\x12EnsureImageRequest\x12\x1d\n" +
 	"\n" +
-	"image_name\x18\x01 \x01(\tR\timageName\"f\n" +
+	"image_name\x18\x01 \x01(\tR\timageName\"\xb6\x01\n" +
 	"\x13EnsureImageResponse\x12\x1c\n" +
 	"\bprogress\x18\x01 \x01(\fH\x00R\bprogress\x12\x16\n" +
 	"\x05error\x18\x02 \x01(\tH\x00R\x05error\x12\x10\n" +
-	"\x02ok\x18\x03 \x01(\bH\x00R\x02okB\a\n" +
-	"\x05event2\xe6\v\n" +
+	"\x02ok\x18\x03 \x01(\bH\x00R\x02ok\x12N\n" +
+	"\rpull_progress\x18\x04 \x01(\v2'.sand.daemon.v1.ImagePullProgressUpdateH\x00R\fpullProgressB\a\n" +
+	"\x05event\"\xdf\x06\n" +
+	"\x17ImagePullProgressUpdate\x12%\n" +
+	"\vdescription\x18\x01 \x01(\tH\x00R\vdescription\x88\x01\x01\x12,\n" +
+	"\x0fsub_description\x18\x02 \x01(\tH\x01R\x0esubDescription\x88\x01\x01\x12\"\n" +
+	"\n" +
+	"items_name\x18\x03 \x01(\tH\x02R\titemsName\x88\x01\x01\x12 \n" +
+	"\tadd_tasks\x18\x04 \x01(\x03H\x03R\baddTasks\x88\x01\x01\x12 \n" +
+	"\tset_tasks\x18\x05 \x01(\x03H\x04R\bsetTasks\x88\x01\x01\x12+\n" +
+	"\x0fadd_total_tasks\x18\x06 \x01(\x03H\x05R\raddTotalTasks\x88\x01\x01\x12+\n" +
+	"\x0fset_total_tasks\x18\a \x01(\x03H\x06R\rsetTotalTasks\x88\x01\x01\x12 \n" +
+	"\tadd_items\x18\b \x01(\x03H\aR\baddItems\x88\x01\x01\x12 \n" +
+	"\tset_items\x18\t \x01(\x03H\bR\bsetItems\x88\x01\x01\x12+\n" +
+	"\x0fadd_total_items\x18\n" +
+	" \x01(\x03H\tR\raddTotalItems\x88\x01\x01\x12+\n" +
+	"\x0fset_total_items\x18\v \x01(\x03H\n" +
+	"R\rsetTotalItems\x88\x01\x01\x12\x1e\n" +
+	"\badd_size\x18\f \x01(\x03H\vR\aaddSize\x88\x01\x01\x12\x1e\n" +
+	"\bset_size\x18\r \x01(\x03H\fR\asetSize\x88\x01\x01\x12)\n" +
+	"\x0eadd_total_size\x18\x0e \x01(\x03H\rR\faddTotalSize\x88\x01\x01\x12)\n" +
+	"\x0eset_total_size\x18\x0f \x01(\x03H\x0eR\fsetTotalSize\x88\x01\x01B\x0e\n" +
+	"\f_descriptionB\x12\n" +
+	"\x10_sub_descriptionB\r\n" +
+	"\v_items_nameB\f\n" +
+	"\n" +
+	"_add_tasksB\f\n" +
+	"\n" +
+	"_set_tasksB\x12\n" +
+	"\x10_add_total_tasksB\x12\n" +
+	"\x10_set_total_tasksB\f\n" +
+	"\n" +
+	"_add_itemsB\f\n" +
+	"\n" +
+	"_set_itemsB\x12\n" +
+	"\x10_add_total_itemsB\x12\n" +
+	"\x10_set_total_itemsB\v\n" +
+	"\t_add_sizeB\v\n" +
+	"\t_set_sizeB\x11\n" +
+	"\x0f_add_total_sizeB\x11\n" +
+	"\x0f_set_total_size2\xe6\v\n" +
 	"\rDaemonService\x12A\n" +
 	"\x04Ping\x12\x1b.sand.daemon.v1.PingRequest\x1a\x1c.sand.daemon.v1.PingResponse\x12J\n" +
 	"\aVersion\x12\x1e.sand.daemon.v1.VersionRequest\x1a\x1f.sand.daemon.v1.VersionResponse\x12K\n" +
@@ -1619,7 +1830,7 @@ func file_internal_daemon_daemonpb_daemon_proto_rawDescGZIP() []byte {
 	return file_internal_daemon_daemonpb_daemon_proto_rawDescData
 }
 
-var file_internal_daemon_daemonpb_daemon_proto_msgTypes = make([]protoimpl.MessageInfo, 27)
+var file_internal_daemon_daemonpb_daemon_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
 var file_internal_daemon_daemonpb_daemon_proto_goTypes = []any{
 	(*PingRequest)(nil),                   // 0: sand.daemon.v1.PingRequest
 	(*PingResponse)(nil),                  // 1: sand.daemon.v1.PingResponse
@@ -1647,55 +1858,57 @@ var file_internal_daemon_daemonpb_daemon_proto_goTypes = []any{
 	(*CreateSandboxResponse)(nil),         // 23: sand.daemon.v1.CreateSandboxResponse
 	(*EnsureImageRequest)(nil),            // 24: sand.daemon.v1.EnsureImageRequest
 	(*EnsureImageResponse)(nil),           // 25: sand.daemon.v1.EnsureImageResponse
-	nil,                                   // 26: sand.daemon.v1.ResolveAgentLaunchEnvResponse.EnvEntry
+	(*ImagePullProgressUpdate)(nil),       // 26: sand.daemon.v1.ImagePullProgressUpdate
+	nil,                                   // 27: sand.daemon.v1.ResolveAgentLaunchEnvResponse.EnvEntry
 }
 var file_internal_daemon_daemonpb_daemon_proto_depIdxs = []int32{
 	15, // 0: sand.daemon.v1.ResolveAgentLaunchEnvRequest.profile_env:type_name -> sand.daemon.v1.EnvPolicy
-	26, // 1: sand.daemon.v1.ResolveAgentLaunchEnvResponse.env:type_name -> sand.daemon.v1.ResolveAgentLaunchEnvResponse.EnvEntry
+	27, // 1: sand.daemon.v1.ResolveAgentLaunchEnvResponse.env:type_name -> sand.daemon.v1.ResolveAgentLaunchEnvResponse.EnvEntry
 	16, // 2: sand.daemon.v1.EnvPolicy.files:type_name -> sand.daemon.v1.EnvFileRef
 	17, // 3: sand.daemon.v1.EnvPolicy.vars:type_name -> sand.daemon.v1.EnvVarRule
 	21, // 4: sand.daemon.v1.CreateSandboxRequest.shared_caches:type_name -> sand.daemon.v1.SharedCacheConfig
-	0,  // 5: sand.daemon.v1.DaemonService.Ping:input_type -> sand.daemon.v1.PingRequest
-	2,  // 6: sand.daemon.v1.DaemonService.Version:input_type -> sand.daemon.v1.VersionRequest
-	5,  // 7: sand.daemon.v1.DaemonService.Shutdown:input_type -> sand.daemon.v1.ShutdownRequest
-	6,  // 8: sand.daemon.v1.DaemonService.LogSandbox:input_type -> sand.daemon.v1.IDRequest
-	8,  // 9: sand.daemon.v1.DaemonService.ListSandboxes:input_type -> sand.daemon.v1.ListSandboxesRequest
-	8,  // 10: sand.daemon.v1.DaemonService.ListDeletedSandboxes:input_type -> sand.daemon.v1.ListSandboxesRequest
-	6,  // 11: sand.daemon.v1.DaemonService.GetSandbox:input_type -> sand.daemon.v1.IDRequest
-	6,  // 12: sand.daemon.v1.DaemonService.RemoveSandbox:input_type -> sand.daemon.v1.IDRequest
-	6,  // 13: sand.daemon.v1.DaemonService.ExpungeSandbox:input_type -> sand.daemon.v1.IDRequest
-	6,  // 14: sand.daemon.v1.DaemonService.StopSandbox:input_type -> sand.daemon.v1.IDRequest
-	11, // 15: sand.daemon.v1.DaemonService.StartSandbox:input_type -> sand.daemon.v1.StartSandboxRequest
-	6,  // 16: sand.daemon.v1.DaemonService.SyncHostGitMirror:input_type -> sand.daemon.v1.IDRequest
-	13, // 17: sand.daemon.v1.DaemonService.ResolveAgentLaunchEnv:input_type -> sand.daemon.v1.ResolveAgentLaunchEnvRequest
-	18, // 18: sand.daemon.v1.DaemonService.ExportImage:input_type -> sand.daemon.v1.ExportImageRequest
-	19, // 19: sand.daemon.v1.DaemonService.Stats:input_type -> sand.daemon.v1.StatsRequest
-	6,  // 20: sand.daemon.v1.DaemonService.VSC:input_type -> sand.daemon.v1.IDRequest
-	22, // 21: sand.daemon.v1.DaemonService.CreateSandbox:input_type -> sand.daemon.v1.CreateSandboxRequest
-	24, // 22: sand.daemon.v1.DaemonService.EnsureImage:input_type -> sand.daemon.v1.EnsureImageRequest
-	1,  // 23: sand.daemon.v1.DaemonService.Ping:output_type -> sand.daemon.v1.PingResponse
-	3,  // 24: sand.daemon.v1.DaemonService.Version:output_type -> sand.daemon.v1.VersionResponse
-	4,  // 25: sand.daemon.v1.DaemonService.Shutdown:output_type -> sand.daemon.v1.StatusResponse
-	7,  // 26: sand.daemon.v1.DaemonService.LogSandbox:output_type -> sand.daemon.v1.LogSandboxResponse
-	9,  // 27: sand.daemon.v1.DaemonService.ListSandboxes:output_type -> sand.daemon.v1.ListSandboxesResponse
-	9,  // 28: sand.daemon.v1.DaemonService.ListDeletedSandboxes:output_type -> sand.daemon.v1.ListSandboxesResponse
-	10, // 29: sand.daemon.v1.DaemonService.GetSandbox:output_type -> sand.daemon.v1.GetSandboxResponse
-	4,  // 30: sand.daemon.v1.DaemonService.RemoveSandbox:output_type -> sand.daemon.v1.StatusResponse
-	4,  // 31: sand.daemon.v1.DaemonService.ExpungeSandbox:output_type -> sand.daemon.v1.StatusResponse
-	4,  // 32: sand.daemon.v1.DaemonService.StopSandbox:output_type -> sand.daemon.v1.StatusResponse
-	4,  // 33: sand.daemon.v1.DaemonService.StartSandbox:output_type -> sand.daemon.v1.StatusResponse
-	12, // 34: sand.daemon.v1.DaemonService.SyncHostGitMirror:output_type -> sand.daemon.v1.SyncHostGitMirrorResponse
-	14, // 35: sand.daemon.v1.DaemonService.ResolveAgentLaunchEnv:output_type -> sand.daemon.v1.ResolveAgentLaunchEnvResponse
-	4,  // 36: sand.daemon.v1.DaemonService.ExportImage:output_type -> sand.daemon.v1.StatusResponse
-	20, // 37: sand.daemon.v1.DaemonService.Stats:output_type -> sand.daemon.v1.StatsResponse
-	4,  // 38: sand.daemon.v1.DaemonService.VSC:output_type -> sand.daemon.v1.StatusResponse
-	23, // 39: sand.daemon.v1.DaemonService.CreateSandbox:output_type -> sand.daemon.v1.CreateSandboxResponse
-	25, // 40: sand.daemon.v1.DaemonService.EnsureImage:output_type -> sand.daemon.v1.EnsureImageResponse
-	23, // [23:41] is the sub-list for method output_type
-	5,  // [5:23] is the sub-list for method input_type
-	5,  // [5:5] is the sub-list for extension type_name
-	5,  // [5:5] is the sub-list for extension extendee
-	0,  // [0:5] is the sub-list for field type_name
+	26, // 5: sand.daemon.v1.EnsureImageResponse.pull_progress:type_name -> sand.daemon.v1.ImagePullProgressUpdate
+	0,  // 6: sand.daemon.v1.DaemonService.Ping:input_type -> sand.daemon.v1.PingRequest
+	2,  // 7: sand.daemon.v1.DaemonService.Version:input_type -> sand.daemon.v1.VersionRequest
+	5,  // 8: sand.daemon.v1.DaemonService.Shutdown:input_type -> sand.daemon.v1.ShutdownRequest
+	6,  // 9: sand.daemon.v1.DaemonService.LogSandbox:input_type -> sand.daemon.v1.IDRequest
+	8,  // 10: sand.daemon.v1.DaemonService.ListSandboxes:input_type -> sand.daemon.v1.ListSandboxesRequest
+	8,  // 11: sand.daemon.v1.DaemonService.ListDeletedSandboxes:input_type -> sand.daemon.v1.ListSandboxesRequest
+	6,  // 12: sand.daemon.v1.DaemonService.GetSandbox:input_type -> sand.daemon.v1.IDRequest
+	6,  // 13: sand.daemon.v1.DaemonService.RemoveSandbox:input_type -> sand.daemon.v1.IDRequest
+	6,  // 14: sand.daemon.v1.DaemonService.ExpungeSandbox:input_type -> sand.daemon.v1.IDRequest
+	6,  // 15: sand.daemon.v1.DaemonService.StopSandbox:input_type -> sand.daemon.v1.IDRequest
+	11, // 16: sand.daemon.v1.DaemonService.StartSandbox:input_type -> sand.daemon.v1.StartSandboxRequest
+	6,  // 17: sand.daemon.v1.DaemonService.SyncHostGitMirror:input_type -> sand.daemon.v1.IDRequest
+	13, // 18: sand.daemon.v1.DaemonService.ResolveAgentLaunchEnv:input_type -> sand.daemon.v1.ResolveAgentLaunchEnvRequest
+	18, // 19: sand.daemon.v1.DaemonService.ExportImage:input_type -> sand.daemon.v1.ExportImageRequest
+	19, // 20: sand.daemon.v1.DaemonService.Stats:input_type -> sand.daemon.v1.StatsRequest
+	6,  // 21: sand.daemon.v1.DaemonService.VSC:input_type -> sand.daemon.v1.IDRequest
+	22, // 22: sand.daemon.v1.DaemonService.CreateSandbox:input_type -> sand.daemon.v1.CreateSandboxRequest
+	24, // 23: sand.daemon.v1.DaemonService.EnsureImage:input_type -> sand.daemon.v1.EnsureImageRequest
+	1,  // 24: sand.daemon.v1.DaemonService.Ping:output_type -> sand.daemon.v1.PingResponse
+	3,  // 25: sand.daemon.v1.DaemonService.Version:output_type -> sand.daemon.v1.VersionResponse
+	4,  // 26: sand.daemon.v1.DaemonService.Shutdown:output_type -> sand.daemon.v1.StatusResponse
+	7,  // 27: sand.daemon.v1.DaemonService.LogSandbox:output_type -> sand.daemon.v1.LogSandboxResponse
+	9,  // 28: sand.daemon.v1.DaemonService.ListSandboxes:output_type -> sand.daemon.v1.ListSandboxesResponse
+	9,  // 29: sand.daemon.v1.DaemonService.ListDeletedSandboxes:output_type -> sand.daemon.v1.ListSandboxesResponse
+	10, // 30: sand.daemon.v1.DaemonService.GetSandbox:output_type -> sand.daemon.v1.GetSandboxResponse
+	4,  // 31: sand.daemon.v1.DaemonService.RemoveSandbox:output_type -> sand.daemon.v1.StatusResponse
+	4,  // 32: sand.daemon.v1.DaemonService.ExpungeSandbox:output_type -> sand.daemon.v1.StatusResponse
+	4,  // 33: sand.daemon.v1.DaemonService.StopSandbox:output_type -> sand.daemon.v1.StatusResponse
+	4,  // 34: sand.daemon.v1.DaemonService.StartSandbox:output_type -> sand.daemon.v1.StatusResponse
+	12, // 35: sand.daemon.v1.DaemonService.SyncHostGitMirror:output_type -> sand.daemon.v1.SyncHostGitMirrorResponse
+	14, // 36: sand.daemon.v1.DaemonService.ResolveAgentLaunchEnv:output_type -> sand.daemon.v1.ResolveAgentLaunchEnvResponse
+	4,  // 37: sand.daemon.v1.DaemonService.ExportImage:output_type -> sand.daemon.v1.StatusResponse
+	20, // 38: sand.daemon.v1.DaemonService.Stats:output_type -> sand.daemon.v1.StatsResponse
+	4,  // 39: sand.daemon.v1.DaemonService.VSC:output_type -> sand.daemon.v1.StatusResponse
+	23, // 40: sand.daemon.v1.DaemonService.CreateSandbox:output_type -> sand.daemon.v1.CreateSandboxResponse
+	25, // 41: sand.daemon.v1.DaemonService.EnsureImage:output_type -> sand.daemon.v1.EnsureImageResponse
+	24, // [24:42] is the sub-list for method output_type
+	6,  // [6:24] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_internal_daemon_daemonpb_daemon_proto_init() }
@@ -1712,14 +1925,16 @@ func file_internal_daemon_daemonpb_daemon_proto_init() {
 		(*EnsureImageResponse_Progress)(nil),
 		(*EnsureImageResponse_Error)(nil),
 		(*EnsureImageResponse_Ok)(nil),
+		(*EnsureImageResponse_PullProgress)(nil),
 	}
+	file_internal_daemon_daemonpb_daemon_proto_msgTypes[26].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_daemon_daemonpb_daemon_proto_rawDesc), len(file_internal_daemon_daemonpb_daemon_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   27,
+			NumMessages:   28,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
