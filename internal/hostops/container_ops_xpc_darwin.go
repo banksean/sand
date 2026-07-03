@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -160,6 +161,18 @@ func (o *xpcContainerOps) ExecStream(ctx context.Context, opts *options.ExecCont
 	if opts == nil {
 		opts = &options.ExecContainer{}
 	}
+	processID := uuid.NewString()
+	slog.InfoContext(ctx, "xpcContainerOps.ExecStream starting",
+		"containerID", containerID,
+		"processID", processID,
+		"cmd", cmd,
+		"args", args,
+		"interactive", opts.ProcessOptions.Interactive,
+		"tty", opts.ProcessOptions.TTY,
+		"stdin", streamDebugInfo(stdin),
+		"stdout", streamDebugInfo(stdout),
+		"stderr", streamDebugInfo(stderr))
+
 	snapshot, err := o.client.GetContainer(ctx, containerID)
 	if err != nil {
 		return nil, err
@@ -173,11 +186,19 @@ func (o *xpcContainerOps) ExecStream(ctx context.Context, opts *options.ExecCont
 	if err != nil {
 		return nil, err
 	}
-	processID := uuid.NewString()
+	slog.InfoContext(ctx, "xpcContainerOps.ExecStream stdio prepared",
+		"containerID", containerID,
+		"processID", processID,
+		"terminal", cfg.Terminal,
+		"stdinFD", fileDebugInfo(stdio[0]),
+		"stdoutFD", fileDebugInfo(stdio[1]),
+		"stderrFD", fileDebugInfo(stdio[2]))
+
 	if err := o.client.CreateProcess(ctx, containerID, processID, cfg, stdio); err != nil {
 		cleanup()
 		return nil, err
 	}
+	slog.InfoContext(ctx, "xpcContainerOps.ExecStream process created", "containerID", containerID, "processID", processID)
 
 	var savedState *term.State
 	if stdinFile, ok := stdin.(*os.File); ok && term.IsTerminal(int(stdinFile.Fd())) {
@@ -186,11 +207,19 @@ func (o *xpcContainerOps) ExecStream(ctx context.Context, opts *options.ExecCont
 			cleanup()
 			return nil, fmt.Errorf("making terminal raw: %w", err)
 		}
+		slog.InfoContext(ctx, "xpcContainerOps.ExecStream terminal raw mode enabled",
+			"containerID", containerID,
+			"processID", processID,
+			"stdinFD", int(stdinFile.Fd()))
 	}
 	restore := func() {
 		if savedState != nil {
 			if stdinFile, ok := stdin.(*os.File); ok {
 				_ = term.Restore(int(stdinFile.Fd()), savedState)
+				slog.InfoContext(ctx, "xpcContainerOps.ExecStream terminal restored",
+					"containerID", containerID,
+					"processID", processID,
+					"stdinFD", int(stdinFile.Fd()))
 			}
 		}
 	}
@@ -205,6 +234,10 @@ func (o *xpcContainerOps) ExecStream(ctx context.Context, opts *options.ExecCont
 			case <-done:
 				return
 			case sig := <-sigCh:
+				slog.InfoContext(ctx, "xpcContainerOps.ExecStream signal received",
+					"containerID", containerID,
+					"processID", processID,
+					"signal", sig.String())
 				switch sig {
 				case syscall.SIGWINCH:
 					if w, h, ok := terminalSize(stdin, stdout); ok {
@@ -226,15 +259,22 @@ func (o *xpcContainerOps) ExecStream(ctx context.Context, opts *options.ExecCont
 		cleanup()
 		return nil, err
 	}
+	slog.InfoContext(ctx, "xpcContainerOps.ExecStream process started", "containerID", containerID, "processID", processID)
 
 	return func() error {
-		defer close(done)
-		defer restore()
-		defer cleanup()
+		slog.InfoContext(ctx, "xpcContainerOps.ExecStream waiting", "containerID", containerID, "processID", processID)
+		defer func() {
+			close(done)
+			restore()
+			cleanup()
+			slog.InfoContext(ctx, "xpcContainerOps.ExecStream cleanup complete", "containerID", containerID, "processID", processID)
+		}()
 		code, err := o.client.WaitProcess(ctx, containerID, processID)
 		if err != nil {
+			slog.WarnContext(ctx, "xpcContainerOps.ExecStream wait failed", "containerID", containerID, "processID", processID, "error", err)
 			return err
 		}
+		slog.InfoContext(ctx, "xpcContainerOps.ExecStream process exited", "containerID", containerID, "processID", processID, "exitCode", code)
 		if code != 0 {
 			return fmt.Errorf("process exited with code %d", code)
 		}
@@ -551,6 +591,26 @@ func terminalSize(stdin io.Reader, stdout io.Writer) (int, int, bool) {
 		}
 	}
 	return 0, 0, false
+}
+
+func streamDebugInfo(v any) string {
+	file, ok := v.(*os.File)
+	if !ok {
+		if v == nil {
+			return "<nil>"
+		}
+		return fmt.Sprintf("%T", v)
+	}
+	terminal := term.IsTerminal(int(file.Fd()))
+	return fmt.Sprintf("%s fd=%d terminal=%t", file.Name(), int(file.Fd()), terminal)
+}
+
+func fileDebugInfo(file *os.File) string {
+	if file == nil {
+		return "<nil>"
+	}
+	terminal := term.IsTerminal(int(file.Fd()))
+	return fmt.Sprintf("%s fd=%d terminal=%t", file.Name(), int(file.Fd()), terminal)
 }
 
 func parsePlatform(platform string) (xpc.Platform, error) {
