@@ -21,9 +21,7 @@ import (
 	"github.com/banksean/sand/internal/applecontainer/options"
 	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/applecontainer/xpc"
-	"github.com/creack/pty"
 	"github.com/google/uuid"
-	"golang.org/x/sys/unix"
 	"golang.org/x/term"
 )
 
@@ -521,8 +519,8 @@ func parseVolumeFilesystem(spec string) (xpc.Filesystem, error) {
 }
 
 func processFiles(stdin io.Reader, stdout, stderr io.Writer, tty bool) ([3]*os.File, func(), error) {
-	if tty && isTerminalFile(stdin) && isTerminalFile(stdout) {
-		return processTerminalFiles(stdin.(*os.File), stdout.(*os.File), stderr)
+	if tty && (isTerminalFile(stdin) || isTerminalFile(stdout) || isTerminalFile(stderr)) {
+		return [3]*os.File{}, func() {}, fmt.Errorf("terminal-backed XPC exec is unsupported; use SSH for interactive sessions")
 	}
 
 	var files [3]*os.File
@@ -567,6 +565,11 @@ func processFiles(stdin io.Reader, stdout, stderr io.Writer, tty bool) ([3]*os.F
 	return files, cleanup, nil
 }
 
+func isTerminalFile(v any) bool {
+	f, ok := v.(*os.File)
+	return ok && term.IsTerminal(int(f.Fd()))
+}
+
 func nullStdio() ([3]*os.File, func(), error) {
 	var files [3]*os.File
 	var cleanups []func()
@@ -585,60 +588,6 @@ func nullStdio() ([3]*os.File, func(), error) {
 		cleanups = append(cleanups, func() { f.Close() })
 	}
 	return files, cleanup, nil
-}
-
-func processTerminalFiles(stdin, stdout *os.File, stderr io.Writer) ([3]*os.File, func(), error) {
-	var files [3]*os.File
-	ptmx, tty, err := pty.Open()
-	if err != nil {
-		return files, func() {}, err
-	}
-	stdinCopy, err := dupFile(stdin)
-	if err != nil {
-		ptmx.Close()
-		tty.Close()
-		return files, func() {}, err
-	}
-
-	if w, h, ok := terminalSize(stdin, stdout); ok {
-		_ = pty.Setsize(ptmx, &pty.Winsize{Rows: uint16(h), Cols: uint16(w)})
-	}
-
-	files[0] = tty
-	files[1] = tty
-
-	done := make(chan struct{})
-	go func() {
-		io.Copy(ptmx, stdinCopy) //nolint:errcheck
-	}()
-	go func() {
-		io.Copy(stdout, ptmx) //nolint:errcheck
-		close(done)
-	}()
-
-	cleanup := func() {
-		stdinCopy.Close()
-		tty.Close()
-		ptmx.Close()
-		select {
-		case <-done:
-		default:
-		}
-	}
-	return files, cleanup, nil
-}
-
-func dupFile(file *os.File) (*os.File, error) {
-	fd, err := unix.Dup(int(file.Fd()))
-	if err != nil {
-		return nil, err
-	}
-	return os.NewFile(uintptr(fd), file.Name()), nil
-}
-
-func isTerminalFile(v any) bool {
-	f, ok := v.(*os.File)
-	return ok && term.IsTerminal(int(f.Fd()))
 }
 
 func writerFile(w io.Writer) (*os.File, func(), error) {

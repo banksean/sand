@@ -2,59 +2,31 @@ package cli
 
 import (
 	"context"
-	"errors"
+	"fmt"
+	"os/exec"
 	"reflect"
 	"strings"
 	"testing"
 
-	"github.com/banksean/sand/internal/applecontainer/options"
+	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/hostops"
 	"github.com/banksean/sand/internal/sandtypes"
 )
 
 func TestCheckoutSandboxBranch(t *testing.T) {
-	type execCall struct {
-		containerID string
-		cmd         string
-		args        []string
-		opts        *options.ExecContainer
-	}
-
 	sbox := &sandtypes.Box{
-		ID:          "sb-123",
-		Name:        "sb-123",
-		ContainerID: "ctr-123",
-		EnvFile:     "/tmp/test.env",
-		Username:    "alice",
-		Uid:         "1001",
-	}
-	var calls []execCall
-	containerSvc := &hostops.MockContainerOps{
-		ExecFunc: func(_ context.Context, opts *options.ExecContainer, containerID, cmd string, _ []string, args ...string) (string, error) {
-			calls = append(calls, execCall{
-				containerID: containerID,
-				cmd:         cmd,
-				args:        append([]string(nil), args...),
-				opts:        opts,
-			})
-			return "", nil
+		ID:       "sb-123",
+		Name:     "sb-123",
+		EnvFile:  "/tmp/test.env",
+		Username: "alice",
+		Uid:      "1001",
+		Container: &types.Container{
+			Configuration: types.ContainerConfig{ID: "sb-123.local"},
 		},
 	}
-	if err := checkoutSandboxBranch(context.Background(), containerSvc, sbox, plainCommandEnv{}); err != nil {
-		t.Fatalf("checkoutSandboxBranch() error = %v", err)
-	}
-	if len(calls) != 2 {
-		t.Fatalf("expected 2 exec calls, got %d", len(calls))
-	}
-	if calls[0].containerID != sbox.ContainerID {
-		t.Fatalf("config call container ID = %q, want %q", calls[0].containerID, sbox.ContainerID)
-	}
-	if calls[0].cmd != "git" {
-		t.Fatalf("config call cmd = %q, want git", calls[0].cmd)
-	}
-	if diff := reflect.DeepEqual(calls[0].args, []string{"config", "--global", "--add", "safe.directory", "/app"}); !diff {
-		t.Fatalf("config call args = %v", calls[0].args)
-	}
+	var calls [][]string
+	restore := stubSSH(t, &calls, []string{"", ""}, []int{0, 0})
+	defer restore()
 
 	tests := []struct {
 		name       string
@@ -69,82 +41,84 @@ func TestCheckoutSandboxBranch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var calls []execCall
-			containerSvc := &hostops.MockContainerOps{
-				ExecFunc: func(_ context.Context, opts *options.ExecContainer, containerID, cmd string, _ []string, args ...string) (string, error) {
-					calls = append(calls, execCall{
-						containerID: containerID,
-						cmd:         cmd,
-						args:        append([]string(nil), args...),
-						opts:        opts,
-					})
-					return "", nil
-				},
-			}
+			calls = nil
 
-			checkoutSandboxBranch(context.Background(), containerSvc, sbox, tt.projectEnv)
+			if err := checkoutSandboxBranch(context.Background(), sbox, tt.projectEnv); err != nil {
+				t.Fatalf("checkoutSandboxBranch() error = %v", err)
+			}
 
 			if len(calls) != 2 {
-				t.Fatalf("expected 2 exec calls, got %d", len(calls))
+				t.Fatalf("expected 2 ssh calls, got %d", len(calls))
 			}
-
-			if calls[0].containerID != sbox.ContainerID {
-				t.Fatalf("config call container ID = %q, want %q", calls[0].containerID, sbox.ContainerID)
+			wantFirst := []string{
+				"sb-123.local",
+				"cd '/app' && env 'HOSTNAME=sb-123.local' 'git' 'config' '--global' '--add' 'safe.directory' '/app'",
 			}
-			if calls[0].cmd != "git" {
-				t.Fatalf("config call cmd = %q, want git", calls[0].cmd)
+			if tt.projectEnv.Env["PROJECT_NAME"] != "" {
+				wantFirst[1] = "cd '/app' && env 'HOSTNAME=sb-123.local' 'PROJECT_NAME=sand' 'git' 'config' '--global' '--add' 'safe.directory' '/app'"
 			}
-			if diff := reflect.DeepEqual(calls[0].args, []string{"config", "--global", "--add", "safe.directory", "/app"}); !diff {
-				t.Fatalf("config call args = %v", calls[0].args)
+			if !reflect.DeepEqual(calls[0], wantFirst) {
+				t.Fatalf("config ssh call = %#v, want %#v", calls[0], wantFirst)
 			}
-
-			if calls[1].cmd != "git" {
-				t.Fatalf("checkout call cmd = %q, want git", calls[1].cmd)
+			wantSecond := []string{
+				"sb-123.local",
+				"cd '/app' && env 'HOSTNAME=sb-123.local' 'git' 'checkout' '-b' 'sb-123'",
 			}
-			if diff := reflect.DeepEqual(calls[1].args, []string{"checkout", "-b", sbox.Name}); !diff {
-				t.Fatalf("checkout call args = %v", calls[1].args)
+			if tt.projectEnv.Env["PROJECT_NAME"] != "" {
+				wantSecond[1] = "cd '/app' && env 'HOSTNAME=sb-123.local' 'PROJECT_NAME=sand' 'git' 'checkout' '-b' 'sb-123'"
 			}
-
-			wantOpts := &options.ExecContainer{
-				ProcessOptions: options.ProcessOptions{
-					WorkDir: "/app",
-					Env:     tt.projectEnv.Env,
-					EnvFile: tt.projectEnv.EnvFile,
-					User:    sbox.Username,
-					UID:     sbox.Uid,
-				},
-			}
-			if !reflect.DeepEqual(calls[0].opts, wantOpts) {
-				t.Fatalf("config call opts = %+v, want %+v", calls[0].opts, wantOpts)
-			}
-			if !reflect.DeepEqual(calls[1].opts, wantOpts) {
-				t.Fatalf("checkout call opts = %+v, want %+v", calls[1].opts, wantOpts)
+			if !reflect.DeepEqual(calls[1], wantSecond) {
+				t.Fatalf("checkout ssh call = %#v, want %#v", calls[1], wantSecond)
 			}
 		})
 	}
 }
 
 func TestCheckoutSandboxBranch_ReturnsCheckoutError(t *testing.T) {
-	containerSvc := &hostops.MockContainerOps{
-		ExecFunc: func(_ context.Context, _ *options.ExecContainer, _ string, _ string, _ []string, args ...string) (string, error) {
-			if reflect.DeepEqual(args, []string{"checkout", "-b", "sb-123"}) {
-				return "fatal: a branch named 'sb-123' already exists", errors.New("exit status 128")
-			}
-			return "", nil
+	var calls [][]string
+	restore := stubSSH(t, &calls, []string{"", "fatal: a branch named 'sb-123' already exists"}, []int{0, 128})
+	defer restore()
+	sbox := &sandtypes.Box{
+		ID:   "sb-123",
+		Name: "sb-123",
+		Container: &types.Container{
+			Configuration: types.ContainerConfig{ID: "sb-123.local"},
 		},
 	}
-	sbox := &sandtypes.Box{
-		ID:          "sb-123",
-		Name:        "sb-123",
-		ContainerID: "ctr-123",
-	}
 
-	err := checkoutSandboxBranch(context.Background(), containerSvc, sbox, plainCommandEnv{})
+	err := checkoutSandboxBranch(context.Background(), sbox, plainCommandEnv{})
 	if err == nil {
 		t.Fatal("checkoutSandboxBranch() error = nil, want non-nil")
 	}
 	if !strings.Contains(err.Error(), `creating branch "sb-123"`) {
 		t.Fatalf("checkoutSandboxBranch() error = %v, want branch context", err)
+	}
+}
+
+func stubSSH(t *testing.T, calls *[][]string, outputs []string, exitCodes []int) func() {
+	t.Helper()
+	oldSSHCommand := sshCommand
+	oldCheck := checkSSHReachability
+	call := 0
+	sshCommand = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		*calls = append(*calls, append([]string(nil), args...))
+		output := ""
+		if call < len(outputs) {
+			output = outputs[call]
+		}
+		exitCode := 0
+		if call < len(exitCodes) {
+			exitCode = exitCodes[call]
+		}
+		call++
+		return exec.CommandContext(ctx, "sh", "-c", "printf %s "+shellQuote(output)+"; exit "+shellQuote(fmt.Sprint(exitCode)))
+	}
+	checkSSHReachability = func(context.Context, string) (func() error, error) {
+		return nil, nil
+	}
+	return func() {
+		sshCommand = oldSSHCommand
+		checkSSHReachability = oldCheck
 	}
 }
 

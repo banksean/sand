@@ -8,10 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/banksean/sand/internal/applecontainer/options"
-	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/daemon"
-	"github.com/banksean/sand/internal/hostops"
 	"github.com/goombaio/namegenerator"
 )
 
@@ -95,30 +92,19 @@ func (c *ExecCmd) Run(cctx *CLIContext) error {
 
 	slog.InfoContext(ctx, "main: sbox.exec starting")
 
+	if len(c.Arg) == 0 {
+		return fmt.Errorf("command is required")
+	}
 	args := []string{}
 	if len(c.Arg) > 1 {
 		args = c.Arg[1:]
 	}
-	containerSvc := hostops.NewAppleContainerOps()
-	hostname := types.GetContainerHostname(sbox.Container)
 	projectEnv, err := plainCommandProjectEnv(sbox, c.ProjectEnv)
 	if err != nil {
 		return err
 	}
 	defer projectEnv.Cleanup()
-	env := mergeEnv(projectEnv.Env, map[string]string{
-		"HOSTNAME": hostname,
-	})
-	out, err := containerSvc.Exec(ctx,
-		&options.ExecContainer{
-			ProcessOptions: options.ProcessOptions{
-				WorkDir: "/app",
-				Env:     env,
-				EnvFile: projectEnv.EnvFile,
-				User:    c.Username,
-				UID:     c.Uid,
-			},
-		}, sbox.ContainerID, c.Arg[0], os.Environ(), args...)
+	out, err := runSSHOutput(ctx, sbox, projectEnv.EnvFile, projectEnv.Env, c.Arg[0], args...)
 	if err != nil {
 		slog.ErrorContext(ctx, "sbox.exec", "error", err, "out", out)
 	}

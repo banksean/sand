@@ -261,6 +261,7 @@ func envScopeAllowsProject(scope sandtypes.EnvScope) bool {
 }
 
 var sshCommand = exec.CommandContext
+var checkSSHReachability = sshimmer.CheckSSHReachability
 
 // runShell executes an interactive shell or command in sbox's container over SSH,
 // connecting the current process's stdin/stdout/stderr. Non-zero shell exit is
@@ -279,11 +280,7 @@ func runShell(ctx context.Context, sbox *sandtypes.Box, shell string, args []str
 	if err != nil {
 		return err
 	}
-	remoteCommand := remoteInteractiveCommand(env, shell, args)
-	cmd := sshCommand(ctx, "ssh", "-tt", hostname, remoteCommand)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	cmd := sshStreamCommand(ctx, hostname, true, env, shell, args)
 	slog.InfoContext(ctx, "runShell: ssh", "sandbox", sbox.ID, "hostname", hostname, "shell", shell)
 	if err := cmd.Run(); err != nil {
 		slog.WarnContext(ctx, "runShell: shell exited with error", "sandbox", sbox.ID, "error", err)
@@ -291,8 +288,60 @@ func runShell(ctx context.Context, sbox *sandtypes.Box, shell string, args []str
 	return nil
 }
 
+func runSSHOutput(ctx context.Context, sbox *sandtypes.Box, envFile string, extraEnv map[string]string, shell string, args ...string) (string, error) {
+	if sbox.Container == nil {
+		return "", fmt.Errorf("sandbox %s has no container", sbox.ID)
+	}
+	hostname := types.GetContainerHostname(sbox.Container)
+	if err := ensureSSHReachability(ctx, hostname); err != nil {
+		return "", err
+	}
+	env, err := sshCommandEnv(hostname, envFile, extraEnv)
+	if err != nil {
+		return "", err
+	}
+	cmd := sshOutputCommand(ctx, hostname, env, shell, args)
+	slog.InfoContext(ctx, "runSSHOutput: ssh", "sandbox", sbox.ID, "hostname", hostname, "shell", shell)
+	out, err := cmd.CombinedOutput()
+	return string(out), err
+}
+
+func runSSHStream(ctx context.Context, sbox *sandtypes.Box, tty bool, envFile string, extraEnv map[string]string, shell string, args ...string) error {
+	if sbox.Container == nil {
+		return fmt.Errorf("sandbox %s has no container", sbox.ID)
+	}
+	hostname := types.GetContainerHostname(sbox.Container)
+	if err := ensureSSHReachability(ctx, hostname); err != nil {
+		return err
+	}
+	env, err := interactiveSSHEnv(hostname, true, envFile, extraEnv)
+	if err != nil {
+		return err
+	}
+	cmd := sshStreamCommand(ctx, hostname, tty, env, shell, args)
+	slog.InfoContext(ctx, "runSSHStream: ssh", "sandbox", sbox.ID, "hostname", hostname, "shell", shell, "tty", tty)
+	return cmd.Run()
+}
+
+func sshOutputCommand(ctx context.Context, hostname string, env map[string]string, shell string, args []string) *exec.Cmd {
+	return sshCommand(ctx, "ssh", hostname, remoteInteractiveCommand(env, shell, args))
+}
+
+func sshStreamCommand(ctx context.Context, hostname string, tty bool, env map[string]string, shell string, args []string) *exec.Cmd {
+	sshArgs := []string{}
+	if tty {
+		sshArgs = append(sshArgs, "-tt")
+	}
+	sshArgs = append(sshArgs, hostname, remoteInteractiveCommand(env, shell, args))
+	cmd := sshCommand(ctx, "ssh", sshArgs...)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd
+}
+
 func ensureSSHReachability(ctx context.Context, hostname string) error {
-	updateSSHConfFunc, err := sshimmer.CheckSSHReachability(ctx, hostname)
+	updateSSHConfFunc, err := checkSSHReachability(ctx, hostname)
 	if err != nil {
 		slog.ErrorContext(ctx, "sshimmer.CheckSSHReachability", "error", err)
 	}
@@ -318,6 +367,17 @@ func ensureSSHReachability(ctx context.Context, hostname string) error {
 }
 
 func interactiveSSHEnv(hostname string, scrubSSHAgent bool, envFile string, extraEnv map[string]string) (map[string]string, error) {
+	env, err := sshCommandEnv(hostname, envFile, extraEnv)
+	if err != nil {
+		return nil, err
+	}
+	for key, value := range buildInteractiveEnv(hostname, scrubSSHAgent, nil) {
+		env[key] = value
+	}
+	return env, nil
+}
+
+func sshCommandEnv(hostname string, envFile string, extraEnv map[string]string) (map[string]string, error) {
 	env := map[string]string{}
 	fileEnv, err := readEnvFile(envFile)
 	if err != nil {
@@ -326,7 +386,8 @@ func interactiveSSHEnv(hostname string, scrubSSHAgent bool, envFile string, extr
 	for key, value := range fileEnv {
 		env[key] = value
 	}
-	for key, value := range buildInteractiveEnv(hostname, scrubSSHAgent, extraEnv) {
+	env["HOSTNAME"] = hostname
+	for key, value := range extraEnv {
 		env[key] = value
 	}
 	return env, nil

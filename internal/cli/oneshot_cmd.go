@@ -8,11 +8,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/banksean/sand/internal/applecontainer/options"
-	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/cli/agentlaunch"
 	"github.com/banksean/sand/internal/daemon"
-	"github.com/banksean/sand/internal/hostops"
 	"github.com/banksean/sand/internal/runtimedeps"
 	"github.com/goombaio/namegenerator"
 )
@@ -117,32 +114,17 @@ func (c *OneshotCmd) Run(cctx *CLIContext) error {
 	}
 	fmt.Printf("executing in sandbox: %s (%s)\n", sbox.Name, sbox.ID)
 
-	containerSvc := hostops.NewAppleContainerOps()
-	hostname := types.GetContainerHostname(sbox.Container)
 	authEnv, err := resolveAgentLaunchEnv(ctx, mc, c.Agent, sbox)
 	if err != nil {
 		return err
 	}
-	env := buildInteractiveEnv(hostname, true, authEnv)
-	env["SAND_ONESHOT_PROMPT"] = c.Prompt
-	wait, err := containerSvc.ExecStream(ctx,
-		&options.ExecContainer{
-			ProcessOptions: options.ProcessOptions{
-				Interactive: true,
-				TTY:         true,
-				WorkDir:     "/app",
-				Env:         env,
-				User:        c.Username,
-				UID:         c.Uid,
-			},
-		}, sbox.ContainerID, "/bin/sh", os.Environ(),
-		os.Stdin, os.Stdout, os.Stderr,
-		"-c", agentCmd)
-	if err != nil {
-		return fmt.Errorf("starting agent in sandbox %s: %w", sbox.ID, err)
+	env := mergeEnv(authEnv)
+	if env == nil {
+		env = map[string]string{}
 	}
-	if err := wait(); err != nil {
-		slog.ErrorContext(ctx, "OneshotCmd: agent wait", "sandbox", sbox.ID, "error", err)
+	env["SAND_ONESHOT_PROMPT"] = c.Prompt
+	if err := runSSHStream(ctx, sbox, true, "", env, "/bin/sh", "-c", agentCmd); err != nil {
+		return fmt.Errorf("starting agent in sandbox %s: %w", sbox.ID, err)
 	}
 
 	if c.Stop {

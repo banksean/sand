@@ -13,7 +13,6 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/banksean/sand/internal/applecontainer"
-	"github.com/banksean/sand/internal/applecontainer/options"
 	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/cli/agentlaunch"
 	"github.com/banksean/sand/internal/daemon"
@@ -179,7 +178,7 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 			return err
 		}
 		defer projectEnv.Cleanup()
-		if err := checkoutSandboxBranch(ctx, hostops.NewAppleContainerOps(), sbox, projectEnv); err != nil {
+		if err := checkoutSandboxBranch(ctx, sbox, projectEnv); err != nil {
 			return err
 		}
 	}
@@ -228,25 +227,15 @@ func validateNewSandboxBranch(ctx context.Context, gitOps hostops.GitOps, cloneF
 	return fmt.Errorf("branch name %q is already taken in %q", sandboxName, cloneFromDir)
 }
 
-func checkoutSandboxBranch(ctx context.Context, containerSvc hostops.ContainerOps, sbox *sandtypes.Box, projectEnv plainCommandEnv) error {
-	execOpts := &options.ExecContainer{
-		ProcessOptions: options.ProcessOptions{
-			WorkDir: "/app",
-			Env:     projectEnv.Env,
-			EnvFile: projectEnv.EnvFile,
-			User:    sbox.Username,
-			UID:     sbox.Uid,
-		},
-	}
-
-	out, err := containerSvc.Exec(ctx, execOpts, sbox.ContainerID, "git", os.Environ(),
+func checkoutSandboxBranch(ctx context.Context, sbox *sandtypes.Box, projectEnv plainCommandEnv) error {
+	out, err := runSSHOutput(ctx, sbox, projectEnv.EnvFile, projectEnv.Env, "git",
 		"config", "--global", "--add", "safe.directory", "/app")
 	if err != nil {
 		slog.ErrorContext(ctx, "sbox.new git checkout, config", "error", err, "out", out)
 		return fmt.Errorf("configuring git in sandbox %q: %w", sbox.ID, err)
 	}
 
-	out, err = containerSvc.Exec(ctx, execOpts, sbox.ContainerID, "git", os.Environ(),
+	out, err = runSSHOutput(ctx, sbox, projectEnv.EnvFile, projectEnv.Env, "git",
 		"checkout", "-b", sbox.Name)
 	if err != nil {
 		slog.ErrorContext(ctx, "sbox.new git checkout", "error", err, "out", out)
