@@ -260,8 +260,10 @@ func envScopeAllowsProject(scope sandtypes.EnvScope) bool {
 	return scope == sandtypes.EnvScopeProject || scope == sandtypes.EnvScopeAll
 }
 
-var sshCommand = exec.CommandContext
-var checkSSHReachability = sshimmer.CheckSSHReachability
+var (
+	sshCommand           = exec.CommandContext
+	checkSSHReachability = sshimmer.CheckSSHReachability
+)
 
 // runShell executes an interactive shell or command in sbox's container over SSH,
 // connecting the current process's stdin/stdout/stderr. Non-zero shell exit is

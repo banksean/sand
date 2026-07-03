@@ -10,6 +10,7 @@ package xpc
 xpc_connection_t create_progress_endpoint(uint64_t id, xpc_endpoint_t *endpoint_out);
 */
 import "C"
+
 import (
 	"sync"
 	"sync/atomic"
