@@ -21,7 +21,9 @@ import (
 	"github.com/banksean/sand/internal/applecontainer/options"
 	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/applecontainer/xpc"
+	"github.com/creack/pty"
 	"github.com/google/uuid"
+	"golang.org/x/sys/unix"
 	"golang.org/x/term"
 )
 
@@ -112,7 +114,12 @@ func (o *xpcContainerOps) Create(ctx context.Context, opts *options.CreateContai
 }
 
 func (o *xpcContainerOps) Start(ctx context.Context, opts *options.StartContainer, containerID string) (string, error) {
-	if err := o.client.BootstrapContainer(ctx, containerID, [3]*os.File{}, nil); err != nil {
+	stdio, cleanup, err := nullStdio()
+	if err != nil {
+		return "", err
+	}
+	defer cleanup()
+	if err := o.client.BootstrapContainer(ctx, containerID, stdio, nil); err != nil {
 		return "", err
 	}
 	if err := o.client.StartProcess(ctx, containerID, containerID); err != nil {
@@ -514,6 +521,10 @@ func parseVolumeFilesystem(spec string) (xpc.Filesystem, error) {
 }
 
 func processFiles(stdin io.Reader, stdout, stderr io.Writer, tty bool) ([3]*os.File, func(), error) {
+	if tty && isTerminalFile(stdin) && isTerminalFile(stdout) {
+		return processTerminalFiles(stdin.(*os.File), stdout.(*os.File), stderr)
+	}
+
 	var files [3]*os.File
 	var cleanups []func()
 	addCleanup := func(fn func()) { cleanups = append(cleanups, fn) }
@@ -554,6 +565,80 @@ func processFiles(stdin io.Reader, stdout, stderr io.Writer, tty bool) ([3]*os.F
 		addCleanup(errCleanup)
 	}
 	return files, cleanup, nil
+}
+
+func nullStdio() ([3]*os.File, func(), error) {
+	var files [3]*os.File
+	var cleanups []func()
+	cleanup := func() {
+		for i := len(cleanups) - 1; i >= 0; i-- {
+			cleanups[i]()
+		}
+	}
+	for i := range files {
+		f, err := os.OpenFile(os.DevNull, os.O_RDWR, 0)
+		if err != nil {
+			cleanup()
+			return files, cleanup, err
+		}
+		files[i] = f
+		cleanups = append(cleanups, func() { f.Close() })
+	}
+	return files, cleanup, nil
+}
+
+func processTerminalFiles(stdin, stdout *os.File, stderr io.Writer) ([3]*os.File, func(), error) {
+	var files [3]*os.File
+	ptmx, tty, err := pty.Open()
+	if err != nil {
+		return files, func() {}, err
+	}
+	stdinCopy, err := dupFile(stdin)
+	if err != nil {
+		ptmx.Close()
+		tty.Close()
+		return files, func() {}, err
+	}
+
+	if w, h, ok := terminalSize(stdin, stdout); ok {
+		_ = pty.Setsize(ptmx, &pty.Winsize{Rows: uint16(h), Cols: uint16(w)})
+	}
+
+	files[0] = tty
+	files[1] = tty
+
+	done := make(chan struct{})
+	go func() {
+		io.Copy(ptmx, stdinCopy) //nolint:errcheck
+	}()
+	go func() {
+		io.Copy(stdout, ptmx) //nolint:errcheck
+		close(done)
+	}()
+
+	cleanup := func() {
+		stdinCopy.Close()
+		tty.Close()
+		ptmx.Close()
+		select {
+		case <-done:
+		default:
+		}
+	}
+	return files, cleanup, nil
+}
+
+func dupFile(file *os.File) (*os.File, error) {
+	fd, err := unix.Dup(int(file.Fd()))
+	if err != nil {
+		return nil, err
+	}
+	return os.NewFile(uintptr(fd), file.Name()), nil
+}
+
+func isTerminalFile(v any) bool {
+	f, ok := v.(*os.File)
+	return ok && term.IsTerminal(int(f.Fd()))
 }
 
 func writerFile(w io.Writer) (*os.File, func(), error) {
