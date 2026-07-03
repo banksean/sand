@@ -20,7 +20,6 @@ import (
 	"github.com/banksean/sand/internal/hostops"
 	"github.com/banksean/sand/internal/runtimedeps"
 	"github.com/banksean/sand/internal/sandtypes"
-	"github.com/banksean/sand/internal/sshimmer"
 	"github.com/goombaio/namegenerator"
 )
 
@@ -181,29 +180,6 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 		}
 		defer projectEnv.Cleanup()
 		if err := checkoutSandboxBranch(ctx, hostops.NewAppleContainerOps(), sbox, projectEnv); err != nil {
-			return err
-		}
-	}
-
-	updateSSHConfFunc, err := sshimmer.CheckSSHReachability(ctx, hostname)
-	if err != nil {
-		slog.ErrorContext(ctx, "sshimmer.CheckSSHReachability", "error", err)
-	}
-	if updateSSHConfFunc != nil {
-		if os.Getenv("SMOKE_TEST") == "" {
-			// Only confirm interactively for this if *aren't* running a smoke test.
-			stdinReader := *bufio.NewReader(os.Stdin)
-			fmt.Printf("\nTo enable you to use ssh to connect to local sand containers, we need to add one line to the top of your ssh config. Proceed [y/N]? ")
-			text, err := stdinReader.ReadString('\n')
-			if err != nil {
-				return fmt.Errorf("couldn't read from stdin: %w", err)
-			}
-			text = strings.TrimSpace(strings.ToLower(text))
-			if text != "y" && text != "Y" {
-				return fmt.Errorf("User declined to edit ssh config file")
-			}
-		}
-		if err := updateSSHConfFunc(); err != nil {
 			return err
 		}
 	}

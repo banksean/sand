@@ -37,6 +37,48 @@ func TestBuildInteractiveEnv(t *testing.T) {
 	})
 }
 
+func TestRemoteInteractiveCommandQuotesEnvAndArgs(t *testing.T) {
+	got := remoteInteractiveCommand(
+		map[string]string{
+			"TERM":  "xterm-256color",
+			"QUOTE": "can't",
+		},
+		"/bin/zsh",
+		[]string{"-c", "echo 'hello world'"},
+	)
+	want := "cd '/app' && env 'QUOTE=can'\"'\"'t' 'TERM=xterm-256color' '/bin/zsh' '-c' 'echo '\"'\"'hello world'\"'\"''"
+	if got != want {
+		t.Fatalf("remoteInteractiveCommand() = %q, want %q", got, want)
+	}
+}
+
+func TestInteractiveSSHEnvMergesEnvFileThenExplicitEnv(t *testing.T) {
+	dir := t.TempDir()
+	envFile := filepath.Join(dir, ".env")
+	if err := os.WriteFile(envFile, []byte("A=file\nB=file\n# comment\n\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("LANG", "C.UTF-8")
+	t.Setenv("TERM", "xterm")
+
+	env, err := interactiveSSHEnv("box.local", true, envFile, map[string]string{"B": "explicit"})
+	if err != nil {
+		t.Fatalf("interactiveSSHEnv: %v", err)
+	}
+	if env["A"] != "file" {
+		t.Fatalf("A = %q, want file", env["A"])
+	}
+	if env["B"] != "explicit" {
+		t.Fatalf("B = %q, want explicit", env["B"])
+	}
+	if env["HOSTNAME"] != "box.local" {
+		t.Fatalf("HOSTNAME = %q, want box.local", env["HOSTNAME"])
+	}
+	if env["SSH_AUTH_SOCK"] != "" || env["SSH_AGENT_PID"] != "" {
+		t.Fatalf("ssh agent vars not scrubbed: %#v", env)
+	}
+}
+
 func TestSelectedProfileEnvPolicy(t *testing.T) {
 	home := t.TempDir()
 	project := t.TempDir()

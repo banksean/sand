@@ -1,20 +1,22 @@
 package cli
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
 	"log/slog"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 
-	"github.com/banksean/sand/internal/applecontainer/options"
 	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/daemon"
-	"github.com/banksean/sand/internal/hostops"
 	"github.com/banksean/sand/internal/profiles"
 	"github.com/banksean/sand/internal/sandtypes"
+	"github.com/banksean/sand/internal/sshimmer"
 	"github.com/posener/complete"
 )
 
@@ -258,35 +260,136 @@ func envScopeAllowsProject(scope sandtypes.EnvScope) bool {
 	return scope == sandtypes.EnvScopeProject || scope == sandtypes.EnvScopeAll
 }
 
-// runShell executes an interactive shell or command in sbox's container,
-// connecting the current process's stdin/stdout/stderr. shell and args are
-// passed directly to ExecStream. Non-zero shell exit is logged but not
-// returned as an error — an interactive session ending with a non-zero code
-// is not a CLI failure.
+var sshCommand = exec.CommandContext
+
+// runShell executes an interactive shell or command in sbox's container over SSH,
+// connecting the current process's stdin/stdout/stderr. Non-zero shell exit is
+// logged but not returned as an error — an interactive session ending with a
+// non-zero code is not a CLI failure.
 func runShell(ctx context.Context, sbox *sandtypes.Box, shell string, args []string, scrubSSHAgent bool, envFile string, extraEnv map[string]string) error {
 	if sbox.Container == nil {
 		return fmt.Errorf("sandbox %s has no container", sbox.ID)
 	}
 	hostname := types.GetContainerHostname(sbox.Container)
-	containerSvc := hostops.NewAppleContainerOps()
-	wait, err := containerSvc.ExecStream(ctx,
-		&options.ExecContainer{
-			ProcessOptions: options.ProcessOptions{
-				Interactive: true,
-				TTY:         true,
-				WorkDir:     "/app",
-				Env:         buildInteractiveEnv(hostname, scrubSSHAgent, extraEnv),
-				EnvFile:     envFile,
-				User:        sbox.Username,
-				UID:         sbox.Uid,
-			},
-		}, sbox.ContainerID, shell, os.Environ(), os.Stdin, os.Stdout, os.Stderr, args...)
-	if err != nil {
-		slog.ErrorContext(ctx, "runShell: ExecStream", "sandbox", sbox.ID, "error", err)
-		return fmt.Errorf("failed to execute shell in sandbox %s: %w", sbox.ID, err)
+	if err := ensureSSHReachability(ctx, hostname); err != nil {
+		return err
 	}
-	if err := wait(); err != nil {
+
+	env, err := interactiveSSHEnv(hostname, scrubSSHAgent, envFile, extraEnv)
+	if err != nil {
+		return err
+	}
+	remoteCommand := remoteInteractiveCommand(env, shell, args)
+	cmd := sshCommand(ctx, "ssh", "-tt", hostname, remoteCommand)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	slog.InfoContext(ctx, "runShell: ssh", "sandbox", sbox.ID, "hostname", hostname, "shell", shell)
+	if err := cmd.Run(); err != nil {
 		slog.WarnContext(ctx, "runShell: shell exited with error", "sandbox", sbox.ID, "error", err)
 	}
 	return nil
+}
+
+func ensureSSHReachability(ctx context.Context, hostname string) error {
+	updateSSHConfFunc, err := sshimmer.CheckSSHReachability(ctx, hostname)
+	if err != nil {
+		slog.ErrorContext(ctx, "sshimmer.CheckSSHReachability", "error", err)
+	}
+	if updateSSHConfFunc == nil {
+		return nil
+	}
+	if os.Getenv("SMOKE_TEST") == "" {
+		reader := bufio.NewReader(os.Stdin)
+		fmt.Printf("\nTo enable you to use ssh to connect to local sand containers, we need to add one line to the top of your ssh config. Proceed [y/N]? ")
+		text, err := reader.ReadString('\n')
+		if err != nil {
+			return fmt.Errorf("couldn't read from stdin: %w", err)
+		}
+		text = strings.TrimSpace(strings.ToLower(text))
+		if text != "y" {
+			return fmt.Errorf("user declined to edit ssh config file")
+		}
+	}
+	if err := updateSSHConfFunc(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func interactiveSSHEnv(hostname string, scrubSSHAgent bool, envFile string, extraEnv map[string]string) (map[string]string, error) {
+	env := map[string]string{}
+	fileEnv, err := readEnvFile(envFile)
+	if err != nil {
+		return nil, err
+	}
+	for key, value := range fileEnv {
+		env[key] = value
+	}
+	for key, value := range buildInteractiveEnv(hostname, scrubSSHAgent, extraEnv) {
+		env[key] = value
+	}
+	return env, nil
+}
+
+func readEnvFile(path string) (map[string]string, error) {
+	env := map[string]string{}
+	if strings.TrimSpace(path) == "" {
+		return env, nil
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return env, nil
+		}
+		return nil, fmt.Errorf("reading env file %s: %w", path, err)
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		key, value, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		key = strings.TrimSpace(key)
+		if key == "" {
+			continue
+		}
+		env[key] = value
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("reading env file %s: %w", path, err)
+	}
+	return env, nil
+}
+
+func remoteInteractiveCommand(env map[string]string, shell string, args []string) string {
+	parts := []string{"cd", shellQuote("/app"), "&&", "env"}
+	keys := make([]string, 0, len(env))
+	for key := range env {
+		if key != "" {
+			keys = append(keys, key)
+		}
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		parts = append(parts, shellQuote(key+"="+env[key]))
+	}
+	parts = append(parts, shellQuote(shell))
+	for _, arg := range args {
+		parts = append(parts, shellQuote(arg))
+	}
+	return strings.Join(parts, " ")
+}
+
+func shellQuote(s string) string {
+	if s == "" {
+		return "''"
+	}
+	return "'" + strings.ReplaceAll(s, "'", "'\"'\"'") + "'"
 }
