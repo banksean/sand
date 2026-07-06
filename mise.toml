@@ -1,5 +1,5 @@
 [tools]
-go = "1.25.7"
+go = "1.26.4"
 "aqua:go-task/task" = "3.50.0"
 "aqua:protocolbuffers/protobuf/protoc" = "33.1"
 "aqua:protocolbuffers/protobuf-go/protoc-gen-go" = "1.36.11"

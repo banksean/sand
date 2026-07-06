@@ -34,14 +34,14 @@ jobs:
           go-version-file: "${{ inputs.working-directory || '.'}}/go.mod"
           cache: true
 
-      - name: Cache Go 1.25.1
+      - name: Cache Go build
         uses: actions/cache@v4
         with:
           path: |
             ~/.cache/go-build
-          key: ${{ runner.os }}-go1.25.1-${{ hashFiles('**/go.sum') }}
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.mod', '**/go.sum') }}
           restore-keys: |
-            ${{ runner.os }}-go1.25.1-
+            ${{ runner.os }}-go-
 
       - name: Download and install apple/container
         run: scripts/push-to-main.sh

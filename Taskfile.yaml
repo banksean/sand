@@ -71,7 +71,7 @@ tasks:
     deps:
       - generate
     cmds:
-      - GOEXPERIMENT=synctest gotestsum ./...
+      - gotestsum ./...
 
   install:
     desc: Install Go commands

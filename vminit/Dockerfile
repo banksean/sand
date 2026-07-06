@@ -1,6 +1,6 @@
 FROM --platform=linux/arm64 docker.io/library/alpine:latest AS go-builder
 RUN apk add --no-cache clang llvm libbpf-dev linux-headers iproute2-tc
-ARG GO_VERSION=1.25.1
+ARG GO_VERSION=1.26.4
 RUN ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') && \
   wget "https://go.dev/dl/go${GO_VERSION}.linux-${ARCH}.tar.gz" && \
   tar -C /usr/local -xzf "go${GO_VERSION}.linux-${ARCH}.tar.gz" && \
@@ -22,4 +22,3 @@ COPY --from=base /sbin/vminitd /sbin/vminitd.real
 COPY --from=go-builder /build/initwrapper /sbin/vminitd
 COPY --from=go-builder /build/dnsproxy /sbin/dnsproxy
 COPY allowed-domains.txt /etc/sandbox/allowed-domains.txt
-
