@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/banksean/sand/internal/agentdefs"
-	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/sandtypes"
 )
 
@@ -50,7 +49,7 @@ func (c *DefinitionContainerConfiguration) GetStartHooks(artifacts CloneArtifact
 }
 
 func (c *DefinitionContainerConfiguration) installAgentHook() sandtypes.ContainerHook {
-	return sandtypes.NewContainerHook("install "+c.agentName+" agent", func(ctx context.Context, ctr *types.Container, exec sandtypes.HookStreamer) error {
+	return sandtypes.NewContainerHook("install "+c.agentName+" agent", func(ctx context.Context, ctr *sandtypes.Container, exec sandtypes.HookStreamer) error {
 		script, err := agentInstallScript(c.agentName, *c.install)
 		if err != nil {
 			return err
@@ -199,7 +198,7 @@ func (c *DefinitionContainerConfiguration) namedHooks(artifacts CloneArtifacts) 
 }
 
 func unknownAgentHook(name string) sandtypes.ContainerHook {
-	return sandtypes.NewContainerHook("unknown agent hook "+name, func(ctx context.Context, ctr *types.Container, exec sandtypes.HookStreamer) error {
+	return sandtypes.NewContainerHook("unknown agent hook "+name, func(ctx context.Context, ctr *sandtypes.Container, exec sandtypes.HookStreamer) error {
 		return fmt.Errorf("unknown agent hook %q", name)
 	})
 }

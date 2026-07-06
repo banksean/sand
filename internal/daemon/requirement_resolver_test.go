@@ -10,7 +10,6 @@ import (
 
 	"github.com/banksean/sand/internal/agentdefs"
 	"github.com/banksean/sand/internal/applecontainer/options"
-	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/cloning"
 	"github.com/banksean/sand/internal/daemon/internal/boxer"
 	"github.com/banksean/sand/internal/hostops"
@@ -279,7 +278,7 @@ func TestCreateSandboxRejectsMissingAuthBeforeSandboxCreation(t *testing.T) {
 			createCalls++
 			return "mock-container-id", nil
 		},
-		InspectFunc: func(ctx context.Context, containerID string) ([]types.Container, error) {
+		InspectFunc: func(ctx context.Context, containerID string) ([]sandtypes.Container, error) {
 			return nil, nil
 		},
 	})
@@ -324,12 +323,12 @@ profiles:
 			createCalls++
 			return "mock-container-id", nil
 		},
-		InspectFunc: func(ctx context.Context, containerID string) ([]types.Container, error) {
+		InspectFunc: func(ctx context.Context, containerID string) ([]sandtypes.Container, error) {
 			inspectCalls++
 			if inspectCalls == 1 {
 				return nil, nil
 			}
-			return []types.Container{{Status: types.ContainerStatus{State: "running"}}}, nil
+			return []sandtypes.Container{{Status: sandtypes.ContainerStatus{State: "running"}}}, nil
 		},
 	})
 
@@ -371,7 +370,7 @@ profiles:
 			createCalls++
 			return "mock-container-id", nil
 		},
-		InspectFunc: func(ctx context.Context, containerID string) ([]types.Container, error) {
+		InspectFunc: func(ctx context.Context, containerID string) ([]sandtypes.Container, error) {
 			return nil, nil
 		},
 	})
@@ -400,7 +399,7 @@ func TestCreateSandboxRejectsUnknownAgentBeforeSandboxCreation(t *testing.T) {
 			createCalls++
 			return "mock-container-id", nil
 		},
-		InspectFunc: func(ctx context.Context, containerID string) ([]types.Container, error) {
+		InspectFunc: func(ctx context.Context, containerID string) ([]sandtypes.Container, error) {
 			return nil, nil
 		},
 	})

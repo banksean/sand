@@ -15,8 +15,8 @@ import (
 	"strings"
 
 	"github.com/banksean/sand/internal/applecontainer"
-	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/hostops"
+	"github.com/banksean/sand/internal/sandtypes"
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/crane"
 )
@@ -64,7 +64,7 @@ type containerSystem interface {
 }
 
 type imageInspector interface {
-	Inspect(ctx context.Context, name string) ([]*types.ImageManifest, error)
+	Inspect(ctx context.Context, name string) ([]*sandtypes.ImageManifest, error)
 }
 
 type VerifyOptions struct {
@@ -385,7 +385,7 @@ func CheckImageIsLatest(ctx context.Context, imageName string) (bool, error) {
 	return CheckImageDigestIsLatest(ctx, imageName, imgs[0].Index.Digest)
 }
 
-func inspectLocalImage(ctx context.Context, imageName string) ([]*types.ImageManifest, error) {
+func inspectLocalImage(ctx context.Context, imageName string) ([]*sandtypes.ImageManifest, error) {
 	ops, err := localImageOps()
 	if err != nil {
 		return nil, err

@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/banksean/sand/internal/applecontainer/options"
-	"github.com/banksean/sand/internal/applecontainer/types"
+	"github.com/banksean/sand/internal/sandtypes"
 )
 
 type MockContainerOps struct {
@@ -16,8 +16,8 @@ type MockContainerOps struct {
 	DeleteFunc     func(ctx context.Context, opts *options.DeleteContainer, containerID string) (string, error)
 	ExecFunc       func(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, args ...string) (string, error)
 	ExecStreamFunc func(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, stdin io.Reader, stdout, stderr io.Writer, cmdArgs ...string) (func() error, error)
-	InspectFunc    func(ctx context.Context, containerID string) ([]types.Container, error)
-	StatsFunc      func(ctx context.Context, containerID ...string) ([]types.ContainerStats, error)
+	InspectFunc    func(ctx context.Context, containerID string) ([]sandtypes.Container, error)
+	StatsFunc      func(ctx context.Context, containerID ...string) ([]sandtypes.ContainerStats, error)
 	ExportFunc     func(ctx context.Context, containerID, image string) (string, error)
 }
 
@@ -68,20 +68,20 @@ func (m *MockContainerOps) ExecStream(ctx context.Context, opts *options.ExecCon
 	return func() error { return nil }, nil
 }
 
-func (m *MockContainerOps) Inspect(ctx context.Context, containerID string) ([]types.Container, error) {
+func (m *MockContainerOps) Inspect(ctx context.Context, containerID string) ([]sandtypes.Container, error) {
 	if m.InspectFunc != nil {
 		return m.InspectFunc(ctx, containerID)
 	}
-	return []types.Container{
+	return []sandtypes.Container{
 		{
-			Status: types.ContainerStatus{
+			Status: sandtypes.ContainerStatus{
 				State: "running",
 			},
 		},
 	}, nil
 }
 
-func (m *MockContainerOps) Stats(ctx context.Context, containerID ...string) ([]types.ContainerStats, error) {
+func (m *MockContainerOps) Stats(ctx context.Context, containerID ...string) ([]sandtypes.ContainerStats, error) {
 	if m.StatsFunc != nil {
 		return m.StatsFunc(ctx, containerID...)
 	}

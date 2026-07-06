@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/applecontainer/xpc"
 	"github.com/banksean/sand/internal/imageprogress"
+	"github.com/banksean/sand/internal/sandtypes"
 )
 
 type xpcImageOps struct {
@@ -27,12 +27,12 @@ func NewXPCImageOps() (ImageOps, error) {
 	return &xpcImageOps{client: client}, nil
 }
 
-func (o *xpcImageOps) List(ctx context.Context) ([]types.ImageEntry, error) {
+func (o *xpcImageOps) List(ctx context.Context) ([]sandtypes.ImageEntry, error) {
 	images, err := o.client.ListImages(ctx)
 	if err != nil {
 		return nil, err
 	}
-	ret := make([]types.ImageEntry, 0, len(images))
+	ret := make([]sandtypes.ImageEntry, 0, len(images))
 	for _, image := range images {
 		ret = append(ret, imageDescriptionToEntry(image))
 	}
@@ -68,7 +68,7 @@ func (o *xpcImageOps) Pull(ctx context.Context, image string, progress imageprog
 	return func() error { return nil }, nil
 }
 
-func (o *xpcImageOps) Inspect(ctx context.Context, name string) ([]*types.ImageManifest, error) {
+func (o *xpcImageOps) Inspect(ctx context.Context, name string) ([]*sandtypes.ImageManifest, error) {
 	image, err := o.findImage(ctx, name)
 	if err != nil {
 		return nil, err
@@ -77,7 +77,7 @@ func (o *xpcImageOps) Inspect(ctx context.Context, name string) ([]*types.ImageM
 	if err != nil {
 		return nil, err
 	}
-	return []*types.ImageManifest{manifest}, nil
+	return []*sandtypes.ImageManifest{manifest}, nil
 }
 
 func (o *xpcImageOps) findImage(ctx context.Context, name string) (xpc.ImageDescription, error) {
@@ -93,12 +93,12 @@ func (o *xpcImageOps) findImage(ctx context.Context, name string) (xpc.ImageDesc
 	return xpc.ImageDescription{}, fmt.Errorf("image %q not found", name)
 }
 
-func (o *xpcImageOps) inspectImage(ctx context.Context, image xpc.ImageDescription) (*types.ImageManifest, error) {
+func (o *xpcImageOps) inspectImage(ctx context.Context, image xpc.ImageDescription) (*sandtypes.ImageManifest, error) {
 	content, err := o.content(ctx, image.Descriptor.Digest)
 	if err != nil {
 		return nil, err
 	}
-	index := types.Index{
+	index := sandtypes.Index{
 		Size:        int(image.Descriptor.Size),
 		Digest:      image.Descriptor.Digest,
 		MediaType:   image.Descriptor.MediaType,
@@ -115,7 +115,7 @@ func (o *xpcImageOps) inspectImage(ctx context.Context, image xpc.ImageDescripti
 		if index.Annotations == nil {
 			index.Annotations = parsed.Annotations
 		}
-		var variants []types.ImageVariant
+		var variants []sandtypes.ImageVariant
 		for _, desc := range parsed.Manifests {
 			if skipManifestDescriptor(desc) {
 				continue
@@ -126,36 +126,36 @@ func (o *xpcImageOps) inspectImage(ctx context.Context, image xpc.ImageDescripti
 			}
 			variants = append(variants, variant)
 		}
-		return &types.ImageManifest{Name: image.Reference, Index: index, Variants: variants}, nil
+		return &sandtypes.ImageManifest{Name: image.Reference, Index: index, Variants: variants}, nil
 	}
 	platform := image.Descriptor.Platform
 	variant, err := o.variantFromManifestData(ctx, image.Descriptor, platform, content)
 	if err != nil {
 		return nil, err
 	}
-	return &types.ImageManifest{Name: image.Reference, Index: index, Variants: []types.ImageVariant{variant}}, nil
+	return &sandtypes.ImageManifest{Name: image.Reference, Index: index, Variants: []sandtypes.ImageVariant{variant}}, nil
 }
 
-func (o *xpcImageOps) variant(ctx context.Context, desc xpc.Descriptor, platform *xpc.Platform) (types.ImageVariant, error) {
+func (o *xpcImageOps) variant(ctx context.Context, desc xpc.Descriptor, platform *xpc.Platform) (sandtypes.ImageVariant, error) {
 	content, err := o.content(ctx, desc.Digest)
 	if err != nil {
-		return types.ImageVariant{}, err
+		return sandtypes.ImageVariant{}, err
 	}
 	return o.variantFromManifestData(ctx, desc, platform, content)
 }
 
-func (o *xpcImageOps) variantFromManifestData(ctx context.Context, desc xpc.Descriptor, platform *xpc.Platform, content []byte) (types.ImageVariant, error) {
+func (o *xpcImageOps) variantFromManifestData(ctx context.Context, desc xpc.Descriptor, platform *xpc.Platform, content []byte) (sandtypes.ImageVariant, error) {
 	var manifest ociManifest
 	if err := json.Unmarshal(content, &manifest); err != nil {
-		return types.ImageVariant{}, fmt.Errorf("decode image manifest %q: %w", desc.Digest, err)
+		return sandtypes.ImageVariant{}, fmt.Errorf("decode image manifest %q: %w", desc.Digest, err)
 	}
 	configContent, err := o.content(ctx, manifest.Config.Digest)
 	if err != nil {
-		return types.ImageVariant{}, err
+		return sandtypes.ImageVariant{}, err
 	}
 	var config xpc.OCIImage
 	if err := json.Unmarshal(configContent, &config); err != nil {
-		return types.ImageVariant{}, fmt.Errorf("decode image config %q: %w", manifest.Config.Digest, err)
+		return sandtypes.ImageVariant{}, fmt.Errorf("decode image config %q: %w", manifest.Config.Digest, err)
 	}
 	if platform == nil {
 		platform = &xpc.Platform{OS: config.OS, Architecture: config.Architecture}
@@ -163,10 +163,10 @@ func (o *xpcImageOps) variantFromManifestData(ctx context.Context, desc xpc.Desc
 			platform.Variant = *config.Variant
 		}
 	}
-	return types.ImageVariant{
+	return sandtypes.ImageVariant{
 		Size:     int(desc.Size),
-		Platform: platformToTypes(*platform),
-		Config:   ociConfigToTypes(config),
+		Platform: platformToSandtypes(*platform),
+		Config:   ociConfigToSandtypes(config),
 	}, nil
 }
 
@@ -194,12 +194,12 @@ type ociManifest struct {
 	Layers    []xpc.Descriptor `json:"layers"`
 }
 
-func imageDescriptionToEntry(image xpc.ImageDescription) types.ImageEntry {
-	return types.ImageEntry{
+func imageDescriptionToEntry(image xpc.ImageDescription) sandtypes.ImageEntry {
+	return sandtypes.ImageEntry{
 		ID: imageID(image.Descriptor.Digest),
-		Configuration: types.ImageConfiguration{
+		Configuration: sandtypes.ImageConfiguration{
 			Name: image.Reference,
-			Descriptor: types.ImageDescriptor{
+			Descriptor: sandtypes.ImageDescriptor{
 				Size:        int(image.Descriptor.Size),
 				Digest:      image.Descriptor.Digest,
 				MediaType:   image.Descriptor.MediaType,
@@ -230,16 +230,16 @@ func skipManifestDescriptor(desc xpc.Descriptor) bool {
 	return false
 }
 
-func platformToTypes(platform xpc.Platform) types.Platform {
-	return types.Platform{OS: platform.OS, Architecture: platform.Architecture, Variant: platform.Variant}
+func platformToSandtypes(platform xpc.Platform) sandtypes.Platform {
+	return sandtypes.Platform{OS: platform.OS, Architecture: platform.Architecture, Variant: platform.Variant}
 }
 
-func ociConfigToTypes(image xpc.OCIImage) types.ImageVariantConfig {
+func ociConfigToSandtypes(image xpc.OCIImage) sandtypes.ImageVariantConfig {
 	var created time.Time
 	if image.Created != nil {
 		created, _ = time.Parse(time.RFC3339Nano, *image.Created)
 	}
-	var cfg types.ImageVariantContainerConfig
+	var cfg sandtypes.ImageVariantContainerConfig
 	if image.Config != nil {
 		cfg.Cmd = append([]string{}, image.Config.Cmd...)
 		cfg.Env = append([]string{}, image.Config.Env...)
@@ -248,24 +248,24 @@ func ociConfigToTypes(image xpc.OCIImage) types.ImageVariantConfig {
 			cfg.WorkingDir = *image.Config.WorkingDir
 		}
 	}
-	return types.ImageVariantConfig{
+	return sandtypes.ImageVariantConfig{
 		Config:       cfg,
-		Rootfs:       types.Rootfs{Type: image.Rootfs.Type, DiffIDs: append([]string{}, image.Rootfs.DiffIDs...)},
-		History:      historyToTypes(image.History),
+		Rootfs:       sandtypes.Rootfs{Type: image.Rootfs.Type, DiffIDs: append([]string{}, image.Rootfs.DiffIDs...)},
+		History:      historyToSandtypes(image.History),
 		Architecture: image.Architecture,
 		Created:      created,
 		OS:           image.OS,
 	}
 }
 
-func historyToTypes(history []xpc.History) []types.HistoryEntry {
-	ret := make([]types.HistoryEntry, 0, len(history))
+func historyToSandtypes(history []xpc.History) []sandtypes.HistoryEntry {
+	ret := make([]sandtypes.HistoryEntry, 0, len(history))
 	for _, item := range history {
 		var created time.Time
 		if item.Created != nil {
 			created, _ = time.Parse(time.RFC3339Nano, *item.Created)
 		}
-		entry := types.HistoryEntry{Created: created}
+		entry := sandtypes.HistoryEntry{Created: created}
 		if item.CreatedBy != nil {
 			entry.CreatedBy = *item.CreatedBy
 		}

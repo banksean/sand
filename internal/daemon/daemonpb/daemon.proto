@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package sand.daemon.v1;
 
+import "google/protobuf/timestamp.proto";
+
 option go_package = "github.com/banksean/sand/internal/daemon/daemonpb";
 
 service DaemonService {
@@ -59,11 +61,11 @@ message LogSandboxResponse {
 message ListSandboxesRequest {}
 
 message ListSandboxesResponse {
-  bytes boxes_json = 1;
+  repeated Sandbox boxes = 1;
 }
 
 message GetSandboxResponse {
-  bytes box_json = 1;
+  Sandbox box = 1;
 }
 
 message StartSandboxRequest {
@@ -112,7 +114,182 @@ message StatsRequest {
 }
 
 message StatsResponse {
-  bytes stats_json = 1;
+  repeated ContainerStats stats = 1;
+}
+
+message Sandbox {
+  string id = 1;
+  string name = 2;
+  string state = 3;
+  string agent_type = 4;
+  string profile_name = 5;
+  string container_id = 6;
+  string host_origin_dir = 7;
+  string sandbox_work_dir = 8;
+  string trash_work_dir = 9;
+  google.protobuf.Timestamp deleted_at = 10;
+  string image_name = 11;
+  string dns_domain = 12;
+  string env_file = 13;
+  repeated string allowed_domains = 14;
+  repeated MountSpec mounts = 15;
+  repeated MountRequest mount_requests = 16;
+  SharedCacheMounts shared_cache_mounts = 17;
+  int32 cpus = 18;
+  int32 memory_mb = 19;
+  string sandbox_work_dir_error = 20;
+  string sandbox_container_error = 21;
+  string username = 22;
+  string uid = 23;
+  GitDetails original_git_details = 24;
+  GitDetails current_git_details = 25;
+  Container container = 26;
+}
+
+message MountSpec {
+  string source = 1;
+  string target = 2;
+  bool read_only = 3;
+}
+
+message MountRequest {
+  string kind = 1;
+  string original = 2;
+  string source = 3;
+  string clone = 4;
+  string target = 5;
+  bool read_only = 6;
+  string runtime = 7;
+}
+
+message SharedCacheMounts {
+  string mise_cache_host_dir = 1;
+  string apk_cache_host_dir = 2;
+  string agent_cache_host_dir = 3;
+}
+
+message GitDetails {
+  string remote_origin = 1;
+  string branch = 2;
+  string commit = 3;
+  bool is_dirty = 4;
+  bool has_relative = 5;
+  int32 ahead = 6;
+  int32 behind = 7;
+}
+
+message Container {
+  repeated ContainerNetworkStatus networks = 1;
+  ContainerStatus status = 2;
+  ContainerConfig configuration = 3;
+}
+
+message ContainerNetworkStatus {
+  string hostname = 1;
+  string network = 2;
+  string ipv4_address = 3;
+  string ipv4_gateway = 4;
+  string ipv6_address = 5;
+  string ipv6_gateway = 6;
+}
+
+message ContainerStatus {
+  string state = 1;
+}
+
+message ContainerConfig {
+  repeated Mount mounts = 1;
+  Platform platform = 2;
+  bool virtualization = 3;
+  InitProcess init_process = 4;
+  DNS dns = 5;
+  repeated ContainerNetwork networks = 6;
+  string id = 7;
+  string runtime_handler = 8;
+  bool ssh = 9;
+  Image image = 10;
+  Resources resources = 11;
+  bool rosetta = 12;
+}
+
+message Mount {
+  MountType type = 1;
+  string source = 2;
+  string destination = 3;
+  repeated string options = 4;
+}
+
+message MountType {
+  bool tmpfs = 1;
+  bool virtiofs = 2;
+}
+
+message Platform {
+  string os = 1;
+  string architecture = 2;
+  string variant = 3;
+}
+
+message InitProcess {
+  repeated string environment = 1;
+  string executable = 2;
+  string working_directory = 3;
+  repeated string arguments = 4;
+  bool terminal = 5;
+  User user = 6;
+}
+
+message User {
+  UserID id = 1;
+}
+
+message UserID {
+  int32 uid = 1;
+  int32 gid = 2;
+}
+
+message DNS {
+  repeated string options = 1;
+  repeated string nameservers = 2;
+  repeated string search_domains = 3;
+}
+
+message ContainerNetwork {
+  NetworkOptions options = 1;
+  string network = 2;
+}
+
+message NetworkOptions {
+  string hostname = 1;
+  int32 mtu = 2;
+}
+
+message Image {
+  string reference = 1;
+  Descriptor descriptor = 2;
+}
+
+message Descriptor {
+  string digest = 1;
+  int64 size = 2;
+  string media_type = 3;
+}
+
+message Resources {
+  int32 cpus = 1;
+  int64 memory_in_bytes = 2;
+}
+
+message ContainerStats {
+  int64 block_read_bytes = 1;
+  int64 block_write_bytes = 2;
+  int64 cpu_usage_usec = 3;
+  string id = 4;
+  int64 memory_limit_bytes = 5;
+  int64 memory_usage_bytes = 6;
+  int64 network_rx_bytes = 7;
+  int64 network_tx_bytes = 8;
+  int64 num_processes = 9;
 }
 
 message SharedCacheConfig {
@@ -142,7 +319,7 @@ message CreateSandboxRequest {
 message CreateSandboxResponse {
   oneof event {
     string progress = 1;
-    bytes box_json = 2;
+    Sandbox box = 2;
     string error = 3;
   }
 }

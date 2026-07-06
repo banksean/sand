@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/daemon"
 	"github.com/banksean/sand/internal/hostops"
 	"github.com/banksean/sand/internal/sandtypes"
@@ -43,7 +42,7 @@ func (c *LsCmd) Run(cctx *CLIContext) error {
 	}
 
 	currentWorkspace := currentWorkspaceDir(ctx)
-	var statsByContainerID map[string]*types.ContainerStats
+	var statsByContainerID map[string]*sandtypes.ContainerStats
 	if c.Long {
 		statsByContainerID = lsStatsByContainerID(ctx, mc, list)
 	}
@@ -65,7 +64,7 @@ func (c *LsCmd) Run(cctx *CLIContext) error {
 	return renderLsTable(os.Stdout, currentRows, otherRows, deletedRows, c.Long)
 }
 
-func rowFromSandbox(sbox sandtypes.Box, userHomeDir string, stats *types.ContainerStats) lsRow {
+func rowFromSandbox(sbox sandtypes.Box, userHomeDir string, stats *sandtypes.ContainerStats) lsRow {
 	ctr := sbox.Container
 	status := []string{"dormant"}
 	if sbox.State == "deleted" {
@@ -127,7 +126,7 @@ func samePath(a, b string) bool {
 	return canonicalPath(a) == canonicalPath(b)
 }
 
-func lsStatsByContainerID(ctx context.Context, mc daemon.Client, list []sandtypes.Box) map[string]*types.ContainerStats {
+func lsStatsByContainerID(ctx context.Context, mc daemon.Client, list []sandtypes.Box) map[string]*sandtypes.ContainerStats {
 	names := make([]string, 0, len(list))
 	for _, sbox := range list {
 		if sbox.Name == "" || sbox.ContainerID == "" || !isRunningContainer(sbox.Container) {
@@ -143,14 +142,14 @@ func lsStatsByContainerID(ctx context.Context, mc daemon.Client, list []sandtype
 		slog.WarnContext(ctx, "Stats for sand ls", "error", err)
 		return nil
 	}
-	byID := make(map[string]*types.ContainerStats, len(stats))
+	byID := make(map[string]*sandtypes.ContainerStats, len(stats))
 	for i := range stats {
 		byID[stats[i].ID] = &stats[i]
 	}
 	return byID
 }
 
-func isRunningContainer(ctr *types.Container) bool {
+func isRunningContainer(ctr *sandtypes.Container) bool {
 	return ctr != nil && strings.EqualFold(ctr.Status.State, "running")
 }
 

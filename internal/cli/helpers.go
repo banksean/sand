@@ -12,7 +12,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/daemon"
 	"github.com/banksean/sand/internal/profiles"
 	"github.com/banksean/sand/internal/sandtypes"
@@ -273,7 +272,7 @@ func runShell(ctx context.Context, sbox *sandtypes.Box, shell string, args []str
 	if sbox.Container == nil {
 		return fmt.Errorf("sandbox %s has no container", sbox.ID)
 	}
-	hostname := types.GetContainerHostname(sbox.Container)
+	hostname := sandtypes.GetContainerHostname(sbox.Container)
 	if err := ensureSSHReachability(ctx, hostname); err != nil {
 		return err
 	}
@@ -294,7 +293,7 @@ func runSSHOutput(ctx context.Context, sbox *sandtypes.Box, envFile string, extr
 	if sbox.Container == nil {
 		return "", fmt.Errorf("sandbox %s has no container", sbox.ID)
 	}
-	hostname := types.GetContainerHostname(sbox.Container)
+	hostname := sandtypes.GetContainerHostname(sbox.Container)
 	if err := ensureSSHReachability(ctx, hostname); err != nil {
 		return "", err
 	}
@@ -312,7 +311,7 @@ func runSSHStream(ctx context.Context, sbox *sandtypes.Box, tty bool, envFile st
 	if sbox.Container == nil {
 		return fmt.Errorf("sandbox %s has no container", sbox.ID)
 	}
-	hostname := types.GetContainerHostname(sbox.Container)
+	hostname := sandtypes.GetContainerHostname(sbox.Container)
 	if err := ensureSSHReachability(ctx, hostname); err != nil {
 		return err
 	}

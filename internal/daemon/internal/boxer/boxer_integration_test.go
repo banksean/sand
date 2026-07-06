@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	"github.com/banksean/sand/internal/applecontainer/options"
-	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/cloning"
 	"github.com/banksean/sand/internal/hostops"
 	"github.com/banksean/sand/internal/imageprogress"
@@ -21,24 +20,24 @@ import (
 )
 
 type mockImageOps struct {
-	listFunc    func(ctx context.Context) ([]types.ImageEntry, error)
+	listFunc    func(ctx context.Context) ([]sandtypes.ImageEntry, error)
 	pullFunc    func(ctx context.Context, image string, progress imageprogress.Sink) (func() error, error)
-	inspectFunc func(ctx context.Context, name string) ([]*types.ImageManifest, error)
+	inspectFunc func(ctx context.Context, name string) ([]*sandtypes.ImageManifest, error)
 }
 
 // Inspect implements [hostops.ImageOps].
-func (m *mockImageOps) Inspect(ctx context.Context, name string) ([]*types.ImageManifest, error) {
+func (m *mockImageOps) Inspect(ctx context.Context, name string) ([]*sandtypes.ImageManifest, error) {
 	if m.inspectFunc != nil {
 		return m.inspectFunc(ctx, name)
 	}
 	return nil, nil
 }
 
-func (m *mockImageOps) List(ctx context.Context) ([]types.ImageEntry, error) {
+func (m *mockImageOps) List(ctx context.Context) ([]sandtypes.ImageEntry, error) {
 	if m.listFunc != nil {
 		return m.listFunc(ctx)
 	}
-	return []types.ImageEntry{}, nil
+	return []sandtypes.ImageEntry{}, nil
 }
 
 func (m *mockImageOps) Pull(ctx context.Context, image string, progress imageprogress.Sink) (func() error, error) {
@@ -275,11 +274,11 @@ func TestBoxer_CreateContainerSSHAgentOptIn(t *testing.T) {
 		},
 	}
 	mockImage := &mockImageOps{
-		inspectFunc: func(ctx context.Context, name string) ([]*types.ImageManifest, error) {
-			return []*types.ImageManifest{{
-				Variants: []types.ImageVariant{{
-					Config: types.ImageVariantConfig{
-						Config: types.ImageVariantContainerConfig{
+		inspectFunc: func(ctx context.Context, name string) ([]*sandtypes.ImageManifest, error) {
+			return []*sandtypes.ImageManifest{{
+				Variants: []sandtypes.ImageVariant{{
+					Config: sandtypes.ImageVariantConfig{
+						Config: sandtypes.ImageVariantContainerConfig{
 							Cmd: []string{"/bin/sh"},
 						},
 					},
@@ -491,7 +490,7 @@ func TestBoxer_StartContainersPrependInnieSocketPermissionHook(t *testing.T) {
 }
 
 func agentHookForTest(name string) sandtypes.ContainerHook {
-	return sandtypes.NewContainerHook(name, func(ctx context.Context, ctr *types.Container, exec sandtypes.HookStreamer) error {
+	return sandtypes.NewContainerHook(name, func(ctx context.Context, ctr *sandtypes.Container, exec sandtypes.HookStreamer) error {
 		_, err := exec.Exec(ctx, "agent-hook", name)
 		return err
 	})
@@ -504,9 +503,9 @@ func TestBoxer_Sync(t *testing.T) {
 		var inspectCalls []string
 
 		mockContainer := &hostops.MockContainerOps{
-			InspectFunc: func(ctx context.Context, containerID string) ([]types.Container, error) {
+			InspectFunc: func(ctx context.Context, containerID string) ([]sandtypes.Container, error) {
 				inspectCalls = append(inspectCalls, containerID)
-				return []types.Container{{Status: types.ContainerStatus{State: "running"}}}, nil
+				return []sandtypes.Container{{Status: sandtypes.ContainerStatus{State: "running"}}}, nil
 			},
 		}
 		mockImage := &mockImageOps{}
@@ -545,7 +544,7 @@ func TestBoxer_Sync(t *testing.T) {
 
 	t.Run("handles sandbox sync errors gracefully", func(t *testing.T) {
 		mockContainer := &hostops.MockContainerOps{
-			InspectFunc: func(ctx context.Context, containerID string) ([]types.Container, error) {
+			InspectFunc: func(ctx context.Context, containerID string) ([]sandtypes.Container, error) {
 				return nil, errors.New("inspect failed")
 			},
 		}
@@ -833,10 +832,10 @@ func TestBoxer_EnsureImage(t *testing.T) {
 
 	t.Run("image already present", func(t *testing.T) {
 		mockImage := &mockImageOps{
-			listFunc: func(ctx context.Context) ([]types.ImageEntry, error) {
-				return []types.ImageEntry{
-					{Configuration: types.ImageConfiguration{Name: "test-image:latest"}},
-					{Configuration: types.ImageConfiguration{Name: "other-image:v1"}},
+			listFunc: func(ctx context.Context) ([]sandtypes.ImageEntry, error) {
+				return []sandtypes.ImageEntry{
+					{Configuration: sandtypes.ImageConfiguration{Name: "test-image:latest"}},
+					{Configuration: sandtypes.ImageConfiguration{Name: "other-image:v1"}},
 				}, nil
 			},
 		}
@@ -855,9 +854,9 @@ func TestBoxer_EnsureImage(t *testing.T) {
 		waitCalled := false
 
 		mockImage := &mockImageOps{
-			listFunc: func(ctx context.Context) ([]types.ImageEntry, error) {
-				return []types.ImageEntry{
-					{Configuration: types.ImageConfiguration{Name: "other-image:v1"}},
+			listFunc: func(ctx context.Context) ([]sandtypes.ImageEntry, error) {
+				return []sandtypes.ImageEntry{
+					{Configuration: sandtypes.ImageConfiguration{Name: "other-image:v1"}},
 				}, nil
 			},
 			pullFunc: func(ctx context.Context, image string, progress imageprogress.Sink) (func() error, error) {
@@ -891,7 +890,7 @@ func TestBoxer_EnsureImage(t *testing.T) {
 	t.Run("list error", func(t *testing.T) {
 		expectedErr := errors.New("list failed")
 		mockImage := &mockImageOps{
-			listFunc: func(ctx context.Context) ([]types.ImageEntry, error) {
+			listFunc: func(ctx context.Context) ([]sandtypes.ImageEntry, error) {
 				return nil, expectedErr
 			},
 		}
@@ -907,7 +906,7 @@ func TestBoxer_EnsureImage(t *testing.T) {
 
 	t.Run("container system not running list error", func(t *testing.T) {
 		mockImage := &mockImageOps{
-			listFunc: func(ctx context.Context) ([]types.ImageEntry, error) {
+			listFunc: func(ctx context.Context) ([]sandtypes.ImageEntry, error) {
 				return nil, errors.New("container system service is not running")
 			},
 		}
@@ -930,8 +929,8 @@ func TestBoxer_EnsureImage(t *testing.T) {
 	t.Run("pull error", func(t *testing.T) {
 		expectedErr := errors.New("pull failed")
 		mockImage := &mockImageOps{
-			listFunc: func(ctx context.Context) ([]types.ImageEntry, error) {
-				return []types.ImageEntry{}, nil
+			listFunc: func(ctx context.Context) ([]sandtypes.ImageEntry, error) {
+				return []sandtypes.ImageEntry{}, nil
 			},
 			pullFunc: func(ctx context.Context, image string, progress imageprogress.Sink) (func() error, error) {
 				return nil, expectedErr
@@ -950,8 +949,8 @@ func TestBoxer_EnsureImage(t *testing.T) {
 	t.Run("wait error", func(t *testing.T) {
 		expectedErr := errors.New("wait failed")
 		mockImage := &mockImageOps{
-			listFunc: func(ctx context.Context) ([]types.ImageEntry, error) {
-				return []types.ImageEntry{}, nil
+			listFunc: func(ctx context.Context) ([]sandtypes.ImageEntry, error) {
+				return []sandtypes.ImageEntry{}, nil
 			},
 			pullFunc: func(ctx context.Context, image string, progress imageprogress.Sink) (func() error, error) {
 				return func() error {
@@ -976,8 +975,8 @@ func TestBoxer_ExecuteHooks_StreamsProgress(t *testing.T) {
 	var execStreamCalls []string
 	var execStreamEnvFiles []string
 	mockContainer := &hostops.MockContainerOps{
-		InspectFunc: func(ctx context.Context, containerID string) ([]types.Container, error) {
-			return []types.Container{{Status: types.ContainerStatus{State: "running"}}}, nil
+		InspectFunc: func(ctx context.Context, containerID string) ([]sandtypes.Container, error) {
+			return []sandtypes.Container{{Status: sandtypes.ContainerStatus{State: "running"}}}, nil
 		},
 		ExecStreamFunc: func(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, stdin io.Reader, stdout, stderr io.Writer, cmdArgs ...string) (func() error, error) {
 			execStreamCalls = append(execStreamCalls, cmd)
@@ -992,7 +991,7 @@ func TestBoxer_ExecuteHooks_StreamsProgress(t *testing.T) {
 	boxer := newTestBoxer(t, mockContainer, mockImage)
 
 	hooks := []sandtypes.ContainerHook{
-		sandtypes.NewContainerHook("streamed hook", func(ctx context.Context, ctr *types.Container, exec sandtypes.HookStreamer) error {
+		sandtypes.NewContainerHook("streamed hook", func(ctx context.Context, ctr *sandtypes.Container, exec sandtypes.HookStreamer) error {
 			return exec.ExecStream(ctx, io.Discard, io.Discard, "mise.sh")
 		}),
 	}
@@ -1028,8 +1027,8 @@ func TestBoxer_ExecuteHooks_DoesNotPassEnvFileToExec(t *testing.T) {
 
 	var execEnvFiles []string
 	mockContainer := &hostops.MockContainerOps{
-		InspectFunc: func(ctx context.Context, containerID string) ([]types.Container, error) {
-			return []types.Container{{Status: types.ContainerStatus{State: "running"}}}, nil
+		InspectFunc: func(ctx context.Context, containerID string) ([]sandtypes.Container, error) {
+			return []sandtypes.Container{{Status: sandtypes.ContainerStatus{State: "running"}}}, nil
 		},
 		ExecFunc: func(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, args ...string) (string, error) {
 			execEnvFiles = append(execEnvFiles, opts.ProcessOptions.EnvFile)
@@ -1039,7 +1038,7 @@ func TestBoxer_ExecuteHooks_DoesNotPassEnvFileToExec(t *testing.T) {
 	boxer := newTestBoxer(t, mockContainer, &mockImageOps{})
 
 	hooks := []sandtypes.ContainerHook{
-		sandtypes.NewContainerHook("plain hook", func(ctx context.Context, ctr *types.Container, exec sandtypes.HookStreamer) error {
+		sandtypes.NewContainerHook("plain hook", func(ctx context.Context, ctr *sandtypes.Container, exec sandtypes.HookStreamer) error {
 			_, err := exec.Exec(ctx, "setup.sh")
 			return err
 		}),

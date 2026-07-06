@@ -10,7 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/sandtypes"
 )
 
@@ -88,7 +87,7 @@ func TestCurrentWorkspaceDirUsesGitTopLevelFromNestedDir(t *testing.T) {
 }
 
 func TestFormatStatsColumns(t *testing.T) {
-	stats := &types.ContainerStats{
+	stats := &sandtypes.ContainerStats{
 		CPUUsageUsec:     1500,
 		NumProcesses:     3,
 		MemoryUsageBytes: 1024,
@@ -135,7 +134,7 @@ func TestRenderLsTableLongUsesShortIDAndStats(t *testing.T) {
 		Status:    "running",
 		FromDir:   "~/project",
 		ImageName: "base:latest",
-		Stats: &types.ContainerStats{
+		Stats: &sandtypes.ContainerStats{
 			CPUUsageUsec:     1500,
 			NumProcesses:     3,
 			MemoryUsageBytes: 1024,

@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/banksean/sand/internal/applecontainer/options"
-	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/cloning"
 	"github.com/banksean/sand/internal/daemon/internal/boxer"
 	"github.com/banksean/sand/internal/hostops"
@@ -28,8 +27,8 @@ func newDaemonForTest(t *testing.T, appDir string) *Daemon {
 	b, err := boxer.NewBoxerWithDeps(appDir, boxer.BoxerDeps{
 		ContainerService: &hostops.MockContainerOps{},
 		ImageService: &testImageOps{
-			ListFunc: func(context.Context) ([]types.ImageEntry, error) {
-				return []types.ImageEntry{{Configuration: types.ImageConfiguration{Name: "test-image:latest"}}}, nil
+			ListFunc: func(context.Context) ([]sandtypes.ImageEntry, error) {
+				return []sandtypes.ImageEntry{{Configuration: sandtypes.ImageConfiguration{Name: "test-image:latest"}}}, nil
 			},
 		},
 	})
@@ -41,12 +40,12 @@ func newDaemonForTest(t *testing.T, appDir string) *Daemon {
 }
 
 type testImageOps struct {
-	ListFunc    func(context.Context) ([]types.ImageEntry, error)
+	ListFunc    func(context.Context) ([]sandtypes.ImageEntry, error)
 	PullFunc    func(context.Context, string, imageprogress.Sink) (func() error, error)
-	InspectFunc func(context.Context, string) ([]*types.ImageManifest, error)
+	InspectFunc func(context.Context, string) ([]*sandtypes.ImageManifest, error)
 }
 
-func (m *testImageOps) List(ctx context.Context) ([]types.ImageEntry, error) {
+func (m *testImageOps) List(ctx context.Context) ([]sandtypes.ImageEntry, error) {
 	if m.ListFunc != nil {
 		return m.ListFunc(ctx)
 	}
@@ -60,7 +59,7 @@ func (m *testImageOps) Pull(ctx context.Context, image string, progress imagepro
 	return func() error { return nil }, nil
 }
 
-func (m *testImageOps) Inspect(ctx context.Context, name string) ([]*types.ImageManifest, error) {
+func (m *testImageOps) Inspect(ctx context.Context, name string) ([]*sandtypes.ImageManifest, error) {
 	if m.InspectFunc != nil {
 		return m.InspectFunc(ctx, name)
 	}
@@ -156,8 +155,8 @@ func TestDaemonGRPCEnsureImageStreamsStructuredProgress(t *testing.T) {
 	b, err := boxer.NewBoxerWithDeps(tmpDir, boxer.BoxerDeps{
 		ContainerService: &hostops.MockContainerOps{},
 		ImageService: &testImageOps{
-			ListFunc: func(context.Context) ([]types.ImageEntry, error) {
-				return []types.ImageEntry{}, nil
+			ListFunc: func(context.Context) ([]sandtypes.ImageEntry, error) {
+				return []sandtypes.ImageEntry{}, nil
 			},
 			PullFunc: func(ctx context.Context, image string, progress imageprogress.Sink) (func() error, error) {
 				progress.Update(imageprogress.Update{
@@ -296,19 +295,19 @@ func TestStartSandboxRecreatesStoppedContainerAfterSocketCreation(t *testing.T) 
 	var startCalls []string
 
 	containerSvc := &hostops.MockContainerOps{
-		InspectFunc: func(_ context.Context, containerID string) ([]types.Container, error) {
+		InspectFunc: func(_ context.Context, containerID string) ([]sandtypes.Container, error) {
 			switch containerID {
 			case oldContainerID:
-				return []types.Container{{
-					Status: types.ContainerStatus{State: "stopped"},
-					Configuration: types.ContainerConfig{
+				return []sandtypes.Container{{
+					Status: sandtypes.ContainerStatus{State: "stopped"},
+					Configuration: sandtypes.ContainerConfig{
 						SSH: false,
 					},
 				}}, nil
 			case newContainerID:
-				return []types.Container{{
-					Status: types.ContainerStatus{State: "stopped"},
-					Configuration: types.ContainerConfig{
+				return []sandtypes.Container{{
+					Status: sandtypes.ContainerStatus{State: "stopped"},
+					Configuration: sandtypes.ContainerConfig{
 						SSH: true,
 					},
 				}}, nil

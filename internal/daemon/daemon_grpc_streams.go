@@ -1,8 +1,6 @@
 package daemon
 
 import (
-	"encoding/json"
-	"fmt"
 	"log/slog"
 	"sync"
 
@@ -102,15 +100,8 @@ func (s *daemonGRPCServer) CreateSandbox(req *daemonpb.CreateSandboxRequest, str
 		})
 	}
 
-	boxJSON, err := json.Marshal(sbox)
-	if err != nil {
-		err = fmt.Errorf("marshal created sandbox: %w", err)
-		return stream.Send(&daemonpb.CreateSandboxResponse{
-			Event: &daemonpb.CreateSandboxResponse_Error{Error: err.Error()},
-		})
-	}
 	return stream.Send(&daemonpb.CreateSandboxResponse{
-		Event: &daemonpb.CreateSandboxResponse_BoxJson{BoxJson: boxJSON},
+		Event: &daemonpb.CreateSandboxResponse_Box{Box: sandboxToProto(sbox)},
 	})
 }
 

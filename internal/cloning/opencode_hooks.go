@@ -8,13 +8,12 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/sandtypes"
 )
 
 // openCodeSSHTunnelHook sets up an SSH reverse tunnel for Chrome DevTools MCP.
 func openCodeSSHTunnelHook(username string) sandtypes.ContainerHook {
-	return sandtypes.NewContainerHook("open remote ssh tunnel for chrome-devtools mcp", func(ctx context.Context, ctr *types.Container, execFn sandtypes.HookStreamer) error {
+	return sandtypes.NewContainerHook("open remote ssh tunnel for chrome-devtools mcp", func(ctx context.Context, ctr *sandtypes.Container, execFn sandtypes.HookStreamer) error {
 		hostname := getContainerHostname(ctr)
 
 		// No context - this should run in a separate process that outlives the cloner startup hook invocations.
@@ -41,7 +40,7 @@ func openCodeSSHTunnelHook(username string) sandtypes.ContainerHook {
 	})
 }
 
-func getContainerHostname(ctr *types.Container) string {
+func getContainerHostname(ctr *sandtypes.Container) string {
 	for _, n := range ctr.Networks {
 		return strings.TrimSuffix(n.Hostname, ".")
 	}

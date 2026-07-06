@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"io"
 	"strings"
-
-	"github.com/banksean/sand/internal/applecontainer/types"
 )
 
 // MountSpec describes a bind mount that should be attached to a container.
@@ -87,23 +85,23 @@ type HookStreamer interface {
 // ContainerHook allows callers to inject container customisation step.
 type ContainerHook interface {
 	Name() string
-	Run(ctx context.Context, ctr *types.Container, exec HookStreamer) error
+	Run(ctx context.Context, ctr *Container, exec HookStreamer) error
 }
 
 type containerHook struct {
 	name string
-	fn   func(ctx context.Context, ctr *types.Container, exec HookStreamer) error
+	fn   func(ctx context.Context, ctr *Container, exec HookStreamer) error
 }
 
 func (h containerHook) Name() string {
 	return h.name
 }
 
-func (h containerHook) Run(ctx context.Context, ctr *types.Container, exec HookStreamer) error {
+func (h containerHook) Run(ctx context.Context, ctr *Container, exec HookStreamer) error {
 	return h.fn(ctx, ctr, exec)
 }
 
 // NewContainerHook helps callers construct hook instances without exporting internals.
-func NewContainerHook(name string, fn func(ctx context.Context, ctr *types.Container, exec HookStreamer) error) ContainerHook {
+func NewContainerHook(name string, fn func(ctx context.Context, ctr *Container, exec HookStreamer) error) ContainerHook {
 	return containerHook{name: name, fn: fn}
 }

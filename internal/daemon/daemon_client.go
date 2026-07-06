@@ -4,7 +4,6 @@ import (
 	"context"
 	"io"
 
-	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/sandtypes"
 	"github.com/banksean/sand/internal/version"
 )
@@ -26,7 +25,7 @@ type Client interface {
 	SyncHostGitMirror(ctx context.Context, name string) (string, error)
 	ResolveAgentLaunchEnv(ctx context.Context, opts ResolveAgentLaunchEnvOpts) (map[string]string, error)
 	ExportImage(ctx context.Context, name, imageName string) error
-	Stats(ctx context.Context, name ...string) ([]types.ContainerStats, error)
+	Stats(ctx context.Context, name ...string) ([]sandtypes.ContainerStats, error)
 	VSC(ctx context.Context, name string) error
 	CreateSandbox(ctx context.Context, opts CreateSandboxOpts, w io.Writer) (*sandtypes.Box, error)
 	// EnsureImage ensures imageName is present locally and up to date, pulling if needed.

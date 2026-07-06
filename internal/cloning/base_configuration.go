@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/sandtypes"
 )
 
@@ -197,7 +196,7 @@ func (c *BaseContainerConfiguration) GetFirstStartHooks(artifacts CloneArtifacts
 }
 
 func (c *BaseContainerConfiguration) defaultContainerHook(username, uid string, sharedCaches sandtypes.SharedCacheMounts) sandtypes.ContainerHook {
-	return sandtypes.NewContainerHook("default container bootstrap", func(ctx context.Context, ctr *types.Container, exec sandtypes.HookStreamer) error {
+	return sandtypes.NewContainerHook("default container bootstrap", func(ctx context.Context, ctr *sandtypes.Container, exec sandtypes.HookStreamer) error {
 		flavor, err := c.detectBootstrapFlavor(ctx, exec)
 		if err != nil {
 			return err
@@ -214,7 +213,7 @@ func (c *BaseContainerConfiguration) detectBootstrapFlavor(ctx context.Context, 
 	return ubuntuBootstrapFlavor, nil
 }
 
-func (c *BaseContainerConfiguration) runDefaultContainerHook(ctx context.Context, ctr *types.Container, exec sandtypes.HookStreamer, flavor containerBootstrapFlavor, username, uid string, sharedCaches sandtypes.SharedCacheMounts) error {
+func (c *BaseContainerConfiguration) runDefaultContainerHook(ctx context.Context, ctr *sandtypes.Container, exec sandtypes.HookStreamer, flavor containerBootstrapFlavor, username, uid string, sharedCaches sandtypes.SharedCacheMounts) error {
 	runner := newContainerHookRunner(ctx, exec, flavor.hookName, username)
 
 	// We create a group and a user with the same name and uid as the the host user.

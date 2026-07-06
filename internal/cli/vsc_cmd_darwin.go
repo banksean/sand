@@ -8,7 +8,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/banksean/sand/internal/applecontainer/types"
+	"github.com/banksean/sand/internal/sandtypes"
 )
 
 type VscCmd struct {
@@ -33,7 +33,7 @@ func (c *VscCmd) Run(cctx *CLIContext) error {
 		return fmt.Errorf("cannot connect to sandbox %q becacuse it is not currently running", c.SandboxName)
 	}
 
-	hostname := types.GetContainerHostname(ctr)
+	hostname := sandtypes.GetContainerHostname(ctr)
 	vscCmd := exec.Command("code", "--remote", fmt.Sprintf("ssh-remote+%s", hostname), "/app", "-n")
 	slog.InfoContext(ctx, "main: running vsc with", "cmd", strings.Join(vscCmd.Args, " "))
 	out, err := vscCmd.CombinedOutput()

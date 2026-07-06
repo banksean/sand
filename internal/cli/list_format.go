@@ -8,7 +8,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/banksean/sand/internal/applecontainer/types"
+	"github.com/banksean/sand/internal/sandtypes"
 )
 
 type lsRow struct {
@@ -19,7 +19,7 @@ type lsRow struct {
 	FromGit    string
 	CurrentGit string
 	ImageName  string
-	Stats      *types.ContainerStats
+	Stats      *sandtypes.ContainerStats
 }
 
 func renderLsTable(w io.Writer, currentRows, otherRows, deletedRows []lsRow, long bool) error {
@@ -82,7 +82,7 @@ func renderLsRows(w io.Writer, rows []lsRow, long bool) error {
 	return nil
 }
 
-func formatStatsColumns(stats *types.ContainerStats) []string {
+func formatStatsColumns(stats *sandtypes.ContainerStats) []string {
 	if stats == nil {
 		return []string{"-", "-", "-", "-", "-"}
 	}

@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/banksean/sand/internal/applecontainer/options"
-	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/cloning"
 	"github.com/banksean/sand/internal/db"
 	"github.com/banksean/sand/internal/hostops"
@@ -126,7 +125,7 @@ func boxerStartHooks(hooks []sandtypes.ContainerHook) []sandtypes.ContainerHook 
 }
 
 func innieSocketPermissionHook() sandtypes.ContainerHook {
-	return sandtypes.NewContainerHook("repair host service socket permissions", func(ctx context.Context, ctr *types.Container, exec sandtypes.HookStreamer) error {
+	return sandtypes.NewContainerHook("repair host service socket permissions", func(ctx context.Context, ctr *sandtypes.Container, exec sandtypes.HookStreamer) error {
 		out, err := exec.Exec(ctx, "sh", "-c", innieSocketPermissionScript)
 		if err != nil {
 			if out != "" {
@@ -818,7 +817,7 @@ func (sb *Boxer) getContainer(ctx context.Context, containerID string) (interfac
 	return &ctrs[0], nil
 }
 
-func (sb *Boxer) GetContainer(ctx context.Context, containerID string) (*types.Container, error) {
+func (sb *Boxer) GetContainer(ctx context.Context, containerID string) (*sandtypes.Container, error) {
 	ctr, err := sb.getContainer(ctx, containerID)
 	if err != nil {
 		return nil, err
@@ -826,10 +825,10 @@ func (sb *Boxer) GetContainer(ctx context.Context, containerID string) (*types.C
 	if ctr == nil {
 		return nil, nil
 	}
-	return ctr.(*types.Container), nil
+	return ctr.(*sandtypes.Container), nil
 }
 
-func (sb *Boxer) GetContainerStats(ctx context.Context, containerID ...string) ([]types.ContainerStats, error) {
+func (sb *Boxer) GetContainerStats(ctx context.Context, containerID ...string) ([]sandtypes.ContainerStats, error) {
 	stats, err := sb.ContainerService.Stats(ctx, containerID...)
 	if err != nil {
 		return nil, err

@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/sandtypes"
 )
 
@@ -85,9 +84,9 @@ func TestRedactionHandlerRedactsInitProcessArgs(t *testing.T) {
 
 	b := &sandtypes.Box{
 		ID: "sand-1",
-		Container: &types.Container{
-			Configuration: types.ContainerConfig{
-				InitProcess: types.InitProcess{
+		Container: &sandtypes.Container{
+			Configuration: sandtypes.ContainerConfig{
+				InitProcess: sandtypes.InitProcess{
 					Environment: []string{
 						"OPENAI_API_KEY=sk-proj-decafBAD",
 						"ENV=/etc/shared_env.sh",

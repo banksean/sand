@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"runtime/debug"
 
-	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/daemon/daemonpb"
 	"github.com/banksean/sand/internal/imageprogress"
 	"github.com/banksean/sand/internal/sandtypes"
@@ -100,11 +99,7 @@ func (c *GRPCClient) ListSandboxes(ctx context.Context) ([]sandtypes.Box, error)
 	if err != nil {
 		return nil, err
 	}
-	var boxes []sandtypes.Box
-	if err := json.Unmarshal(resp.GetBoxesJson(), &boxes); err != nil {
-		return nil, fmt.Errorf("decode sandbox list: %w", err)
-	}
-	return boxes, nil
+	return sandboxesFromProto(resp.GetBoxes()), nil
 }
 
 func (c *GRPCClient) ListDeletedSandboxes(ctx context.Context) ([]sandtypes.Box, error) {
@@ -112,11 +107,7 @@ func (c *GRPCClient) ListDeletedSandboxes(ctx context.Context) ([]sandtypes.Box,
 	if err != nil {
 		return nil, err
 	}
-	var boxes []sandtypes.Box
-	if err := json.Unmarshal(resp.GetBoxesJson(), &boxes); err != nil {
-		return nil, fmt.Errorf("decode deleted sandbox list: %w", err)
-	}
-	return boxes, nil
+	return sandboxesFromProto(resp.GetBoxes()), nil
 }
 
 func (c *GRPCClient) GetSandbox(ctx context.Context, name string) (*sandtypes.Box, error) {
@@ -124,11 +115,7 @@ func (c *GRPCClient) GetSandbox(ctx context.Context, name string) (*sandtypes.Bo
 	if err != nil {
 		return nil, err
 	}
-	var box sandtypes.Box
-	if err := json.Unmarshal(resp.GetBoxJson(), &box); err != nil {
-		return nil, fmt.Errorf("decode sandbox: %w", err)
-	}
-	return &box, nil
+	return sandboxFromProto(resp.GetBox()), nil
 }
 
 func (c *GRPCClient) RemoveSandbox(ctx context.Context, name string) error {
@@ -214,16 +201,12 @@ func (c *GRPCClient) ExportImage(ctx context.Context, name, destinationPath stri
 	return err
 }
 
-func (c *GRPCClient) Stats(ctx context.Context, names ...string) ([]types.ContainerStats, error) {
+func (c *GRPCClient) Stats(ctx context.Context, names ...string) ([]sandtypes.ContainerStats, error) {
 	resp, err := c.client.Stats(ctx, &daemonpb.StatsRequest{Ids: names})
 	if err != nil {
 		return nil, err
 	}
-	var stats []types.ContainerStats
-	if err := json.Unmarshal(resp.GetStatsJson(), &stats); err != nil {
-		return nil, fmt.Errorf("decode container stats: %w", err)
-	}
-	return stats, nil
+	return containerStatsFromProto(resp.GetStats()), nil
 }
 
 func (c *GRPCClient) VSC(ctx context.Context, name string) error {
@@ -253,15 +236,12 @@ func (c *GRPCClient) CreateSandbox(ctx context.Context, opts CreateSandboxOpts, 
 					return nil, err
 				}
 			}
-		case *daemonpb.CreateSandboxResponse_BoxJson:
-			var box sandtypes.Box
-			if err := json.Unmarshal(e.BoxJson, &box); err != nil {
-				return nil, fmt.Errorf("decode created sandbox: %w", err)
-			}
+		case *daemonpb.CreateSandboxResponse_Box:
+			box := sandboxFromProto(e.Box)
 			if err := drainCreateSandboxStream(stream); err != nil {
 				return nil, err
 			}
-			return &box, nil
+			return box, nil
 		case *daemonpb.CreateSandboxResponse_Error:
 			if err := drainCreateSandboxStream(stream); err != nil {
 				return nil, err

@@ -2,8 +2,6 @@ package sandtypes
 
 import (
 	"time"
-
-	"github.com/banksean/sand/internal/applecontainer/types"
 )
 
 // Box is a "sandbox" - it represents the connection between
@@ -72,7 +70,7 @@ type Box struct {
 
 	OriginalGitDetails *GitDetails
 	CurrentGitDetails  *GitDetails
-	Container          *types.Container
+	Container          *Container
 }
 
 type SharedCacheConfig struct {

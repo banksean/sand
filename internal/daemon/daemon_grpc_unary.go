@@ -3,7 +3,6 @@ package daemon
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os/exec"
@@ -11,7 +10,6 @@ import (
 	"time"
 
 	"github.com/banksean/sand/internal/applecontainer/options"
-	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/daemon/daemonpb"
 	"github.com/banksean/sand/internal/sandboxlog"
 	"github.com/banksean/sand/internal/sandtypes"
@@ -40,11 +38,7 @@ func (s *daemonGRPCServer) ListSandboxes(ctx context.Context, _ *daemonpb.ListSa
 	if err != nil {
 		return nil, err
 	}
-	boxesJSON, err := json.Marshal(boxes)
-	if err != nil {
-		return nil, fmt.Errorf("marshal sandboxes: %w", err)
-	}
-	return &daemonpb.ListSandboxesResponse{BoxesJson: boxesJSON}, nil
+	return &daemonpb.ListSandboxesResponse{Boxes: sandboxesToProto(boxes)}, nil
 }
 
 func (s *daemonGRPCServer) ListDeletedSandboxes(ctx context.Context, _ *daemonpb.ListSandboxesRequest) (*daemonpb.ListSandboxesResponse, error) {
@@ -52,11 +46,7 @@ func (s *daemonGRPCServer) ListDeletedSandboxes(ctx context.Context, _ *daemonpb
 	if err != nil {
 		return nil, err
 	}
-	boxesJSON, err := json.Marshal(boxes)
-	if err != nil {
-		return nil, fmt.Errorf("marshal deleted sandboxes: %w", err)
-	}
-	return &daemonpb.ListSandboxesResponse{BoxesJson: boxesJSON}, nil
+	return &daemonpb.ListSandboxesResponse{Boxes: sandboxesToProto(boxes)}, nil
 }
 
 func (s *daemonGRPCServer) GetSandbox(ctx context.Context, req *daemonpb.IDRequest) (*daemonpb.GetSandboxResponse, error) {
@@ -69,11 +59,7 @@ func (s *daemonGRPCServer) GetSandbox(ctx context.Context, req *daemonpb.IDReque
 	if sbox == nil {
 		return nil, fmt.Errorf("id not found: %q", id)
 	}
-	boxJSON, err := json.Marshal(sbox)
-	if err != nil {
-		return nil, fmt.Errorf("marshal sandbox: %w", err)
-	}
-	return &daemonpb.GetSandboxResponse{BoxJson: boxJSON}, nil
+	return &daemonpb.GetSandboxResponse{Box: sandboxToProto(sbox)}, nil
 }
 
 func (s *daemonGRPCServer) RemoveSandbox(ctx context.Context, req *daemonpb.IDRequest) (*daemonpb.StatusResponse, error) {
@@ -188,11 +174,7 @@ func (s *daemonGRPCServer) Stats(ctx context.Context, req *daemonpb.StatsRequest
 	if err != nil {
 		return nil, err
 	}
-	statsJSON, err := json.Marshal(stats)
-	if err != nil {
-		return nil, fmt.Errorf("marshal stats: %w", err)
-	}
-	return &daemonpb.StatsResponse{StatsJson: statsJSON}, nil
+	return &daemonpb.StatsResponse{Stats: containerStatsToProto(stats)}, nil
 }
 
 func (s *daemonGRPCServer) VSC(ctx context.Context, req *daemonpb.IDRequest) (*daemonpb.StatusResponse, error) {
@@ -206,7 +188,7 @@ func (s *daemonGRPCServer) VSC(ctx context.Context, req *daemonpb.IDRequest) (*d
 		return nil, fmt.Errorf("cannot connect to sandbox %q becacuse it is not currently running", id)
 	}
 
-	hostname := types.GetContainerHostname(sbox.Container)
+	hostname := sandtypes.GetContainerHostname(sbox.Container)
 	vscCmd := exec.Command("code", "--remote", fmt.Sprintf("ssh-remote+%s", hostname), "/app", "-n")
 	slog.InfoContext(ctx, "gRPC VSC: running code", "cmd", strings.Join(vscCmd.Args, " "))
 	out, err := vscCmd.CombinedOutput()

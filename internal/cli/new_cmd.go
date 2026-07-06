@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/alecthomas/kong"
-	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/cli/agentlaunch"
 	"github.com/banksean/sand/internal/daemon"
 	"github.com/banksean/sand/internal/hostops"
@@ -159,7 +158,7 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 	if sbox.Container == nil {
 		return fmt.Errorf("sandbox's container field is nil")
 	}
-	hostname := types.GetContainerHostname(sbox.Container)
+	hostname := sandtypes.GetContainerHostname(sbox.Container)
 
 	slog.InfoContext(ctx, "main: sbox.new starting")
 

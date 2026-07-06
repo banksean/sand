@@ -3,14 +3,12 @@ package daemon
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"net"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/daemon/daemonpb"
 	"github.com/banksean/sand/internal/sandtypes"
 	"go.opentelemetry.io/otel"
@@ -38,12 +36,8 @@ func TestGRPCSB(t *testing.T) {
 				}); err != nil {
 					return err
 				}
-				boxJSON, err := json.Marshal(testSandboxBox)
-				if err != nil {
-					return err
-				}
 				return stream.Send(&daemonpb.CreateSandboxResponse{
-					Event: &daemonpb.CreateSandboxResponse_BoxJson{BoxJson: boxJSON},
+					Event: &daemonpb.CreateSandboxResponse_Box{Box: sandboxToProto(&testSandboxBox)},
 				})
 			},
 		})
@@ -252,12 +246,8 @@ func TestGRPCStreamingClientSpansEnd(t *testing.T) {
 
 	srv := startTestGRPCDaemon(t, appDir, &testGRPCDaemonService{
 		CreateSandboxFunc: func(req *daemonpb.CreateSandboxRequest, stream daemonpb.DaemonService_CreateSandboxServer) error {
-			boxJSON, err := json.Marshal(testSandboxBox)
-			if err != nil {
-				return err
-			}
 			return stream.Send(&daemonpb.CreateSandboxResponse{
-				Event: &daemonpb.CreateSandboxResponse_BoxJson{BoxJson: boxJSON},
+				Event: &daemonpb.CreateSandboxResponse_Box{Box: sandboxToProto(&testSandboxBox)},
 			})
 		},
 		EnsureImageFunc: func(req *daemonpb.EnsureImageRequest, stream daemonpb.DaemonService_EnsureImageServer) error {
@@ -358,28 +348,16 @@ func TestGRPCUnary(t *testing.T) {
 			return &daemonpb.LogSandboxResponse{Data: []byte("log line\n")}, nil
 		},
 		ListSandboxesFunc: func(ctx context.Context, req *daemonpb.ListSandboxesRequest) (*daemonpb.ListSandboxesResponse, error) {
-			boxesJSON, err := json.Marshal([]sandtypes.Box{testSandboxBox})
-			if err != nil {
-				return nil, err
-			}
-			return &daemonpb.ListSandboxesResponse{BoxesJson: boxesJSON}, nil
+			return &daemonpb.ListSandboxesResponse{Boxes: sandboxesToProto([]sandtypes.Box{testSandboxBox})}, nil
 		},
 		ListDeletedSandboxesFunc: func(ctx context.Context, req *daemonpb.ListSandboxesRequest) (*daemonpb.ListSandboxesResponse, error) {
-			boxesJSON, err := json.Marshal([]sandtypes.Box{{ID: "deleted-box", State: "deleted"}})
-			if err != nil {
-				return nil, err
-			}
-			return &daemonpb.ListSandboxesResponse{BoxesJson: boxesJSON}, nil
+			return &daemonpb.ListSandboxesResponse{Boxes: sandboxesToProto([]sandtypes.Box{{ID: "deleted-box", State: "deleted"}})}, nil
 		},
 		GetSandboxFunc: func(ctx context.Context, req *daemonpb.IDRequest) (*daemonpb.GetSandboxResponse, error) {
 			if req.GetId() != "test-box" {
 				t.Fatalf("GetSandbox request ID = %q, want test-box", req.GetId())
 			}
-			boxJSON, err := json.Marshal(testSandboxBox)
-			if err != nil {
-				return nil, err
-			}
-			return &daemonpb.GetSandboxResponse{BoxJson: boxJSON}, nil
+			return &daemonpb.GetSandboxResponse{Box: sandboxToProto(&testSandboxBox)}, nil
 		},
 		StartSandboxFunc: func(ctx context.Context, req *daemonpb.StartSandboxRequest) (*daemonpb.StatusResponse, error) {
 			if req.GetId() != "test-box" {
@@ -412,11 +390,7 @@ func TestGRPCUnary(t *testing.T) {
 			if strings.Join(req.GetIds(), ",") != "test-box,other-box" {
 				t.Fatalf("Stats request IDs = %+v", req.GetIds())
 			}
-			statsJSON, err := json.Marshal([]types.ContainerStats{{ID: "test-box"}})
-			if err != nil {
-				return nil, err
-			}
-			return &daemonpb.StatsResponse{StatsJson: statsJSON}, nil
+			return &daemonpb.StatsResponse{Stats: containerStatsToProto([]sandtypes.ContainerStats{{ID: "test-box"}})}, nil
 		},
 		RemoveSandboxFunc: func(ctx context.Context, req *daemonpb.IDRequest) (*daemonpb.StatusResponse, error) {
 			if req.GetId() != "test-box" {

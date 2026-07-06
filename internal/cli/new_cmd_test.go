@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/hostops"
 	"github.com/banksean/sand/internal/sandtypes"
 )
@@ -20,8 +19,8 @@ func TestCheckoutSandboxBranch(t *testing.T) {
 		EnvFile:  "/tmp/test.env",
 		Username: "alice",
 		Uid:      "1001",
-		Container: &types.Container{
-			Configuration: types.ContainerConfig{ID: "sb-123.local"},
+		Container: &sandtypes.Container{
+			Configuration: sandtypes.ContainerConfig{ID: "sb-123.local"},
 		},
 	}
 	var calls [][]string
@@ -81,8 +80,8 @@ func TestCheckoutSandboxBranch_ReturnsCheckoutError(t *testing.T) {
 	sbox := &sandtypes.Box{
 		ID:   "sb-123",
 		Name: "sb-123",
-		Container: &types.Container{
-			Configuration: types.ContainerConfig{ID: "sb-123.local"},
+		Container: &sandtypes.Container{
+			Configuration: sandtypes.ContainerConfig{ID: "sb-123.local"},
 		},
 	}
 

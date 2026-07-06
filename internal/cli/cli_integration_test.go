@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/banksean/sand/internal/applecontainer/options"
-	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/cli"
 	"github.com/banksean/sand/internal/daemon/daemontest"
 	"github.com/banksean/sand/internal/hostops"
@@ -76,11 +75,11 @@ func TestLsCmd_RequestsStatsForRunningSandboxes(t *testing.T) {
 	var statsCallsMu sync.Mutex
 	cctx := newCLIContext(t, daemontest.Deps{
 		ContainerService: &hostops.MockContainerOps{
-			StatsFunc: func(_ context.Context, containerID ...string) ([]types.ContainerStats, error) {
+			StatsFunc: func(_ context.Context, containerID ...string) ([]sandtypes.ContainerStats, error) {
 				statsCallsMu.Lock()
 				defer statsCallsMu.Unlock()
 				statsCalls = append(statsCalls, containerID...)
-				return []types.ContainerStats{
+				return []sandtypes.ContainerStats{
 					{ID: "ctr-alpha", CPUUsageUsec: 1000},
 					{ID: "ctr-beta", CPUUsageUsec: 2000},
 				}, nil
@@ -105,7 +104,7 @@ func TestLsCmd_DefaultDoesNotRequestStats(t *testing.T) {
 	var statsCallsMu sync.Mutex
 	cctx := newCLIContext(t, daemontest.Deps{
 		ContainerService: &hostops.MockContainerOps{
-			StatsFunc: func(_ context.Context, containerID ...string) ([]types.ContainerStats, error) {
+			StatsFunc: func(_ context.Context, containerID ...string) ([]sandtypes.ContainerStats, error) {
 				statsCallsMu.Lock()
 				defer statsCallsMu.Unlock()
 				statsCalls++
@@ -302,8 +301,8 @@ func TestStartCmd_AlreadyRunning(t *testing.T) {
 	cctx := newCLIContext(t, daemontest.Deps{
 		ContainerService: &hostops.MockContainerOps{
 			// Default Inspect returns Status="running"
-			InspectFunc: func(_ context.Context, containerID string) ([]types.Container, error) {
-				return []types.Container{{Status: types.ContainerStatus{State: "running"}}}, nil
+			InspectFunc: func(_ context.Context, containerID string) ([]sandtypes.Container, error) {
+				return []sandtypes.Container{{Status: sandtypes.ContainerStatus{State: "running"}}}, nil
 			},
 			StartFunc: func(_ context.Context, _ *options.StartContainer, containerID string) (string, error) {
 				startCallsMu.Lock()
@@ -331,8 +330,8 @@ func TestStartCmd_StartsStopped(t *testing.T) {
 	var startCallsMu sync.Mutex
 	cctx := newCLIContext(t, daemontest.Deps{
 		ContainerService: &hostops.MockContainerOps{
-			InspectFunc: func(_ context.Context, containerID string) ([]types.Container, error) {
-				return []types.Container{{Status: types.ContainerStatus{State: "stopped"}}}, nil
+			InspectFunc: func(_ context.Context, containerID string) ([]sandtypes.Container, error) {
+				return []sandtypes.Container{{Status: sandtypes.ContainerStatus{State: "stopped"}}}, nil
 			},
 			StartFunc: func(_ context.Context, _ *options.StartContainer, containerID string) (string, error) {
 				startCallsMu.Lock()
@@ -360,8 +359,8 @@ func TestStartCmd_Multiple(t *testing.T) {
 	var startCallsMu sync.Mutex
 	cctx := newCLIContext(t, daemontest.Deps{
 		ContainerService: &hostops.MockContainerOps{
-			InspectFunc: func(_ context.Context, containerID string) ([]types.Container, error) {
-				return []types.Container{{Status: types.ContainerStatus{State: "stopped"}}}, nil
+			InspectFunc: func(_ context.Context, containerID string) ([]sandtypes.Container, error) {
+				return []sandtypes.Container{{Status: sandtypes.ContainerStatus{State: "stopped"}}}, nil
 			},
 			StartFunc: func(_ context.Context, _ *options.StartContainer, containerID string) (string, error) {
 				startCallsMu.Lock()
@@ -392,8 +391,8 @@ func TestStartCmd_All(t *testing.T) {
 	var startCallsMu sync.Mutex
 	cctx := newCLIContext(t, daemontest.Deps{
 		ContainerService: &hostops.MockContainerOps{
-			InspectFunc: func(_ context.Context, containerID string) ([]types.Container, error) {
-				return []types.Container{{Status: types.ContainerStatus{State: "stopped"}}}, nil
+			InspectFunc: func(_ context.Context, containerID string) ([]sandtypes.Container, error) {
+				return []sandtypes.Container{{Status: sandtypes.ContainerStatus{State: "stopped"}}}, nil
 			},
 			StartFunc: func(_ context.Context, _ *options.StartContainer, containerID string) (string, error) {
 				startCallsMu.Lock()

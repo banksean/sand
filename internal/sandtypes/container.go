@@ -1,5 +1,4 @@
-// package types defines structs for unmashaling the output from various `container` commands.
-package types
+package sandtypes
 
 import (
 	"strings"
@@ -7,40 +6,41 @@ import (
 )
 
 type Container struct {
-	Networks []struct {
-		Hostname    string `json:"hostname"`
-		Network     string `json:"network"`
-		IPv4Address string `json:"ipv4Address"`
-		IPv4Gateway string `json:"ipv4Gateway"`
-		IPv6Address string `json:"ipv6Address"`
-		IPv6Gateway string `json:"ipv6Gateway"`
-	} `json:"networks"`
-	Status        ContainerStatus `json:"status"`
-	Configuration ContainerConfig `json:"configuration"`
+	Networks      []ContainerNetworkStatus `json:"networks"`
+	Status        ContainerStatus          `json:"status"`
+	Configuration ContainerConfig          `json:"configuration"`
+}
+
+type ContainerNetworkStatus struct {
+	Hostname    string `json:"hostname"`
+	Network     string `json:"network"`
+	IPv4Address string `json:"ipv4Address"`
+	IPv4Gateway string `json:"ipv4Gateway"`
+	IPv6Address string `json:"ipv6Address"`
+	IPv6Gateway string `json:"ipv6Gateway"`
 }
 
 type ContainerStatus struct {
-	// Networks []struct{} `json:"networks"`
 	State string `json:"state"`
 }
 
 type ContainerConfig struct {
-	PublishedSockets []interface{}          `json:"publishedSockets"`
-	Sysctls          map[string]interface{} `json:"sysctls"`
-	Mounts           []Mount                `json:"mounts"`
-	Labels           map[string]interface{} `json:"labels"`
-	Platform         Platform               `json:"platform"`
-	Virtualization   bool                   `json:"virtualization"`
-	PublishedPorts   []interface{}          `json:"publishedPorts"`
-	InitProcess      InitProcess            `json:"initProcess"`
-	DNS              DNS                    `json:"dns"`
-	Networks         []ContainerNetwork     `json:"networks"`
-	ID               string                 `json:"id"`
-	RuntimeHandler   string                 `json:"runtimeHandler"`
-	SSH              bool                   `json:"ssh"`
-	Image            Image                  `json:"image"`
-	Resources        Resources              `json:"resources"`
-	Rosetta          bool                   `json:"rosetta"`
+	PublishedSockets []any              `json:"publishedSockets"`
+	Sysctls          map[string]any     `json:"sysctls"`
+	Mounts           []Mount            `json:"mounts"`
+	Labels           map[string]any     `json:"labels"`
+	Platform         Platform           `json:"platform"`
+	Virtualization   bool               `json:"virtualization"`
+	PublishedPorts   []any              `json:"publishedPorts"`
+	InitProcess      InitProcess        `json:"initProcess"`
+	DNS              DNS                `json:"dns"`
+	Networks         []ContainerNetwork `json:"networks"`
+	ID               string             `json:"id"`
+	RuntimeHandler   string             `json:"runtimeHandler"`
+	SSH              bool               `json:"ssh"`
+	Image            Image              `json:"image"`
+	Resources        Resources          `json:"resources"`
+	Rosetta          bool               `json:"rosetta"`
 }
 
 type ContainerStats struct {
@@ -74,14 +74,14 @@ type Platform struct {
 }
 
 type InitProcess struct {
-	Rlimits            []interface{} `json:"rlimits"`
-	Environment        []string      `json:"environment"`
-	Executable         string        `json:"executable"`
-	WorkingDirectory   string        `json:"workingDirectory"`
-	Arguments          []string      `json:"arguments"`
-	Terminal           bool          `json:"terminal"`
-	SupplementalGroups []interface{} `json:"supplementalGroups"`
-	User               User          `json:"user"`
+	Rlimits            []any    `json:"rlimits"`
+	Environment        []string `json:"environment"`
+	Executable         string   `json:"executable"`
+	WorkingDirectory   string   `json:"workingDirectory"`
+	Arguments          []string `json:"arguments"`
+	Terminal           bool     `json:"terminal"`
+	SupplementalGroups []any    `json:"supplementalGroups"`
+	User               User     `json:"user"`
 }
 
 type User struct {
@@ -100,11 +100,11 @@ type DNS struct {
 }
 
 type ContainerNetwork struct {
-	Options NetowrkOptions `json:"options"`
+	Options NetworkOptions `json:"options"`
 	Network string         `json:"network"`
 }
 
-type NetowrkOptions struct {
+type NetworkOptions struct {
 	Hostname string `json:"hostname,omitempty"`
 	MTU      int    `json:"mtu,omitempty"`
 }
@@ -233,10 +233,8 @@ func GetContainerHostname(ctr *Container) string {
 		}
 	}
 	for _, n := range ctr.Configuration.Networks {
-		if n.Network == "default" {
-			if n.Options.Hostname != "" {
-				hostname = n.Options.Hostname
-			}
+		if n.Network == "default" && n.Options.Hostname != "" {
+			hostname = n.Options.Hostname
 		}
 	}
 	return strings.TrimSuffix(hostname, ".")

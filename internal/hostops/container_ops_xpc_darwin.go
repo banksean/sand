@@ -19,8 +19,8 @@ import (
 	"syscall"
 
 	"github.com/banksean/sand/internal/applecontainer/options"
-	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/applecontainer/xpc"
+	"github.com/banksean/sand/internal/sandtypes"
 	"github.com/google/uuid"
 	"golang.org/x/term"
 )
@@ -287,22 +287,22 @@ func (o *xpcContainerOps) ExecStream(ctx context.Context, opts *options.ExecCont
 	}, nil
 }
 
-func (o *xpcContainerOps) Inspect(ctx context.Context, containerID string) ([]types.Container, error) {
+func (o *xpcContainerOps) Inspect(ctx context.Context, containerID string) ([]sandtypes.Container, error) {
 	ctr, err := o.client.GetContainer(ctx, containerID)
 	if err != nil {
 		return nil, err
 	}
-	return []types.Container{xpcSnapshotToContainer(ctr)}, nil
+	return []sandtypes.Container{xpcSnapshotToContainer(ctr)}, nil
 }
 
-func (o *xpcContainerOps) Stats(ctx context.Context, containerID ...string) ([]types.ContainerStats, error) {
-	var ret []types.ContainerStats
+func (o *xpcContainerOps) Stats(ctx context.Context, containerID ...string) ([]sandtypes.ContainerStats, error) {
+	var ret []sandtypes.ContainerStats
 	for _, id := range containerID {
 		stats, err := o.client.ContainerStats(ctx, id)
 		if err != nil {
 			return nil, err
 		}
-		ret = append(ret, xpcStatsToTypes(stats))
+		ret = append(ret, xpcStatsToSandtypes(stats))
 	}
 	return ret, nil
 }
@@ -317,7 +317,7 @@ func (o *xpcContainerOps) Export(ctx context.Context, opts *options.ExportContai
 	return "", nil
 }
 
-func (o *xpcContainerOps) imageDescription(ctx context.Context, imageName string, platform xpc.Platform) (xpc.ImageDescription, *types.ImageVariantContainerConfig, error) {
+func (o *xpcContainerOps) imageDescription(ctx context.Context, imageName string, platform xpc.Platform) (xpc.ImageDescription, *sandtypes.ImageVariantContainerConfig, error) {
 	desc, err := o.imageOps.findImage(ctx, imageName)
 	if err != nil {
 		return xpc.ImageDescription{}, nil, err
@@ -345,7 +345,7 @@ func (o *xpcContainerOps) kernel(ctx context.Context, customPath string, platfor
 	return o.client.GetDefaultKernel(ctx, platform)
 }
 
-func createProcessConfig(process options.ProcessOptions, management options.ManagementOptions, initArgs []string, imageConfig *types.ImageVariantContainerConfig) (xpc.ProcessConfiguration, error) {
+func createProcessConfig(process options.ProcessOptions, management options.ManagementOptions, initArgs []string, imageConfig *sandtypes.ImageVariantContainerConfig) (xpc.ProcessConfiguration, error) {
 	args := append([]string{}, initArgs...)
 	if management.Entrypoint != "" {
 		args = append([]string{management.Entrypoint}, args...)
@@ -402,7 +402,7 @@ func applyExecOptions(cfg *xpc.ProcessConfiguration, process options.ProcessOpti
 	return nil
 }
 
-func processEnvironment(process options.ProcessOptions, imageConfig *types.ImageVariantContainerConfig) ([]string, error) {
+func processEnvironment(process options.ProcessOptions, imageConfig *sandtypes.ImageVariantContainerConfig) ([]string, error) {
 	var env []string
 	if imageConfig != nil {
 		env = append(env, imageConfig.Env...)
@@ -675,13 +675,13 @@ func defaultNetworkAttachments(id, domain, network string) []xpc.AttachmentConfi
 	return []xpc.AttachmentConfiguration{{Network: network, Options: xpc.AttachmentOptions{Hostname: hostname, MTU: &mtu}}}
 }
 
-func xpcSnapshotToContainer(snapshot xpc.ContainerSnapshot) types.Container {
-	ctr := types.Container{
-		Status: types.ContainerStatus{State: string(snapshot.Status)},
-		Configuration: types.ContainerConfig{
+func xpcSnapshotToContainer(snapshot xpc.ContainerSnapshot) sandtypes.Container {
+	ctr := sandtypes.Container{
+		Status: sandtypes.ContainerStatus{State: string(snapshot.Status)},
+		Configuration: sandtypes.ContainerConfig{
 			ID:  snapshot.Configuration.ID,
 			SSH: snapshot.Configuration.SSH,
-			Resources: types.Resources{
+			Resources: sandtypes.Resources{
 				CPUs:          snapshot.Configuration.Resources.CPUs,
 				MemoryInBytes: int64(snapshot.Configuration.Resources.MemoryInBytes),
 			},
@@ -703,9 +703,9 @@ func xpcSnapshotToContainer(snapshot xpc.ContainerSnapshot) types.Container {
 		})
 	}
 	for _, network := range snapshot.Configuration.Networks {
-		ctr.Configuration.Networks = append(ctr.Configuration.Networks, types.ContainerNetwork{
+		ctr.Configuration.Networks = append(ctr.Configuration.Networks, sandtypes.ContainerNetwork{
 			Network: network.Network,
-			Options: types.NetowrkOptions{
+			Options: sandtypes.NetworkOptions{
 				Hostname: network.Options.Hostname,
 			},
 		})
@@ -713,8 +713,8 @@ func xpcSnapshotToContainer(snapshot xpc.ContainerSnapshot) types.Container {
 	return ctr
 }
 
-func xpcStatsToTypes(stats xpc.ContainerStats) types.ContainerStats {
-	return types.ContainerStats{
+func xpcStatsToSandtypes(stats xpc.ContainerStats) sandtypes.ContainerStats {
+	return sandtypes.ContainerStats{
 		ID:               stats.ID,
 		MemoryUsageBytes: uint64PtrToInt(stats.MemoryUsageBytes),
 		MemoryLimitBytes: uint64PtrToInt(stats.MemoryLimitBytes),
