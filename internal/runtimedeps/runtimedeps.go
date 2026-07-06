@@ -16,6 +16,8 @@ import (
 
 	"github.com/banksean/sand/internal/applecontainer"
 	"github.com/banksean/sand/internal/applecontainer/options"
+	"github.com/banksean/sand/internal/applecontainer/types"
+	"github.com/banksean/sand/internal/hostops"
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/crane"
 )
@@ -63,6 +65,10 @@ type containerSystem interface {
 	Start(ctx context.Context, opts *options.SystemStart) (string, error)
 }
 
+type imageInspector interface {
+	Inspect(ctx context.Context, name string) ([]*types.ImageManifest, error)
+}
+
 type VerifyOptions struct {
 	Stdin            io.Reader
 	Stdout           io.Writer
@@ -72,6 +78,7 @@ type VerifyOptions struct {
 
 var (
 	systemOps = containerSystem(&applecontainer.System)
+	imageOps  imageInspector
 
 	diagnosticChecks = []diagnosticCheck{
 		{
@@ -205,10 +212,12 @@ var (
 			ID:          CustomInitImagePulled,
 			Description: "custom init image must be pulled and available in local registry. run `sand install-ebpf-support` to install it",
 			Run: func(ctx context.Context, appBaseDir string, opts VerifyOptions) error {
-				inspectCmd := exec.Command("container", "image", "inspect", CustomInitImage)
-				_, err := inspectCmd.Output()
+				imgs, err := inspectLocalImage(ctx, CustomInitImage)
 				if err != nil {
 					return err
+				}
+				if len(imgs) == 0 {
+					return fmt.Errorf("not found in local registry: %s", CustomInitImage)
 				}
 				return nil
 			},
@@ -373,7 +382,7 @@ func getMacOSMajorVersion(ctx context.Context) (int, error) {
 }
 
 func CheckImageExistsLocally(ctx context.Context, imageName string) bool {
-	imgs, err := applecontainer.Images.Inspect(ctx, imageName)
+	imgs, err := inspectLocalImage(ctx, imageName)
 	if err != nil || len(imgs) == 0 {
 		return false
 	}
@@ -381,7 +390,7 @@ func CheckImageExistsLocally(ctx context.Context, imageName string) bool {
 }
 
 func CheckImageIsLatest(ctx context.Context, imageName string) (bool, error) {
-	imgs, err := applecontainer.Images.Inspect(ctx, imageName)
+	imgs, err := inspectLocalImage(ctx, imageName)
 	if err != nil {
 		return false, fmt.Errorf("failed to inspect local registry for %s: %w", imageName, err)
 	}
@@ -389,6 +398,21 @@ func CheckImageIsLatest(ctx context.Context, imageName string) (bool, error) {
 		return false, fmt.Errorf("not found in local registry: %s", imageName)
 	}
 	return CheckImageDigestIsLatest(ctx, imageName, imgs[0].Index.Digest)
+}
+
+func inspectLocalImage(ctx context.Context, imageName string) ([]*types.ImageManifest, error) {
+	ops, err := localImageOps()
+	if err != nil {
+		return nil, err
+	}
+	return ops.Inspect(ctx, imageName)
+}
+
+func localImageOps() (imageInspector, error) {
+	if imageOps != nil {
+		return imageOps, nil
+	}
+	return hostops.NewAppleImageOps()
 }
 
 func CheckImageDigestIsLatest(ctx context.Context, imageName, localDigest string) (bool, error) {

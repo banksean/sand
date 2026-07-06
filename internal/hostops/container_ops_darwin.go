@@ -2,18 +2,10 @@
 
 package hostops
 
-func newAppleContainerOps() ContainerOps {
-	ops, err := NewXPCContainerOps()
-	if err != nil {
-		return &appleContainerOps{}
-	}
-	return ops
+func newAppleContainerOps() (ContainerOps, error) {
+	return NewXPCContainerOps()
 }
 
-func newAppleImageOps() ImageOps {
-	ops, err := NewXPCImageOps()
-	if err != nil {
-		return &appleImageOps{}
-	}
-	return ops
+func newAppleImageOps() (ImageOps, error) {
+	return NewXPCImageOps()
 }

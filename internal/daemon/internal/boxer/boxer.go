@@ -200,14 +200,22 @@ func NewBoxer(appRoot, localDomain string, terminalWriter io.Writer) (*Boxer, er
 
 	messenger := hostops.NewTerminalMessenger(terminalWriter)
 	agentRegistry := cloning.InitializeGlobalRegistry(appRoot, messenger, hostops.NewDefaultGitOps(), fileOps)
+	containerService, err := hostops.NewAppleContainerOps()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create apple container ops: %w", err)
+	}
+	imageService, err := hostops.NewAppleImageOps()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create apple image ops: %w", err)
+	}
 
 	sb := &Boxer{
 		appRoot:          appRoot,
 		messenger:        hostops.NewTerminalMessenger(terminalWriter),
 		sqlDB:            sqlDB,
 		queries:          db.New(sqlDB),
-		ContainerService: hostops.NewAppleContainerOps(),
-		ImageService:     hostops.NewAppleImageOps(),
+		ContainerService: containerService,
+		ImageService:     imageService,
 		GitOps:           hostops.NewDefaultGitOps(),
 		FileOps:          fileOps,
 		SSHim:            sshim,

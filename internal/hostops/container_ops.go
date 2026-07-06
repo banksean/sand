@@ -4,7 +4,6 @@ import (
 	"context"
 	"io"
 
-	ac "github.com/banksean/sand/internal/applecontainer"
 	"github.com/banksean/sand/internal/applecontainer/options"
 	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/imageprogress"
@@ -28,64 +27,10 @@ type ImageOps interface {
 	Inspect(ctx context.Context, name string) ([]*types.ImageManifest, error)
 }
 
-type appleContainerOps struct{}
-
-func NewAppleContainerOps() ContainerOps {
+func NewAppleContainerOps() (ContainerOps, error) {
 	return newAppleContainerOps()
 }
 
-// Stats implements [ContainerOps].
-func (a *appleContainerOps) Stats(ctx context.Context, containerID ...string) ([]types.ContainerStats, error) {
-	return ac.Containers.Stats(ctx, containerID...)
-}
-
-// Export implements [ContainerOps].
-func (a *appleContainerOps) Export(ctx context.Context, opts *options.ExportContainer, imageName string) (string, error) {
-	return ac.Containers.Export(ctx, opts, imageName)
-}
-
-func (a *appleContainerOps) Create(ctx context.Context, opts *options.CreateContainer, image string, args []string) (string, error) {
-	return ac.Containers.Create(ctx, opts, image, args)
-}
-
-func (a *appleContainerOps) Start(ctx context.Context, opts *options.StartContainer, containerID string) (string, error) {
-	return ac.Containers.Start(ctx, opts, containerID)
-}
-
-func (a *appleContainerOps) Stop(ctx context.Context, opts *options.StopContainer, containerID string) (string, error) {
-	return ac.Containers.Stop(ctx, opts, containerID)
-}
-
-func (a *appleContainerOps) Delete(ctx context.Context, opts *options.DeleteContainer, containerID string) (string, error) {
-	return ac.Containers.Delete(ctx, opts, containerID)
-}
-
-func (a *appleContainerOps) Exec(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, args ...string) (string, error) {
-	return ac.Containers.Exec(ctx, opts, containerID, cmd, env, args...)
-}
-
-func (a *appleContainerOps) ExecStream(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, stdin io.Reader, stdout, stderr io.Writer, cmdArgs ...string) (func() error, error) {
-	return ac.Containers.ExecStream(ctx, opts, containerID, cmd, env, stdin, stdout, stderr, cmdArgs...)
-}
-
-func (a *appleContainerOps) Inspect(ctx context.Context, containerID string) ([]types.Container, error) {
-	return ac.Containers.Inspect(ctx, containerID)
-}
-
-type appleImageOps struct{}
-
-func NewAppleImageOps() ImageOps {
+func NewAppleImageOps() (ImageOps, error) {
 	return newAppleImageOps()
-}
-
-func (a *appleImageOps) List(ctx context.Context) ([]types.ImageEntry, error) {
-	return ac.Images.List(ctx)
-}
-
-func (a *appleImageOps) Pull(ctx context.Context, image string, progress imageprogress.Sink) (func() error, error) {
-	return ac.Images.Pull(ctx, image, progress)
-}
-
-func (a *appleImageOps) Inspect(ctx context.Context, name string) ([]*types.ImageManifest, error) {
-	return ac.Images.Inspect(ctx, name)
 }

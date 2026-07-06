@@ -29,38 +29,11 @@ type SystemStart struct {
 	Debug bool `flag:"--debug"`
 }
 
-type SystemStop struct {
-	// Prefix is the launchd prefix for services (default: com.apple.container.)
-	Prefix string `flag:"--prefix"`
-	// Debug enables debug output [environment: CONTAINER_DEBUG]
-	Debug bool `flag:"--debug"`
-}
-
-type SystemLogs struct {
-	// Follow enables following log output
-	Follow bool `flag:"--follow"`
-	// Last specifies fetching logs starting from the specified time period (minus the current time); supported formats: m, h, d (default: 5m)
-	Last string `flag:"--last"`
-	// Debug enables debug output [environment: CONTAINER_DEBUG]
-	Debug bool `flag:"--debug"`
-}
-
 // CreateContainer are the options flags for the "container" cli commands dealing with container instances.
 type CreateContainer struct {
 	ProcessOptions
 	ResourceOptions
 	ManagementOptions
-}
-
-type ContainerLogs struct {
-	// Boot displays the boot log for the container instead of stdio
-	Boot bool `flag:"--boot"`
-	// Follow enables following log output
-	Follow bool `flag:"--follow"`
-	// N is the number of lines to show from the end of the logs. If not provided this will print all of the logs
-	N int `flag:"-n"`
-	// Debug enables debug output [environment: CONTAINER_DEBUG]
-	Debug bool `flag:"--debug"`
 }
 
 type StartContainer struct {
@@ -83,28 +56,11 @@ type StopContainer struct {
 	Debug bool `flag:"--debug"`
 }
 
-type KillContainer struct {
-	// All kills all running containers
-	All bool `flag:"--all"`
-	// Signal is the signal to send the containers (default: SIGTERM)
-	Signal string `flag:"--signal"`
-}
-
 type DeleteContainer struct {
 	// Force forces the removal of one or more running containers
 	Force bool `flag:"--force"`
 	// All removes all containers
 	All bool `flag:"--all"`
-}
-
-type RunContainer struct {
-	ProcessOptions
-	ResourceOptions
-	ManagementOptions
-	// Scheme is the scheme to use when connecting to the container registry (http, https, auto) (default: auto)
-	Scheme string `flag:"--scheme"`
-	// DisableProgressUpdates disables progress bar updates
-	DisableProgressUpdates bool `flag:"--disable-progress-updates"`
 }
 
 // ExecContainer runs a new command in a running container.

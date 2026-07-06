@@ -32,16 +32,6 @@ func TestToFlags(t *testing.T) {
 				"--detach", // bools don't get a value, just include the flag name.
 			},
 		},
-		"logs": {
-			s: &ContainerLogs{
-				Boot: true,
-				N:    100,
-			},
-			expected: []string{
-				"--boot",
-				"-n", "100",
-			},
-		},
 		"env": {
 			s: &ProcessOptions{
 				Env: map[string]string{
@@ -58,8 +48,8 @@ func TestToFlags(t *testing.T) {
 				"--env", "d=3",
 			},
 		},
-		"container run": {
-			s: &RunContainer{
+		"create container process and management flags": {
+			s: &CreateContainer{
 				ProcessOptions: ProcessOptions{
 					Interactive: true,
 				},

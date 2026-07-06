@@ -3,11 +3,9 @@ package applecontainer
 import (
 	"context"
 	"fmt"
-	"io"
 	"log/slog"
 	"os/exec"
 	"strings"
-	"syscall"
 
 	"github.com/banksean/sand/internal/applecontainer/options"
 )
@@ -47,17 +45,6 @@ func (s *SystemSvc) Start(ctx context.Context, opts *options.SystemStart) (strin
 	return strings.TrimSpace(string(output)), nil
 }
 
-// Stop stops the container system. It returns the output of the command, or an error.
-func (s *SystemSvc) Stop(ctx context.Context, opts *options.SystemStop) (string, error) {
-	args := options.ToArgs(opts)
-	cmd := exec.CommandContext(ctx, "container", append([]string{"system", "stop"}, args...)...)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(string(output)), nil
-}
-
 // DNSList lists the container system's dns domains, or an error.
 func (s *SystemSvc) DNSList(ctx context.Context) ([]string, error) {
 	cmd := exec.CommandContext(ctx, "container", "system", "dns", "list")
@@ -75,17 +62,6 @@ func (s *SystemSvc) DNSList(ctx context.Context) ([]string, error) {
 	return ret, nil
 }
 
-// DNSCreate adds a new local dns domain to the container system.
-func (s *SystemSvc) DNSCreate(ctx context.Context, domain string) error {
-	cmd := exec.CommandContext(ctx, "container", "system", "dns", "create", domain)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		slog.ErrorContext(ctx, "SystemSvc.DNSCreate", "output", output, "error", err)
-		return err
-	}
-	return nil
-}
-
 // PropertyList returns a slice of system property values, or an error.
 func (s *SystemSvc) GetConfig(ctx context.Context) (*ContainerSystemConfig, error) {
 	cmd := exec.CommandContext(ctx, "container", "system", "property", "ls")
@@ -95,23 +71,4 @@ func (s *SystemSvc) GetConfig(ctx context.Context) (*ContainerSystemConfig, erro
 	}
 	cfg, err := ParseContainerSystemConfig(output)
 	return cfg, err
-}
-
-// Logs returns an io.ReadCloser for streaming log output and a wait func that blocks on the command's completion, or an error.
-func (s *SystemSvc) Logs(ctx context.Context, opts *options.SystemLogs) (io.ReadCloser, func() error, error) {
-	args := options.ToArgs(opts)
-	cmd := exec.CommandContext(ctx, "container", append([]string{"system", "logs"}, args...)...)
-	// This Setpgid business is basically PTSD-induced superstition learned through Linux debugging nightmares.
-	// It may not be necessary on MacOS at all.
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-
-	out, err := cmd.StdoutPipe()
-	if err != nil {
-		return nil, nil, err
-	}
-	if err := cmd.Start(); err != nil {
-		return nil, nil, err
-	}
-
-	return out, cmd.Wait, nil
 }
