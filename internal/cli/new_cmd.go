@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/alecthomas/kong"
-	"github.com/banksean/sand/internal/applecontainer"
 	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/cli/agentlaunch"
 	"github.com/banksean/sand/internal/daemon"
@@ -21,8 +20,6 @@ import (
 	"github.com/banksean/sand/internal/sandtypes"
 	"github.com/goombaio/namegenerator"
 )
-
-var newCmdContainerSystemStart = applecontainer.System.Start
 
 type NewCmd struct {
 	SandboxCreationFlags

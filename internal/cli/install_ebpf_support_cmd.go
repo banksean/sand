@@ -6,9 +6,10 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 
+	"github.com/banksean/sand/internal/hostops"
+	"github.com/banksean/sand/internal/imageprogress"
 	"github.com/banksean/sand/internal/runtimedeps"
 	"golang.org/x/sync/errgroup"
 )
@@ -93,9 +94,15 @@ func (c *InstallEBPFSupportCmd) downloadKernel(cctx *CLIContext) error {
 }
 
 func (c *InstallEBPFSupportCmd) pullInitImage(cctx *CLIContext) error {
-	pullCmd := exec.CommandContext(cctx.Context, "container", "image", "pull", runtimedeps.CustomInitImage)
-	_, err := pullCmd.Output()
-	return err
+	ops, err := hostops.NewAppleImageOps()
+	if err != nil {
+		return err
+	}
+	wait, err := ops.Pull(cctx.Context, runtimedeps.CustomInitImage, imageprogress.NewTextSink(os.Stdout))
+	if err != nil {
+		return err
+	}
+	return wait()
 }
 
 func (c *InstallEBPFSupportCmd) Run(cctx *CLIContext) error {

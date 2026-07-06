@@ -282,8 +282,8 @@ func main() {
 		},
 		runtimedeps.MacOS,
 		runtimedeps.MacOSVersion,
-		runtimedeps.ContainerCommand,
 		runtimedeps.ContainerSystemRunning,
+		runtimedeps.ContainerCommand,
 		runtimedeps.ContainerSystemDNSDomain,
 		runtimedeps.ContainerSystemDNSRegistration); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %s\n", err)

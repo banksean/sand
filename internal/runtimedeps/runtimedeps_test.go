@@ -8,30 +8,27 @@ import (
 	"testing"
 
 	"github.com/banksean/sand/internal/applecontainer"
-	"github.com/banksean/sand/internal/applecontainer/options"
 )
 
 type fakeContainerSystem struct {
 	versionFunc   func(context.Context) (string, error)
+	runningFunc   func(context.Context) error
 	dnsListFunc   func(context.Context) ([]string, error)
 	getConfigFunc func(context.Context) (*applecontainer.ContainerSystemConfig, error)
-}
-
-// Start implements [containerSystem].
-func (f *fakeContainerSystem) Start(ctx context.Context, opts *options.SystemStart) (string, error) {
-	panic("unimplemented")
-}
-
-// Status implements [containerSystem].
-func (f *fakeContainerSystem) Status(ctx context.Context, opts *options.SystemStatus) (string, error) {
-	panic("unimplemented")
 }
 
 func (f *fakeContainerSystem) Version(ctx context.Context) (string, error) {
 	if f.versionFunc != nil {
 		return f.versionFunc(ctx)
 	}
-	return "container CLI version " + AppleContainerVersion, nil
+	return AppleContainerVersion, nil
+}
+
+func (f *fakeContainerSystem) EnsureRunning(ctx context.Context) error {
+	if f.runningFunc != nil {
+		return f.runningFunc(ctx)
+	}
+	return nil
 }
 
 func (f *fakeContainerSystem) DNSList(ctx context.Context) ([]string, error) {
@@ -111,12 +108,34 @@ func TestContainerCommandMissingUsesVersionConstantInInstallerURL(t *testing.T) 
 	}
 	got := err.Error()
 	for _, want := range []string{
-		"apple/container " + AppleContainerVersion + " is not installed",
-		"/download/" + AppleContainerVersion + "/",
-		"container-" + AppleContainerVersion + "-installer-signed.pkg",
+		"could not get apple/container API server version",
+		"not found",
 	} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("VerifyWithOptions() error = %q, want substring %q", got, want)
+		}
+	}
+}
+
+func TestContainerSystemRunningAddsStartRemedy(t *testing.T) {
+	replaceSystemOps(t, &fakeContainerSystem{
+		runningFunc: func(context.Context) error {
+			return errors.New("XPC connection error")
+		},
+	})
+
+	err := VerifyWithOptions(context.Background(), "", VerifyOptions{}, ContainerSystemRunning)
+	if err == nil {
+		t.Fatal("VerifyWithOptions() error = nil, want error")
+	}
+	for _, want := range []string{
+		"Container system service is running",
+		"container system service is not running",
+		"container system start",
+		"XPC connection error",
+	} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("VerifyWithOptions() error = %q, want substring %q", err, want)
 		}
 	}
 }

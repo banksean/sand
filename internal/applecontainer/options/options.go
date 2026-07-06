@@ -9,26 +9,6 @@ import (
 	"strings"
 )
 
-type SystemStatus struct {
-	// Prefix is the launchd prefix for services (default: com.apple.container.)
-	Prefix string `flag:"--prefix"`
-	// Debug enables debug output [environment: CONTAINER_DEBUG]
-	Debug bool `flag:"--debug"`
-}
-
-type SystemStart struct {
-	// AppRoot is the path to the root directory for application data
-	AppRoot string `flag:"--app-root"`
-	// InstallRoot is the path to the root directory for application executables and plugins
-	InstallRoot string `flag:"--install-root"`
-	// EnableKernelIsntall specifies whether the default kernel should be installed or not (default: prompt user)
-	EnableKernelIsntall bool `flag:"--enable-kernel-install"`
-	// DisableKernelIsntall specifies whether the default kernel should be installed or not (default: prompt user)
-	DisableKernelIsntall bool `flag:"--disable-kernel-install"`
-	// Debug enables debug output [environment: CONTAINER_DEBUG]
-	Debug bool `flag:"--debug"`
-}
-
 // CreateContainer are the options flags for the "container" cli commands dealing with container instances.
 type CreateContainer struct {
 	ProcessOptions

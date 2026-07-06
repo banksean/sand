@@ -15,7 +15,6 @@ import (
 	"strings"
 
 	"github.com/banksean/sand/internal/applecontainer"
-	"github.com/banksean/sand/internal/applecontainer/options"
 	"github.com/banksean/sand/internal/applecontainer/types"
 	"github.com/banksean/sand/internal/hostops"
 	"github.com/google/go-containerregistry/pkg/authn"
@@ -59,10 +58,9 @@ var ErrContainerSystemNotRunning = errors.New("container system service is not r
 
 type containerSystem interface {
 	Version(context.Context) (string, error)
+	EnsureRunning(context.Context) error
 	DNSList(context.Context) ([]string, error)
 	GetConfig(ctx context.Context) (*applecontainer.ContainerSystemConfig, error)
-	Status(ctx context.Context, opts *options.SystemStatus) (string, error)
-	Start(ctx context.Context, opts *options.SystemStart) (string, error)
 }
 
 type imageInspector interface {
@@ -77,7 +75,7 @@ type VerifyOptions struct {
 }
 
 var (
-	systemOps = containerSystem(&applecontainer.System)
+	systemOps = containerSystem(xpcContainerSystem{})
 	imageOps  imageInspector
 
 	diagnosticChecks = []diagnosticCheck{
@@ -111,10 +109,10 @@ var (
 			Run: func(ctx context.Context, appBaseDir string, opts VerifyOptions) error {
 				version, err := systemOps.Version(ctx)
 				if err != nil {
-					return fmt.Errorf("apple/container %s is not installed. Install it from %s", AppleContainerVersion, AppleContainerInstallerURL())
+					return fmt.Errorf("could not get apple/container API server version: %w", err)
 				}
 				slog.InfoContext(ctx, "verifyPrerequisites", "version", version)
-				if !strings.Contains("container CLI version "+version, AppleContainerVersion) {
+				if !strings.Contains(version, AppleContainerVersion) {
 					return fmt.Errorf("apple/container %s is required, but found %q. Install it from %s", AppleContainerVersion, version, AppleContainerInstallerURL())
 				}
 				return nil
@@ -139,27 +137,14 @@ var (
 			ID:          ContainerSystemRunning,
 			Description: "Container system service is running",
 			Run: func(ctx context.Context, appBaseDir string, opts VerifyOptions) error {
-				status, err := systemOps.Status(ctx, nil)
-				if err == nil {
+				if err := systemOps.EnsureRunning(ctx); err == nil {
 					return nil
-				}
-				if status == "apiserver is not running and not registered with launchd" {
+				} else {
 					if !opts.PromptRemedies {
-						return fmt.Errorf("container system service is not running")
+						return ContainerSystemNotRunningError(err)
 					}
-					ok, err := PromptYesDefault(opts.Stdin, opts.Stdout, fmt.Sprintf("Start container system [Y/n]? "))
-					if err != nil {
-						return err
-					}
-					if !ok {
-						return fmt.Errorf("start container service by running `container system start`")
-					}
-
-					if msg, err := systemOps.Start(ctx, nil); err != nil {
-						return fmt.Errorf("starting container service: %q %w", msg, err)
-					}
+					return ContainerSystemNotRunningError(err)
 				}
-				return nil
 			},
 		},
 		{
