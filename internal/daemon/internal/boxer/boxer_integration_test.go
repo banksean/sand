@@ -11,7 +11,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/banksean/sand/internal/applecontainer/options"
 	"github.com/banksean/sand/internal/cloning"
 	"github.com/banksean/sand/internal/hostops"
 	"github.com/banksean/sand/internal/imageprogress"
@@ -113,7 +112,7 @@ func TestBoxer_NewSandbox_EndToEnd(t *testing.T) {
 	t.Run("success creates sandbox with all components", func(t *testing.T) {
 		var createdContainerID string
 		mockContainer := &hostops.MockContainerOps{
-			CreateFunc: func(ctx context.Context, opts *options.CreateContainer, image string, args []string) (string, error) {
+			CreateFunc: func(ctx context.Context, opts *hostops.CreateContainer, image string, args []string) (string, error) {
 				createdContainerID = "test-container-123"
 				return createdContainerID, nil
 			},
@@ -266,9 +265,9 @@ func TestBoxer_NewSandbox_EndToEnd(t *testing.T) {
 func TestBoxer_CreateContainerSSHAgentOptIn(t *testing.T) {
 	ctx := context.Background()
 
-	var createCalls []*options.CreateContainer
+	var createCalls []*hostops.CreateContainer
 	mockContainer := &hostops.MockContainerOps{
-		CreateFunc: func(ctx context.Context, opts *options.CreateContainer, image string, args []string) (string, error) {
+		CreateFunc: func(ctx context.Context, opts *hostops.CreateContainer, image string, args []string) (string, error) {
 			createCalls = append(createCalls, opts)
 			return "test-container-123", nil
 		},
@@ -453,7 +452,7 @@ func TestBoxer_StartContainersPrependInnieSocketPermissionHook(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var execCalls []string
 			mockContainer := &hostops.MockContainerOps{
-				ExecFunc: func(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, args ...string) (string, error) {
+				ExecFunc: func(ctx context.Context, opts *hostops.ExecContainer, containerID, cmd string, env []string, args ...string) (string, error) {
 					execCalls = append(execCalls, strings.Join(append([]string{cmd}, args...), " "))
 					return "", nil
 				},
@@ -579,11 +578,11 @@ func TestBoxer_Cleanup_EndToEnd(t *testing.T) {
 		var renameCalls []struct{ oldpath, newpath string }
 
 		mockContainer := &hostops.MockContainerOps{
-			StopFunc: func(ctx context.Context, opts *options.StopContainer, containerID string) (string, error) {
+			StopFunc: func(ctx context.Context, opts *hostops.StopContainer, containerID string) (string, error) {
 				stopCalls = append(stopCalls, containerID)
 				return "stopped", nil
 			},
-			DeleteFunc: func(ctx context.Context, opts *options.DeleteContainer, containerID string) (string, error) {
+			DeleteFunc: func(ctx context.Context, opts *hostops.DeleteContainer, containerID string) (string, error) {
 				deleteCalls = append(deleteCalls, containerID)
 				return "deleted", nil
 			},
@@ -668,10 +667,10 @@ func TestBoxer_Cleanup_EndToEnd(t *testing.T) {
 	t.Run("cleanup logs container errors but continues", func(t *testing.T) {
 		var renameCalled bool
 		mockContainer := &hostops.MockContainerOps{
-			StopFunc: func(ctx context.Context, opts *options.StopContainer, containerID string) (string, error) {
+			StopFunc: func(ctx context.Context, opts *hostops.StopContainer, containerID string) (string, error) {
 				return "", errors.New("stop failed")
 			},
-			DeleteFunc: func(ctx context.Context, opts *options.DeleteContainer, containerID string) (string, error) {
+			DeleteFunc: func(ctx context.Context, opts *hostops.DeleteContainer, containerID string) (string, error) {
 				return "", errors.New("delete failed")
 			},
 		}
@@ -978,7 +977,7 @@ func TestBoxer_ExecuteHooks_StreamsProgress(t *testing.T) {
 		InspectFunc: func(ctx context.Context, containerID string) ([]sandtypes.Container, error) {
 			return []sandtypes.Container{{Status: sandtypes.ContainerStatus{State: "running"}}}, nil
 		},
-		ExecStreamFunc: func(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, stdin io.Reader, stdout, stderr io.Writer, cmdArgs ...string) (func() error, error) {
+		ExecStreamFunc: func(ctx context.Context, opts *hostops.ExecContainer, containerID, cmd string, env []string, stdin io.Reader, stdout, stderr io.Writer, cmdArgs ...string) (func() error, error) {
 			execStreamCalls = append(execStreamCalls, cmd)
 			execStreamEnvFiles = append(execStreamEnvFiles, opts.ProcessOptions.EnvFile)
 			if _, err := io.WriteString(stdout, "warming cache\n"); err != nil {
@@ -1030,7 +1029,7 @@ func TestBoxer_ExecuteHooks_DoesNotPassEnvFileToExec(t *testing.T) {
 		InspectFunc: func(ctx context.Context, containerID string) ([]sandtypes.Container, error) {
 			return []sandtypes.Container{{Status: sandtypes.ContainerStatus{State: "running"}}}, nil
 		},
-		ExecFunc: func(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, args ...string) (string, error) {
+		ExecFunc: func(ctx context.Context, opts *hostops.ExecContainer, containerID, cmd string, env []string, args ...string) (string, error) {
 			execEnvFiles = append(execEnvFiles, opts.ProcessOptions.EnvFile)
 			return "", nil
 		},
@@ -1064,7 +1063,7 @@ func TestBoxer_StopContainer(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		var stopCalls []string
 		mockContainer := &hostops.MockContainerOps{
-			StopFunc: func(ctx context.Context, opts *options.StopContainer, containerID string) (string, error) {
+			StopFunc: func(ctx context.Context, opts *hostops.StopContainer, containerID string) (string, error) {
 				stopCalls = append(stopCalls, containerID)
 				return "stopped", nil
 			},
@@ -1110,7 +1109,7 @@ func TestBoxer_StopContainer(t *testing.T) {
 	t.Run("stop error", func(t *testing.T) {
 		expectedErr := errors.New("stop failed")
 		mockContainer := &hostops.MockContainerOps{
-			StopFunc: func(ctx context.Context, opts *options.StopContainer, containerID string) (string, error) {
+			StopFunc: func(ctx context.Context, opts *hostops.StopContainer, containerID string) (string, error) {
 				return "", expectedErr
 			},
 		}

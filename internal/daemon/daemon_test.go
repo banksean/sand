@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/banksean/sand/internal/applecontainer/options"
 	"github.com/banksean/sand/internal/cloning"
 	"github.com/banksean/sand/internal/daemon/internal/boxer"
 	"github.com/banksean/sand/internal/hostops"
@@ -315,7 +314,7 @@ func TestStartSandboxRecreatesStoppedContainerAfterSocketCreation(t *testing.T) 
 				return nil, nil
 			}
 		},
-		CreateFunc: func(_ context.Context, opts *options.CreateContainer, _ string, _ []string) (string, error) {
+		CreateFunc: func(_ context.Context, opts *hostops.CreateContainer, _ string, _ []string) (string, error) {
 			if !opts.ManagementOptions.SSH {
 				t.Fatal("recreated container did not enable ssh-agent forwarding")
 			}
@@ -327,15 +326,15 @@ func TestStartSandboxRecreatesStoppedContainerAfterSocketCreation(t *testing.T) 
 			}
 			return newContainerID, nil
 		},
-		StopFunc: func(_ context.Context, _ *options.StopContainer, containerID string) (string, error) {
+		StopFunc: func(_ context.Context, _ *hostops.StopContainer, containerID string) (string, error) {
 			stopCalls = append(stopCalls, containerID)
 			return "stopped", nil
 		},
-		DeleteFunc: func(_ context.Context, _ *options.DeleteContainer, containerID string) (string, error) {
+		DeleteFunc: func(_ context.Context, _ *hostops.DeleteContainer, containerID string) (string, error) {
 			deleteCalls = append(deleteCalls, containerID)
 			return "deleted", nil
 		},
-		StartFunc: func(_ context.Context, _ *options.StartContainer, containerID string) (string, error) {
+		StartFunc: func(_ context.Context, _ *hostops.StartContainer, containerID string) (string, error) {
 			startCalls = append(startCalls, containerID)
 			return "started", nil
 		},

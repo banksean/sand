@@ -15,7 +15,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/banksean/sand/internal/applecontainer/options"
 	"github.com/banksean/sand/internal/cloning"
 	"github.com/banksean/sand/internal/db"
 	"github.com/banksean/sand/internal/hostops"
@@ -70,8 +69,8 @@ type hookExecutor struct {
 
 func (h hookExecutor) Exec(ctx context.Context, shellCmd string, args ...string) (string, error) {
 	output, err := h.container.Exec(ctx,
-		&options.ExecContainer{
-			ProcessOptions: options.ProcessOptions{
+		&hostops.ExecContainer{
+			ProcessOptions: hostops.ProcessOptions{
 				Interactive: false,
 				TTY:         true,
 				WorkDir:     "/app",
@@ -98,8 +97,8 @@ func (h hookExecutor) ExecStream(ctx context.Context, stdout, stderr io.Writer, 
 	}
 
 	wait, err := h.container.ExecStream(ctx,
-		&options.ExecContainer{
-			ProcessOptions: options.ProcessOptions{
+		&hostops.ExecContainer{
+			ProcessOptions: hostops.ProcessOptions{
 				Interactive: false,
 				TTY:         true,
 				WorkDir:     "/app",
@@ -896,7 +895,7 @@ func (sber *Boxer) CreateContainer(ctx context.Context, sb *sandtypes.Box, enabl
 	volumeOpts = append(volumeOpts, runtimepaths.ContainerHTTPSocketPath(sb.ID)+":/run/host-services/sandd.sock")
 	volumeOpts = append(volumeOpts, runtimepaths.ContainerGRPCSocketPath(sb.ID)+":/run/host-services/sandd.grpc.sock")
 
-	mgmtOpts := options.ManagementOptions{
+	mgmtOpts := hostops.ManagementOptions{
 		Name:      sandboxContainerName(sb),
 		SSH:       enableSSHAgent,
 		DNSDomain: sb.DNSDomain,
@@ -906,7 +905,7 @@ func (sber *Boxer) CreateContainer(ctx context.Context, sb *sandtypes.Box, enabl
 		// just directories. --volume (which we don't otherwise use here) does let us do this.
 		Volume: volumeOpts,
 	}
-	resOpts := options.ResourceOptions{
+	resOpts := hostops.ResourceOptions{
 		CPUs:   sb.CPUs,
 		Memory: fmt.Sprintf("%dM", sb.MemoryMB),
 	}
@@ -926,8 +925,8 @@ func (sber *Boxer) CreateContainer(ctx context.Context, sb *sandtypes.Box, enabl
 	}
 
 	containerID, err := sber.ContainerService.Create(ctx,
-		&options.CreateContainer{
-			ProcessOptions: options.ProcessOptions{
+		&hostops.CreateContainer{
+			ProcessOptions: hostops.ProcessOptions{
 				Interactive: true,
 				TTY:         true,
 			},

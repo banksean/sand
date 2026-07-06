@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/banksean/sand/internal/applecontainer/options"
 	"github.com/banksean/sand/internal/daemon/daemonpb"
+	"github.com/banksean/sand/internal/hostops"
 	"github.com/banksean/sand/internal/sandboxlog"
 	"github.com/banksean/sand/internal/sandtypes"
 )
@@ -152,7 +152,7 @@ func (s *daemonGRPCServer) ExportImage(ctx context.Context, req *daemonpb.Export
 	if sbox == nil {
 		return nil, fmt.Errorf("sandbox not found: %s", req.GetId())
 	}
-	if _, err := s.daemon.boxer.ContainerService.Export(ctx, &options.ExportContainer{Output: req.GetDestinationPath()}, sbox.ContainerID); err != nil {
+	if _, err := s.daemon.boxer.ContainerService.Export(ctx, &hostops.ExportContainer{Output: req.GetDestinationPath()}, sbox.ContainerID); err != nil {
 		return nil, err
 	}
 	return okStatus(), nil

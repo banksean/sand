@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/banksean/sand/internal/agentdefs"
-	"github.com/banksean/sand/internal/applecontainer/options"
 	"github.com/banksean/sand/internal/cloning"
 	"github.com/banksean/sand/internal/daemon/internal/boxer"
 	"github.com/banksean/sand/internal/hostops"
@@ -274,7 +273,7 @@ func TestCreateSandboxRejectsMissingAuthBeforeSandboxCreation(t *testing.T) {
 	t.Setenv("OPENAI_API_KEY", "")
 	var createCalls int
 	d := newRequirementTestDaemon(t, requirementTestRegistry(), &hostops.MockContainerOps{
-		CreateFunc: func(ctx context.Context, _ *options.CreateContainer, image string, args []string) (string, error) {
+		CreateFunc: func(ctx context.Context, _ *hostops.CreateContainer, image string, args []string) (string, error) {
 			createCalls++
 			return "mock-container-id", nil
 		},
@@ -319,7 +318,7 @@ profiles:
 	var createCalls int
 	var inspectCalls int
 	d := newRequirementTestDaemon(t, requirementTestRegistry(), &hostops.MockContainerOps{
-		CreateFunc: func(ctx context.Context, _ *options.CreateContainer, image string, args []string) (string, error) {
+		CreateFunc: func(ctx context.Context, _ *hostops.CreateContainer, image string, args []string) (string, error) {
 			createCalls++
 			return "mock-container-id", nil
 		},
@@ -366,7 +365,7 @@ profiles:
 
 	var createCalls int
 	d := newRequirementTestDaemon(t, requirementTestRegistry(), &hostops.MockContainerOps{
-		CreateFunc: func(ctx context.Context, _ *options.CreateContainer, image string, args []string) (string, error) {
+		CreateFunc: func(ctx context.Context, _ *hostops.CreateContainer, image string, args []string) (string, error) {
 			createCalls++
 			return "mock-container-id", nil
 		},
@@ -395,7 +394,7 @@ profiles:
 func TestCreateSandboxRejectsUnknownAgentBeforeSandboxCreation(t *testing.T) {
 	var createCalls int
 	d := newRequirementTestDaemon(t, requirementTestRegistry(), &hostops.MockContainerOps{
-		CreateFunc: func(ctx context.Context, _ *options.CreateContainer, image string, args []string) (string, error) {
+		CreateFunc: func(ctx context.Context, _ *hostops.CreateContainer, image string, args []string) (string, error) {
 			createCalls++
 			return "mock-container-id", nil
 		},

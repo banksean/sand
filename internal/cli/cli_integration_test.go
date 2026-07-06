@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/banksean/sand/internal/applecontainer/options"
 	"github.com/banksean/sand/internal/cli"
 	"github.com/banksean/sand/internal/daemon/daemontest"
 	"github.com/banksean/sand/internal/hostops"
@@ -216,7 +215,7 @@ func TestStopCmd_Single(t *testing.T) {
 	var stopCallsMu sync.Mutex
 	cctx := newCLIContext(t, daemontest.Deps{
 		ContainerService: &hostops.MockContainerOps{
-			StopFunc: func(_ context.Context, _ *options.StopContainer, containerID string) (string, error) {
+			StopFunc: func(_ context.Context, _ *hostops.StopContainer, containerID string) (string, error) {
 				stopCallsMu.Lock()
 				defer stopCallsMu.Unlock()
 				stopCalls = append(stopCalls, containerID)
@@ -242,7 +241,7 @@ func TestStopCmd_Multiple(t *testing.T) {
 	var stopCallsMu sync.Mutex
 	cctx := newCLIContext(t, daemontest.Deps{
 		ContainerService: &hostops.MockContainerOps{
-			StopFunc: func(_ context.Context, _ *options.StopContainer, containerID string) (string, error) {
+			StopFunc: func(_ context.Context, _ *hostops.StopContainer, containerID string) (string, error) {
 				stopCallsMu.Lock()
 				defer stopCallsMu.Unlock()
 				stopCalls = append(stopCalls, containerID)
@@ -271,7 +270,7 @@ func TestStopCmd_All(t *testing.T) {
 	var stopCallsMu sync.Mutex
 	cctx := newCLIContext(t, daemontest.Deps{
 		ContainerService: &hostops.MockContainerOps{
-			StopFunc: func(_ context.Context, _ *options.StopContainer, containerID string) (string, error) {
+			StopFunc: func(_ context.Context, _ *hostops.StopContainer, containerID string) (string, error) {
 				stopCallsMu.Lock()
 				defer stopCallsMu.Unlock()
 				stopCalls = append(stopCalls, containerID)
@@ -304,7 +303,7 @@ func TestStartCmd_AlreadyRunning(t *testing.T) {
 			InspectFunc: func(_ context.Context, containerID string) ([]sandtypes.Container, error) {
 				return []sandtypes.Container{{Status: sandtypes.ContainerStatus{State: "running"}}}, nil
 			},
-			StartFunc: func(_ context.Context, _ *options.StartContainer, containerID string) (string, error) {
+			StartFunc: func(_ context.Context, _ *hostops.StartContainer, containerID string) (string, error) {
 				startCallsMu.Lock()
 				defer startCallsMu.Unlock()
 				startCalls = append(startCalls, containerID)
@@ -333,7 +332,7 @@ func TestStartCmd_StartsStopped(t *testing.T) {
 			InspectFunc: func(_ context.Context, containerID string) ([]sandtypes.Container, error) {
 				return []sandtypes.Container{{Status: sandtypes.ContainerStatus{State: "stopped"}}}, nil
 			},
-			StartFunc: func(_ context.Context, _ *options.StartContainer, containerID string) (string, error) {
+			StartFunc: func(_ context.Context, _ *hostops.StartContainer, containerID string) (string, error) {
 				startCallsMu.Lock()
 				defer startCallsMu.Unlock()
 				startCalls = append(startCalls, containerID)
@@ -362,7 +361,7 @@ func TestStartCmd_Multiple(t *testing.T) {
 			InspectFunc: func(_ context.Context, containerID string) ([]sandtypes.Container, error) {
 				return []sandtypes.Container{{Status: sandtypes.ContainerStatus{State: "stopped"}}}, nil
 			},
-			StartFunc: func(_ context.Context, _ *options.StartContainer, containerID string) (string, error) {
+			StartFunc: func(_ context.Context, _ *hostops.StartContainer, containerID string) (string, error) {
 				startCallsMu.Lock()
 				defer startCallsMu.Unlock()
 				startCalls = append(startCalls, containerID)
@@ -394,7 +393,7 @@ func TestStartCmd_All(t *testing.T) {
 			InspectFunc: func(_ context.Context, containerID string) ([]sandtypes.Container, error) {
 				return []sandtypes.Container{{Status: sandtypes.ContainerStatus{State: "stopped"}}}, nil
 			},
-			StartFunc: func(_ context.Context, _ *options.StartContainer, containerID string) (string, error) {
+			StartFunc: func(_ context.Context, _ *hostops.StartContainer, containerID string) (string, error) {
 				startCallsMu.Lock()
 				defer startCallsMu.Unlock()
 				startCalls = append(startCalls, containerID)

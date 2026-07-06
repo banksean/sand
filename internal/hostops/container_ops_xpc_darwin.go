@@ -18,7 +18,6 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/banksean/sand/internal/applecontainer/options"
 	"github.com/banksean/sand/internal/applecontainer/xpc"
 	"github.com/banksean/sand/internal/sandtypes"
 	"github.com/google/uuid"
@@ -43,9 +42,9 @@ func NewXPCContainerOps() (ContainerOps, error) {
 	return &xpcContainerOps{client: client, imageOps: &xpcImageOps{client: imageClient}}, nil
 }
 
-func (o *xpcContainerOps) Create(ctx context.Context, opts *options.CreateContainer, imageName string, initArgs []string) (string, error) {
+func (o *xpcContainerOps) Create(ctx context.Context, opts *CreateContainer, imageName string, initArgs []string) (string, error) {
 	if opts == nil {
-		opts = &options.CreateContainer{}
+		opts = &CreateContainer{}
 	}
 	id := opts.Name
 	if id == "" {
@@ -111,7 +110,7 @@ func (o *xpcContainerOps) Create(ctx context.Context, opts *options.CreateContai
 	return id, nil
 }
 
-func (o *xpcContainerOps) Start(ctx context.Context, opts *options.StartContainer, containerID string) (string, error) {
+func (o *xpcContainerOps) Start(ctx context.Context, opts *StartContainer, containerID string) (string, error) {
 	stdio, cleanup, err := nullStdio()
 	if err != nil {
 		return "", err
@@ -126,7 +125,7 @@ func (o *xpcContainerOps) Start(ctx context.Context, opts *options.StartContaine
 	return containerID, nil
 }
 
-func (o *xpcContainerOps) Stop(ctx context.Context, opts *options.StopContainer, containerID string) (string, error) {
+func (o *xpcContainerOps) Stop(ctx context.Context, opts *StopContainer, containerID string) (string, error) {
 	stopOpts := xpc.ContainerStopOptions{}
 	if opts != nil {
 		stopOpts.TimeoutInSeconds = int32(opts.Time)
@@ -140,7 +139,7 @@ func (o *xpcContainerOps) Stop(ctx context.Context, opts *options.StopContainer,
 	return containerID, nil
 }
 
-func (o *xpcContainerOps) Delete(ctx context.Context, opts *options.DeleteContainer, containerID string) (string, error) {
+func (o *xpcContainerOps) Delete(ctx context.Context, opts *DeleteContainer, containerID string) (string, error) {
 	force := opts != nil && opts.Force
 	if err := o.client.DeleteContainer(ctx, containerID, force); err != nil {
 		return "", err
@@ -148,7 +147,7 @@ func (o *xpcContainerOps) Delete(ctx context.Context, opts *options.DeleteContai
 	return containerID, nil
 }
 
-func (o *xpcContainerOps) Exec(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, args ...string) (string, error) {
+func (o *xpcContainerOps) Exec(ctx context.Context, opts *ExecContainer, containerID, cmd string, env []string, args ...string) (string, error) {
 	var stdout, stderr bytes.Buffer
 	wait, err := o.ExecStream(ctx, opts, containerID, cmd, env, nil, &stdout, &stderr, args...)
 	if err != nil {
@@ -162,21 +161,11 @@ func (o *xpcContainerOps) Exec(ctx context.Context, opts *options.ExecContainer,
 	return out, nil
 }
 
-func (o *xpcContainerOps) ExecStream(ctx context.Context, opts *options.ExecContainer, containerID, cmd string, env []string, stdin io.Reader, stdout, stderr io.Writer, args ...string) (func() error, error) {
+func (o *xpcContainerOps) ExecStream(ctx context.Context, opts *ExecContainer, containerID, cmd string, env []string, stdin io.Reader, stdout, stderr io.Writer, args ...string) (func() error, error) {
 	if opts == nil {
-		opts = &options.ExecContainer{}
+		opts = &ExecContainer{}
 	}
 	processID := uuid.NewString()
-	slog.InfoContext(ctx, "xpcContainerOps.ExecStream starting",
-		"containerID", containerID,
-		"processID", processID,
-		"cmd", cmd,
-		"args", args,
-		"interactive", opts.ProcessOptions.Interactive,
-		"tty", opts.ProcessOptions.TTY,
-		"stdin", streamDebugInfo(stdin),
-		"stdout", streamDebugInfo(stdout),
-		"stderr", streamDebugInfo(stderr))
 
 	snapshot, err := o.client.GetContainer(ctx, containerID)
 	if err != nil {
@@ -307,7 +296,7 @@ func (o *xpcContainerOps) Stats(ctx context.Context, containerID ...string) ([]s
 	return ret, nil
 }
 
-func (o *xpcContainerOps) Export(ctx context.Context, opts *options.ExportContainer, containerID string) (string, error) {
+func (o *xpcContainerOps) Export(ctx context.Context, opts *ExportContainer, containerID string) (string, error) {
 	if opts == nil || opts.Output == "" {
 		return "", fmt.Errorf("export output path is required")
 	}
@@ -345,7 +334,7 @@ func (o *xpcContainerOps) kernel(ctx context.Context, customPath string, platfor
 	return o.client.GetDefaultKernel(ctx, platform)
 }
 
-func createProcessConfig(process options.ProcessOptions, management options.ManagementOptions, initArgs []string, imageConfig *sandtypes.ImageVariantContainerConfig) (xpc.ProcessConfiguration, error) {
+func createProcessConfig(process ProcessOptions, management ManagementOptions, initArgs []string, imageConfig *sandtypes.ImageVariantContainerConfig) (xpc.ProcessConfiguration, error) {
 	args := append([]string{}, initArgs...)
 	if management.Entrypoint != "" {
 		args = append([]string{management.Entrypoint}, args...)
@@ -382,7 +371,7 @@ func createProcessConfig(process options.ProcessOptions, management options.Mana
 	}, nil
 }
 
-func applyExecOptions(cfg *xpc.ProcessConfiguration, process options.ProcessOptions, cmd string, args []string) error {
+func applyExecOptions(cfg *xpc.ProcessConfiguration, process ProcessOptions, cmd string, args []string) error {
 	cfg.Executable = cmd
 	cfg.Arguments = append([]string{}, args...)
 	cfg.Terminal = process.TTY
@@ -402,7 +391,7 @@ func applyExecOptions(cfg *xpc.ProcessConfiguration, process options.ProcessOpti
 	return nil
 }
 
-func processEnvironment(process options.ProcessOptions, imageConfig *sandtypes.ImageVariantContainerConfig) ([]string, error) {
+func processEnvironment(process ProcessOptions, imageConfig *sandtypes.ImageVariantContainerConfig) ([]string, error) {
 	var env []string
 	if imageConfig != nil {
 		env = append(env, imageConfig.Env...)
@@ -707,6 +696,7 @@ func xpcSnapshotToContainer(snapshot xpc.ContainerSnapshot) sandtypes.Container 
 			Network: network.Network,
 			Options: sandtypes.NetworkOptions{
 				Hostname: network.Options.Hostname,
+				MTU:      int(*network.Options.MTU),
 			},
 		})
 	}
