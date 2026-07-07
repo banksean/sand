@@ -90,6 +90,7 @@ func (m *MockContainerOps) Stats(ctx context.Context, containerID ...string) ([]
 type MockGitOps struct {
 	AddRemoteFunc         func(ctx context.Context, dir, name, url string) error
 	RemoveRemoteFunc      func(ctx context.Context, dir, name string) error
+	RenameRemoteFunc      func(ctx context.Context, dir, oldName, newName string) error
 	SetRemoteURLFunc      func(ctx context.Context, dir, name, url string) error
 	FetchFunc             func(ctx context.Context, dir, remote string) error
 	CloneMirrorFunc       func(ctx context.Context, sourceDir, mirrorDir string) error
@@ -115,6 +116,13 @@ func (m *MockGitOps) AddRemote(ctx context.Context, dir, name, url string) error
 func (m *MockGitOps) RemoveRemote(ctx context.Context, dir, name string) error {
 	if m.RemoveRemoteFunc != nil {
 		return m.RemoveRemoteFunc(ctx, dir, name)
+	}
+	return nil
+}
+
+func (m *MockGitOps) RenameRemote(ctx context.Context, dir, oldName, newName string) error {
+	if m.RenameRemoteFunc != nil {
+		return m.RenameRemoteFunc(ctx, dir, oldName, newName)
 	}
 	return nil
 }

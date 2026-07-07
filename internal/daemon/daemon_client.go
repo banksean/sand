@@ -28,6 +28,7 @@ type Client interface {
 	Stats(ctx context.Context, name ...string) ([]sandtypes.ContainerStats, error)
 	VSC(ctx context.Context, name string) error
 	CreateSandbox(ctx context.Context, opts CreateSandboxOpts, w io.Writer) (*sandtypes.Box, error)
+	RenameSandbox(ctx context.Context, oldName, newName string, w io.Writer) (*sandtypes.Box, error)
 	// EnsureImage ensures imageName is present locally and up to date, pulling if needed.
 	// Progress lines from the daemon are written to w as they arrive.
 	EnsureImage(ctx context.Context, imageName string, w io.Writer) error

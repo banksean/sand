@@ -87,6 +87,38 @@ func imageProgressUpdateToProto(update imageprogress.Update) *daemonpb.ImagePull
 	}
 }
 
+type grpcRenameSandboxProgressWriter struct {
+	stream daemonpb.DaemonService_RenameSandboxServer
+	mu     sync.Mutex
+}
+
+func (w *grpcRenameSandboxProgressWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if err := w.stream.Send(&daemonpb.RenameSandboxResponse{
+		Event: &daemonpb.RenameSandboxResponse_Progress{Progress: string(p)},
+	}); err != nil {
+		return 0, err
+	}
+	return len(p), nil
+}
+
+func (s *daemonGRPCServer) RenameSandbox(req *daemonpb.RenameSandboxRequest, stream daemonpb.DaemonService_RenameSandboxServer) error {
+	ctx := stream.Context()
+	writer := &grpcRenameSandboxProgressWriter{stream: stream}
+
+	sbox, err := s.daemon.RenameSandbox(ctx, req.GetOldName(), req.GetNewName(), writer)
+	if err != nil {
+		slog.ErrorContext(ctx, "Daemon.gRPC RenameSandbox", "error", err)
+		return stream.Send(&daemonpb.RenameSandboxResponse{
+			Event: &daemonpb.RenameSandboxResponse_Error{Error: err.Error()},
+		})
+	}
+	return stream.Send(&daemonpb.RenameSandboxResponse{
+		Event: &daemonpb.RenameSandboxResponse_Box{Box: sandboxToProto(sbox)},
+	})
+}
+
 func (s *daemonGRPCServer) CreateSandbox(req *daemonpb.CreateSandboxRequest, stream daemonpb.DaemonService_CreateSandboxServer) error {
 	opts := createSandboxOptsFromProto(req)
 	ctx := stream.Context()

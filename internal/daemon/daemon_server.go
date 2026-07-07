@@ -814,3 +814,7 @@ func (d *Daemon) ExpungeSandbox(ctx context.Context, id string) error {
 	ctx = sandboxlog.WithSandboxID(ctx, id)
 	return d.boxer.Expunge(ctx, id)
 }
+
+func (d *Daemon) RenameSandbox(ctx context.Context, oldName, newName string, progress io.Writer) (*sandtypes.Box, error) {
+	return d.boxer.RenameSandbox(ctx, oldName, newName, progress)
+}

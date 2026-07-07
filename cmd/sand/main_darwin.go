@@ -47,6 +47,7 @@ type Outie struct {
 	Expunge            cli.ExpungeCmd            `cmd:"" help:"hard-delete soft-deleted sandboxes"`
 	Stop               cli.StopCmd               `cmd:"" help:"stop sandbox container"`
 	Start              cli.StartCmd              `cmd:"" help:"start sandbox container"`
+	Rename             cli.RenameCmd             `cmd:"" help:"rename a stopped sandbox"`
 	Git                cli.GitCmd                `cmd:"" help:"git operations with sandboxes"`
 	Doc                DocCmd                    `cmd:"" help:"print complete command help formatted as markdown"`
 	BuildInfo          cli.BuildInfoCmd          `cmd:"" help:"print version infomation about this command"`

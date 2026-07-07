@@ -214,6 +214,45 @@ func (c *GRPCClient) VSC(ctx context.Context, name string) error {
 	return err
 }
 
+func (c *GRPCClient) RenameSandbox(ctx context.Context, oldName, newName string, w io.Writer) (*sandtypes.Box, error) {
+	stream, err := c.client.RenameSandbox(ctx, &daemonpb.RenameSandboxRequest{
+		OldName: oldName,
+		NewName: newName,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	for {
+		event, err := stream.Recv()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return nil, io.ErrUnexpectedEOF
+			}
+			return nil, err
+		}
+
+		switch e := event.GetEvent().(type) {
+		case *daemonpb.RenameSandboxResponse_Progress:
+			if w != nil {
+				if _, err := io.WriteString(w, e.Progress); err != nil {
+					return nil, err
+				}
+			}
+		case *daemonpb.RenameSandboxResponse_Box:
+			box := sandboxFromProto(e.Box)
+			return box, nil
+		case *daemonpb.RenameSandboxResponse_Error:
+			if e.Error == "" {
+				return nil, fmt.Errorf("sandbox rename failed")
+			}
+			return nil, errors.New(e.Error)
+		default:
+			return nil, fmt.Errorf("unknown rename sandbox stream event %T", e)
+		}
+	}
+}
+
 func (c *GRPCClient) CreateSandbox(ctx context.Context, opts CreateSandboxOpts, w io.Writer) (*sandtypes.Box, error) {
 	stream, err := c.client.CreateSandbox(ctx, createSandboxOptsToProto(opts))
 	if err != nil {

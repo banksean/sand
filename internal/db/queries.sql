@@ -58,6 +58,12 @@ SET container_id = ?,
     updated_at = CURRENT_TIMESTAMP
 WHERE id = ?;
 
+-- name: RenameSandbox :exec
+UPDATE sandboxes
+SET name = ?,
+    updated_at = CURRENT_TIMESTAMP
+WHERE id = ? AND state = 'active';
+
 -- name: SoftDeleteSandbox :exec
 UPDATE sandboxes
 SET state = 'deleted',

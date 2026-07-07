@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"time"
@@ -556,6 +557,73 @@ func (sb *Boxer) GetByID(ctx context.Context, id string) (*sandtypes.Box, error)
 	box.Container = ctr
 	box.CurrentGitDetails = sb.getCurrentGitDetails(ctx, box)
 	return box, nil
+}
+
+// sandboxNameRe enforces DNS label rules: 1-63 chars, lowercase alnum or hyphens,
+// not starting or ending with a hyphen.
+var sandboxNameRe = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
+
+func validateSandboxName(name string) error {
+	if !sandboxNameRe.MatchString(name) {
+		return fmt.Errorf("sandbox name %q is invalid: must be 1-63 lowercase alphanumeric characters or hyphens, not starting or ending with a hyphen", name)
+	}
+	return nil
+}
+
+// RenameSandbox renames a stopped sandbox. The container is deleted and recreated
+// under the new name (the container ID in apple's runtime IS the sandbox name).
+// The git remote on the host is renamed best-effort; failures are logged but do not
+// abort the rename.
+func (sb *Boxer) RenameSandbox(ctx context.Context, oldName, newName string, progress io.Writer) (*sandtypes.Box, error) {
+	sbox, err := sb.Get(ctx, oldName)
+	if err != nil {
+		return nil, err
+	}
+	if sbox == nil {
+		return nil, fmt.Errorf("sandbox not found: %s", oldName)
+	}
+	ctx = sandboxlog.WithSandboxID(ctx, sbox.ID)
+
+	if sbox.Container != nil && sbox.Container.Status.State == "running" {
+		return nil, fmt.Errorf("sandbox %s is running; stop it before renaming", oldName)
+	}
+	if err := validateSandboxName(newName); err != nil {
+		return nil, err
+	}
+
+	enableSSHAgent := sbox.Container != nil && sbox.Container.Configuration.SSH
+	oldRemoteName := sandboxRemoteName(sbox)
+
+	if sbox.ContainerID != "" {
+		fmt.Fprintf(progress, "[sand] deleting container %s\n", sbox.ContainerID)
+		if out, err := sb.ContainerService.Delete(ctx, nil, sbox.ContainerID); err != nil {
+			slog.WarnContext(ctx, "Boxer.RenameSandbox delete old container", "containerID", sbox.ContainerID, "error", err, "output", out)
+		}
+	}
+
+	sbox.Name = newName
+	if err := sb.queries.RenameSandbox(ctx, db.RenameSandboxParams{Name: newName, ID: sbox.ID}); err != nil {
+		return nil, fmt.Errorf("rename sandbox in db: %w", err)
+	}
+
+	fmt.Fprintf(progress, "[sand] creating container %s\n", newName)
+	if err := sb.CreateContainer(ctx, sbox, enableSSHAgent); err != nil {
+		return nil, fmt.Errorf("create container after rename: %w", err)
+	}
+	if err := sb.UpdateContainerID(ctx, sbox, sbox.ContainerID); err != nil {
+		return nil, fmt.Errorf("update container id: %w", err)
+	}
+
+	if sbox.HostOriginDir != "" {
+		oldRemote := cloning.ClonedWorkDirGitRemotePrefix + oldRemoteName
+		newRemote := cloning.ClonedWorkDirGitRemotePrefix + newName
+		fmt.Fprintf(progress, "[sand] renaming git remote %s -> %s\n", oldRemote, newRemote)
+		if err := sb.GitOps.RenameRemote(ctx, sbox.HostOriginDir, oldRemote, newRemote); err != nil {
+			slog.WarnContext(ctx, "Boxer.RenameSandbox rename git remote", "old", oldRemote, "new", newRemote, "error", err)
+		}
+	}
+
+	return sbox, nil
 }
 
 func (sb *Boxer) SoftDelete(ctx context.Context, sbox *sandtypes.Box) error {

@@ -36,6 +36,7 @@ const (
 	DaemonService_Stats_FullMethodName                 = "/sand.daemon.v1.DaemonService/Stats"
 	DaemonService_VSC_FullMethodName                   = "/sand.daemon.v1.DaemonService/VSC"
 	DaemonService_CreateSandbox_FullMethodName         = "/sand.daemon.v1.DaemonService/CreateSandbox"
+	DaemonService_RenameSandbox_FullMethodName         = "/sand.daemon.v1.DaemonService/RenameSandbox"
 	DaemonService_EnsureImage_FullMethodName           = "/sand.daemon.v1.DaemonService/EnsureImage"
 )
 
@@ -60,6 +61,7 @@ type DaemonServiceClient interface {
 	Stats(ctx context.Context, in *StatsRequest, opts ...grpc.CallOption) (*StatsResponse, error)
 	VSC(ctx context.Context, in *IDRequest, opts ...grpc.CallOption) (*StatusResponse, error)
 	CreateSandbox(ctx context.Context, in *CreateSandboxRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CreateSandboxResponse], error)
+	RenameSandbox(ctx context.Context, in *RenameSandboxRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[RenameSandboxResponse], error)
 	EnsureImage(ctx context.Context, in *EnsureImageRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[EnsureImageResponse], error)
 }
 
@@ -250,9 +252,28 @@ func (c *daemonServiceClient) CreateSandbox(ctx context.Context, in *CreateSandb
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type DaemonService_CreateSandboxClient = grpc.ServerStreamingClient[CreateSandboxResponse]
 
+func (c *daemonServiceClient) RenameSandbox(ctx context.Context, in *RenameSandboxRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[RenameSandboxResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &DaemonService_ServiceDesc.Streams[1], DaemonService_RenameSandbox_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[RenameSandboxRequest, RenameSandboxResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type DaemonService_RenameSandboxClient = grpc.ServerStreamingClient[RenameSandboxResponse]
+
 func (c *daemonServiceClient) EnsureImage(ctx context.Context, in *EnsureImageRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[EnsureImageResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &DaemonService_ServiceDesc.Streams[1], DaemonService_EnsureImage_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &DaemonService_ServiceDesc.Streams[2], DaemonService_EnsureImage_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -290,6 +311,7 @@ type DaemonServiceServer interface {
 	Stats(context.Context, *StatsRequest) (*StatsResponse, error)
 	VSC(context.Context, *IDRequest) (*StatusResponse, error)
 	CreateSandbox(*CreateSandboxRequest, grpc.ServerStreamingServer[CreateSandboxResponse]) error
+	RenameSandbox(*RenameSandboxRequest, grpc.ServerStreamingServer[RenameSandboxResponse]) error
 	EnsureImage(*EnsureImageRequest, grpc.ServerStreamingServer[EnsureImageResponse]) error
 	mustEmbedUnimplementedDaemonServiceServer()
 }
@@ -351,6 +373,9 @@ func (UnimplementedDaemonServiceServer) VSC(context.Context, *IDRequest) (*Statu
 }
 func (UnimplementedDaemonServiceServer) CreateSandbox(*CreateSandboxRequest, grpc.ServerStreamingServer[CreateSandboxResponse]) error {
 	return status.Error(codes.Unimplemented, "method CreateSandbox not implemented")
+}
+func (UnimplementedDaemonServiceServer) RenameSandbox(*RenameSandboxRequest, grpc.ServerStreamingServer[RenameSandboxResponse]) error {
+	return status.Error(codes.Unimplemented, "method RenameSandbox not implemented")
 }
 func (UnimplementedDaemonServiceServer) EnsureImage(*EnsureImageRequest, grpc.ServerStreamingServer[EnsureImageResponse]) error {
 	return status.Error(codes.Unimplemented, "method EnsureImage not implemented")
@@ -675,6 +700,17 @@ func _DaemonService_CreateSandbox_Handler(srv interface{}, stream grpc.ServerStr
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type DaemonService_CreateSandboxServer = grpc.ServerStreamingServer[CreateSandboxResponse]
 
+func _DaemonService_RenameSandbox_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(RenameSandboxRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(DaemonServiceServer).RenameSandbox(m, &grpc.GenericServerStream[RenameSandboxRequest, RenameSandboxResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type DaemonService_RenameSandboxServer = grpc.ServerStreamingServer[RenameSandboxResponse]
+
 func _DaemonService_EnsureImage_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(EnsureImageRequest)
 	if err := stream.RecvMsg(m); err != nil {
@@ -762,6 +798,11 @@ var DaemonService_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "CreateSandbox",
 			Handler:       _DaemonService_CreateSandbox_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "RenameSandbox",
+			Handler:       _DaemonService_RenameSandbox_Handler,
 			ServerStreams: true,
 		},
 		{

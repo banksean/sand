@@ -263,6 +263,23 @@ func (q *Queries) ListSandboxes(ctx context.Context) ([]Sandbox, error) {
 	return items, nil
 }
 
+const renameSandbox = `-- name: RenameSandbox :exec
+UPDATE sandboxes
+SET name = ?,
+    updated_at = CURRENT_TIMESTAMP
+WHERE id = ? AND state = 'active'
+`
+
+type RenameSandboxParams struct {
+	Name string `json:"name"`
+	ID   string `json:"id"`
+}
+
+func (q *Queries) RenameSandbox(ctx context.Context, arg RenameSandboxParams) error {
+	_, err := q.db.ExecContext(ctx, renameSandbox, arg.Name, arg.ID)
+	return err
+}
+
 const softDeleteSandbox = `-- name: SoftDeleteSandbox :exec
 UPDATE sandboxes
 SET state = 'deleted',
