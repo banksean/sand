@@ -54,7 +54,7 @@ func TestDefinitionContainerConfigurationKeepsOpenCodeTunnelAsRecurringHook(t *t
 	cfg := NewDefinitionContainerConfiguration(definition)
 
 	startHooks := cfg.GetStartHooks(CloneArtifacts{Username: "sean"})
-	if got, want := hookNames(startHooks), []string{"open remote ssh tunnel for chrome-devtools mcp"}; !reflect.DeepEqual(got, want) {
+	if got, want := hookNames(startHooks), []string{"start sshd", "open remote ssh tunnel for chrome-devtools mcp"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("start hook names = %#v, want %#v", got, want)
 	}
 

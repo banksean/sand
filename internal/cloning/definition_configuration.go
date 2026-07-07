@@ -45,7 +45,7 @@ func (c *DefinitionContainerConfiguration) GetFirstStartHooks(artifacts CloneArt
 }
 
 func (c *DefinitionContainerConfiguration) GetStartHooks(artifacts CloneArtifacts) []sandtypes.ContainerHook {
-	return c.namedHooks(artifacts)
+	return append(c.base.GetStartHooks(artifacts), c.namedHooks(artifacts)...)
 }
 
 func (c *DefinitionContainerConfiguration) installAgentHook() sandtypes.ContainerHook {

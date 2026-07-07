@@ -186,7 +186,19 @@ func (c *BaseContainerConfiguration) GetMounts(artifacts CloneArtifacts) []sandt
 }
 
 func (c *BaseContainerConfiguration) GetStartHooks(artifacts CloneArtifacts) []sandtypes.ContainerHook {
-	return nil
+	return []sandtypes.ContainerHook{
+		sandtypes.NewContainerHook("start sshd", func(ctx context.Context, ctr *sandtypes.Container, exec sandtypes.HookStreamer) error {
+			flavor, err := c.detectBootstrapFlavor(ctx, exec)
+			if err != nil {
+				return err
+			}
+			runner := newContainerHookRunner(ctx, exec, flavor.hookName, artifacts.Uid)
+
+			// Start sshd
+			runner.run("starting sshd", "start sshd", "/usr/sbin/sshd", "-f", "/etc/ssh/sshd_config")
+			return nil
+		}),
+	}
 }
 
 func (c *BaseContainerConfiguration) GetFirstStartHooks(artifacts CloneArtifacts) []sandtypes.ContainerHook {
