@@ -3057,13 +3057,8 @@ func (x *RenameSandboxRequest) GetNewName() string {
 }
 
 type RenameSandboxResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Types that are valid to be assigned to Event:
-	//
-	//	*RenameSandboxResponse_Progress
-	//	*RenameSandboxResponse_Box
-	//	*RenameSandboxResponse_Error
-	Event         isRenameSandboxResponse_Event `protobuf_oneof:"event"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Box           *Sandbox               `protobuf:"bytes,1,opt,name=box,proto3" json:"box,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3098,61 +3093,12 @@ func (*RenameSandboxResponse) Descriptor() ([]byte, []int) {
 	return file_internal_daemon_daemonpb_daemon_proto_rawDescGZIP(), []int{47}
 }
 
-func (x *RenameSandboxResponse) GetEvent() isRenameSandboxResponse_Event {
-	if x != nil {
-		return x.Event
-	}
-	return nil
-}
-
-func (x *RenameSandboxResponse) GetProgress() string {
-	if x != nil {
-		if x, ok := x.Event.(*RenameSandboxResponse_Progress); ok {
-			return x.Progress
-		}
-	}
-	return ""
-}
-
 func (x *RenameSandboxResponse) GetBox() *Sandbox {
 	if x != nil {
-		if x, ok := x.Event.(*RenameSandboxResponse_Box); ok {
-			return x.Box
-		}
+		return x.Box
 	}
 	return nil
 }
-
-func (x *RenameSandboxResponse) GetError() string {
-	if x != nil {
-		if x, ok := x.Event.(*RenameSandboxResponse_Error); ok {
-			return x.Error
-		}
-	}
-	return ""
-}
-
-type isRenameSandboxResponse_Event interface {
-	isRenameSandboxResponse_Event()
-}
-
-type RenameSandboxResponse_Progress struct {
-	Progress string `protobuf:"bytes,1,opt,name=progress,proto3,oneof"`
-}
-
-type RenameSandboxResponse_Box struct {
-	Box *Sandbox `protobuf:"bytes,2,opt,name=box,proto3,oneof"`
-}
-
-type RenameSandboxResponse_Error struct {
-	Error string `protobuf:"bytes,3,opt,name=error,proto3,oneof"`
-}
-
-func (*RenameSandboxResponse_Progress) isRenameSandboxResponse_Event() {}
-
-func (*RenameSandboxResponse_Box) isRenameSandboxResponse_Event() {}
-
-func (*RenameSandboxResponse_Error) isRenameSandboxResponse_Event() {}
 
 type EnsureImageRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -3708,12 +3654,9 @@ const file_internal_daemon_daemonpb_daemon_proto_rawDesc = "" +
 	"\x05event\"L\n" +
 	"\x14RenameSandboxRequest\x12\x19\n" +
 	"\bold_name\x18\x01 \x01(\tR\aoldName\x12\x19\n" +
-	"\bnew_name\x18\x02 \x01(\tR\anewName\"\x83\x01\n" +
-	"\x15RenameSandboxResponse\x12\x1c\n" +
-	"\bprogress\x18\x01 \x01(\tH\x00R\bprogress\x12+\n" +
-	"\x03box\x18\x02 \x01(\v2\x17.sand.daemon.v1.SandboxH\x00R\x03box\x12\x16\n" +
-	"\x05error\x18\x03 \x01(\tH\x00R\x05errorB\a\n" +
-	"\x05event\"3\n" +
+	"\bnew_name\x18\x02 \x01(\tR\anewName\"B\n" +
+	"\x15RenameSandboxResponse\x12)\n" +
+	"\x03box\x18\x01 \x01(\v2\x17.sand.daemon.v1.SandboxR\x03box\"3\n" +
 	"\x12EnsureImageRequest\x12\x1d\n" +
 	"\n" +
 	"image_name\x18\x01 \x01(\tR\timageName\"\xb6\x01\n" +
@@ -3760,7 +3703,7 @@ const file_internal_daemon_daemonpb_daemon_proto_rawDesc = "" +
 	"\t_add_sizeB\v\n" +
 	"\t_set_sizeB\x11\n" +
 	"\x0f_add_total_sizeB\x11\n" +
-	"\x0f_set_total_size2\xc6\f\n" +
+	"\x0f_set_total_size2\xc4\f\n" +
 	"\rDaemonService\x12A\n" +
 	"\x04Ping\x12\x1b.sand.daemon.v1.PingRequest\x1a\x1c.sand.daemon.v1.PingResponse\x12J\n" +
 	"\aVersion\x12\x1e.sand.daemon.v1.VersionRequest\x1a\x1f.sand.daemon.v1.VersionResponse\x12K\n" +
@@ -3780,8 +3723,8 @@ const file_internal_daemon_daemonpb_daemon_proto_rawDesc = "" +
 	"\vExportImage\x12\".sand.daemon.v1.ExportImageRequest\x1a\x1e.sand.daemon.v1.StatusResponse\x12D\n" +
 	"\x05Stats\x12\x1c.sand.daemon.v1.StatsRequest\x1a\x1d.sand.daemon.v1.StatsResponse\x12@\n" +
 	"\x03VSC\x12\x19.sand.daemon.v1.IDRequest\x1a\x1e.sand.daemon.v1.StatusResponse\x12^\n" +
-	"\rCreateSandbox\x12$.sand.daemon.v1.CreateSandboxRequest\x1a%.sand.daemon.v1.CreateSandboxResponse0\x01\x12^\n" +
-	"\rRenameSandbox\x12$.sand.daemon.v1.RenameSandboxRequest\x1a%.sand.daemon.v1.RenameSandboxResponse0\x01\x12X\n" +
+	"\rCreateSandbox\x12$.sand.daemon.v1.CreateSandboxRequest\x1a%.sand.daemon.v1.CreateSandboxResponse0\x01\x12\\\n" +
+	"\rRenameSandbox\x12$.sand.daemon.v1.RenameSandboxRequest\x1a%.sand.daemon.v1.RenameSandboxResponse\x12X\n" +
 	"\vEnsureImage\x12\".sand.daemon.v1.EnsureImageRequest\x1a#.sand.daemon.v1.EnsureImageResponse0\x01B3Z1github.com/banksean/sand/internal/daemon/daemonpbb\x06proto3"
 
 var (
@@ -3940,11 +3883,6 @@ func file_internal_daemon_daemonpb_daemon_proto_init() {
 		(*CreateSandboxResponse_Progress)(nil),
 		(*CreateSandboxResponse_Box)(nil),
 		(*CreateSandboxResponse_Error)(nil),
-	}
-	file_internal_daemon_daemonpb_daemon_proto_msgTypes[47].OneofWrappers = []any{
-		(*RenameSandboxResponse_Progress)(nil),
-		(*RenameSandboxResponse_Box)(nil),
-		(*RenameSandboxResponse_Error)(nil),
 	}
 	file_internal_daemon_daemonpb_daemon_proto_msgTypes[49].OneofWrappers = []any{
 		(*EnsureImageResponse_Progress)(nil),

@@ -107,6 +107,14 @@ func (s *daemonGRPCServer) SyncHostGitMirror(ctx context.Context, req *daemonpb.
 	return &daemonpb.SyncHostGitMirrorResponse{MirrorPath: mirrorPath}, nil
 }
 
+func (s *daemonGRPCServer) RenameSandbox(ctx context.Context, req *daemonpb.RenameSandboxRequest) (*daemonpb.RenameSandboxResponse, error) {
+	sbox, err := s.daemon.RenameSandbox(ctx, req.GetOldName(), req.GetNewName())
+	if err != nil {
+		return nil, err
+	}
+	return &daemonpb.RenameSandboxResponse{Box: sandboxToProto(sbox)}, nil
+}
+
 func (s *daemonGRPCServer) ResolveAgentLaunchEnv(ctx context.Context, req *daemonpb.ResolveAgentLaunchEnvRequest) (*daemonpb.ResolveAgentLaunchEnvResponse, error) {
 	resolved, err := s.daemon.resolveCreateSandboxRequirements(CreateSandboxOpts{
 		Agent:                req.GetAgent(),

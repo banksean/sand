@@ -1,9 +1,6 @@
 package cli
 
-import (
-	"fmt"
-	"os"
-)
+import "fmt"
 
 type RenameCmd struct {
 	OldName string `arg:"" required:"" help:"current sandbox name" predictor:"sandbox-name"`
@@ -14,7 +11,7 @@ func (c *RenameCmd) Run(cctx *CLIContext) error {
 	ctx := cctx.Context
 	mc := cctx.Daemon
 
-	_, err := mc.RenameSandbox(ctx, c.OldName, c.NewName, os.Stdout)
+	_, err := mc.RenameSandbox(ctx, c.OldName, c.NewName)
 	if err != nil {
 		return err
 	}

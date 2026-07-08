@@ -24,7 +24,7 @@ service DaemonService {
   rpc Stats(StatsRequest) returns (StatsResponse);
   rpc VSC(IDRequest) returns (StatusResponse);
   rpc CreateSandbox(CreateSandboxRequest) returns (stream CreateSandboxResponse);
-  rpc RenameSandbox(RenameSandboxRequest) returns (stream RenameSandboxResponse);
+  rpc RenameSandbox(RenameSandboxRequest) returns (RenameSandboxResponse);
   rpc EnsureImage(EnsureImageRequest) returns (stream EnsureImageResponse);
 }
 
@@ -331,11 +331,7 @@ message RenameSandboxRequest {
 }
 
 message RenameSandboxResponse {
-  oneof event {
-    string progress = 1;
-    Sandbox box = 2;
-    string error = 3;
-  }
+  Sandbox box = 1;
 }
 
 message EnsureImageRequest {
