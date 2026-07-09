@@ -1423,12 +1423,13 @@ func (x *MountRequest) GetRuntime() string {
 }
 
 type SharedCacheMounts struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	MiseCacheHostDir  string                 `protobuf:"bytes,1,opt,name=mise_cache_host_dir,json=miseCacheHostDir,proto3" json:"mise_cache_host_dir,omitempty"`
-	ApkCacheHostDir   string                 `protobuf:"bytes,2,opt,name=apk_cache_host_dir,json=apkCacheHostDir,proto3" json:"apk_cache_host_dir,omitempty"`
-	AgentCacheHostDir string                 `protobuf:"bytes,3,opt,name=agent_cache_host_dir,json=agentCacheHostDir,proto3" json:"agent_cache_host_dir,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	MiseCacheHostDir    string                 `protobuf:"bytes,1,opt,name=mise_cache_host_dir,json=miseCacheHostDir,proto3" json:"mise_cache_host_dir,omitempty"`
+	ApkCacheHostDir     string                 `protobuf:"bytes,2,opt,name=apk_cache_host_dir,json=apkCacheHostDir,proto3" json:"apk_cache_host_dir,omitempty"`
+	AgentCacheHostDir   string                 `protobuf:"bytes,3,opt,name=agent_cache_host_dir,json=agentCacheHostDir,proto3" json:"agent_cache_host_dir,omitempty"`
+	BazelRemoteCacheUrl string                 `protobuf:"bytes,4,opt,name=bazel_remote_cache_url,json=bazelRemoteCacheUrl,proto3" json:"bazel_remote_cache_url,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *SharedCacheMounts) Reset() {
@@ -1478,6 +1479,13 @@ func (x *SharedCacheMounts) GetApkCacheHostDir() string {
 func (x *SharedCacheMounts) GetAgentCacheHostDir() string {
 	if x != nil {
 		return x.AgentCacheHostDir
+	}
+	return ""
+}
+
+func (x *SharedCacheMounts) GetBazelRemoteCacheUrl() string {
+	if x != nil {
+		return x.BazelRemoteCacheUrl
 	}
 	return ""
 }
@@ -2695,6 +2703,7 @@ type SharedCacheConfig struct {
 	Mise          bool                   `protobuf:"varint,1,opt,name=mise,proto3" json:"mise,omitempty"`
 	Apk           bool                   `protobuf:"varint,2,opt,name=apk,proto3" json:"apk,omitempty"`
 	Agents        bool                   `protobuf:"varint,3,opt,name=agents,proto3" json:"agents,omitempty"`
+	Bazel         bool                   `protobuf:"varint,4,opt,name=bazel,proto3" json:"bazel,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2746,6 +2755,13 @@ func (x *SharedCacheConfig) GetApk() bool {
 func (x *SharedCacheConfig) GetAgents() bool {
 	if x != nil {
 		return x.Agents
+	}
+	return false
+}
+
+func (x *SharedCacheConfig) GetBazel() bool {
+	if x != nil {
+		return x.Bazel
 	}
 	return false
 }
@@ -3524,11 +3540,12 @@ const file_internal_daemon_daemonpb_daemon_proto_rawDesc = "" +
 	"\x05clone\x18\x04 \x01(\tR\x05clone\x12\x16\n" +
 	"\x06target\x18\x05 \x01(\tR\x06target\x12\x1b\n" +
 	"\tread_only\x18\x06 \x01(\bR\breadOnly\x12\x18\n" +
-	"\aruntime\x18\a \x01(\tR\aruntime\"\xa0\x01\n" +
+	"\aruntime\x18\a \x01(\tR\aruntime\"\xd5\x01\n" +
 	"\x11SharedCacheMounts\x12-\n" +
 	"\x13mise_cache_host_dir\x18\x01 \x01(\tR\x10miseCacheHostDir\x12+\n" +
 	"\x12apk_cache_host_dir\x18\x02 \x01(\tR\x0fapkCacheHostDir\x12/\n" +
-	"\x14agent_cache_host_dir\x18\x03 \x01(\tR\x11agentCacheHostDir\"\xcd\x01\n" +
+	"\x14agent_cache_host_dir\x18\x03 \x01(\tR\x11agentCacheHostDir\x123\n" +
+	"\x16bazel_remote_cache_url\x18\x04 \x01(\tR\x13bazelRemoteCacheUrl\"\xcd\x01\n" +
 	"\n" +
 	"GitDetails\x12#\n" +
 	"\rremote_origin\x18\x01 \x01(\tR\fremoteOrigin\x12\x16\n" +
@@ -3624,11 +3641,12 @@ const file_internal_daemon_daemonpb_daemon_proto_rawDesc = "" +
 	"\x12memory_usage_bytes\x18\x06 \x01(\x03R\x10memoryUsageBytes\x12(\n" +
 	"\x10network_rx_bytes\x18\a \x01(\x03R\x0enetworkRxBytes\x12(\n" +
 	"\x10network_tx_bytes\x18\b \x01(\x03R\x0enetworkTxBytes\x12#\n" +
-	"\rnum_processes\x18\t \x01(\x03R\fnumProcesses\"Q\n" +
+	"\rnum_processes\x18\t \x01(\x03R\fnumProcesses\"g\n" +
 	"\x11SharedCacheConfig\x12\x12\n" +
 	"\x04mise\x18\x01 \x01(\bR\x04mise\x12\x10\n" +
 	"\x03apk\x18\x02 \x01(\bR\x03apk\x12\x16\n" +
-	"\x06agents\x18\x03 \x01(\bR\x06agents\"\xe2\x03\n" +
+	"\x06agents\x18\x03 \x01(\bR\x06agents\x12\x14\n" +
+	"\x05bazel\x18\x04 \x01(\bR\x05bazel\"\xe2\x03\n" +
 	"\x14CreateSandboxRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12$\n" +
 	"\x0eclone_from_dir\x18\x02 \x01(\tR\fcloneFromDir\x12\x1d\n" +

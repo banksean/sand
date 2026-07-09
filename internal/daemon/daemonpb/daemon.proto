@@ -167,6 +167,7 @@ message SharedCacheMounts {
   string mise_cache_host_dir = 1;
   string apk_cache_host_dir = 2;
   string agent_cache_host_dir = 3;
+  string bazel_remote_cache_url = 4;
 }
 
 message GitDetails {
@@ -297,6 +298,7 @@ message SharedCacheConfig {
   bool mise = 1;
   bool apk = 2;
   bool agents = 3;
+  bool bazel = 4;
 }
 
 message CreateSandboxRequest {

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 
 	"github.com/banksean/sand/internal/sandtypes"
 )
@@ -22,6 +23,11 @@ const (
 	goBuildCachePath = miseCachePath + "/go/build"
 	apkCachePath     = "/var/cache/apk"
 	agentCachePath   = "/opt/sand-agent-cache"
+)
+
+const (
+	bazelrcManagedStart = "# sand bazel remote cache start"
+	bazelrcManagedEnd   = "# sand bazel remote cache end"
 )
 
 type containerBootstrapFlavor struct {
@@ -237,6 +243,13 @@ func (c *BaseContainerConfiguration) runDefaultContainerHook(ctx context.Context
 	// Copy config and known_hosts from /root/.ssh to make sure github host keys are already known for the user.
 	runner.run("copying /root/.ssh to ~/.ssh", "copy /root/.ssh", "cp", "-r", "/root/.ssh", "/home/"+username+"/.ssh")
 
+	if sharedCaches.BazelRemoteCacheURL != "" {
+		runner.run("configuring root bazel remote cache", "configure root bazel remote cache",
+			"sh", "-c", bazelrcUpdateScript("/root/.bazelrc", sharedCaches.BazelRemoteCacheURL))
+		runner.run("configuring user bazel remote cache", "configure user bazel remote cache",
+			"sh", "-c", bazelrcUpdateScript("/home/"+username+"/.bazelrc", sharedCaches.BazelRemoteCacheURL))
+	}
+
 	// Create the parent directories before chown so the container user owns them,
 	// but delay the symlink creation until after chown so we don't traverse into
 	// shared host-mounted cache dirs.
@@ -288,4 +301,29 @@ func (c *BaseContainerConfiguration) runDefaultContainerHook(ctx context.Context
 
 	slog.InfoContext(ctx, flavor.hookName+" completed", "hook", "default container bootstrap", "flavor", flavor.name)
 	return runner.err()
+}
+
+func bazelrcUpdateScript(path, remoteCacheURL string) string {
+	block := fmt.Sprintf("%s\nbuild --remote_cache=%s\nbuild --experimental_guard_against_concurrent_changes\n%s\n",
+		bazelrcManagedStart,
+		remoteCacheURL,
+		bazelrcManagedEnd,
+	)
+	return fmt.Sprintf(`set -e
+file=%s
+tmp="${file}.tmp"
+mkdir -p "$(dirname "$file")"
+if [ -f "$file" ]; then
+	sed '/^%s$/,/^%s$/d' "$file" > "$tmp"
+	cat "$tmp" > "$file"
+	rm -f "$tmp"
+fi
+cat >> "$file" <<'EOF'
+%sEOF
+`,
+		strconv.Quote(path),
+		bazelrcManagedStart,
+		bazelrcManagedEnd,
+		block,
+	)
 }

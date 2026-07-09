@@ -340,7 +340,7 @@ func (sb *Boxer) NewSandbox(ctx context.Context, opts NewSandboxOpts) (*sandtype
 	if _, err := os.Stat(envFile); err != nil {
 		envFile = ""
 	}
-	sharedCacheMounts, err := sb.ensureSharedCacheMounts(opts.SharedCaches)
+	sharedCacheMounts, err := sb.ensureSharedCacheMounts(opts.SharedCaches, opts.LocalDomain)
 	if err != nil {
 		return nil, err
 	}
@@ -921,7 +921,7 @@ func (b *Boxer) EffectiveMounts(sb *sandtypes.Box) []sandtypes.MountSpec {
 	})
 }
 
-func (sb *Boxer) ensureSharedCacheMounts(cfg sandtypes.SharedCacheConfig) (sandtypes.SharedCacheMounts, error) {
+func (sb *Boxer) ensureSharedCacheMounts(cfg sandtypes.SharedCacheConfig, localDomain string) (sandtypes.SharedCacheMounts, error) {
 	var mounts sandtypes.SharedCacheMounts
 
 	if cfg.Mise {
@@ -945,7 +945,18 @@ func (sb *Boxer) ensureSharedCacheMounts(cfg sandtypes.SharedCacheConfig) (sandt
 		}
 	}
 
+	if cfg.Bazel {
+		mounts.BazelRemoteCacheURL = bazelRemoteCacheURL(localDomain)
+	}
+
 	return mounts, nil
+}
+
+func bazelRemoteCacheURL(localDomain string) string {
+	if localDomain == "" {
+		localDomain = runtimedeps.DefaultDNSDomain
+	}
+	return "http://sand-bazel-cache." + strings.Trim(localDomain, ".") + ":8080"
 }
 
 // CreateContainer creates a new container instance. The container image must exist.

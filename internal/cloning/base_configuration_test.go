@@ -217,6 +217,48 @@ func TestDefaultContainerHook_UsesUbuntuFlavorWhenAPKUnavailable(t *testing.T) {
 	}
 }
 
+func TestDefaultContainerHook_ConfiguresBazelRemoteCacheWhenEnabled(t *testing.T) {
+	cfg := NewBaseContainerConfiguration()
+	exec := &fakeHookStreamer{
+		execResults: map[string]fakeExecResult{
+			commandKey("apk", "--version"): {err: errors.New("apk not found")},
+			commandKey("which", "mise.sh"): {out: "/usr/local/bin/mise.sh"},
+		},
+		streamResults: map[string]fakeExecResult{
+			commandKey("mise.sh"): {out: "mise ok"},
+		},
+	}
+
+	hook := cfg.defaultContainerHook("sean", "1000", sandtypes.SharedCacheMounts{
+		BazelRemoteCacheURL: "http://sand-bazel-cache.test.local:8080",
+	})
+
+	if err := hook.Run(context.Background(), nil, exec); err != nil {
+		t.Fatalf("hook.Run() error = %v", err)
+	}
+
+	var rootConfigured, userConfigured bool
+	for _, call := range exec.calls {
+		if strings.Contains(call, `file="/root/.bazelrc"`) &&
+			strings.Contains(call, "build --remote_cache=http://sand-bazel-cache.test.local:8080") {
+			rootConfigured = true
+		}
+		if strings.Contains(call, `file="/home/sean/.bazelrc"`) &&
+			strings.Contains(call, "build --experimental_guard_against_concurrent_changes") {
+			userConfigured = true
+		}
+		if strings.Contains(call, "/app/.bazelrc") {
+			t.Fatalf("hook touched project bazelrc: %s", call)
+		}
+	}
+	if !rootConfigured {
+		t.Fatalf("root .bazelrc was not configured; calls: %#v", exec.calls)
+	}
+	if !userConfigured {
+		t.Fatalf("user .bazelrc was not configured; calls: %#v", exec.calls)
+	}
+}
+
 func TestBaseMiseScriptPersistsMiseEnvironment(t *testing.T) {
 	script, err := os.ReadFile("../../images/base/mise.sh")
 	if err != nil {

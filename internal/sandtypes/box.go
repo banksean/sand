@@ -77,12 +77,14 @@ type SharedCacheConfig struct {
 	Mise   bool `json:"mise,omitempty"`
 	APK    bool `json:"apk,omitempty"`
 	Agents bool `json:"agents,omitempty"`
+	Bazel  bool `json:"bazel,omitempty"`
 }
 
 type SharedCacheMounts struct {
-	MiseCacheHostDir  string
-	APKCacheHostDir   string
-	AgentCacheHostDir string
+	MiseCacheHostDir    string
+	APKCacheHostDir     string
+	AgentCacheHostDir   string
+	BazelRemoteCacheURL string
 }
 
 type GitDetails struct {

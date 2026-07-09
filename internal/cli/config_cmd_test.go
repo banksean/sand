@@ -312,7 +312,7 @@ func TestLoadEffectiveConfigMaps_NormalizesCacheFlags(t *testing.T) {
 	if !ok {
 		t.Fatalf("defaults missing caches map: %v", defs)
 	}
-	if defCaches["apk"] != "true" || defCaches["mise"] != "true" || defCaches["agents"] != "true" {
+	if defCaches["apk"] != "true" || defCaches["mise"] != "true" || defCaches["agents"] != "true" || defCaches["bazel"] != "false" {
 		t.Fatalf("default caches: got %v", defCaches)
 	}
 }

@@ -143,6 +143,7 @@ func createSandboxOptsToProto(opts CreateSandboxOpts) *daemonpb.CreateSandboxReq
 			Mise:   opts.SharedCaches.Mise,
 			Apk:    opts.SharedCaches.APK,
 			Agents: opts.SharedCaches.Agents,
+			Bazel:  opts.SharedCaches.Bazel,
 		},
 		Cpus:   int32(opts.CPUs),
 		Memory: int32(opts.Memory),
@@ -171,6 +172,7 @@ func createSandboxOptsFromProto(req *daemonpb.CreateSandboxRequest) CreateSandbo
 			Mise:   sharedCaches.GetMise(),
 			APK:    sharedCaches.GetApk(),
 			Agents: sharedCaches.GetAgents(),
+			Bazel:  sharedCaches.GetBazel(),
 		}
 	}
 	return opts

@@ -8,6 +8,7 @@ type CacheFlags struct {
 	Mise   *bool `name:"mise" default:"true" help:"enable mise cache"`
 	APK    *bool `name:"apk" default:"true" help:"enable apk cache"`
 	Agents *bool `name:"agents" default:"true" help:"enable agent installer cache"`
+	Bazel  *bool `name:"bazel" default:"false" help:"enable Bazel remote build cache configuration"`
 }
 
 func (c CacheFlags) SharedCacheConfig() sandtypes.SharedCacheConfig {
@@ -23,6 +24,10 @@ func (c CacheFlags) SharedCacheConfig() sandtypes.SharedCacheConfig {
 
 	if c.Agents != nil {
 		cfg.Agents = *c.Agents
+	}
+
+	if c.Bazel != nil {
+		cfg.Bazel = *c.Bazel
 	}
 
 	return cfg

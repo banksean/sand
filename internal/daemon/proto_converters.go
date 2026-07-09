@@ -175,9 +175,10 @@ func sharedCacheMountsToProto(mounts sandtypes.SharedCacheMounts) *daemonpb.Shar
 		return nil
 	}
 	return &daemonpb.SharedCacheMounts{
-		MiseCacheHostDir:  mounts.MiseCacheHostDir,
-		ApkCacheHostDir:   mounts.APKCacheHostDir,
-		AgentCacheHostDir: mounts.AgentCacheHostDir,
+		MiseCacheHostDir:    mounts.MiseCacheHostDir,
+		ApkCacheHostDir:     mounts.APKCacheHostDir,
+		AgentCacheHostDir:   mounts.AgentCacheHostDir,
+		BazelRemoteCacheUrl: mounts.BazelRemoteCacheURL,
 	}
 }
 
@@ -186,9 +187,10 @@ func sharedCacheMountsFromProto(mounts *daemonpb.SharedCacheMounts) sandtypes.Sh
 		return sandtypes.SharedCacheMounts{}
 	}
 	return sandtypes.SharedCacheMounts{
-		MiseCacheHostDir:  mounts.GetMiseCacheHostDir(),
-		APKCacheHostDir:   mounts.GetApkCacheHostDir(),
-		AgentCacheHostDir: mounts.GetAgentCacheHostDir(),
+		MiseCacheHostDir:    mounts.GetMiseCacheHostDir(),
+		APKCacheHostDir:     mounts.GetApkCacheHostDir(),
+		AgentCacheHostDir:   mounts.GetAgentCacheHostDir(),
+		BazelRemoteCacheURL: mounts.GetBazelRemoteCacheUrl(),
 	}
 }
 

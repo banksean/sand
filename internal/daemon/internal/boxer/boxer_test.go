@@ -23,7 +23,7 @@ func TestEnsureSharedCacheMounts_GoCachesUseMiseMount(t *testing.T) {
 		},
 	}
 
-	mounts, err := b.ensureSharedCacheMounts(sandtypes.SharedCacheConfig{Mise: true, Agents: true})
+	mounts, err := b.ensureSharedCacheMounts(sandtypes.SharedCacheConfig{Mise: true, Agents: true}, "dev.local")
 	if err != nil {
 		t.Fatalf("ensureSharedCacheMounts: %v", err)
 	}
@@ -47,6 +47,26 @@ func TestEnsureSharedCacheMounts_GoCachesUseMiseMount(t *testing.T) {
 		if mkdirs[i] != want[i] {
 			t.Fatalf("mkdir call %d: want %q, got %q", i, want[i], mkdirs[i])
 		}
+	}
+}
+
+func TestEnsureSharedCacheMounts_BazelSetsRemoteCacheURL(t *testing.T) {
+	b := &Boxer{
+		appRoot: "/tmp/sand-app",
+		FileOps: &hostops.MockFileOps{
+			MkdirAllFunc: func(path string, perm os.FileMode) error {
+				return nil
+			},
+		},
+	}
+
+	mounts, err := b.ensureSharedCacheMounts(sandtypes.SharedCacheConfig{Bazel: true}, "test.local")
+	if err != nil {
+		t.Fatalf("ensureSharedCacheMounts: %v", err)
+	}
+
+	if mounts.BazelRemoteCacheURL != "http://sand-bazel-cache.test.local:8080" {
+		t.Fatalf("bazel remote cache URL = %q", mounts.BazelRemoteCacheURL)
 	}
 }
 

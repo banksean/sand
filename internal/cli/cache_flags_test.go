@@ -21,6 +21,7 @@ func TestCacheFlagsSharedCacheConfig(t *testing.T) {
 			mise   bool
 			apk    bool
 			agents bool
+			bazel  bool
 		}
 	}{
 		{
@@ -32,6 +33,7 @@ func TestCacheFlagsSharedCacheConfig(t *testing.T) {
 				mise   bool
 				apk    bool
 				agents bool
+				bazel  bool
 			}{mise: true},
 		},
 		{
@@ -40,12 +42,14 @@ func TestCacheFlagsSharedCacheConfig(t *testing.T) {
 				Mise:   boolPtr(true),
 				APK:    boolPtr(true),
 				Agents: boolPtr(true),
+				Bazel:  boolPtr(true),
 			},
 			want: struct {
 				mise   bool
 				apk    bool
 				agents bool
-			}{mise: true, apk: true, agents: true},
+				bazel  bool
+			}{mise: true, apk: true, agents: true, bazel: true},
 		},
 	}
 
@@ -60,6 +64,9 @@ func TestCacheFlagsSharedCacheConfig(t *testing.T) {
 			}
 			if got.Agents != tt.want.agents {
 				t.Fatalf("got agents=%v, want agents=%v", got.Agents, tt.want.agents)
+			}
+			if got.Bazel != tt.want.bazel {
+				t.Fatalf("got bazel=%v, want bazel=%v", got.Bazel, tt.want.bazel)
 			}
 		})
 	}
@@ -77,7 +84,7 @@ func TestCacheFlagsLoadedByKongYAML(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(homeDir, ".sand.yaml"), []byte("caches:\n  mise: false\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(projDir, ".sand.yaml"), []byte("caches:\n mise: true\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(projDir, ".sand.yaml"), []byte("caches:\n mise: true\n bazel: true\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -94,5 +101,8 @@ func TestCacheFlagsLoadedByKongYAML(t *testing.T) {
 	got := parsed.Caches.SharedCacheConfig()
 	if !got.Mise {
 		t.Fatalf("got mise=%v, want mise=true", got.Mise)
+	}
+	if !got.Bazel {
+		t.Fatalf("got bazel=%v, want bazel=true", got.Bazel)
 	}
 }
