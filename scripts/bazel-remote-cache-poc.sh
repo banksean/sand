@@ -3,7 +3,7 @@ set -euo pipefail
 
 CONTAINER_DNS_DOMAIN="${CONTAINER_DNS_DOMAIN:-dev.local}"
 CACHE_CONTAINER_NAME="${CACHE_CONTAINER_NAME:-sand-bazel-cache}"
-CACHE_IMAGE="${CACHE_IMAGE:-buchgr/bazel-remote-cache:latest}"
+CACHE_IMAGE="${CACHE_IMAGE:-docker.io/buchgr/bazel-remote-cache:latest}"
 CACHE_MAX_SIZE_GIB="${CACHE_MAX_SIZE_GIB:-10}"
 CACHE_PORT="${CACHE_PORT:-8080}"
 
