@@ -373,8 +373,8 @@ func createProcessConfig(process ProcessOptions, management ManagementOptions, i
 }
 
 func applyExecOptions(cfg *xpc.ProcessConfiguration, process ProcessOptions, cmd string, args []string) error {
-	cfg.Executable = cmd
-	cfg.Arguments = append([]string{}, args...)
+	cfg.Executable = "/bin/sh"
+	cfg.Arguments = append([]string{"-c", `exec "$0" "$@"`, cmd}, args...)
 	cfg.Terminal = process.TTY
 	if process.WorkDir != "" {
 		cfg.WorkingDirectory = process.WorkDir

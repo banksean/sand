@@ -5,7 +5,10 @@ package hostops
 import (
 	"bytes"
 	"os"
+	"reflect"
 	"testing"
+
+	"github.com/banksean/sand/internal/applecontainer/xpc"
 )
 
 func TestNullStdioUsesDevNull(t *testing.T) {
@@ -72,5 +75,27 @@ func TestSameWriterDetectsSharedComparableWriter(t *testing.T) {
 	var other bytes.Buffer
 	if sameWriter(&buf, &other) {
 		t.Fatal("sameWriter() = true, want false for separate buffers")
+	}
+}
+
+func TestApplyExecOptionsWrapsCommandWithShell(t *testing.T) {
+	cfg := xpc.ProcessConfiguration{
+		Executable: "/bin/zsh",
+		Arguments:  []string{"-l"},
+	}
+
+	if err := applyExecOptions(&cfg, ProcessOptions{WorkDir: "/app"}, "missing-command", []string{"--flag"}); err != nil {
+		t.Fatalf("applyExecOptions() error = %v", err)
+	}
+
+	if cfg.Executable != "/bin/sh" {
+		t.Fatalf("Executable = %q, want /bin/sh", cfg.Executable)
+	}
+	wantArgs := []string{"-c", `exec "$0" "$@"`, "missing-command", "--flag"}
+	if !reflect.DeepEqual(cfg.Arguments, wantArgs) {
+		t.Fatalf("Arguments = %#v, want %#v", cfg.Arguments, wantArgs)
+	}
+	if cfg.WorkingDirectory != "/app" {
+		t.Fatalf("WorkingDirectory = %q, want /app", cfg.WorkingDirectory)
 	}
 }
