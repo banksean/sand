@@ -54,7 +54,7 @@ func TestDefaultContainerHook_UsesAlpineFlavorWhenAPKAvailable(t *testing.T) {
 	cfg := NewBaseContainerConfiguration()
 	exec := &fakeHookStreamer{
 		execResults: map[string]fakeExecResult{
-			commandKey("apk", "--version"): {out: "apk-tools 2.14"},
+			commandKey("which", "apk"):     {out: "apk-tools 2.14"},
 			commandKey("stat", "/etc/apk"): {out: "ok"},
 			commandKey("which", "mise.sh"): {out: "/usr/local/bin/mise.sh"},
 		},
@@ -73,7 +73,7 @@ func TestDefaultContainerHook_UsesAlpineFlavorWhenAPKAvailable(t *testing.T) {
 	}
 
 	wantCalls := []string{
-		"exec:apk --version",
+		"exec:which apk",
 		"exec:addgroup -g 1000 sean",
 		"exec:adduser -u 1000 -D -G sean -s /bin/zsh sean",
 		"exec:passwd -u sean",
@@ -172,7 +172,7 @@ func TestStartHook_PreparesSSHDForUbuntuFlavor(t *testing.T) {
 	cfg := NewBaseContainerConfiguration()
 	exec := &fakeHookStreamer{
 		execResults: map[string]fakeExecResult{
-			commandKey("apk", "--version"): {err: errors.New("apk not found")},
+			commandKey("which", "apk"): {err: errors.New("apk not found")},
 		},
 	}
 
@@ -185,7 +185,7 @@ func TestStartHook_PreparesSSHDForUbuntuFlavor(t *testing.T) {
 	}
 
 	wantCalls := []string{
-		"exec:apk --version",
+		"exec:which apk",
 		"exec:mkdir -p /run/sshd",
 		"exec:/usr/sbin/sshd -f /etc/ssh/sshd_config",
 	}
@@ -198,7 +198,7 @@ func TestStartHook_SkipsSSHDPrepareForAlpineFlavor(t *testing.T) {
 	cfg := NewBaseContainerConfiguration()
 	exec := &fakeHookStreamer{
 		execResults: map[string]fakeExecResult{
-			commandKey("apk", "--version"): {out: "apk-tools 2.14"},
+			commandKey("which", "apk"): {out: "apk-tools 2.14"},
 		},
 	}
 
@@ -211,7 +211,7 @@ func TestStartHook_SkipsSSHDPrepareForAlpineFlavor(t *testing.T) {
 	}
 
 	wantCalls := []string{
-		"exec:apk --version",
+		"exec:which apk",
 		"exec:/usr/sbin/sshd -f /etc/ssh/sshd_config",
 	}
 	if !reflect.DeepEqual(exec.calls, wantCalls) {
@@ -223,7 +223,7 @@ func TestDefaultContainerHook_UsesUbuntuFlavorWhenAPKUnavailable(t *testing.T) {
 	cfg := NewBaseContainerConfiguration()
 	exec := &fakeHookStreamer{
 		execResults: map[string]fakeExecResult{
-			commandKey("apk", "--version"): {err: errors.New("apk not found")},
+			commandKey("which", "apk"):     {err: errors.New("apk not found")},
 			commandKey("which", "mise.sh"): {out: "/usr/local/bin/mise.sh"},
 		},
 		streamResults: map[string]fakeExecResult{
@@ -240,7 +240,7 @@ func TestDefaultContainerHook_UsesUbuntuFlavorWhenAPKUnavailable(t *testing.T) {
 	}
 
 	wantCalls := []string{
-		"exec:apk --version",
+		"exec:which apk",
 		"exec:groupadd -g 1000 sean",
 		"exec:useradd -u 1000 -g sean -s /bin/zsh sean",
 		"exec:passwd -d sean",
@@ -273,7 +273,7 @@ func TestDefaultContainerHook_ConfiguresBazelRemoteCacheWhenEnabled(t *testing.T
 	cfg := NewBaseContainerConfiguration()
 	exec := &fakeHookStreamer{
 		execResults: map[string]fakeExecResult{
-			commandKey("apk", "--version"): {err: errors.New("apk not found")},
+			commandKey("which", "apk"):     {err: errors.New("apk not found")},
 			commandKey("which", "mise.sh"): {out: "/usr/local/bin/mise.sh"},
 		},
 		streamResults: map[string]fakeExecResult{

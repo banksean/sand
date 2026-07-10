@@ -228,7 +228,7 @@ func (c *BaseContainerConfiguration) defaultContainerHook(username, uid string, 
 }
 
 func (c *BaseContainerConfiguration) detectBootstrapFlavor(ctx context.Context, exec sandtypes.HookStreamer) (containerBootstrapFlavor, error) {
-	if _, err := exec.Exec(ctx, "apk", "--version"); err == nil {
+	if _, err := exec.Exec(ctx, "which", "apk"); err == nil {
 		return alpineBootstrapFlavor, nil
 	}
 	return ubuntuBootstrapFlavor, nil
