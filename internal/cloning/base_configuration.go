@@ -200,9 +200,11 @@ func (c *BaseContainerConfiguration) GetStartHooks(artifacts CloneArtifacts) []s
 			}
 			runner := newContainerHookRunner(ctx, exec, flavor.hookName, artifacts.Uid)
 
+			flavor.prepareSSHD(runner)
+
 			// Start sshd
 			runner.run("starting sshd", "start sshd", "/usr/sbin/sshd", "-f", "/etc/ssh/sshd_config")
-			return nil
+			return runner.err()
 		}),
 	}
 }

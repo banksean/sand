@@ -168,6 +168,57 @@ func TestBaseContainerConfigurationMountsAgentCache(t *testing.T) {
 	}
 }
 
+func TestStartHook_PreparesSSHDForUbuntuFlavor(t *testing.T) {
+	cfg := NewBaseContainerConfiguration()
+	exec := &fakeHookStreamer{
+		execResults: map[string]fakeExecResult{
+			commandKey("apk", "--version"): {err: errors.New("apk not found")},
+		},
+	}
+
+	hooks := cfg.GetStartHooks(CloneArtifacts{Uid: "1000"})
+	if len(hooks) != 1 {
+		t.Fatalf("GetStartHooks() len = %d, want 1", len(hooks))
+	}
+	if err := hooks[0].Run(context.Background(), nil, exec); err != nil {
+		t.Fatalf("start hook error = %v", err)
+	}
+
+	wantCalls := []string{
+		"exec:apk --version",
+		"exec:mkdir -p /run/sshd",
+		"exec:/usr/sbin/sshd -f /etc/ssh/sshd_config",
+	}
+	if !reflect.DeepEqual(exec.calls, wantCalls) {
+		t.Fatalf("start hook calls mismatch\n got: %#v\nwant: %#v", exec.calls, wantCalls)
+	}
+}
+
+func TestStartHook_SkipsSSHDPrepareForAlpineFlavor(t *testing.T) {
+	cfg := NewBaseContainerConfiguration()
+	exec := &fakeHookStreamer{
+		execResults: map[string]fakeExecResult{
+			commandKey("apk", "--version"): {out: "apk-tools 2.14"},
+		},
+	}
+
+	hooks := cfg.GetStartHooks(CloneArtifacts{Uid: "1000"})
+	if len(hooks) != 1 {
+		t.Fatalf("GetStartHooks() len = %d, want 1", len(hooks))
+	}
+	if err := hooks[0].Run(context.Background(), nil, exec); err != nil {
+		t.Fatalf("start hook error = %v", err)
+	}
+
+	wantCalls := []string{
+		"exec:apk --version",
+		"exec:/usr/sbin/sshd -f /etc/ssh/sshd_config",
+	}
+	if !reflect.DeepEqual(exec.calls, wantCalls) {
+		t.Fatalf("start hook calls mismatch\n got: %#v\nwant: %#v", exec.calls, wantCalls)
+	}
+}
+
 func TestDefaultContainerHook_UsesUbuntuFlavorWhenAPKUnavailable(t *testing.T) {
 	cfg := NewBaseContainerConfiguration()
 	exec := &fakeHookStreamer{
