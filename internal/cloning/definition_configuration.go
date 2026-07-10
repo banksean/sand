@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"regexp"
 	"strings"
 
@@ -54,6 +55,7 @@ func (c *DefinitionContainerConfiguration) installAgentHook() sandtypes.Containe
 		if err != nil {
 			return err
 		}
+		slog.InfoContext(ctx, "agentInstallScript", "script", script)
 		var buf bytes.Buffer
 		if err := exec.ExecStream(ctx, &buf, &buf, "sh", "-c", script); err != nil {
 			out := strings.TrimSpace(buf.String())
