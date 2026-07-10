@@ -128,6 +128,7 @@ func alpinePrepareSSHD(r *containerHookRunner) {}
 func ubuntuCreateUser(r *containerHookRunner, username, uid string) {
 	r.run("adding group for user", "groupadd", "groupadd", "-g", uid, username)
 	r.run("creating user", "useradd", "useradd", "-u", uid, "-g", username, "-s", "/bin/zsh", username)
+	r.run("unlocking account", "passwd -d", "passwd", "-d", username)
 	r.run("adding user to sudo", "usermod", "usermod", "-a", "-G", "sudo", username)
 	r.run("making user home dir", "making user home dir", "mkdir", "-p", "/home/"+username)
 }

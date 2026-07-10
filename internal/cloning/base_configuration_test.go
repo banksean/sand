@@ -243,6 +243,7 @@ func TestDefaultContainerHook_UsesUbuntuFlavorWhenAPKUnavailable(t *testing.T) {
 		"exec:apk --version",
 		"exec:groupadd -g 1000 sean",
 		"exec:useradd -u 1000 -g sean -s /bin/zsh sean",
+		"exec:passwd -d sean",
 		"exec:usermod -a -G sudo sean",
 		"exec:mkdir -p /home/sean",
 		"exec:cp -r /dotfiles/. /home/sean/.",
