@@ -131,7 +131,7 @@ trap cleanup_lock EXIT INT TERM
 }
 
 func npmAgentInstallScript(agentName string, install agentdefs.InstallSpec) string {
-	return agentInstallScriptPrelude(agentName, install.Version) + fmt.Sprintf(`
+	return fmt.Sprintf(`set -eu
 if ! command -v %s >/dev/null 2>&1; then
 	if command -v apk >/dev/null 2>&1; then
 		apk add --no-cache nodejs npm
@@ -139,19 +139,7 @@ if ! command -v %s >/dev/null 2>&1; then
 		apt-get update
 		apt-get install -y --no-install-recommends nodejs npm
 	fi
-	INSTALL_TGZ="$CACHE_DIR/install.tgz"
-	if [ ! -s "$INSTALL_TGZ" ]; then
-		TMP_DIR="$(mktemp -d)"
-		trap 'rm -rf "$TMP_DIR"; cleanup_lock' EXIT INT TERM
-		npm install -g --prefix "$TMP_DIR/prefix" %s@%s
-		mkdir -p "$CACHE_DIR"
-		TMP_TGZ="$CACHE_DIR/install.tgz.tmp.$$"
-		tar -C "$TMP_DIR/prefix" -czf "$TMP_TGZ" .
-		mv "$TMP_TGZ" "$INSTALL_TGZ"
-		rm -rf "$TMP_DIR"
-		trap cleanup_lock EXIT INT TERM
-	fi
-	tar -C /usr/local -xzf "$INSTALL_TGZ"
+	npm install -g %s@%s
 fi
 `, install.Command, install.Package, install.Version)
 }

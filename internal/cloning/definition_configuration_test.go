@@ -32,16 +32,22 @@ func TestDefinitionContainerConfigurationAddsInstallHookAfterBaseHook(t *testing
 		t.Fatalf("install hook calls = %#v", exec.calls)
 	}
 	for _, want := range []string{
-		"AGENT=codex",
-		"VERSION=0.137.0",
-		"CACHE_ROOT=/opt/sand-agent-cache",
-		"LOCK_DIR=\"$CACHE_DIR.lock\"",
-		"INSTALL_TGZ=\"$CACHE_DIR/install.tgz\"",
-		"npm install -g --prefix \"$TMP_DIR/prefix\" @openai/codex@0.137.0",
-		"tar -C /usr/local -xzf \"$INSTALL_TGZ\"",
+		"apt-get install -y --no-install-recommends nodejs npm",
+		"apk add --no-cache nodejs npm",
+		"npm install -g @openai/codex@0.137.0",
 	} {
 		if !strings.Contains(exec.calls[0], want) {
 			t.Fatalf("install hook script missing %q: %q", want, exec.calls[0])
+		}
+	}
+	for _, unwanted := range []string{
+		"LOCK_DIR=",
+		"INSTALL_TGZ=",
+		"npm install -g --prefix",
+		"tar -C /usr/local",
+	} {
+		if strings.Contains(exec.calls[0], unwanted) {
+			t.Fatalf("install hook script still contains %q: %q", unwanted, exec.calls[0])
 		}
 	}
 }
