@@ -3,6 +3,7 @@
 package hostops
 
 import (
+	"bytes"
 	"os"
 	"testing"
 )
@@ -45,5 +46,31 @@ func TestProcessFilesNonTerminalDoesNotUseCallerFilesForOutputPipes(t *testing.T
 	}
 	if stdio[2] == nil {
 		t.Fatalf("stderr pipe is nil")
+	}
+}
+
+func TestProcessFilesNilStdinUsesDevNull(t *testing.T) {
+	stdio, cleanup, err := processFiles(nil, nil, nil, false)
+	if err != nil {
+		t.Fatalf("processFiles() error = %v", err)
+	}
+	defer cleanup()
+
+	if stdio[0] == nil {
+		t.Fatal("stdin is nil")
+	}
+	if stdio[0].Name() != os.DevNull {
+		t.Fatalf("stdin.Name() = %q, want %q", stdio[0].Name(), os.DevNull)
+	}
+}
+
+func TestSameWriterDetectsSharedComparableWriter(t *testing.T) {
+	var buf bytes.Buffer
+	if !sameWriter(&buf, &buf) {
+		t.Fatal("sameWriter() = false, want true for shared buffer")
+	}
+	var other bytes.Buffer
+	if sameWriter(&buf, &other) {
+		t.Fatal("sameWriter() = true, want false for separate buffers")
 	}
 }

@@ -73,7 +73,6 @@ func (h hookExecutor) Exec(ctx context.Context, shellCmd string, args ...string)
 		&hostops.ExecContainer{
 			ProcessOptions: hostops.ProcessOptions{
 				Interactive: false,
-				TTY:         true,
 				WorkDir:     "/app",
 			},
 		}, h.containerID, shellCmd, os.Environ(), args...)
@@ -101,7 +100,6 @@ func (h hookExecutor) ExecStream(ctx context.Context, stdout, stderr io.Writer, 
 		&hostops.ExecContainer{
 			ProcessOptions: hostops.ProcessOptions{
 				Interactive: false,
-				TTY:         true,
 				WorkDir:     "/app",
 			},
 		}, h.containerID, shellCmd, os.Environ(),

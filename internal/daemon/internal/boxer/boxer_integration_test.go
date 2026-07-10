@@ -973,6 +973,7 @@ func TestBoxer_ExecuteHooks_StreamsProgress(t *testing.T) {
 
 	var execStreamCalls []string
 	var execStreamEnvFiles []string
+	var execStreamTTY []bool
 	mockContainer := &hostops.MockContainerOps{
 		InspectFunc: func(ctx context.Context, containerID string) ([]sandtypes.Container, error) {
 			return []sandtypes.Container{{Status: sandtypes.ContainerStatus{State: "running"}}}, nil
@@ -980,6 +981,7 @@ func TestBoxer_ExecuteHooks_StreamsProgress(t *testing.T) {
 		ExecStreamFunc: func(ctx context.Context, opts *hostops.ExecContainer, containerID, cmd string, env []string, stdin io.Reader, stdout, stderr io.Writer, cmdArgs ...string) (func() error, error) {
 			execStreamCalls = append(execStreamCalls, cmd)
 			execStreamEnvFiles = append(execStreamEnvFiles, opts.ProcessOptions.EnvFile)
+			execStreamTTY = append(execStreamTTY, opts.ProcessOptions.TTY)
 			if _, err := io.WriteString(stdout, "warming cache\n"); err != nil {
 				return nil, err
 			}
@@ -1011,6 +1013,9 @@ func TestBoxer_ExecuteHooks_StreamsProgress(t *testing.T) {
 	if len(execStreamEnvFiles) != 1 || execStreamEnvFiles[0] != "" {
 		t.Fatalf("executeHooks() ExecStream env files = %v, want [\"\"]", execStreamEnvFiles)
 	}
+	if len(execStreamTTY) != 1 || execStreamTTY[0] {
+		t.Fatalf("executeHooks() ExecStream TTY = %v, want [false]", execStreamTTY)
+	}
 
 	got := progress.String()
 	if !strings.Contains(got, "[sand] streamed hook\n") {
@@ -1025,12 +1030,14 @@ func TestBoxer_ExecuteHooks_DoesNotPassEnvFileToExec(t *testing.T) {
 	ctx := context.Background()
 
 	var execEnvFiles []string
+	var execTTY []bool
 	mockContainer := &hostops.MockContainerOps{
 		InspectFunc: func(ctx context.Context, containerID string) ([]sandtypes.Container, error) {
 			return []sandtypes.Container{{Status: sandtypes.ContainerStatus{State: "running"}}}, nil
 		},
 		ExecFunc: func(ctx context.Context, opts *hostops.ExecContainer, containerID, cmd string, env []string, args ...string) (string, error) {
 			execEnvFiles = append(execEnvFiles, opts.ProcessOptions.EnvFile)
+			execTTY = append(execTTY, opts.ProcessOptions.TTY)
 			return "", nil
 		},
 	}
@@ -1054,6 +1061,9 @@ func TestBoxer_ExecuteHooks_DoesNotPassEnvFileToExec(t *testing.T) {
 
 	if len(execEnvFiles) != 1 || execEnvFiles[0] != "" {
 		t.Fatalf("executeHooks() Exec env files = %v, want [\"\"]", execEnvFiles)
+	}
+	if len(execTTY) != 1 || execTTY[0] {
+		t.Fatalf("executeHooks() Exec TTY = %v, want [false]", execTTY)
 	}
 }
 

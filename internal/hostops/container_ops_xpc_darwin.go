@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strconv"
 	"strings"
@@ -511,6 +512,11 @@ func processFiles(stdin io.Reader, stdout, stderr io.Writer, tty bool) ([3]*os.F
 	if tty && (isTerminalFile(stdin) || isTerminalFile(stdout) || isTerminalFile(stderr)) {
 		return [3]*os.File{}, func() {}, fmt.Errorf("terminal-backed XPC exec is unsupported; use SSH for interactive sessions")
 	}
+	if sameWriter(stdout, stderr) {
+		shared := &lockedWriter{w: stdout}
+		stdout = shared
+		stderr = shared
+	}
 
 	var files [3]*os.File
 	var cleanups []func()
@@ -534,6 +540,14 @@ func processFiles(stdin io.Reader, stdout, stderr io.Writer, tty bool) ([3]*os.F
 			io.Copy(w, stdin) //nolint:errcheck
 			w.Close()
 		}()
+	} else {
+		f, err := os.Open(os.DevNull)
+		if err != nil {
+			cleanup()
+			return files, cleanup, err
+		}
+		files[0] = f
+		addCleanup(func() { f.Close() })
 	}
 	outFile, outCleanup, err := writerFile(stdout)
 	if err != nil {
@@ -552,6 +566,27 @@ func processFiles(stdin io.Reader, stdout, stderr io.Writer, tty bool) ([3]*os.F
 		addCleanup(errCleanup)
 	}
 	return files, cleanup, nil
+}
+
+type lockedWriter struct {
+	mu sync.Mutex
+	w  io.Writer
+}
+
+func (w *lockedWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.w.Write(p)
+}
+
+func sameWriter(a, b io.Writer) bool {
+	if a == nil || b == nil {
+		return false
+	}
+	if reflect.TypeOf(a) != reflect.TypeOf(b) || !reflect.TypeOf(a).Comparable() {
+		return false
+	}
+	return a == b
 }
 
 func isTerminalFile(v any) bool {
