@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `sand` creates lightweight, disposable Linux sandboxes for AI coding agents on Apple Silicon Macs. It uses APFS copy-on-write clones for fast filesystem isolation and Apple Containerization (Kata-based) for hardware-level process isolation. The primary use case is running AI agents (Claude Code, Codex, Gemini, opencode) against a cloned project without risk to the host filesystem.
 
-**Platform requirements:** macOS 26+, Apple Silicon, Apple `container` CLI v1.0.0.
+**Platform requirements:** macOS 26+, Apple Silicon, Apple `container` CLI v1.1.0.
 
 ## Build and development commands
 

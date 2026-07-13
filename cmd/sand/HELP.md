@@ -2,7 +2,7 @@
 
 Manage lightweight linux container sandboxes on MacOS.
 
-Requires apple container CLI: https://github.com/apple/container/releases/tag/1.0.0
+Requires apple container CLI: https://github.com/apple/container/releases/tag/1.1.0
 
 ## Global Flags
 

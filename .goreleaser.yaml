@@ -81,7 +81,7 @@ brews:
     license: "Apache"
     dependencies:
       - name: container
-        version: 1.0.0
+        version: 1.1.0
     install: |
       bin.install "sand"
       bin.install "sandd"
