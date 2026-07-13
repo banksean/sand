@@ -70,6 +70,7 @@ release:
 
 brews:
   - name: sand
+    skip_upload: "{{ eq .Env.HOMEBREW_TAP_GITHUB_TOKEN \"\" }}"
     ids: [sand-combined]
     repository:
       owner: banksean
