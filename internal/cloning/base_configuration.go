@@ -307,12 +307,14 @@ func (c *BaseContainerConfiguration) runDefaultContainerHook(ctx context.Context
 }
 
 func bazelrcUpdateScript(path, remoteCacheURL string) string {
-	block := fmt.Sprintf("%s\nbuild --remote_cache=%s\nbuild --experimental_guard_against_concurrent_changes\n%s\n",
+	block := fmt.Sprintf(
+		"%s\nbuild --remote_cache=%s\nbuild --experimental_guard_against_concurrent_changes\n%s\n",
 		bazelrcManagedStart,
 		remoteCacheURL,
 		bazelrcManagedEnd,
 	)
-	return fmt.Sprintf(`set -e
+	return fmt.Sprintf(
+		`set -e
 file=%s
 tmp="${file}.tmp"
 mkdir -p "$(dirname "$file")"
