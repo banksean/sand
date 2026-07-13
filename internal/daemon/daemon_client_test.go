@@ -289,7 +289,7 @@ func TestCreateSandboxOptsProtoRoundTrip(t *testing.T) {
 		AllowedDomains: []string{"example.com", "api.example.com"},
 		Mounts:         []string{"source=/host,target=/container,readonly"},
 		CloneMounts:    []string{"source=/src/data,target=/data,readonly"},
-		SharedCaches:   sandtypes.SharedCacheConfig{Mise: true, APK: true, Agents: true, Bazel: true},
+		SharedCaches:   sandtypes.SharedCacheConfig{Mise: true, APK: true, Agents: true, Bazel: true, HTTP: true},
 		CPUs:           4,
 		Memory:         8192,
 	}
@@ -317,6 +317,21 @@ func TestCreateSandboxOptsProtoRoundTrip(t *testing.T) {
 	}
 	if strings.Join(got.CloneMounts, ",") != strings.Join(opts.CloneMounts, ",") {
 		t.Fatalf("round trip clone mounts = %+v, want %+v", got.CloneMounts, opts.CloneMounts)
+	}
+}
+
+func TestSharedCacheMountsProtoRoundTripIncludesHTTPProxyURL(t *testing.T) {
+	mounts := sandtypes.SharedCacheMounts{
+		MiseCacheHostDir:    "/host/mise",
+		APKCacheHostDir:     "/host/apk",
+		AgentCacheHostDir:   "/host/agents",
+		BazelRemoteCacheURL: "http://sand-bazel-cache.test.local:8080",
+		HTTPProxyURL:        "http://sand-http-cache.test.local:3142",
+	}
+
+	got := sharedCacheMountsFromProto(sharedCacheMountsToProto(mounts))
+	if got != mounts {
+		t.Fatalf("round trip shared cache mounts = %+v, want %+v", got, mounts)
 	}
 }
 

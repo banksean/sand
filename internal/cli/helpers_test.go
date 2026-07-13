@@ -79,6 +79,55 @@ func TestInteractiveSSHEnvMergesEnvFileThenExplicitEnv(t *testing.T) {
 	}
 }
 
+func TestSSHCommandEnvMergesSandboxProxyEnv(t *testing.T) {
+	proxyURL := "http://sand-http-cache.test.local:3142"
+	env, err := sshCommandEnv("box.local", "", mergeEnv(
+		sandboxProxyEnv(&sandtypes.Box{
+			SharedCacheMounts: sandtypes.SharedCacheMounts{HTTPProxyURL: proxyURL},
+		}),
+		map[string]string{"EXPLICIT": "1"},
+	))
+	if err != nil {
+		t.Fatalf("sshCommandEnv: %v", err)
+	}
+
+	for _, key := range []string{"http_proxy", "HTTP_PROXY", "https_proxy", "HTTPS_PROXY"} {
+		if env[key] != proxyURL {
+			t.Fatalf("%s = %q, want %q", key, env[key], proxyURL)
+		}
+	}
+	if env["no_proxy"] != "localhost,127.0.0.1,::1,.local,.test.local" {
+		t.Fatalf("no_proxy = %q", env["no_proxy"])
+	}
+	if env["NO_PROXY"] != env["no_proxy"] {
+		t.Fatalf("NO_PROXY = %q, want %q", env["NO_PROXY"], env["no_proxy"])
+	}
+	if env["EXPLICIT"] != "1" {
+		t.Fatalf("EXPLICIT = %q, want 1", env["EXPLICIT"])
+	}
+}
+
+func TestSSHCommandEnvExplicitEnvOverridesSandboxProxyEnv(t *testing.T) {
+	proxyURL := "http://sand-http-cache.test.local:3142"
+	overrideURL := "http://override.local:8080"
+	env, err := sshCommandEnv("box.local", "", mergeEnv(
+		sandboxProxyEnv(&sandtypes.Box{
+			SharedCacheMounts: sandtypes.SharedCacheMounts{HTTPProxyURL: proxyURL},
+		}),
+		map[string]string{"HTTP_PROXY": overrideURL},
+	))
+	if err != nil {
+		t.Fatalf("sshCommandEnv: %v", err)
+	}
+
+	if env["HTTP_PROXY"] != overrideURL {
+		t.Fatalf("HTTP_PROXY = %q, want %q", env["HTTP_PROXY"], overrideURL)
+	}
+	if env["http_proxy"] != proxyURL {
+		t.Fatalf("http_proxy = %q, want %q", env["http_proxy"], proxyURL)
+	}
+}
+
 func TestSelectedProfileEnvPolicy(t *testing.T) {
 	home := t.TempDir()
 	project := t.TempDir()

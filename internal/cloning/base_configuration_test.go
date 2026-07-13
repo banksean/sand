@@ -323,6 +323,56 @@ func TestDefaultContainerHook_ConfiguresBazelRemoteCacheWhenEnabled(t *testing.T
 	}
 }
 
+func TestDefaultContainerHook_ConfiguresSharedHTTPProxyWhenEnabled(t *testing.T) {
+	cfg := NewBaseContainerConfiguration()
+	exec := &fakeHookStreamer{
+		execResults: map[string]fakeExecResult{
+			commandKey("which", "apk"):     {err: errors.New("apk not found")},
+			commandKey("which", "mise.sh"): {out: "/usr/local/bin/mise.sh"},
+		},
+		streamResults: map[string]fakeExecResult{
+			commandKey("mise.sh"): {out: "mise ok"},
+		},
+	}
+
+	hook := cfg.defaultContainerHook("sean", "1000", sandtypes.SharedCacheMounts{
+		HTTPProxyURL: "http://sand-http-cache.test.local:3142",
+	})
+
+	if err := hook.Run(context.Background(), nil, exec); err != nil {
+		t.Fatalf("hook.Run() error = %v", err)
+	}
+
+	var proxyConfigured bool
+	for _, call := range exec.calls {
+		if !strings.Contains(call, "sand-http-cache.sh") {
+			continue
+		}
+		proxyConfigured = true
+		for _, want := range []string{
+			"profile=/etc/profile.d/sand-http-cache.sh",
+			"envfile=/etc/environment",
+			"export http_proxy='http://sand-http-cache.test.local:3142'",
+			"export HTTP_PROXY='http://sand-http-cache.test.local:3142'",
+			"export https_proxy='http://sand-http-cache.test.local:3142'",
+			"export HTTPS_PROXY='http://sand-http-cache.test.local:3142'",
+			"http_proxy=http://sand-http-cache.test.local:3142",
+			"HTTP_PROXY=http://sand-http-cache.test.local:3142",
+			"https_proxy=http://sand-http-cache.test.local:3142",
+			"HTTPS_PROXY=http://sand-http-cache.test.local:3142",
+			"no_proxy=localhost,127.0.0.1,::1,.local,.test.local",
+			"NO_PROXY=localhost,127.0.0.1,::1,.local,.test.local",
+		} {
+			if !strings.Contains(call, want) {
+				t.Fatalf("shared HTTP proxy script missing %q in call:\n%s", want, call)
+			}
+		}
+	}
+	if !proxyConfigured {
+		t.Fatalf("shared HTTP proxy was not configured; calls: %#v", exec.calls)
+	}
+}
+
 func TestBaseMiseScriptPersistsMiseEnvironment(t *testing.T) {
 	script, err := os.ReadFile("../../images/base/mise.sh")
 	if err != nil {

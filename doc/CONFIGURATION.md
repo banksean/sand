@@ -82,6 +82,7 @@ caches:
   apk: true
   agents: true
   bazel: false
+  http: false
 ```
 
 `mise: true` makes new sandboxes mount a sand-managed host cache directory for mise and for Go's `GOMODCACHE` and `GOCACHE`, so repeated `mise install`, `go mod download`, `go test`, and `go build` work can be reused across containers.
@@ -91,6 +92,10 @@ caches:
 `agents: true` makes new sandboxes mount a sand-managed host cache directory for pinned agent installer artifacts, so repeated `sand new -a <agent>` invocations can install from the host cache instead of downloading the same agent package again.
 
 `bazel: true` configures new sandboxes to use a shared Bazel remote build cache at `http://sand-bazel-cache.<container-dns-domain>:8080`. Start that cache service separately with `scripts/bazel-remote-cache-poc.sh`; see [Bazel Remote Cache PoC](BAZEL_REMOTE_CACHE_POC.md).
+
+`http: true`, or `--caches-http`, configures new sandboxes to use a shared HTTP proxy at `http://sand-http-cache.<container-dns-domain>:3142`. If no container DNS domain is configured, sand uses `dev.local`, so the default proxy URL is `http://sand-http-cache.dev.local:3142`. Start and manage that proxy service separately; sand only writes proxy environment configuration into the sandbox.
+
+HTTPS traffic uses standard proxy `CONNECT` tunneling through the shared proxy. Sand does not install a CA, intercept TLS, or cache encrypted HTTPS payloads.
 
 ## Network filtering config
 
