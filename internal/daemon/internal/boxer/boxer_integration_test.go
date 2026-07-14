@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -63,19 +64,33 @@ func (m *mockSSHimmer) NewKeys(ctx context.Context, domain, username string) (*s
 }
 
 type recordingHookStreamer struct {
-	cmd    string
-	args   []string
-	output string
-	err    error
+	cmd         string
+	args        []string
+	output      string
+	err         error
+	execResults map[string]struct {
+		output string
+		err    error
+	}
+	calls []string
 }
 
 func (r *recordingHookStreamer) Exec(ctx context.Context, shellCmd string, args ...string) (string, error) {
 	r.cmd = shellCmd
 	r.args = append([]string(nil), args...)
+	call := strings.Join(append([]string{shellCmd}, args...), " ")
+	r.calls = append(r.calls, call)
+	if res, ok := r.execResults[call]; ok {
+		return res.output, res.err
+	}
 	return r.output, r.err
 }
 
 func (r *recordingHookStreamer) ExecStream(ctx context.Context, stdout, stderr io.Writer, shellCmd string, args ...string) error {
+	return nil
+}
+
+func (r *recordingHookStreamer) ExecStreamInput(ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, shellCmd string, args ...string) error {
 	return nil
 }
 
@@ -384,31 +399,47 @@ func (m *mockContainerConfiguration) GetFirstStartHooks(artifacts cloning.CloneA
 }
 
 func TestInnieSocketPermissionHookRunsRepairScript(t *testing.T) {
-	streamer := &recordingHookStreamer{}
+	streamer := &recordingHookStreamer{
+		execResults: map[string]struct {
+			output string
+			err    error
+		}{
+			"test -e /run/host-services":                 {},
+			"test -e /run/host-services/sandd.grpc.sock": {},
+			"test -e /run/host-services/sandd.sock":      {},
+		},
+	}
 
 	if err := innieSocketPermissionHook().Run(context.Background(), nil, streamer); err != nil {
 		t.Fatalf("innieSocketPermissionHook() error = %v", err)
 	}
 
-	if streamer.cmd != "sh" {
-		t.Fatalf("innieSocketPermissionHook() command = %q, want sh", streamer.cmd)
+	wantCalls := []string{
+		"test -e /run/host-services",
+		"chmod 755 /run/host-services",
+		"test -e /run/host-services/sandd.grpc.sock",
+		"chmod 666 /run/host-services/sandd.grpc.sock",
+		"test -e /run/host-services/sandd.sock",
+		"chmod 666 /run/host-services/sandd.sock",
 	}
-	wantArgs := []string{"-c", innieSocketPermissionScript}
-	if len(streamer.args) != len(wantArgs) {
-		t.Fatalf("innieSocketPermissionHook() args = %q, want %q", streamer.args, wantArgs)
-	}
-	for i := range wantArgs {
-		if streamer.args[i] != wantArgs[i] {
-			t.Fatalf("innieSocketPermissionHook() args = %q, want %q", streamer.args, wantArgs)
-		}
+	if !reflect.DeepEqual(streamer.calls, wantCalls) {
+		t.Fatalf("innieSocketPermissionHook() calls = %q, want %q", streamer.calls, wantCalls)
 	}
 }
 
 func TestInnieSocketPermissionHookPropagatesExecError(t *testing.T) {
 	expectedErr := errors.New("chmod failed")
 	streamer := &recordingHookStreamer{
-		output: "permission denied\n",
-		err:    expectedErr,
+		execResults: map[string]struct {
+			output string
+			err    error
+		}{
+			"test -e /run/host-services": {},
+			"chmod 755 /run/host-services": {
+				output: "permission denied\n",
+				err:    expectedErr,
+			},
+		},
 	}
 
 	err := innieSocketPermissionHook().Run(context.Background(), nil, streamer)
@@ -475,14 +506,14 @@ func TestBoxer_StartContainersPrependInnieSocketPermissionHook(t *testing.T) {
 				t.Fatalf("%s error = %v", tc.name, err)
 			}
 
-			if len(execCalls) != 2 {
-				t.Fatalf("%s exec calls = %v, want 2 calls", tc.name, execCalls)
+			if len(execCalls) != 7 {
+				t.Fatalf("%s exec calls = %v, want socket checks plus agent hook", tc.name, execCalls)
 			}
-			if got, want := execCalls[0], "sh -c "+innieSocketPermissionScript; got != want {
+			if got, want := execCalls[0], "test -e /run/host-services"; got != want {
 				t.Fatalf("%s first exec call = %q, want %q", tc.name, got, want)
 			}
-			if !strings.HasPrefix(execCalls[1], "agent-hook ") {
-				t.Fatalf("%s second exec call = %q, want agent hook", tc.name, execCalls[1])
+			if !strings.HasPrefix(execCalls[len(execCalls)-1], "agent-hook ") {
+				t.Fatalf("%s last exec call = %q, want agent hook", tc.name, execCalls[len(execCalls)-1])
 			}
 		})
 	}

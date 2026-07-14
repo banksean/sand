@@ -21,6 +21,7 @@ type fakeHookStreamer struct {
 	execResults   map[string]fakeExecResult
 	streamResults map[string]fakeExecResult
 	calls         []string
+	streamInputs  map[string]string
 }
 
 func (f *fakeHookStreamer) Exec(ctx context.Context, shellCmd string, args ...string) (string, error) {
@@ -33,6 +34,24 @@ func (f *fakeHookStreamer) Exec(ctx context.Context, shellCmd string, args ...st
 
 func (f *fakeHookStreamer) ExecStream(ctx context.Context, stdout, stderr io.Writer, shellCmd string, args ...string) error {
 	f.calls = append(f.calls, "stream:"+renderCommand(shellCmd, args...))
+	if res, ok := f.streamResults[commandKey(shellCmd, args...)]; ok {
+		if res.out != "" {
+			_, _ = io.WriteString(stdout, res.out)
+		}
+		return res.err
+	}
+	return nil
+}
+
+func (f *fakeHookStreamer) ExecStreamInput(ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, shellCmd string, args ...string) error {
+	f.calls = append(f.calls, "stream-input:"+renderCommand(shellCmd, args...))
+	if stdin != nil {
+		data, _ := io.ReadAll(stdin)
+		if f.streamInputs == nil {
+			f.streamInputs = make(map[string]string)
+		}
+		f.streamInputs[commandKey(shellCmd, args...)] = string(data)
+	}
 	if res, ok := f.streamResults[commandKey(shellCmd, args...)]; ok {
 		if res.out != "" {
 			_, _ = io.WriteString(stdout, res.out)
@@ -289,25 +308,18 @@ func TestDefaultContainerHook_ConfiguresBazelRemoteCacheWhenEnabled(t *testing.T
 		t.Fatalf("hook.Run() error = %v", err)
 	}
 
-	var rootConfigured, userConfigured bool
 	for _, call := range exec.calls {
-		if strings.Contains(call, `file="/root/.bazelrc"`) &&
-			strings.Contains(call, "build --remote_cache=http://sand-bazel-cache.test.local:8080") {
-			rootConfigured = true
-		}
-		if strings.Contains(call, `file="/home/sean/.bazelrc"`) &&
-			strings.Contains(call, "build --experimental_guard_against_concurrent_changes") {
-			userConfigured = true
-		}
 		if strings.Contains(call, "/app/.bazelrc") {
 			t.Fatalf("hook touched project bazelrc: %s", call)
 		}
 	}
-	if !rootConfigured {
-		t.Fatalf("root .bazelrc was not configured; calls: %#v", exec.calls)
+	root := exec.streamInputs[commandKey("tee", "/root/.bazelrc.sand.tmp")]
+	if !strings.Contains(root, "build --remote_cache=http://sand-bazel-cache.test.local:8080") {
+		t.Fatalf("root .bazelrc content missing remote cache: %q", root)
 	}
-	if !userConfigured {
-		t.Fatalf("user .bazelrc was not configured; calls: %#v", exec.calls)
+	user := exec.streamInputs[commandKey("tee", "/home/sean/.bazelrc.sand.tmp")]
+	if !strings.Contains(user, "build --experimental_guard_against_concurrent_changes") {
+		t.Fatalf("user .bazelrc content missing guard setting: %q", user)
 	}
 }
 

@@ -6,8 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strconv"
 
+	"github.com/banksean/sand/internal/hookscript"
 	"github.com/banksean/sand/internal/sandtypes"
 )
 
@@ -23,11 +23,6 @@ const (
 	goBuildCachePath = miseCachePath + "/go/build"
 	apkCachePath     = "/var/cache/apk"
 	agentCachePath   = "/opt/sand-agent-cache"
-)
-
-const (
-	bazelrcManagedStart = "# sand bazel remote cache start"
-	bazelrcManagedEnd   = "# sand bazel remote cache end"
 )
 
 type containerBootstrapFlavor struct {
@@ -77,6 +72,16 @@ func (r *containerHookRunner) probe(step string, cmd ...string) bool {
 func (r *containerHookRunner) runStream(step, wrap, cmd string) bool {
 	var buf bytes.Buffer
 	if err := r.exec.ExecStream(r.ctx, &buf, &buf, cmd); err != nil {
+		slog.ErrorContext(r.ctx, r.hookName+" "+step, "error", err, "out", buf.String(), "username", r.username)
+		r.errs = append(r.errs, fmt.Errorf("%s: %w", wrap, err))
+		return false
+	}
+	return true
+}
+
+func (r *containerHookRunner) runScript(step, wrap, name, body string) bool {
+	var buf bytes.Buffer
+	if err := hookscript.Execute(r.ctx, r.exec, name, body, &buf); err != nil {
 		slog.ErrorContext(r.ctx, r.hookName+" "+step, "error", err, "out", buf.String(), "username", r.username)
 		r.errs = append(r.errs, fmt.Errorf("%s: %w", wrap, err))
 		return false
@@ -247,10 +252,10 @@ func (c *BaseContainerConfiguration) runDefaultContainerHook(ctx context.Context
 	runner.run("copying /root/.ssh to ~/.ssh", "copy /root/.ssh", "cp", "-r", "/root/.ssh", "/home/"+username+"/.ssh")
 
 	if sharedCaches.BazelRemoteCacheURL != "" {
-		runner.run("configuring root bazel remote cache", "configure root bazel remote cache",
-			"sh", "-c", bazelrcUpdateScript("/root/.bazelrc", sharedCaches.BazelRemoteCacheURL))
-		runner.run("configuring user bazel remote cache", "configure user bazel remote cache",
-			"sh", "-c", bazelrcUpdateScript("/home/"+username+"/.bazelrc", sharedCaches.BazelRemoteCacheURL))
+		runner.runScript("configuring root bazel remote cache", "configure root bazel remote cache", "root-bazelrc.txt",
+			"write-managed-bazelrc /root/.bazelrc "+sharedCaches.BazelRemoteCacheURL+"\n")
+		runner.runScript("configuring user bazel remote cache", "configure user bazel remote cache", "user-bazelrc.txt",
+			"write-managed-bazelrc /home/"+username+"/.bazelrc "+sharedCaches.BazelRemoteCacheURL+"\n")
 	}
 
 	// Create the parent directories before chown so the container user owns them,
@@ -304,31 +309,4 @@ func (c *BaseContainerConfiguration) runDefaultContainerHook(ctx context.Context
 
 	slog.InfoContext(ctx, flavor.hookName+" completed", "hook", "default container bootstrap", "flavor", flavor.name)
 	return runner.err()
-}
-
-func bazelrcUpdateScript(path, remoteCacheURL string) string {
-	block := fmt.Sprintf(
-		"%s\nbuild --remote_cache=%s\nbuild --experimental_guard_against_concurrent_changes\n%s\n",
-		bazelrcManagedStart,
-		remoteCacheURL,
-		bazelrcManagedEnd,
-	)
-	return fmt.Sprintf(
-		`set -e
-file=%s
-tmp="${file}.tmp"
-mkdir -p "$(dirname "$file")"
-if [ -f "$file" ]; then
-	sed '/^%s$/,/^%s$/d' "$file" > "$tmp"
-	cat "$tmp" > "$file"
-	rm -f "$tmp"
-fi
-cat >> "$file" <<'EOF'
-%sEOF
-`,
-		strconv.Quote(path),
-		bazelrcManagedStart,
-		bazelrcManagedEnd,
-		block,
-	)
 }

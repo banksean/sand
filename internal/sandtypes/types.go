@@ -80,6 +80,7 @@ type HookFunc func(ctx context.Context, shellCmd string, args ...string) (string
 type HookStreamer interface {
 	Exec(ctx context.Context, shellCmd string, args ...string) (string, error)
 	ExecStream(ctx context.Context, stdout, stderr io.Writer, shellCmd string, args ...string) error
+	ExecStreamInput(ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, shellCmd string, args ...string) error
 }
 
 // ContainerHook allows callers to inject container customisation step.

@@ -1,6 +1,7 @@
 package boxer
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	_ "embed"
@@ -18,6 +19,7 @@ import (
 
 	"github.com/banksean/sand/internal/cloning"
 	"github.com/banksean/sand/internal/db"
+	"github.com/banksean/sand/internal/hookscript"
 	"github.com/banksean/sand/internal/hostops"
 	"github.com/banksean/sand/internal/imageprogress"
 	"github.com/banksean/sand/internal/runtimedeps"
@@ -31,15 +33,10 @@ import (
 
 const containerGetErrorMsg = "[error getting]"
 
-const innieSocketPermissionScript = `set -e
-if [ -d /run/host-services ]; then
-	chmod 755 /run/host-services
-fi
-for socket in /run/host-services/sandd.grpc.sock /run/host-services/sandd.sock; do
-	if [ -e "$socket" ]; then
-		chmod 666 "$socket"
-	fi
-done`
+const innieSocketPermissionScript = `[exists:/run/host-services] exec chmod 755 /run/host-services
+[exists:/run/host-services/sandd.grpc.sock] exec chmod 666 /run/host-services/sandd.grpc.sock
+[exists:/run/host-services/sandd.sock] exec chmod 666 /run/host-services/sandd.sock
+`
 
 // SSHimmer provisions SSH keys for a new sandbox.
 type SSHimmer interface {
@@ -84,6 +81,10 @@ func (h hookExecutor) Exec(ctx context.Context, shellCmd string, args ...string)
 }
 
 func (h hookExecutor) ExecStream(ctx context.Context, stdout, stderr io.Writer, shellCmd string, args ...string) error {
+	return h.ExecStreamInput(ctx, nil, stdout, stderr, shellCmd, args...)
+}
+
+func (h hookExecutor) ExecStreamInput(ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, shellCmd string, args ...string) error {
 	if stdout == nil {
 		stdout = io.Discard
 	}
@@ -103,7 +104,7 @@ func (h hookExecutor) ExecStream(ctx context.Context, stdout, stderr io.Writer, 
 				WorkDir:     "/app",
 			},
 		}, h.containerID, shellCmd, os.Environ(),
-		nil, stdout, stderr, args...)
+		stdin, stdout, stderr, args...)
 	if err != nil {
 		slog.ErrorContext(h.ctx, "shell: containerService.ExecStream", "sandbox", h.sandboxID, "error", err, "command", shellCmd)
 		return fmt.Errorf("failed to start command for sandbox %s: %w", h.sandboxID, err)
@@ -124,10 +125,10 @@ func boxerStartHooks(hooks []sandtypes.ContainerHook) []sandtypes.ContainerHook 
 
 func innieSocketPermissionHook() sandtypes.ContainerHook {
 	return sandtypes.NewContainerHook("repair host service socket permissions", func(ctx context.Context, ctr *sandtypes.Container, exec sandtypes.HookStreamer) error {
-		out, err := exec.Exec(ctx, "sh", "-c", innieSocketPermissionScript)
-		if err != nil {
-			if out != "" {
-				return fmt.Errorf("repair host service socket permissions: %w: %s", err, strings.TrimSpace(out))
+		var out bytes.Buffer
+		if err := hookscript.Execute(ctx, exec, "innie-socket-permissions.txt", innieSocketPermissionScript, &out); err != nil {
+			if out.String() != "" {
+				return fmt.Errorf("repair host service socket permissions: %w: %s", err, strings.TrimSpace(out.String()))
 			}
 			return fmt.Errorf("repair host service socket permissions: %w", err)
 		}
