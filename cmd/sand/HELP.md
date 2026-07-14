@@ -16,8 +16,38 @@ Requires apple container CLI: https://github.com/apple/container/releases/tag/1.
 - `--caches-mise` - enable mise cache (default: `true`)
 - `--caches-apk` - enable apk cache (default: `true`)
 - `--caches-agents` - enable agent installer cache (default: `true`)
+- `--caches-bazel` - enable Bazel remote build cache configuration (default: `false`)
+- `--caches-http-proxy` - enable shared HTTP proxy cache configuration (default: `false`)
 
 ## Subcommands
+
+## `sand cache`
+
+manage shared cache services
+
+**Usage:**
+
+```
+sand cache <command>
+```
+
+### `sand cache http-proxy`
+
+manage the shared HTTP proxy cache service
+
+**Usage:**
+
+```
+sand cache http-proxy <command>
+```
+
+**Subcommands:**
+
+- `start` - start the shared HTTP proxy cache service
+- `status` - show shared HTTP proxy cache service status
+- `stop` - stop the shared HTTP proxy cache service
+- `restart` - restart the shared HTTP proxy cache service
+- `clear` - remove the shared HTTP proxy cache service and cached data
 
 ## `sand completion`
 

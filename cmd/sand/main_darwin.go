@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/alecthomas/kong"
-	kongyaml "github.com/alecthomas/kong-yaml"
 	"github.com/banksean/sand/internal/cli"
 	"github.com/banksean/sand/internal/daemon"
 	"github.com/banksean/sand/internal/observability"
@@ -49,6 +48,7 @@ type Outie struct {
 	Start              cli.StartCmd              `cmd:"" help:"start sandbox container"`
 	Rename             cli.RenameCmd             `cmd:"" help:"rename a stopped sandbox"`
 	Git                cli.GitCmd                `cmd:"" help:"git operations with sandboxes"`
+	Cache              cli.CacheCmd              `cmd:"" help:"manage shared cache services"`
 	Doc                DocCmd                    `cmd:"" help:"print complete command help formatted as markdown"`
 	BuildInfo          cli.BuildInfoCmd          `cmd:"" help:"print version infomation about this command"`
 	Vsc                cli.VscCmd                `cmd:"" help:"launch a vscode remote window connected to the sandbox's container"`
@@ -258,7 +258,7 @@ func main() {
 	kongCtx := kong.Parse(
 		&app,
 		kong.UsageOnError(),
-		kong.Configuration(kongyaml.Loader, kongConfigPaths...),
+		kong.Configuration(cli.YAMLConfigLoader, kongConfigPaths...),
 		kong.Description(description),
 	)
 

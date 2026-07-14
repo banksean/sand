@@ -38,6 +38,8 @@ const (
 	DaemonService_CreateSandbox_FullMethodName         = "/sand.daemon.v1.DaemonService/CreateSandbox"
 	DaemonService_RenameSandbox_FullMethodName         = "/sand.daemon.v1.DaemonService/RenameSandbox"
 	DaemonService_EnsureImage_FullMethodName           = "/sand.daemon.v1.DaemonService/EnsureImage"
+	DaemonService_HTTPProxyCache_FullMethodName        = "/sand.daemon.v1.DaemonService/HTTPProxyCache"
+	DaemonService_HTTPProxyCacheStatus_FullMethodName  = "/sand.daemon.v1.DaemonService/HTTPProxyCacheStatus"
 )
 
 // DaemonServiceClient is the client API for DaemonService service.
@@ -63,6 +65,8 @@ type DaemonServiceClient interface {
 	CreateSandbox(ctx context.Context, in *CreateSandboxRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CreateSandboxResponse], error)
 	RenameSandbox(ctx context.Context, in *RenameSandboxRequest, opts ...grpc.CallOption) (*RenameSandboxResponse, error)
 	EnsureImage(ctx context.Context, in *EnsureImageRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[EnsureImageResponse], error)
+	HTTPProxyCache(ctx context.Context, in *HTTPProxyCacheRequest, opts ...grpc.CallOption) (*StatusResponse, error)
+	HTTPProxyCacheStatus(ctx context.Context, in *HTTPProxyCacheStatusRequest, opts ...grpc.CallOption) (*HTTPProxyCacheStatusResponse, error)
 }
 
 type daemonServiceClient struct {
@@ -281,6 +285,26 @@ func (c *daemonServiceClient) EnsureImage(ctx context.Context, in *EnsureImageRe
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type DaemonService_EnsureImageClient = grpc.ServerStreamingClient[EnsureImageResponse]
 
+func (c *daemonServiceClient) HTTPProxyCache(ctx context.Context, in *HTTPProxyCacheRequest, opts ...grpc.CallOption) (*StatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StatusResponse)
+	err := c.cc.Invoke(ctx, DaemonService_HTTPProxyCache_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *daemonServiceClient) HTTPProxyCacheStatus(ctx context.Context, in *HTTPProxyCacheStatusRequest, opts ...grpc.CallOption) (*HTTPProxyCacheStatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(HTTPProxyCacheStatusResponse)
+	err := c.cc.Invoke(ctx, DaemonService_HTTPProxyCacheStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DaemonServiceServer is the server API for DaemonService service.
 // All implementations must embed UnimplementedDaemonServiceServer
 // for forward compatibility.
@@ -304,6 +328,8 @@ type DaemonServiceServer interface {
 	CreateSandbox(*CreateSandboxRequest, grpc.ServerStreamingServer[CreateSandboxResponse]) error
 	RenameSandbox(context.Context, *RenameSandboxRequest) (*RenameSandboxResponse, error)
 	EnsureImage(*EnsureImageRequest, grpc.ServerStreamingServer[EnsureImageResponse]) error
+	HTTPProxyCache(context.Context, *HTTPProxyCacheRequest) (*StatusResponse, error)
+	HTTPProxyCacheStatus(context.Context, *HTTPProxyCacheStatusRequest) (*HTTPProxyCacheStatusResponse, error)
 	mustEmbedUnimplementedDaemonServiceServer()
 }
 
@@ -370,6 +396,12 @@ func (UnimplementedDaemonServiceServer) RenameSandbox(context.Context, *RenameSa
 }
 func (UnimplementedDaemonServiceServer) EnsureImage(*EnsureImageRequest, grpc.ServerStreamingServer[EnsureImageResponse]) error {
 	return status.Error(codes.Unimplemented, "method EnsureImage not implemented")
+}
+func (UnimplementedDaemonServiceServer) HTTPProxyCache(context.Context, *HTTPProxyCacheRequest) (*StatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method HTTPProxyCache not implemented")
+}
+func (UnimplementedDaemonServiceServer) HTTPProxyCacheStatus(context.Context, *HTTPProxyCacheStatusRequest) (*HTTPProxyCacheStatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method HTTPProxyCacheStatus not implemented")
 }
 func (UnimplementedDaemonServiceServer) mustEmbedUnimplementedDaemonServiceServer() {}
 func (UnimplementedDaemonServiceServer) testEmbeddedByValue()                       {}
@@ -720,6 +752,42 @@ func _DaemonService_EnsureImage_Handler(srv interface{}, stream grpc.ServerStrea
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type DaemonService_EnsureImageServer = grpc.ServerStreamingServer[EnsureImageResponse]
 
+func _DaemonService_HTTPProxyCache_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HTTPProxyCacheRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DaemonServiceServer).HTTPProxyCache(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DaemonService_HTTPProxyCache_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DaemonServiceServer).HTTPProxyCache(ctx, req.(*HTTPProxyCacheRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DaemonService_HTTPProxyCacheStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HTTPProxyCacheStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DaemonServiceServer).HTTPProxyCacheStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DaemonService_HTTPProxyCacheStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DaemonServiceServer).HTTPProxyCacheStatus(ctx, req.(*HTTPProxyCacheStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // DaemonService_ServiceDesc is the grpc.ServiceDesc for DaemonService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -794,6 +862,14 @@ var DaemonService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RenameSandbox",
 			Handler:    _DaemonService_RenameSandbox_Handler,
+		},
+		{
+			MethodName: "HTTPProxyCache",
+			Handler:    _DaemonService_HTTPProxyCache_Handler,
+		},
+		{
+			MethodName: "HTTPProxyCacheStatus",
+			Handler:    _DaemonService_HTTPProxyCacheStatus_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

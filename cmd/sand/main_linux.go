@@ -12,7 +12,6 @@ import (
 	"syscall"
 
 	"github.com/alecthomas/kong"
-	kongyaml "github.com/alecthomas/kong-yaml"
 	"github.com/banksean/sand/internal/cli"
 	"github.com/banksean/sand/internal/daemon"
 	"github.com/banksean/sand/internal/observability"
@@ -43,6 +42,7 @@ type Innie struct {
 	Expunge   cli.ExpungeCmd    `cmd:"" help:"hard-delete soft-deleted sandboxes"`
 	Stop      cli.StopCmd       `cmd:"" help:"stop sandbox container"`
 	Git       cli.GitCmd        `cmd:"" help:"git operations with sandboxes"`
+	Cache     cli.CacheCmd      `cmd:"" help:"manage shared cache services"`
 	BuildInfo cli.BuildInfoCmd  `cmd:"" help:"print version infomation about this command"`
 	Vsc       cli.VscCmd        `cmd:"" help:"launch a vscode window on your host OS desktop, connected to this sandbox's container via ssh"`
 }
@@ -136,7 +136,7 @@ func main() {
 
 	kongCtx := kong.Parse(&app,
 		kong.UsageOnError(),
-		kong.Configuration(kongyaml.Loader, kongConfigPaths...),
+		kong.Configuration(cli.YAMLConfigLoader, kongConfigPaths...),
 		kong.Description(description))
 
 	app.initSlog()

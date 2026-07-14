@@ -55,6 +55,7 @@ type Boxer struct {
 	FileOps          hostops.FileOps
 	SSHim            SSHimmer
 	AgentRegistry    *cloning.AgentRegistry
+	httpProxyService *HTTPProxyCacheService
 }
 
 type hookExecutor struct {
@@ -63,6 +64,7 @@ type hookExecutor struct {
 	containerID string
 	container   hostops.ContainerOps
 	progress    io.Writer
+	env         []string
 }
 
 func (h hookExecutor) Exec(ctx context.Context, shellCmd string, args ...string) (string, error) {
@@ -72,7 +74,7 @@ func (h hookExecutor) Exec(ctx context.Context, shellCmd string, args ...string)
 				Interactive: false,
 				WorkDir:     "/app",
 			},
-		}, h.containerID, shellCmd, os.Environ(), args...)
+		}, h.containerID, shellCmd, h.env, args...)
 	if err != nil {
 		slog.ErrorContext(h.ctx, "shell: containerService.Exec", "sandbox", h.sandboxID, "error", err, "output", output)
 		return output, fmt.Errorf("failed to execute command for sandbox %s: %w", h.sandboxID, err)
@@ -103,7 +105,7 @@ func (h hookExecutor) ExecStreamInput(ctx context.Context, stdin io.Reader, stdo
 				Interactive: false,
 				WorkDir:     "/app",
 			},
-		}, h.containerID, shellCmd, os.Environ(),
+		}, h.containerID, shellCmd, h.env,
 		stdin, stdout, stderr, args...)
 	if err != nil {
 		slog.ErrorContext(h.ctx, "shell: containerService.ExecStream", "sandbox", h.sandboxID, "error", err, "command", shellCmd)
@@ -134,6 +136,25 @@ func innieSocketPermissionHook() sandtypes.ContainerHook {
 		}
 		return nil
 	})
+}
+
+func hookExecutionEnv(sharedCaches sandtypes.SharedCacheMounts) []string {
+	env := os.Environ()
+	for key, value := range sandtypes.SharedHTTPProxyEnv(sharedCaches.HTTPProxyURL) {
+		env = setEnvValue(env, key, value)
+	}
+	return env
+}
+
+func setEnvValue(env []string, key, value string) []string {
+	prefix := key + "="
+	for i, entry := range env {
+		if strings.HasPrefix(entry, prefix) {
+			env[i] = prefix + value
+			return env
+		}
+	}
+	return append(env, prefix+value)
 }
 
 // BoxerDeps holds the injectable dependencies for a Boxer.
@@ -948,6 +969,10 @@ func (sb *Boxer) ensureSharedCacheMounts(cfg sandtypes.SharedCacheConfig, localD
 		mounts.BazelRemoteCacheURL = bazelRemoteCacheURL(localDomain)
 	}
 
+	if cfg.HTTPProxy {
+		mounts.HTTPProxyURL = httpProxyCacheURL(localDomain)
+	}
+
 	return mounts, nil
 }
 
@@ -956,6 +981,13 @@ func bazelRemoteCacheURL(localDomain string) string {
 		localDomain = runtimedeps.DefaultDNSDomain
 	}
 	return "http://sand-bazel-cache." + strings.Trim(localDomain, ".") + ":8080"
+}
+
+func httpProxyCacheURL(localDomain string) string {
+	if localDomain == "" {
+		localDomain = runtimedeps.DefaultDNSDomain
+	}
+	return "http://sand-http-cache." + strings.Trim(localDomain, ".") + ":3128"
 }
 
 // CreateContainer creates a new container instance. The container image must exist.
@@ -1183,6 +1215,7 @@ func (sber *Boxer) executeHooks(ctx context.Context, sb *sandtypes.Box, hooks []
 			containerID: sb.ContainerID,
 			container:   sber.ContainerService,
 			progress:    progress,
+			env:         hookExecutionEnv(sb.SharedCacheMounts),
 		}
 		if err := hook.Run(ctx, ctr, exec); err != nil {
 			slog.ErrorContext(ctx, "Boxer.executeHooks hook error", "hook", hook.Name(), "error", err)

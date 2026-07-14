@@ -26,6 +26,8 @@ service DaemonService {
   rpc CreateSandbox(CreateSandboxRequest) returns (stream CreateSandboxResponse);
   rpc RenameSandbox(RenameSandboxRequest) returns (RenameSandboxResponse);
   rpc EnsureImage(EnsureImageRequest) returns (stream EnsureImageResponse);
+  rpc HTTPProxyCache(HTTPProxyCacheRequest) returns (StatusResponse);
+  rpc HTTPProxyCacheStatus(HTTPProxyCacheStatusRequest) returns (HTTPProxyCacheStatusResponse);
 }
 
 message PingRequest {}
@@ -47,6 +49,21 @@ message VersionResponse {
 
 message StatusResponse {
   string status = 1;
+}
+
+message HTTPProxyCacheRequest {
+  string action = 1;
+}
+
+message HTTPProxyCacheStatusRequest {}
+
+message HTTPProxyCacheStatusResponse {
+  string name = 1;
+  string image = 2;
+  string state = 3;
+  string url = 4;
+  string cache_dir = 5;
+  bool running = 6;
 }
 
 message ShutdownRequest {}
@@ -168,6 +185,7 @@ message SharedCacheMounts {
   string apk_cache_host_dir = 2;
   string agent_cache_host_dir = 3;
   string bazel_remote_cache_url = 4;
+  string http_proxy_url = 5;
 }
 
 message GitDetails {
@@ -299,6 +317,7 @@ message SharedCacheConfig {
   bool apk = 2;
   bool agents = 3;
   bool bazel = 4;
+  bool http_proxy = 5;
 }
 
 message CreateSandboxRequest {

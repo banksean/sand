@@ -28,6 +28,51 @@ func TestNullStdioUsesDevNull(t *testing.T) {
 	}
 }
 
+func TestParsePublishPort(t *testing.T) {
+	tests := []struct {
+		name          string
+		spec          string
+		hostAddress   xpc.IPAddress
+		hostPort      uint16
+		containerPort uint16
+		proto         xpc.PublishProtocol
+	}{
+		{
+			name:          "host and container port",
+			spec:          "3000:3000/tcp",
+			hostPort:      3000,
+			containerPort: 3000,
+			proto:         xpc.PublishProtocolTCP,
+		},
+		{
+			name:          "host address",
+			spec:          "127.0.0.1:3128:3128/tcp",
+			hostAddress:   "127.0.0.1",
+			hostPort:      3128,
+			containerPort: 3128,
+			proto:         xpc.PublishProtocolTCP,
+		},
+		{
+			name:          "udp",
+			spec:          "5353:5353/udp",
+			hostPort:      5353,
+			containerPort: 5353,
+			proto:         xpc.PublishProtocolUDP,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parsePublishPort(tt.spec)
+			if err != nil {
+				t.Fatalf("parsePublishPort: %v", err)
+			}
+			if got.HostAddress != tt.hostAddress || got.HostPort != tt.hostPort || got.ContainerPort != tt.containerPort || got.Proto != tt.proto || got.Count != 1 {
+				t.Fatalf("parsePublishPort(%q) = %+v", tt.spec, got)
+			}
+		})
+	}
+}
+
 func TestProcessFilesNonTerminalDoesNotUseCallerFilesForOutputPipes(t *testing.T) {
 	stdin, err := os.Open(os.DevNull)
 	if err != nil {

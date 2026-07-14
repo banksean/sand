@@ -695,6 +695,12 @@ func (d *Daemon) createSandbox(ctx context.Context, opts CreateSandboxOpts, prog
 		return nil, err
 	}
 
+	if opts.SharedCaches.HTTPProxy {
+		if err := d.boxer.HTTPProxyCacheService().Ensure(ctx, d.LocalDomain, progress); err != nil {
+			return nil, err
+		}
+	}
+
 	sbox, err := d.boxer.NewSandbox(ctx, boxer.NewSandboxOpts{
 		AgentType:      agentType,
 		ID:             opts.ID,
@@ -756,6 +762,37 @@ func (d *Daemon) createSandbox(ctx context.Context, opts CreateSandboxOpts, prog
 // ListSandboxes returns all sandboxes.
 func (d *Daemon) ListSandboxes(ctx context.Context) ([]sandtypes.Box, error) {
 	return d.boxer.List(ctx)
+}
+
+func (d *Daemon) HTTPProxyCache(ctx context.Context, action string, progress io.Writer) error {
+	service := d.boxer.HTTPProxyCacheService()
+	switch action {
+	case "start":
+		return service.Start(ctx, d.LocalDomain, progress)
+	case "stop":
+		return service.Stop(ctx)
+	case "restart":
+		return service.Restart(ctx, d.LocalDomain, progress)
+	case "clear":
+		return service.Clear(ctx)
+	default:
+		return fmt.Errorf("unknown HTTP proxy cache action %q", action)
+	}
+}
+
+func (d *Daemon) HTTPProxyCacheStatus(ctx context.Context) (HTTPProxyCacheStatus, error) {
+	status, err := d.boxer.HTTPProxyCacheService().Status(ctx, d.LocalDomain)
+	if err != nil {
+		return HTTPProxyCacheStatus{}, err
+	}
+	return HTTPProxyCacheStatus{
+		Name:     status.Name,
+		Image:    status.Image,
+		State:    status.State,
+		URL:      status.URL,
+		CacheDir: status.CacheDir,
+		Running:  status.Running,
+	}, nil
 }
 
 // ListDeletedSandboxes returns soft-deleted sandboxes.

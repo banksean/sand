@@ -214,6 +214,26 @@ func (c *GRPCClient) VSC(ctx context.Context, name string) error {
 	return err
 }
 
+func (c *GRPCClient) HTTPProxyCache(ctx context.Context, action string) error {
+	_, err := c.client.HTTPProxyCache(ctx, &daemonpb.HTTPProxyCacheRequest{Action: action})
+	return err
+}
+
+func (c *GRPCClient) HTTPProxyCacheStatus(ctx context.Context) (HTTPProxyCacheStatus, error) {
+	resp, err := c.client.HTTPProxyCacheStatus(ctx, &daemonpb.HTTPProxyCacheStatusRequest{})
+	if err != nil {
+		return HTTPProxyCacheStatus{}, err
+	}
+	return HTTPProxyCacheStatus{
+		Name:     resp.GetName(),
+		Image:    resp.GetImage(),
+		State:    resp.GetState(),
+		URL:      resp.GetUrl(),
+		CacheDir: resp.GetCacheDir(),
+		Running:  resp.GetRunning(),
+	}, nil
+}
+
 func (c *GRPCClient) RenameSandbox(ctx context.Context, oldName, newName string) (*sandtypes.Box, error) {
 	resp, err := c.client.RenameSandbox(ctx, &daemonpb.RenameSandboxRequest{
 		OldName: oldName,

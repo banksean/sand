@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/banksean/sand/internal/hostops"
@@ -68,6 +69,74 @@ func TestEnsureSharedCacheMounts_BazelSetsRemoteCacheURL(t *testing.T) {
 	if mounts.BazelRemoteCacheURL != "http://sand-bazel-cache.test.local:8080" {
 		t.Fatalf("bazel remote cache URL = %q", mounts.BazelRemoteCacheURL)
 	}
+}
+
+func TestEnsureSharedCacheMounts_HTTPProxyURL(t *testing.T) {
+	b := &Boxer{
+		appRoot: "/tmp/sand-app",
+		FileOps: &hostops.MockFileOps{
+			MkdirAllFunc: func(path string, perm os.FileMode) error {
+				return nil
+			},
+		},
+	}
+
+	mounts, err := b.ensureSharedCacheMounts(sandtypes.SharedCacheConfig{HTTPProxy: true}, "test.local")
+	if err != nil {
+		t.Fatalf("ensureSharedCacheMounts: %v", err)
+	}
+
+	if mounts.HTTPProxyURL != "http://sand-http-cache.test.local:3128" {
+		t.Fatalf("http proxy URL = %q", mounts.HTTPProxyURL)
+	}
+}
+
+func TestEnsureSharedCacheMounts_HTTPProxyURLDefaultDomain(t *testing.T) {
+	b := &Boxer{
+		appRoot: "/tmp/sand-app",
+		FileOps: &hostops.MockFileOps{
+			MkdirAllFunc: func(path string, perm os.FileMode) error {
+				return nil
+			},
+		},
+	}
+
+	mounts, err := b.ensureSharedCacheMounts(sandtypes.SharedCacheConfig{HTTPProxy: true}, "")
+	if err != nil {
+		t.Fatalf("ensureSharedCacheMounts: %v", err)
+	}
+
+	if mounts.HTTPProxyURL != "http://sand-http-cache.dev.local:3128" {
+		t.Fatalf("http proxy URL = %q", mounts.HTTPProxyURL)
+	}
+}
+
+func TestHookExecutionEnvIncludesHTTPProxy(t *testing.T) {
+	env := hookExecutionEnv(sandtypes.SharedCacheMounts{HTTPProxyURL: "http://sand-http-cache.test.local:3128"})
+
+	want := map[string]string{
+		"http_proxy":  "http://sand-http-cache.test.local:3128",
+		"HTTP_PROXY":  "http://sand-http-cache.test.local:3128",
+		"https_proxy": "http://sand-http-cache.test.local:3128",
+		"HTTPS_PROXY": "http://sand-http-cache.test.local:3128",
+		"no_proxy":    "localhost,127.0.0.1,::1,.local,.test.local",
+		"NO_PROXY":    "localhost,127.0.0.1,::1,.local,.test.local",
+	}
+	for key, value := range want {
+		if got := lookupEnvValue(env, key); got != value {
+			t.Fatalf("%s = %q, want %q in %v", key, got, value, env)
+		}
+	}
+}
+
+func lookupEnvValue(env []string, key string) string {
+	prefix := key + "="
+	for _, entry := range env {
+		if strings.HasPrefix(entry, prefix) {
+			return strings.TrimPrefix(entry, prefix)
+		}
+	}
+	return ""
 }
 
 func TestGetCurrentGitDetailsDoesNotFetchSandboxRefsIntoHostRepo(t *testing.T) {

@@ -80,7 +80,7 @@ func TestInteractiveSSHEnvMergesEnvFileThenExplicitEnv(t *testing.T) {
 }
 
 func TestSSHCommandEnvMergesSandboxProxyEnv(t *testing.T) {
-	proxyURL := "http://sand-http-cache.test.local:3142"
+	proxyURL := "http://sand-http-cache.test.local:3128"
 	env, err := sshCommandEnv("box.local", "", mergeEnv(
 		sandboxProxyEnv(&sandtypes.Box{
 			SharedCacheMounts: sandtypes.SharedCacheMounts{HTTPProxyURL: proxyURL},
@@ -108,7 +108,7 @@ func TestSSHCommandEnvMergesSandboxProxyEnv(t *testing.T) {
 }
 
 func TestSSHCommandEnvExplicitEnvOverridesSandboxProxyEnv(t *testing.T) {
-	proxyURL := "http://sand-http-cache.test.local:3142"
+	proxyURL := "http://sand-http-cache.test.local:3128"
 	overrideURL := "http://override.local:8080"
 	env, err := sshCommandEnv("box.local", "", mergeEnv(
 		sandboxProxyEnv(&sandtypes.Box{

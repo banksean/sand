@@ -336,7 +336,7 @@ func TestDefaultContainerHook_ConfiguresSharedHTTPProxyWhenEnabled(t *testing.T)
 	}
 
 	hook := cfg.defaultContainerHook("sean", "1000", sandtypes.SharedCacheMounts{
-		HTTPProxyURL: "http://sand-http-cache.test.local:3142",
+		HTTPProxyURL: "http://sand-http-cache.test.local:3128",
 	})
 
 	if err := hook.Run(context.Background(), nil, exec); err != nil {
@@ -352,14 +352,14 @@ func TestDefaultContainerHook_ConfiguresSharedHTTPProxyWhenEnabled(t *testing.T)
 		for _, want := range []string{
 			"profile=/etc/profile.d/sand-http-cache.sh",
 			"envfile=/etc/environment",
-			"export http_proxy='http://sand-http-cache.test.local:3142'",
-			"export HTTP_PROXY='http://sand-http-cache.test.local:3142'",
-			"export https_proxy='http://sand-http-cache.test.local:3142'",
-			"export HTTPS_PROXY='http://sand-http-cache.test.local:3142'",
-			"http_proxy=http://sand-http-cache.test.local:3142",
-			"HTTP_PROXY=http://sand-http-cache.test.local:3142",
-			"https_proxy=http://sand-http-cache.test.local:3142",
-			"HTTPS_PROXY=http://sand-http-cache.test.local:3142",
+			"export http_proxy='http://sand-http-cache.test.local:3128'",
+			"export HTTP_PROXY='http://sand-http-cache.test.local:3128'",
+			"export https_proxy='http://sand-http-cache.test.local:3128'",
+			"export HTTPS_PROXY='http://sand-http-cache.test.local:3128'",
+			"http_proxy=http://sand-http-cache.test.local:3128",
+			"HTTP_PROXY=http://sand-http-cache.test.local:3128",
+			"https_proxy=http://sand-http-cache.test.local:3128",
+			"HTTPS_PROXY=http://sand-http-cache.test.local:3128",
 			"no_proxy=localhost,127.0.0.1,::1,.local,.test.local",
 			"NO_PROXY=localhost,127.0.0.1,::1,.local,.test.local",
 		} {

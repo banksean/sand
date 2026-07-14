@@ -206,6 +206,28 @@ func (s *daemonGRPCServer) VSC(ctx context.Context, req *daemonpb.IDRequest) (*d
 	return okStatus(), nil
 }
 
+func (s *daemonGRPCServer) HTTPProxyCache(ctx context.Context, req *daemonpb.HTTPProxyCacheRequest) (*daemonpb.StatusResponse, error) {
+	if err := s.daemon.HTTPProxyCache(ctx, req.GetAction(), nil); err != nil {
+		return nil, err
+	}
+	return okStatus(), nil
+}
+
+func (s *daemonGRPCServer) HTTPProxyCacheStatus(ctx context.Context, _ *daemonpb.HTTPProxyCacheStatusRequest) (*daemonpb.HTTPProxyCacheStatusResponse, error) {
+	status, err := s.daemon.HTTPProxyCacheStatus(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &daemonpb.HTTPProxyCacheStatusResponse{
+		Name:     status.Name,
+		Image:    status.Image,
+		State:    status.State,
+		Url:      status.URL,
+		CacheDir: status.CacheDir,
+		Running:  status.Running,
+	}, nil
+}
+
 func okStatus() *daemonpb.StatusResponse {
 	return &daemonpb.StatusResponse{Status: "ok"}
 }

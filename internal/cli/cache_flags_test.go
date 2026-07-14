@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/alecthomas/kong"
-	kongyaml "github.com/alecthomas/kong-yaml"
 )
 
 func boolPtr(v bool) *bool {
@@ -18,10 +17,11 @@ func TestCacheFlagsSharedCacheConfig(t *testing.T) {
 		name  string
 		flags CacheFlags
 		want  struct {
-			mise   bool
-			apk    bool
-			agents bool
-			bazel  bool
+			mise      bool
+			apk       bool
+			agents    bool
+			bazel     bool
+			httpProxy bool
 		}
 	}{
 		{
@@ -30,26 +30,29 @@ func TestCacheFlagsSharedCacheConfig(t *testing.T) {
 				Mise: boolPtr(true),
 			},
 			want: struct {
-				mise   bool
-				apk    bool
-				agents bool
-				bazel  bool
+				mise      bool
+				apk       bool
+				agents    bool
+				bazel     bool
+				httpProxy bool
 			}{mise: true},
 		},
 		{
 			name: "all caches can be enabled directly",
 			flags: CacheFlags{
-				Mise:   boolPtr(true),
-				APK:    boolPtr(true),
-				Agents: boolPtr(true),
-				Bazel:  boolPtr(true),
+				Mise:      boolPtr(true),
+				APK:       boolPtr(true),
+				Agents:    boolPtr(true),
+				Bazel:     boolPtr(true),
+				HTTPProxy: boolPtr(true),
 			},
 			want: struct {
-				mise   bool
-				apk    bool
-				agents bool
-				bazel  bool
-			}{mise: true, apk: true, agents: true, bazel: true},
+				mise      bool
+				apk       bool
+				agents    bool
+				bazel     bool
+				httpProxy bool
+			}{mise: true, apk: true, agents: true, bazel: true, httpProxy: true},
 		},
 	}
 
@@ -68,6 +71,9 @@ func TestCacheFlagsSharedCacheConfig(t *testing.T) {
 			if got.Bazel != tt.want.bazel {
 				t.Fatalf("got bazel=%v, want bazel=%v", got.Bazel, tt.want.bazel)
 			}
+			if got.HTTPProxy != tt.want.httpProxy {
+				t.Fatalf("got httpProxy=%v, want httpProxy=%v", got.HTTPProxy, tt.want.httpProxy)
+			}
 		})
 	}
 }
@@ -84,14 +90,14 @@ func TestCacheFlagsLoadedByKongYAML(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(homeDir, ".sand.yaml"), []byte("caches:\n  mise: false\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(projDir, ".sand.yaml"), []byte("caches:\n mise: true\n bazel: true\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(projDir, ".sand.yaml"), []byte("caches:\n mise: true\n bazel: true\n httpProxy: true\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
 	var parsed cli
 	parser := kong.Must(
 		&parsed,
-		kong.Configuration(kongyaml.Loader, filepath.Join(homeDir, ".sand.yaml"), filepath.Join(projDir, ".sand.yaml")),
+		kong.Configuration(YAMLConfigLoader, filepath.Join(homeDir, ".sand.yaml"), filepath.Join(projDir, ".sand.yaml")),
 	)
 	_, err := parser.Parse([]string{})
 	if err != nil {
@@ -104,5 +110,8 @@ func TestCacheFlagsLoadedByKongYAML(t *testing.T) {
 	}
 	if !got.Bazel {
 		t.Fatalf("got bazel=%v, want bazel=true", got.Bazel)
+	}
+	if !got.HTTPProxy {
+		t.Fatalf("got httpProxy=%v, want httpProxy=true", got.HTTPProxy)
 	}
 }

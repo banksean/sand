@@ -90,6 +90,13 @@ func (o *xpcContainerOps) Create(ctx context.Context, opts *CreateContainer, ima
 	if err != nil {
 		return "", err
 	}
+	if opts.Publish != "" {
+		publishedPort, err := parsePublishPort(opts.Publish)
+		if err != nil {
+			return "", err
+		}
+		cfg.PublishedPorts = []xpc.PublishPort{publishedPort}
+	}
 	cfg.Networks = defaultNetworkAttachments(id, opts.DNSDomain, opts.Netowrk)
 	if !opts.NoDNS {
 		cfg.DNS = &xpc.DNSConfiguration{
@@ -506,6 +513,60 @@ func parseVolumeFilesystem(spec string) (xpc.Filesystem, error) {
 		Destination: parts[1],
 		Options:     options,
 	}, nil
+}
+
+func parsePublishPort(spec string) (xpc.PublishPort, error) {
+	proto := xpc.PublishProtocolTCP
+	if before, after, ok := strings.Cut(spec, "/"); ok {
+		spec = before
+		switch after {
+		case "", "tcp":
+			proto = xpc.PublishProtocolTCP
+		case "udp":
+			proto = xpc.PublishProtocolUDP
+		default:
+			return xpc.PublishPort{}, fmt.Errorf("invalid publish protocol %q", after)
+		}
+	}
+
+	parts := strings.Split(spec, ":")
+	var hostAddress string
+	var hostPortRaw string
+	var containerPortRaw string
+	switch len(parts) {
+	case 2:
+		hostPortRaw = parts[0]
+		containerPortRaw = parts[1]
+	case 3:
+		hostAddress = parts[0]
+		hostPortRaw = parts[1]
+		containerPortRaw = parts[2]
+	default:
+		return xpc.PublishPort{}, fmt.Errorf("invalid publish spec %q", spec)
+	}
+	hostPort, err := parseUint16(hostPortRaw, "host port")
+	if err != nil {
+		return xpc.PublishPort{}, err
+	}
+	containerPort, err := parseUint16(containerPortRaw, "container port")
+	if err != nil {
+		return xpc.PublishPort{}, err
+	}
+	return xpc.PublishPort{
+		HostAddress:   xpc.IPAddress(hostAddress),
+		HostPort:      hostPort,
+		ContainerPort: containerPort,
+		Proto:         proto,
+		Count:         1,
+	}, nil
+}
+
+func parseUint16(raw, name string) (uint16, error) {
+	value, err := strconv.ParseUint(raw, 10, 16)
+	if err != nil {
+		return 0, fmt.Errorf("invalid %s %q", name, raw)
+	}
+	return uint16(value), nil
 }
 
 func processFiles(stdin io.Reader, stdout, stderr io.Writer, tty bool) ([3]*os.File, func(), error) {

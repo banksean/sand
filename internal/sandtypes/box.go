@@ -74,10 +74,11 @@ type Box struct {
 }
 
 type SharedCacheConfig struct {
-	Mise   bool `json:"mise,omitempty"`
-	APK    bool `json:"apk,omitempty"`
-	Agents bool `json:"agents,omitempty"`
-	Bazel  bool `json:"bazel,omitempty"`
+	Mise      bool `json:"mise,omitempty"`
+	APK       bool `json:"apk,omitempty"`
+	Agents    bool `json:"agents,omitempty"`
+	Bazel     bool `json:"bazel,omitempty"`
+	HTTPProxy bool `json:"httpProxy,omitempty"`
 }
 
 type SharedCacheMounts struct {
@@ -85,6 +86,22 @@ type SharedCacheMounts struct {
 	APKCacheHostDir     string
 	AgentCacheHostDir   string
 	BazelRemoteCacheURL string
+	HTTPProxyURL        string
+}
+
+func SharedHTTPProxyEnv(proxyURL string) map[string]string {
+	if proxyURL == "" {
+		return nil
+	}
+	noProxy := "localhost,127.0.0.1,::1,.local,.test.local"
+	return map[string]string{
+		"http_proxy":  proxyURL,
+		"HTTP_PROXY":  proxyURL,
+		"https_proxy": proxyURL,
+		"HTTPS_PROXY": proxyURL,
+		"no_proxy":    noProxy,
+		"NO_PROXY":    noProxy,
+	}
 }
 
 type GitDetails struct {

@@ -32,6 +32,17 @@ type Client interface {
 	// EnsureImage ensures imageName is present locally and up to date, pulling if needed.
 	// Progress lines from the daemon are written to w as they arrive.
 	EnsureImage(ctx context.Context, imageName string, w io.Writer) error
+	HTTPProxyCache(ctx context.Context, action string) error
+	HTTPProxyCacheStatus(ctx context.Context) (HTTPProxyCacheStatus, error)
+}
+
+type HTTPProxyCacheStatus struct {
+	Name     string
+	Image    string
+	State    string
+	URL      string
+	CacheDir string
+	Running  bool
 }
 
 type ResolveAgentLaunchEnvOpts struct {
