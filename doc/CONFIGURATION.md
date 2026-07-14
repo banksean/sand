@@ -82,7 +82,7 @@ caches:
   apk: true
   agents: true
   bazel: false
-  httpProxy: false
+  http-proxy: false
 ```
 
 `mise: true` makes new sandboxes mount a sand-managed host cache directory for mise and for Go's `GOMODCACHE` and `GOCACHE`, so repeated `mise install`, `go mod download`, `go test`, and `go build` work can be reused across containers.
@@ -93,7 +93,7 @@ caches:
 
 `bazel: true` configures new sandboxes to use a shared Bazel remote build cache at `http://sand-bazel-cache.<container-dns-domain>:8080`. Start that cache service separately with `scripts/bazel-remote-cache-poc.sh`; see [Bazel Remote Cache PoC](BAZEL_REMOTE_CACHE_POC.md).
 
-`httpProxy: true`, or `--caches-http-proxy`, configures new sandboxes to use a shared Squid HTTP proxy at `http://sand-http-cache.<container-dns-domain>:3128`. If no container DNS domain is configured, sand uses `dev.local`, so the default proxy URL is `http://sand-http-cache.dev.local:3128`. Sand starts the managed `sand-http-cache` service container on demand; manage it explicitly with `sand cache http-proxy status|start|stop|restart|clear`.
+`http-proxy: true`, or `--caches-http-proxy`, configures new sandboxes to use a shared Squid HTTP proxy at `http://sand-http-cache.<container-dns-domain>:3128`. If no container DNS domain is configured, sand uses `dev.local`, so the default proxy URL is `http://sand-http-cache.dev.local:3128`. Sand starts the managed `sand-http-cache` service container on demand; manage it explicitly with `sand cache http-proxy status|start|stop|restart|clear`.
 
 HTTPS traffic uses standard proxy `CONNECT` tunneling through the shared proxy. Sand does not install a CA, intercept TLS, or cache encrypted HTTPS payloads.
 

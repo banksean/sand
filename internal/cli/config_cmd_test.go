@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/alecthomas/kong"
+	kongyaml "github.com/alecthomas/kong-yaml"
 )
 
 // --- walkMerge ---
@@ -273,7 +274,7 @@ func TestLoadEffectiveConfigMaps_NormalizesCacheFlags(t *testing.T) {
 	var parsed target
 	parser := kong.Must(
 		&parsed,
-		kong.Configuration(YAMLConfigLoader, filepath.Join(homeDir, ".sand.yaml"), filepath.Join(projDir, ".sand.yaml")),
+		kong.Configuration(kongyaml.Loader, filepath.Join(homeDir, ".sand.yaml"), filepath.Join(projDir, ".sand.yaml")),
 	)
 	if _, err := parser.Parse([]string{}); err != nil {
 		t.Fatalf("parse: %v", err)
@@ -311,7 +312,7 @@ func TestLoadEffectiveConfigMaps_NormalizesCacheFlags(t *testing.T) {
 	if !ok {
 		t.Fatalf("defaults missing caches map: %v", defs)
 	}
-	if defCaches["apk"] != "true" || defCaches["mise"] != "true" || defCaches["agents"] != "true" || defCaches["bazel"] != "false" || defCaches["httpProxy"] != "false" {
+	if defCaches["apk"] != "true" || defCaches["mise"] != "true" || defCaches["agents"] != "true" || defCaches["bazel"] != "false" || defCaches["http-proxy"] != "false" {
 		t.Fatalf("default caches: got %v", defCaches)
 	}
 }
@@ -332,7 +333,7 @@ func TestValidateConfigFilesAcceptsKnownKeys(t *testing.T) {
 log-level: debug
 caches:
   mise: false
-  httpProxy: true
+  http-proxy: true
 caches-apk: true
 new:
   image: test-image:latest
@@ -346,25 +347,6 @@ new-allowed-domains-file: other-allowed-domains.txt
 	parser := kong.Must(&parsed)
 	if err := ValidateConfigFiles(parser, cfgPath); err != nil {
 		t.Fatalf("ValidateConfigFiles: %v", err)
-	}
-}
-
-func TestValidateConfigFilesRejectsOldHTTPProxyCacheKey(t *testing.T) {
-	type target struct {
-		Caches CacheFlags `embed:"" prefix:"caches-"`
-	}
-
-	tmp := t.TempDir()
-	cfgPath := filepath.Join(tmp, ".sand.yaml")
-	if err := os.WriteFile(cfgPath, []byte("caches:\n  http: true\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	var parsed target
-	parser := kong.Must(&parsed)
-	err := ValidateConfigFiles(parser, cfgPath)
-	if err == nil || !strings.Contains(err.Error(), "caches.http") {
-		t.Fatalf("ValidateConfigFiles error = %v, want caches.http rejection", err)
 	}
 }
 

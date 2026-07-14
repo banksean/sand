@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -22,24 +21,6 @@ type ConfigCmd struct {
 }
 
 type ConfigLsCmd struct{}
-
-func YAMLConfigLoader(r io.Reader) (kong.Resolver, error) {
-	config := map[string]any{}
-	err := yaml.NewDecoder(r).Decode(config)
-	if err != nil && !errors.Is(err, io.EOF) {
-		return nil, fmt.Errorf("YAML config decode error: %w", err)
-	}
-	config = normalizeConfigForKong(config)
-	return kong.ResolverFunc(func(context *kong.Context, parent *kong.Path, flag *kong.Flag) (any, error) {
-		path := []string{}
-		for n := parent.Node(); n != nil && n.Type != kong.ApplicationNode; n = n.Parent {
-			path = append([]string{n.Name}, path...)
-		}
-		path = append(path, flag.Name)
-		path = strings.Split(strings.Join(path, "-"), "-")
-		return findConfigValue(config, path), nil
-	}), nil
-}
 
 func (c *ConfigLsCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 	projCfg, userCfg, defaultsCfg, projCfgPath, userCfgPath, err := loadEffectiveConfigMaps(k)
@@ -228,7 +209,7 @@ func normalizeConfigMap(cfg map[string]any) map[string]any {
 		switch {
 		case key == "caches":
 			if nested, ok := value.(map[string]any); ok {
-				normalized[key] = normalizeCacheDisplayConfig(nested)
+				normalized[key] = normalizeConfigMap(nested)
 			} else {
 				normalized[key] = derefValue(value)
 			}
@@ -238,7 +219,7 @@ func normalizeConfigMap(cfg map[string]any) map[string]any {
 				cacheCfg = map[string]any{}
 				normalized["caches"] = cacheCfg
 			}
-			cacheCfg[displayCacheKey(strings.TrimPrefix(key, "caches-"))] = derefValue(value)
+			cacheCfg[strings.TrimPrefix(key, "caches-")] = derefValue(value)
 		default:
 			if nested, ok := value.(map[string]any); ok {
 				normalized[key] = normalizeConfigMap(nested)
@@ -249,70 +230,6 @@ func normalizeConfigMap(cfg map[string]any) map[string]any {
 	}
 
 	return normalized
-}
-
-func normalizeCacheDisplayConfig(cfg map[string]any) map[string]any {
-	normalized := map[string]any{}
-	for key, value := range cfg {
-		displayKey := displayCacheKey(key)
-		if nested, ok := value.(map[string]any); ok {
-			normalized[displayKey] = normalizeConfigMap(nested)
-		} else {
-			normalized[displayKey] = derefValue(value)
-		}
-	}
-	return normalized
-}
-
-func displayCacheKey(key string) string {
-	if key == "http-proxy" {
-		return "httpProxy"
-	}
-	return key
-}
-
-func normalizeConfigForKong(cfg map[string]any) map[string]any {
-	normalized := map[string]any{}
-	for key, value := range cfg {
-		if key == "caches" {
-			if nested, ok := value.(map[string]any); ok {
-				normalized[key] = normalizeCacheConfigForKong(nested)
-			} else {
-				normalized[key] = value
-			}
-			continue
-		}
-		if nested, ok := value.(map[string]any); ok {
-			normalized[key] = normalizeConfigForKong(nested)
-		} else {
-			normalized[key] = value
-		}
-	}
-	return normalized
-}
-
-func normalizeCacheConfigForKong(cfg map[string]any) map[string]any {
-	normalized := map[string]any{}
-	for key, value := range cfg {
-		if key == "httpProxy" {
-			key = "http-proxy"
-		}
-		normalized[key] = value
-	}
-	return normalized
-}
-
-func findConfigValue(config map[string]any, path []string) any {
-	if len(path) == 0 {
-		return config
-	}
-	for i := 0; i < len(path); i++ {
-		prefix := strings.Join(path[:i+1], "-")
-		if child, ok := config[prefix].(map[string]any); ok {
-			return findConfigValue(child, path[i+1:])
-		}
-	}
-	return config[strings.Join(path, "-")]
 }
 
 func derefValue(value any) any {

@@ -86,21 +86,13 @@ func unknownConfigKeys(cfg map[string]any, validKeys map[string]struct{}) []stri
 		if isProfileConfigLeaf(path) {
 			return
 		}
-		key := strings.Join(configValidationPath(path), "-")
+		key := strings.Join(path, "-")
 		if _, ok := validKeys[key]; !ok {
 			unknown = append(unknown, strings.Join(path, "."))
 		}
 	})
 	sort.Strings(unknown)
 	return unknown
-}
-
-func configValidationPath(path []string) []string {
-	normalized := append([]string(nil), path...)
-	if len(normalized) >= 2 && normalized[0] == "caches" && normalized[1] == "httpProxy" {
-		normalized[1] = "http-proxy"
-	}
-	return normalized
 }
 
 func walkConfigLeaves(path []string, value any, visit func(path []string)) {

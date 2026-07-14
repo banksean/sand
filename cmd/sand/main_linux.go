@@ -12,6 +12,7 @@ import (
 	"syscall"
 
 	"github.com/alecthomas/kong"
+	kongyaml "github.com/alecthomas/kong-yaml"
 	"github.com/banksean/sand/internal/cli"
 	"github.com/banksean/sand/internal/daemon"
 	"github.com/banksean/sand/internal/observability"
@@ -136,7 +137,7 @@ func main() {
 
 	kongCtx := kong.Parse(&app,
 		kong.UsageOnError(),
-		kong.Configuration(cli.YAMLConfigLoader, kongConfigPaths...),
+		kong.Configuration(kongyaml.Loader, kongConfigPaths...),
 		kong.Description(description))
 
 	app.initSlog()
