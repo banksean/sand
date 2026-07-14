@@ -166,6 +166,7 @@ type ImageVariantConfig struct {
 }
 
 type ImageVariantContainerConfig struct {
+	Entrypoint []string          `json:"Entrypoint,omitempty"`
 	Cmd        []string          `json:"Cmd,omitempty"`
 	WorkingDir string            `json:"WorkingDir,omitempty"`
 	Labels     map[string]string `json:"Labels,omitempty"`

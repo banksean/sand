@@ -241,6 +241,7 @@ func ociConfigToSandtypes(image xpc.OCIImage) sandtypes.ImageVariantConfig {
 	}
 	var cfg sandtypes.ImageVariantContainerConfig
 	if image.Config != nil {
+		cfg.Entrypoint = append([]string{}, image.Config.Entrypoint...)
 		cfg.Cmd = append([]string{}, image.Config.Cmd...)
 		cfg.Env = append([]string{}, image.Config.Env...)
 		cfg.Labels = image.Config.Labels

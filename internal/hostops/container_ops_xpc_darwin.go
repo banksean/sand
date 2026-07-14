@@ -346,8 +346,13 @@ func createProcessConfig(process ProcessOptions, management ManagementOptions, i
 	args := append([]string{}, initArgs...)
 	if management.Entrypoint != "" {
 		args = append([]string{management.Entrypoint}, args...)
-	} else if len(args) == 0 && imageConfig != nil && len(imageConfig.Cmd) > 0 {
-		args = append(args, imageConfig.Cmd...)
+	} else if imageConfig != nil {
+		if len(args) == 0 {
+			args = append(args, imageConfig.Cmd...)
+		}
+		if len(imageConfig.Entrypoint) > 0 {
+			args = append(append([]string{}, imageConfig.Entrypoint...), args...)
+		}
 	}
 	if len(args) == 0 {
 		args = []string{"/bin/sh"}

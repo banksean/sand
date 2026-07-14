@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/banksean/sand/internal/applecontainer/xpc"
+	"github.com/banksean/sand/internal/sandtypes"
 )
 
 func TestNullStdioUsesDevNull(t *testing.T) {
@@ -173,5 +174,41 @@ func TestApplyExecOptionsWrapsCommandWithShell(t *testing.T) {
 	}
 	if cfg.WorkingDirectory != "/app" {
 		t.Fatalf("WorkingDirectory = %q, want /app", cfg.WorkingDirectory)
+	}
+}
+
+func TestCreateProcessConfigUsesImageEntrypointAndCmd(t *testing.T) {
+	cfg, err := createProcessConfig(ProcessOptions{}, ManagementOptions{}, nil, &sandtypes.ImageVariantContainerConfig{
+		Entrypoint: []string{"/usr/sbin/squid"},
+		Cmd:        []string{"-f", "/etc/squid/squid.conf", "-NYC"},
+	})
+	if err != nil {
+		t.Fatalf("createProcessConfig() error = %v", err)
+	}
+
+	if cfg.Executable != "/usr/sbin/squid" {
+		t.Fatalf("Executable = %q, want /usr/sbin/squid", cfg.Executable)
+	}
+	wantArgs := []string{"-f", "/etc/squid/squid.conf", "-NYC"}
+	if !reflect.DeepEqual(cfg.Arguments, wantArgs) {
+		t.Fatalf("Arguments = %#v, want %#v", cfg.Arguments, wantArgs)
+	}
+}
+
+func TestCreateProcessConfigUsesImageEntrypointWithExplicitArgs(t *testing.T) {
+	cfg, err := createProcessConfig(ProcessOptions{}, ManagementOptions{}, []string{"--foreground"}, &sandtypes.ImageVariantContainerConfig{
+		Entrypoint: []string{"/usr/bin/server"},
+		Cmd:        []string{"--from-image"},
+	})
+	if err != nil {
+		t.Fatalf("createProcessConfig() error = %v", err)
+	}
+
+	if cfg.Executable != "/usr/bin/server" {
+		t.Fatalf("Executable = %q, want /usr/bin/server", cfg.Executable)
+	}
+	wantArgs := []string{"--foreground"}
+	if !reflect.DeepEqual(cfg.Arguments, wantArgs) {
+		t.Fatalf("Arguments = %#v, want %#v", cfg.Arguments, wantArgs)
 	}
 }
