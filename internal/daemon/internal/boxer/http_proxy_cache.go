@@ -19,7 +19,7 @@ import (
 
 const (
 	HTTPProxyCacheContainerName = "sand-http-cache"
-	HTTPProxyCacheImage         = "ubuntu/squid:6.6-24.04_beta"
+	HTTPProxyCacheImage         = "docker.io/ubuntu/squid:6.6-24.04_beta"
 	HTTPProxyCachePort          = 3128
 	httpProxyCacheVersion       = "1"
 	httpProxyCacheDirName       = "http-proxy"
