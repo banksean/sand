@@ -73,6 +73,37 @@ func TestParsePublishPort(t *testing.T) {
 	}
 }
 
+func TestXPCSnapshotToContainerPreservesLabelsAndImage(t *testing.T) {
+	got := xpcSnapshotToContainer(xpc.ContainerSnapshot{
+		Status: xpc.RuntimeStatus("running"),
+		Configuration: xpc.ContainerConfiguration{
+			ID: "sand-http-cache",
+			Labels: map[string]string{
+				"sand.service":         "http-proxy",
+				"sand.service.version": "1",
+			},
+			Image: xpc.ImageDescription{
+				Reference: "ubuntu/squid:6.6-24.04_beta",
+				Descriptor: xpc.Descriptor{
+					Digest:    "sha256:test",
+					Size:      42,
+					MediaType: "application/vnd.oci.image.manifest.v1+json",
+				},
+			},
+		},
+	})
+
+	if got.Configuration.Labels["sand.service"] != "http-proxy" {
+		t.Fatalf("labels = %#v", got.Configuration.Labels)
+	}
+	if got.Configuration.Image.Reference != "ubuntu/squid:6.6-24.04_beta" {
+		t.Fatalf("image reference = %q", got.Configuration.Image.Reference)
+	}
+	if got.Configuration.Image.Descriptor.Digest != "sha256:test" {
+		t.Fatalf("image descriptor = %+v", got.Configuration.Image.Descriptor)
+	}
+}
+
 func TestProcessFilesNonTerminalDoesNotUseCallerFilesForOutputPipes(t *testing.T) {
 	stdin, err := os.Open(os.DevNull)
 	if err != nil {

@@ -764,8 +764,17 @@ func xpcSnapshotToContainer(snapshot xpc.ContainerSnapshot) sandtypes.Container 
 	ctr := sandtypes.Container{
 		Status: sandtypes.ContainerStatus{State: string(snapshot.Status)},
 		Configuration: sandtypes.ContainerConfig{
-			ID:  snapshot.Configuration.ID,
-			SSH: snapshot.Configuration.SSH,
+			ID:     snapshot.Configuration.ID,
+			Labels: stringMapToAny(snapshot.Configuration.Labels),
+			SSH:    snapshot.Configuration.SSH,
+			Image: sandtypes.Image{
+				Reference: snapshot.Configuration.Image.Reference,
+				Descriptor: sandtypes.Descriptor{
+					Digest:    snapshot.Configuration.Image.Descriptor.Digest,
+					Size:      int(snapshot.Configuration.Image.Descriptor.Size),
+					MediaType: snapshot.Configuration.Image.Descriptor.MediaType,
+				},
+			},
 			Resources: sandtypes.Resources{
 				CPUs:          snapshot.Configuration.Resources.CPUs,
 				MemoryInBytes: int64(snapshot.Configuration.Resources.MemoryInBytes),
@@ -797,6 +806,17 @@ func xpcSnapshotToContainer(snapshot xpc.ContainerSnapshot) sandtypes.Container 
 		})
 	}
 	return ctr
+}
+
+func stringMapToAny(values map[string]string) map[string]any {
+	if len(values) == 0 {
+		return nil
+	}
+	out := make(map[string]any, len(values))
+	for key, value := range values {
+		out[key] = value
+	}
+	return out
 }
 
 func xpcStatsToSandtypes(stats xpc.ContainerStats) sandtypes.ContainerStats {

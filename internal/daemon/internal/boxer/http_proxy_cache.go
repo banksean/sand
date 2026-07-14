@@ -281,6 +281,9 @@ func validateHTTPProxyCacheContainer(ctr *sandtypes.Container) error {
 	}
 	service, ok := stringLabel(ctr.Configuration.Labels, httpProxyCacheServiceLabel)
 	if !ok {
+		if isExpectedHTTPProxyCacheImage(ctr.Configuration.Image.Reference) {
+			return nil
+		}
 		return fmt.Errorf("container %q already exists but is not managed by sand", HTTPProxyCacheContainerName)
 	}
 	if service != httpProxyCacheServiceValue {
@@ -290,10 +293,14 @@ func validateHTTPProxyCacheContainer(ctr *sandtypes.Container) error {
 	if !ok || version != httpProxyCacheVersion {
 		return fmt.Errorf("container %q has unsupported service version; run `sand cache http-proxy clear` and start it again", HTTPProxyCacheContainerName)
 	}
-	if image := ctr.Configuration.Image.Reference; image != "" && image != HTTPProxyCacheImage {
+	if image := ctr.Configuration.Image.Reference; image != "" && !isExpectedHTTPProxyCacheImage(image) {
 		return fmt.Errorf("container %q uses image %q, want %q; run `sand cache http-proxy clear` and start it again", HTTPProxyCacheContainerName, image, HTTPProxyCacheImage)
 	}
 	return nil
+}
+
+func isExpectedHTTPProxyCacheImage(image string) bool {
+	return image == HTTPProxyCacheImage || image == "docker.io/"+HTTPProxyCacheImage
 }
 
 func stringLabel(labels map[string]any, key string) (string, bool) {

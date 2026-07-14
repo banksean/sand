@@ -101,6 +101,38 @@ func TestHTTPProxyCacheEnsureRejectsNameCollision(t *testing.T) {
 	}
 }
 
+func TestHTTPProxyCacheEnsureAdoptsExpectedImageWithoutLabels(t *testing.T) {
+	var started bool
+	b := &Boxer{
+		appRoot:      "/tmp/sand-app",
+		FileOps:      &hostops.MockFileOps{},
+		ImageService: imageServiceWithHTTPProxyCacheImage(),
+		ContainerService: &hostops.MockContainerOps{
+			InspectFunc: func(ctx context.Context, containerID string) ([]sandtypes.Container, error) {
+				return []sandtypes.Container{{
+					Status: sandtypes.ContainerStatus{State: "stopped"},
+					Configuration: sandtypes.ContainerConfig{
+						Image: sandtypes.Image{Reference: "docker.io/" + HTTPProxyCacheImage},
+					},
+				}}, nil
+			},
+			StartFunc: func(ctx context.Context, opts *hostops.StartContainer, containerID string) (string, error) {
+				started = true
+				return containerID, nil
+			},
+		},
+	}
+	service := b.HTTPProxyCacheService()
+	service.readinessCheck = func(ctx context.Context) error { return nil }
+
+	if err := service.Ensure(context.Background(), "test.local", nil); err != nil {
+		t.Fatalf("Ensure: %v", err)
+	}
+	if !started {
+		t.Fatal("expected unlabeled stopped squid container to be started")
+	}
+}
+
 func TestHTTPProxyCacheClearDeletesContainerAndCacheDir(t *testing.T) {
 	var deleted, removed bool
 	b := &Boxer{
