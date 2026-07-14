@@ -96,7 +96,7 @@ func TestSSHCommandEnvMergesSandboxProxyEnv(t *testing.T) {
 			t.Fatalf("%s = %q, want %q", key, env[key], proxyURL)
 		}
 	}
-	if env["no_proxy"] != "localhost,127.0.0.1,::1,.local,.test.local" {
+	if env["no_proxy"] != "localhost,127.0.0.1,::1" {
 		t.Fatalf("no_proxy = %q", env["no_proxy"])
 	}
 	if env["NO_PROXY"] != env["no_proxy"] {

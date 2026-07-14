@@ -119,8 +119,8 @@ func TestHookExecutionEnvIncludesHTTPProxy(t *testing.T) {
 		"HTTP_PROXY":  "http://sand-http-cache.test.local:3128",
 		"https_proxy": "http://sand-http-cache.test.local:3128",
 		"HTTPS_PROXY": "http://sand-http-cache.test.local:3128",
-		"no_proxy":    "localhost,127.0.0.1,::1,.local,.test.local",
-		"NO_PROXY":    "localhost,127.0.0.1,::1,.local,.test.local",
+		"no_proxy":    "localhost,127.0.0.1,::1",
+		"NO_PROXY":    "localhost,127.0.0.1,::1",
 	}
 	for key, value := range want {
 		if got := lookupEnvValue(env, key); got != value {

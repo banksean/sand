@@ -93,7 +93,7 @@ func SharedHTTPProxyEnv(proxyURL string) map[string]string {
 	if proxyURL == "" {
 		return nil
 	}
-	noProxy := "localhost,127.0.0.1,::1,.local,.test.local"
+	noProxy := "localhost,127.0.0.1,::1"
 	return map[string]string{
 		"http_proxy":  proxyURL,
 		"HTTP_PROXY":  proxyURL,
