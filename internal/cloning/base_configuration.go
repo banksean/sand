@@ -6,8 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"sort"
-	"strings"
 
 	"github.com/banksean/sand/internal/hookscript"
 	"github.com/banksean/sand/internal/sandtypes"
@@ -255,7 +253,7 @@ func (c *BaseContainerConfiguration) runDefaultContainerHook(ctx context.Context
 
 	if sharedCaches.HTTPProxyURL != "" {
 		runner.runScript("configuring shared HTTP proxy", "configure shared HTTP proxy", "http-proxy-env.txt",
-			httpProxyConfigScript(sharedCaches.HTTPProxyURL))
+			"write-http-proxy-env "+sharedCaches.HTTPProxyURL+"\n")
 	}
 
 	if sharedCaches.BazelRemoteCacheURL != "" {
@@ -316,56 +314,4 @@ func (c *BaseContainerConfiguration) runDefaultContainerHook(ctx context.Context
 
 	slog.InfoContext(ctx, flavor.hookName+" completed", "hook", "default container bootstrap", "flavor", flavor.name)
 	return runner.err()
-}
-
-func httpProxyConfigScript(proxyURL string) string {
-	env := sandtypes.SharedHTTPProxyEnv(proxyURL)
-	keys := make([]string, 0, len(env))
-	for key := range env {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-
-	var profile strings.Builder
-	profile.WriteString("# sand shared HTTP proxy cache\n")
-	for _, key := range keys {
-		profile.WriteString("export ")
-		profile.WriteString(key)
-		profile.WriteString("=")
-		profile.WriteString(shellQuote(env[key]))
-		profile.WriteString("\n")
-	}
-
-	var environment strings.Builder
-	for _, key := range keys {
-		environment.WriteString(key)
-		environment.WriteString("=")
-		environment.WriteString(env[key])
-		environment.WriteString("\n")
-	}
-
-	return fmt.Sprintf(`set -e
-profile=/etc/profile.d/sand-http-cache.sh
-cat > "$profile" <<'EOF'
-%sEOF
-chmod 0644 "$profile"
-
-envfile=/etc/environment
-touch "$envfile"
-tmp="${envfile}.tmp"
-grep -v -E '^(http_proxy|HTTP_PROXY|https_proxy|HTTPS_PROXY|no_proxy|NO_PROXY)=' "$envfile" > "$tmp" || true
-cat >> "$tmp" <<'EOF'
-%sEOF
-mv "$tmp" "$envfile"
-`,
-		profile.String(),
-		environment.String(),
-	)
-}
-
-func shellQuote(s string) string {
-	if s == "" {
-		return "''"
-	}
-	return "'" + strings.ReplaceAll(s, "'", "'\"'\"'") + "'"
 }

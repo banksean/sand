@@ -72,6 +72,13 @@ func mergeEnv(envs ...map[string]string) map[string]string {
 	return merged
 }
 
+func sandboxProxyEnv(sbox *sandtypes.Box) map[string]string {
+	if sbox == nil {
+		return nil
+	}
+	return sandtypes.SharedHTTPProxyEnv(sbox.SharedCacheMounts.HTTPProxyURL)
+}
+
 type plainCommandEnv struct {
 	EnvFile string
 	Env     map[string]string
@@ -277,7 +284,7 @@ func runShell(ctx context.Context, sbox *sandtypes.Box, shell string, args []str
 		return err
 	}
 
-	env, err := interactiveSSHEnv(hostname, scrubSSHAgent, envFile, extraEnv)
+	env, err := interactiveSSHEnv(hostname, scrubSSHAgent, envFile, mergeEnv(sandboxProxyEnv(sbox), extraEnv))
 	if err != nil {
 		return err
 	}
@@ -297,7 +304,7 @@ func runSSHOutput(ctx context.Context, sbox *sandtypes.Box, envFile string, extr
 	if err := ensureSSHReachability(ctx, hostname); err != nil {
 		return "", err
 	}
-	env, err := sshCommandEnv(hostname, envFile, extraEnv)
+	env, err := sshCommandEnv(hostname, envFile, mergeEnv(sandboxProxyEnv(sbox), extraEnv))
 	if err != nil {
 		return "", err
 	}
@@ -315,7 +322,7 @@ func runSSHStream(ctx context.Context, sbox *sandtypes.Box, tty bool, envFile st
 	if err := ensureSSHReachability(ctx, hostname); err != nil {
 		return err
 	}
-	env, err := interactiveSSHEnv(hostname, true, envFile, extraEnv)
+	env, err := interactiveSSHEnv(hostname, true, envFile, mergeEnv(sandboxProxyEnv(sbox), extraEnv))
 	if err != nil {
 		return err
 	}

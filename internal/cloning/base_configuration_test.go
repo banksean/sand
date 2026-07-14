@@ -343,33 +343,30 @@ func TestDefaultContainerHook_ConfiguresSharedHTTPProxyWhenEnabled(t *testing.T)
 		t.Fatalf("hook.Run() error = %v", err)
 	}
 
-	var proxyConfigured bool
-	for _, call := range exec.calls {
-		if !strings.Contains(call, "sand-http-cache.sh") {
-			continue
-		}
-		proxyConfigured = true
-		for _, want := range []string{
-			"profile=/etc/profile.d/sand-http-cache.sh",
-			"envfile=/etc/environment",
-			"export http_proxy='http://sand-http-cache.test.local:3128'",
-			"export HTTP_PROXY='http://sand-http-cache.test.local:3128'",
-			"export https_proxy='http://sand-http-cache.test.local:3128'",
-			"export HTTPS_PROXY='http://sand-http-cache.test.local:3128'",
-			"http_proxy=http://sand-http-cache.test.local:3128",
-			"HTTP_PROXY=http://sand-http-cache.test.local:3128",
-			"https_proxy=http://sand-http-cache.test.local:3128",
-			"HTTPS_PROXY=http://sand-http-cache.test.local:3128",
-			"no_proxy=localhost,127.0.0.1,::1,.local,.test.local",
-			"NO_PROXY=localhost,127.0.0.1,::1,.local,.test.local",
-		} {
-			if !strings.Contains(call, want) {
-				t.Fatalf("shared HTTP proxy script missing %q in call:\n%s", want, call)
-			}
+	profile := exec.streamInputs[commandKey("tee", "/etc/profile.d/sand-http-cache.sh")]
+	for _, want := range []string{
+		"export http_proxy='http://sand-http-cache.test.local:3128'",
+		"export HTTP_PROXY='http://sand-http-cache.test.local:3128'",
+		"export https_proxy='http://sand-http-cache.test.local:3128'",
+		"export HTTPS_PROXY='http://sand-http-cache.test.local:3128'",
+	} {
+		if !strings.Contains(profile, want) {
+			t.Fatalf("shared HTTP proxy profile missing %q in:\n%s", want, profile)
 		}
 	}
-	if !proxyConfigured {
-		t.Fatalf("shared HTTP proxy was not configured; calls: %#v", exec.calls)
+
+	environment := exec.streamInputs[commandKey("tee", "/etc/environment.sand.tmp")]
+	for _, want := range []string{
+		"http_proxy=http://sand-http-cache.test.local:3128",
+		"HTTP_PROXY=http://sand-http-cache.test.local:3128",
+		"https_proxy=http://sand-http-cache.test.local:3128",
+		"HTTPS_PROXY=http://sand-http-cache.test.local:3128",
+		"no_proxy=localhost,127.0.0.1,::1,.local,.test.local",
+		"NO_PROXY=localhost,127.0.0.1,::1,.local,.test.local",
+	} {
+		if !strings.Contains(environment, want) {
+			t.Fatalf("shared HTTP proxy environment missing %q in:\n%s", want, environment)
+		}
 	}
 }
 

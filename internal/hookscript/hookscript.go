@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"sort"
 	"strings"
 	"time"
 
@@ -37,6 +38,7 @@ func NewEngine(exec sandtypes.HookStreamer) *script.Engine {
 			"exec":                   execCmd(exec),
 			"stream":                 streamCmd(exec),
 			"write-managed-bazelrc":  writeManagedBazelrcCmd(exec),
+			"write-http-proxy-env":   writeHTTPProxyEnvCmd(exec),
 			"install-npm-agent":      installNPMAgentCmd(exec),
 			"install-opencode-agent": installOpenCodeAgentCmd(exec),
 		},
@@ -78,6 +80,18 @@ func writeManagedBazelrcCmd(exec sandtypes.HookStreamer) script.Cmd {
 			return nil, script.ErrUsage
 		}
 		err := writeManagedBazelrc(s.Context(), exec, args[0], args[1])
+		return func(*script.State) (string, string, error) {
+			return "", "", err
+		}, nil
+	})
+}
+
+func writeHTTPProxyEnvCmd(exec sandtypes.HookStreamer) script.Cmd {
+	return script.Command(script.CmdUsage{Summary: "write shared HTTP proxy environment", Args: "proxy-url"}, func(s *script.State, args ...string) (script.WaitFunc, error) {
+		if len(args) != 1 {
+			return nil, script.ErrUsage
+		}
+		err := writeHTTPProxyEnv(s.Context(), exec, args[0])
 		return func(*script.State) (string, string, error) {
 			return "", "", err
 		}, nil
@@ -167,6 +181,87 @@ func stripManagedBlock(s string) string {
 		}
 	}
 	return out.String()
+}
+
+func writeHTTPProxyEnv(ctx context.Context, exec sandtypes.HookStreamer, proxyURL string) error {
+	env := sandtypes.SharedHTTPProxyEnv(proxyURL)
+	if len(env) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(env))
+	for key := range env {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	var profile strings.Builder
+	profile.WriteString("# sand shared HTTP proxy cache\n")
+	for _, key := range keys {
+		profile.WriteString("export ")
+		profile.WriteString(key)
+		profile.WriteString("=")
+		profile.WriteString(shellQuote(env[key]))
+		profile.WriteString("\n")
+	}
+
+	if _, err := exec.Exec(ctx, "mkdir", "-p", "/etc/profile.d"); err != nil {
+		return fmt.Errorf("mkdir /etc/profile.d: %w", err)
+	}
+	profilePath := "/etc/profile.d/sand-http-cache.sh"
+	if err := exec.ExecStreamInput(ctx, strings.NewReader(profile.String()), io.Discard, io.Discard, "tee", profilePath); err != nil {
+		return fmt.Errorf("write %s: %w", profilePath, err)
+	}
+	if _, err := exec.Exec(ctx, "chmod", "0644", profilePath); err != nil {
+		return fmt.Errorf("chmod %s: %w", profilePath, err)
+	}
+
+	current, err := exec.Exec(ctx, "cat", "/etc/environment")
+	if err != nil {
+		current = ""
+	}
+	next := stripHTTPProxyEnv(current, keys)
+	for _, key := range keys {
+		next += key + "=" + env[key] + "\n"
+	}
+	tmp := "/etc/environment.sand.tmp"
+	if err := exec.ExecStreamInput(ctx, strings.NewReader(next), io.Discard, io.Discard, "tee", tmp); err != nil {
+		return fmt.Errorf("write %s: %w", tmp, err)
+	}
+	if _, err := exec.Exec(ctx, "mv", tmp, "/etc/environment"); err != nil {
+		return fmt.Errorf("mv %s /etc/environment: %w", tmp, err)
+	}
+	return nil
+}
+
+func stripHTTPProxyEnv(current string, keys []string) string {
+	keySet := make(map[string]struct{}, len(keys))
+	for _, key := range keys {
+		keySet[key] = struct{}{}
+	}
+	var out strings.Builder
+	for _, line := range strings.SplitAfter(current, "\n") {
+		if line == "" {
+			continue
+		}
+		name, _, found := strings.Cut(strings.TrimSuffix(line, "\n"), "=")
+		if found {
+			if _, ok := keySet[name]; ok {
+				continue
+			}
+		}
+		out.WriteString(line)
+		if !strings.HasSuffix(line, "\n") {
+			out.WriteString("\n")
+		}
+	}
+	return out.String()
+}
+
+func shellQuote(s string) string {
+	if s == "" {
+		return "''"
+	}
+	return "'" + strings.ReplaceAll(s, "'", "'\"'\"'") + "'"
 }
 
 func installNPMAgent(ctx context.Context, exec sandtypes.HookStreamer, command, pkg, version string) error {

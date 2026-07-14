@@ -179,6 +179,7 @@ func sharedCacheMountsToProto(mounts sandtypes.SharedCacheMounts) *daemonpb.Shar
 		ApkCacheHostDir:     mounts.APKCacheHostDir,
 		AgentCacheHostDir:   mounts.AgentCacheHostDir,
 		BazelRemoteCacheUrl: mounts.BazelRemoteCacheURL,
+		HttpProxyUrl:        mounts.HTTPProxyURL,
 	}
 }
 
@@ -191,6 +192,7 @@ func sharedCacheMountsFromProto(mounts *daemonpb.SharedCacheMounts) sandtypes.Sh
 		APKCacheHostDir:     mounts.GetApkCacheHostDir(),
 		AgentCacheHostDir:   mounts.GetAgentCacheHostDir(),
 		BazelRemoteCacheURL: mounts.GetBazelRemoteCacheUrl(),
+		HTTPProxyURL:        mounts.GetHttpProxyUrl(),
 	}
 }
 
