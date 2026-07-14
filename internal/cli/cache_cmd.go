@@ -16,11 +16,13 @@ type HTTPProxyCacheCmd struct {
 	Clear   HTTPProxyCacheClearCmd   `cmd:"" help:"remove the shared HTTP proxy cache service and cached data"`
 }
 
-type HTTPProxyCacheStartCmd struct{}
-type HTTPProxyCacheStatusCmd struct{}
-type HTTPProxyCacheStopCmd struct{}
-type HTTPProxyCacheRestartCmd struct{}
-type HTTPProxyCacheClearCmd struct{}
+type (
+	HTTPProxyCacheStartCmd   struct{}
+	HTTPProxyCacheStatusCmd  struct{}
+	HTTPProxyCacheStopCmd    struct{}
+	HTTPProxyCacheRestartCmd struct{}
+	HTTPProxyCacheClearCmd   struct{}
+)
 
 func (c *HTTPProxyCacheStartCmd) Run(cctx *CLIContext) error {
 	return cctx.Daemon.HTTPProxyCache(cctx.Context, "start")
