@@ -58,7 +58,7 @@ if ! command -v /usr/lib/squid/security_file_certgen >/dev/null 2>&1; then
 	if command -v apt-get >/dev/null 2>&1; then
 		export DEBIAN_FRONTEND=noninteractive
 		apt-get update
-		apt-get install -y --no-install-recommends squid-openssl ca-certificates
+		apt-get install -y --no-install-recommends -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold squid-openssl ca-certificates
 		rm -rf /var/lib/apt/lists/*
 	fi
 fi
@@ -81,7 +81,7 @@ if [ ! -d /var/lib/squid/ssl_db ]; then
 	/usr/lib/squid/security_file_certgen -c -s /var/lib/squid/ssl_db -M 4MB
 fi
 chown -R proxy:proxy /var/lib/squid /var/spool/squid 2>/dev/null || true
-exec /usr/sbin/squid -f /etc/squid/squid.conf -NYC
+exec /usr/sbin/squid -f /etc/squid/sand-squid.conf -NYC
 `
 
 type HTTPProxyCacheStatus struct {
@@ -262,7 +262,7 @@ func (s *HTTPProxyCacheService) create(ctx context.Context, localDomain string) 
 					Source: cacheDir,
 					Target: "/var/spool/squid",
 				}.String(),
-				httpProxySquidConfigPath(s.boxer.appRoot) + ":/etc/squid/squid.conf:ro",
+				httpProxySquidConfigPath(s.boxer.appRoot) + ":/etc/squid/sand-squid.conf:ro",
 				httpProxySquidPEMPath(s.boxer.appRoot) + ":/etc/squid/certs/squid.pem:ro",
 			},
 			Entrypoint: "/bin/sh",
