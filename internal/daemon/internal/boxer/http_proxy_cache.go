@@ -60,8 +60,12 @@ if ! command -v /usr/lib/squid/security_file_certgen >/dev/null 2>&1; then
 		tmp="$(mktemp -d)"
 		cd "$tmp"
 		apt-get download squid-common squid-openssl
-		dpkg-deb -x squid-common_*.deb /
-		dpkg-deb -x squid-openssl_*.deb /
+		mkdir root
+		dpkg-deb -x squid-common_*.deb root
+		dpkg-deb -x squid-openssl_*.deb root
+		cp -a root/usr/sbin/. /usr/sbin/
+		cp -a root/usr/lib/squid/. /usr/lib/squid/
+		cp -a root/usr/share/squid/. /usr/share/squid/
 		cd /
 		rm -rf "$tmp"
 		rm -rf /var/lib/apt/lists/*
