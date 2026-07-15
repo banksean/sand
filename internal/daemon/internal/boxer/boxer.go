@@ -389,21 +389,9 @@ func (sb *Boxer) NewSandbox(ctx context.Context, opts NewSandboxOpts) (*sandtype
 	}
 
 	// TODO: move this to .Hydrate? Or make it a startup hook?
-	keys, err := sb.SSHim.NewKeys(ctx, opts.Name+"."+opts.LocalDomain, opts.Username)
-	if err != nil {
-		slog.ErrorContext(ctx, "Boxer.NewSanbox: sshim.Povision", "error", err)
-		return nil, err
-	}
-
-	sshKeysMountSpec := sandtypes.MountSpec{
-		Source:   filepath.Join(artifacts.SandboxWorkDir, "sshkeys"),
-		Target:   "/sshkeys",
-		ReadOnly: true,
-	}
-
-	// Write the data in keys fields to the container
-	if err := sb.saveSSHKeys(sshKeysMountSpec.Source, keys); err != nil {
-		return nil, fmt.Errorf("saveSSHKeys: %w", err)
+	sshKeysMountSpec, result, err, shouldReturn := sb.generateSSHKeysMountSpec(ctx, opts, artifacts)
+	if shouldReturn {
+		return result, err
 	}
 
 	// hostWorkDir may not be the same as the git root - should we save both here instead of
@@ -461,6 +449,26 @@ func (sb *Boxer) NewSandbox(ctx context.Context, opts NewSandboxOpts) (*sandtype
 	}
 
 	return ret, nil
+}
+
+func (sb *Boxer) generateSSHKeysMountSpec(ctx context.Context, opts NewSandboxOpts, artifacts *cloning.CloneArtifacts) (sandtypes.MountSpec, *sandtypes.Box, error, bool) {
+	keys, err := sb.SSHim.NewKeys(ctx, opts.Name+"."+opts.LocalDomain, opts.Username)
+	if err != nil {
+		slog.ErrorContext(ctx, "Boxer.NewSanbox: sshim.Povision", "error", err)
+		return sandtypes.MountSpec{}, nil, err, true
+	}
+
+	sshKeysMountSpec := sandtypes.MountSpec{
+		Source:   filepath.Join(artifacts.SandboxWorkDir, "sshkeys"),
+		Target:   "/sshkeys",
+		ReadOnly: true,
+	}
+
+	// Write the data in keys fields to the container
+	if err := sb.saveSSHKeys(sshKeysMountSpec.Source, keys); err != nil {
+		return sandtypes.MountSpec{}, nil, fmt.Errorf("saveSSHKeys: %w", err), true
+	}
+	return sshKeysMountSpec, nil, nil, false
 }
 
 func (sb *Boxer) saveSSHKeys(keysDir string, keys *sshimmer.Keys) error {
