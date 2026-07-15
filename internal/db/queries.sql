@@ -24,9 +24,9 @@ INSERT INTO sandboxes (
     image_name, dns_domain, env_file, agent_type, profile_name,
     original_git_origin, original_git_branch, original_git_commit,
     original_git_is_dirty, allowed_domains, mount_specs,
-    cpu, memory_mb, default_username, default_uid,
+    container_bootstrapped, cpu, memory_mb, default_username, default_uid,
     deleted_at, trash_work_dir
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(id) DO UPDATE SET
     name = excluded.name,
     state = excluded.state,
@@ -45,6 +45,7 @@ ON CONFLICT(id) DO UPDATE SET
     original_git_is_dirty = excluded.original_git_is_dirty,
     allowed_domains = excluded.allowed_domains,
     mount_specs = excluded.mount_specs,
+    container_bootstrapped = excluded.container_bootstrapped,
     cpu = excluded.cpu,
     memory_mb = excluded.memory_mb,
     default_username = excluded.default_username,
@@ -55,6 +56,13 @@ ON CONFLICT(id) DO UPDATE SET
 -- name: UpdateContainerID :exec
 UPDATE sandboxes
 SET container_id = ?,
+    container_bootstrapped = 0,
+    updated_at = CURRENT_TIMESTAMP
+WHERE id = ?;
+
+-- name: UpdateContainerBootstrapped :exec
+UPDATE sandboxes
+SET container_bootstrapped = ?,
     updated_at = CURRENT_TIMESTAMP
 WHERE id = ?;
 

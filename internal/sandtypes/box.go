@@ -25,6 +25,8 @@ type Box struct {
 	ProfileName string
 	// ContainerID is the ID of the container
 	ContainerID string
+	// ContainerBootstrapped tracks whether first-start hooks have successfully run for the current container.
+	ContainerBootstrapped bool
 	// HostOriginDir is the origin of the sandbox, from which we clone its contents
 	HostOriginDir string
 	// SandboxWorkDir is the host OS filesystem path containing the sandbox's c-o-w clone of hostOriginDir.

@@ -3,6 +3,7 @@ package daemon
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -390,6 +391,227 @@ func TestStartSandboxRecreatesStoppedContainerAfterSocketCreation(t *testing.T) 
 	}
 }
 
+func TestStartSandboxRunsFirstStartHooksForUnbootstrappedContainer(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "sdt-*")
+	if err != nil {
+		t.Fatalf("MkdirTemp: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	ctx := context.Background()
+	sandboxID := "unbootstrapped"
+	t.Cleanup(func() {
+		_ = os.Remove(runtimepaths.ContainerHTTPSocketPath(sandboxID))
+		_ = os.Remove(runtimepaths.ContainerGRPCSocketPath(sandboxID))
+	})
+
+	var execCalls []string
+	containerSvc := &hostops.MockContainerOps{
+		InspectFunc: func(_ context.Context, containerID string) ([]sandtypes.Container, error) {
+			return []sandtypes.Container{{
+				Status: sandtypes.ContainerStatus{State: "stopped"},
+				Configuration: sandtypes.ContainerConfig{
+					SSH: true,
+				},
+			}}, nil
+		},
+		StartFunc: func(_ context.Context, _ *hostops.StartContainer, containerID string) (string, error) {
+			return "started", nil
+		},
+		ExecFunc: func(ctx context.Context, opts *hostops.ExecContainer, containerID, cmd string, env []string, args ...string) (string, error) {
+			execCalls = append(execCalls, strings.Join(append([]string{cmd}, args...), " "))
+			return "", nil
+		},
+	}
+
+	registry := cloning.NewAgentRegistry()
+	registry.Register(&cloning.AgentConfig{
+		Name:          "default",
+		Configuration: testBootstrapContainerConfig{},
+	})
+	b, err := boxer.NewBoxerWithDeps(tmpDir, boxer.BoxerDeps{
+		ContainerService: containerSvc,
+		ImageService:     &testImageOps{},
+		GitOps:           &hostops.MockGitOps{},
+		AgentRegistry:    registry,
+	})
+	if err != nil {
+		t.Fatalf("NewBoxerWithDeps: %v", err)
+	}
+	defer b.Close()
+
+	if err := b.SaveSandbox(ctx, &sandtypes.Box{
+		ID:                    sandboxID,
+		Name:                  sandboxID,
+		AgentType:             "default",
+		ContainerID:           "container-id",
+		ContainerBootstrapped: false,
+		HostOriginDir:         t.TempDir(),
+		SandboxWorkDir:        t.TempDir(),
+		ImageName:             "test-image:latest",
+	}); err != nil {
+		t.Fatalf("SaveSandbox: %v", err)
+	}
+
+	dmn := NewDaemonWithBoxer(tmpDir, "test", b)
+	if err := dmn.StartSandbox(ctx, StartSandboxOpts{ID: sandboxID}); err != nil {
+		t.Fatalf("StartSandbox() error = %v", err)
+	}
+
+	if !containsString(execCalls, "first-start-hook") {
+		t.Fatalf("exec calls = %v, want first-start-hook", execCalls)
+	}
+	if containsString(execCalls, "restart-hook") {
+		t.Fatalf("exec calls = %v, did not want restart-hook", execCalls)
+	}
+	loaded, err := b.Get(ctx, sandboxID)
+	if err != nil {
+		t.Fatalf("Get() error = %v", err)
+	}
+	if !loaded.ContainerBootstrapped {
+		t.Fatal("ContainerBootstrapped = false, want true after first-start success")
+	}
+}
+
+func TestStartSandboxRunsRestartHooksForBootstrappedContainer(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "sdt-*")
+	if err != nil {
+		t.Fatalf("MkdirTemp: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	ctx := context.Background()
+	sandboxID := "bootstrapped"
+	t.Cleanup(func() {
+		_ = os.Remove(runtimepaths.ContainerHTTPSocketPath(sandboxID))
+		_ = os.Remove(runtimepaths.ContainerGRPCSocketPath(sandboxID))
+	})
+
+	var execCalls []string
+	containerSvc := &hostops.MockContainerOps{
+		InspectFunc: func(_ context.Context, containerID string) ([]sandtypes.Container, error) {
+			return []sandtypes.Container{{
+				Status: sandtypes.ContainerStatus{State: "stopped"},
+				Configuration: sandtypes.ContainerConfig{
+					SSH: true,
+				},
+			}}, nil
+		},
+		ExecFunc: func(ctx context.Context, opts *hostops.ExecContainer, containerID, cmd string, env []string, args ...string) (string, error) {
+			execCalls = append(execCalls, strings.Join(append([]string{cmd}, args...), " "))
+			return "", nil
+		},
+	}
+
+	registry := cloning.NewAgentRegistry()
+	registry.Register(&cloning.AgentConfig{
+		Name:          "default",
+		Configuration: testBootstrapContainerConfig{},
+	})
+	b, err := boxer.NewBoxerWithDeps(tmpDir, boxer.BoxerDeps{
+		ContainerService: containerSvc,
+		ImageService:     &testImageOps{},
+		GitOps:           &hostops.MockGitOps{},
+		AgentRegistry:    registry,
+	})
+	if err != nil {
+		t.Fatalf("NewBoxerWithDeps: %v", err)
+	}
+	defer b.Close()
+
+	if err := b.SaveSandbox(ctx, &sandtypes.Box{
+		ID:                    sandboxID,
+		Name:                  sandboxID,
+		AgentType:             "default",
+		ContainerID:           "container-id",
+		ContainerBootstrapped: true,
+		HostOriginDir:         t.TempDir(),
+		SandboxWorkDir:        t.TempDir(),
+		ImageName:             "test-image:latest",
+	}); err != nil {
+		t.Fatalf("SaveSandbox: %v", err)
+	}
+
+	dmn := NewDaemonWithBoxer(tmpDir, "test", b)
+	if err := dmn.StartSandbox(ctx, StartSandboxOpts{ID: sandboxID}); err != nil {
+		t.Fatalf("StartSandbox() error = %v", err)
+	}
+
+	if !containsString(execCalls, "restart-hook") {
+		t.Fatalf("exec calls = %v, want restart-hook", execCalls)
+	}
+	if containsString(execCalls, "first-start-hook") {
+		t.Fatalf("exec calls = %v, did not want first-start-hook", execCalls)
+	}
+	loaded, err := b.Get(ctx, sandboxID)
+	if err != nil {
+		t.Fatalf("Get() error = %v", err)
+	}
+	if !loaded.ContainerBootstrapped {
+		t.Fatal("ContainerBootstrapped = false, want true after restart")
+	}
+}
+
+func TestStartSandboxLeavesContainerUnbootstrappedWhenFirstStartHookFails(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "sdt-*")
+	if err != nil {
+		t.Fatalf("MkdirTemp: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	ctx := context.Background()
+	sandboxID := "failed-bootstrap"
+	t.Cleanup(func() {
+		_ = os.Remove(runtimepaths.ContainerHTTPSocketPath(sandboxID))
+		_ = os.Remove(runtimepaths.ContainerGRPCSocketPath(sandboxID))
+	})
+
+	expectedErr := errors.New("bootstrap failed")
+	containerSvc := &hostops.MockContainerOps{
+		InspectFunc: func(_ context.Context, containerID string) ([]sandtypes.Container, error) {
+			return []sandtypes.Container{{Status: sandtypes.ContainerStatus{State: "stopped"}}}, nil
+		},
+	}
+
+	registry := cloning.NewAgentRegistry()
+	registry.Register(&cloning.AgentConfig{
+		Name:          "default",
+		Configuration: testBootstrapContainerConfig{firstStartErr: expectedErr},
+	})
+	b, err := boxer.NewBoxerWithDeps(tmpDir, boxer.BoxerDeps{
+		ContainerService: containerSvc,
+		ImageService:     &testImageOps{},
+		GitOps:           &hostops.MockGitOps{},
+		AgentRegistry:    registry,
+	})
+	if err != nil {
+		t.Fatalf("NewBoxerWithDeps: %v", err)
+	}
+	defer b.Close()
+
+	if err := b.SaveSandbox(ctx, &sandtypes.Box{
+		ID:                    sandboxID,
+		Name:                  sandboxID,
+		AgentType:             "default",
+		ContainerID:           "container-id",
+		ContainerBootstrapped: false,
+		HostOriginDir:         t.TempDir(),
+		SandboxWorkDir:        t.TempDir(),
+		ImageName:             "test-image:latest",
+	}); err != nil {
+		t.Fatalf("SaveSandbox: %v", err)
+	}
+
+	dmn := NewDaemonWithBoxer(tmpDir, "test", b)
+	if err := dmn.StartSandbox(ctx, StartSandboxOpts{ID: sandboxID}); !errors.Is(err, expectedErr) {
+		t.Fatalf("StartSandbox() error = %v, want %v", err, expectedErr)
+	}
+	loaded, err := b.Get(ctx, sandboxID)
+	if err != nil {
+		t.Fatalf("Get() error = %v", err)
+	}
+	if loaded.ContainerBootstrapped {
+		t.Fatal("ContainerBootstrapped = true, want false after first-start failure")
+	}
+}
+
 type noHookContainerConfig struct{}
 
 func (noHookContainerConfig) GetMounts(cloning.CloneArtifacts) []sandtypes.MountSpec {
@@ -402,6 +624,44 @@ func (noHookContainerConfig) GetFirstStartHooks(cloning.CloneArtifacts) []sandty
 
 func (noHookContainerConfig) GetStartHooks(cloning.CloneArtifacts) []sandtypes.ContainerHook {
 	return nil
+}
+
+type testBootstrapContainerConfig struct {
+	firstStartErr error
+}
+
+func (testBootstrapContainerConfig) GetMounts(cloning.CloneArtifacts) []sandtypes.MountSpec {
+	return nil
+}
+
+func (c testBootstrapContainerConfig) GetFirstStartHooks(cloning.CloneArtifacts) []sandtypes.ContainerHook {
+	return []sandtypes.ContainerHook{
+		sandtypes.NewContainerHook("first-start-hook", func(ctx context.Context, ctr *sandtypes.Container, exec sandtypes.HookStreamer) error {
+			if c.firstStartErr != nil {
+				return c.firstStartErr
+			}
+			_, err := exec.Exec(ctx, "first-start-hook")
+			return err
+		}),
+	}
+}
+
+func (testBootstrapContainerConfig) GetStartHooks(cloning.CloneArtifacts) []sandtypes.ContainerHook {
+	return []sandtypes.ContainerHook{
+		sandtypes.NewContainerHook("restart-hook", func(ctx context.Context, ctr *sandtypes.Container, exec sandtypes.HookStreamer) error {
+			_, err := exec.Exec(ctx, "restart-hook")
+			return err
+		}),
+	}
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 func TestDaemonGRPCList(t *testing.T) {

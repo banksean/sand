@@ -443,11 +443,12 @@ func TestUpdateContainerID(t *testing.T) {
 	os.MkdirAll(sandboxDir, 0o755)
 
 	testBox := &sandtypes.Box{
-		ID:             "test-update",
-		ContainerID:    "original-container",
-		HostOriginDir:  "/tmp/host",
-		SandboxWorkDir: sandboxDir,
-		ImageName:      "test-image",
+		ID:                    "test-update",
+		ContainerID:           "original-container",
+		ContainerBootstrapped: true,
+		HostOriginDir:         "/tmp/host",
+		SandboxWorkDir:        sandboxDir,
+		ImageName:             "test-image",
 	}
 
 	if err := sb.SaveSandbox(ctx, testBox); err != nil {
@@ -467,6 +468,9 @@ func TestUpdateContainerID(t *testing.T) {
 
 	if loadedBox.ContainerID != "new-container-id" {
 		t.Errorf("ContainerID not updated: got %s, want %s", loadedBox.ContainerID, "new-container-id")
+	}
+	if loadedBox.ContainerBootstrapped {
+		t.Error("ContainerBootstrapped = true, want false after container ID update")
 	}
 }
 

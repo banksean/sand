@@ -353,6 +353,129 @@ func TestBoxer_CreateContainerSSHAgentOptIn(t *testing.T) {
 	}
 }
 
+func TestBoxer_RenameSandboxRegeneratesSSHKeysAndMarksReplacementUnbootstrapped(t *testing.T) {
+	ctx := context.Background()
+	oldContainerID := "ancient-smoke"
+	newContainerID := "mysandbox"
+	sandboxDir := t.TempDir()
+
+	var newKeysCalls []struct {
+		domain   string
+		username string
+	}
+	var deleteCalls []string
+	var createCalls []*hostops.CreateContainer
+	mockContainer := &hostops.MockContainerOps{
+		InspectFunc: func(ctx context.Context, containerID string) ([]sandtypes.Container, error) {
+			switch containerID {
+			case oldContainerID:
+				return []sandtypes.Container{{
+					Status: sandtypes.ContainerStatus{State: "stopped"},
+					Configuration: sandtypes.ContainerConfig{
+						SSH: true,
+					},
+				}}, nil
+			case newContainerID:
+				return []sandtypes.Container{{
+					Status: sandtypes.ContainerStatus{State: "stopped"},
+					Configuration: sandtypes.ContainerConfig{
+						SSH: true,
+					},
+				}}, nil
+			default:
+				return nil, nil
+			}
+		},
+		DeleteFunc: func(ctx context.Context, opts *hostops.DeleteContainer, containerID string) (string, error) {
+			deleteCalls = append(deleteCalls, containerID)
+			return "deleted", nil
+		},
+		CreateFunc: func(ctx context.Context, opts *hostops.CreateContainer, image string, args []string) (string, error) {
+			createCalls = append(createCalls, opts)
+			return newContainerID, nil
+		},
+	}
+
+	boxer := newTestBoxer(t, mockContainer, &mockImageOps{})
+	boxer.FileOps = &hostops.MockFileOps{
+		MkdirAllFunc: os.MkdirAll,
+		CreateFunc:   os.Create,
+	}
+	boxer.SSHim = &mockSSHimmer{
+		newKeysFunc: func(ctx context.Context, domain, username string) (*sshimmer.Keys, error) {
+			newKeysCalls = append(newKeysCalls, struct {
+				domain   string
+				username string
+			}{domain: domain, username: username})
+			return &sshimmer.Keys{
+				HostKey:     []byte("new-host-key"),
+				HostKeyPub:  []byte("new-host-key-pub"),
+				HostKeyCert: []byte("new-host-key-cert"),
+				UserCAPub:   []byte("new-user-ca-pub"),
+			}, nil
+		},
+	}
+
+	if err := boxer.SaveSandbox(ctx, &sandtypes.Box{
+		ID:                    "sandbox-id",
+		Name:                  "ancient-smoke",
+		ContainerID:           oldContainerID,
+		ContainerBootstrapped: true,
+		HostOriginDir:         t.TempDir(),
+		SandboxWorkDir:        sandboxDir,
+		ImageName:             "test-image:latest",
+		DNSDomain:             "dev.local",
+		Username:              "sean",
+		Uid:                   "1000",
+	}); err != nil {
+		t.Fatalf("SaveSandbox() error = %v", err)
+	}
+
+	got, err := boxer.RenameSandbox(ctx, "ancient-smoke", "mysandbox", io.Discard)
+	if err != nil {
+		t.Fatalf("RenameSandbox() error = %v", err)
+	}
+	if got.Name != "mysandbox" {
+		t.Fatalf("renamed sandbox name = %q, want mysandbox", got.Name)
+	}
+
+	if len(newKeysCalls) != 1 || newKeysCalls[0].domain != "mysandbox.dev.local" || newKeysCalls[0].username != "sean" {
+		t.Fatalf("NewKeys calls = %#v, want mysandbox.dev.local/sean", newKeysCalls)
+	}
+	if len(deleteCalls) != 1 || deleteCalls[0] != oldContainerID {
+		t.Fatalf("Delete calls = %v, want [%s]", deleteCalls, oldContainerID)
+	}
+	if len(createCalls) != 1 {
+		t.Fatalf("Create calls = %d, want 1", len(createCalls))
+	}
+	if createCalls[0].ManagementOptions.Name != "mysandbox" {
+		t.Fatalf("created container name = %q, want mysandbox", createCalls[0].ManagementOptions.Name)
+	}
+	if !createCalls[0].ManagementOptions.SSH {
+		t.Fatal("renamed container did not preserve ssh-agent forwarding")
+	}
+
+	keyPath := filepath.Join(sandboxDir, "sshkeys", "ssh_host_key")
+	keyBytes, err := os.ReadFile(keyPath)
+	if err != nil {
+		t.Fatalf("ReadFile(%q): %v", keyPath, err)
+	}
+	if string(keyBytes) != "new-host-key" {
+		t.Fatalf("ssh host key = %q, want new-host-key", keyBytes)
+	}
+
+	loaded, err := boxer.Get(ctx, "mysandbox")
+	if err != nil {
+		t.Fatalf("Get() error = %v", err)
+	}
+	if loaded.ContainerID != newContainerID {
+		t.Fatalf("ContainerID = %q, want %q", loaded.ContainerID, newContainerID)
+	}
+	if loaded.ContainerBootstrapped {
+		t.Fatal("ContainerBootstrapped = true, want false after rename replacement")
+	}
+}
+
 type mockWorkspacePreparation struct {
 	prepareFunc func(ctx context.Context, req cloning.CloneRequest) (*cloning.CloneArtifacts, error)
 }

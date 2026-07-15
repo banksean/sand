@@ -17,6 +17,7 @@ type Querier interface {
 	ListSandboxes(ctx context.Context) ([]Sandbox, error)
 	RenameSandbox(ctx context.Context, arg RenameSandboxParams) error
 	SoftDeleteSandbox(ctx context.Context, arg SoftDeleteSandboxParams) error
+	UpdateContainerBootstrapped(ctx context.Context, arg UpdateContainerBootstrappedParams) error
 	UpdateContainerID(ctx context.Context, arg UpdateContainerIDParams) error
 	UpsertSandbox(ctx context.Context, arg UpsertSandboxParams) error
 }

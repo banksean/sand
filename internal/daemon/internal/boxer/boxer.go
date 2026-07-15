@@ -452,7 +452,7 @@ func (sb *Boxer) NewSandbox(ctx context.Context, opts NewSandboxOpts) (*sandtype
 }
 
 func (sb *Boxer) generateSSHKeysMountSpec(ctx context.Context, opts NewSandboxOpts, artifacts *cloning.CloneArtifacts) (sandtypes.MountSpec, *sandtypes.Box, error, bool) {
-	keys, err := sb.SSHim.NewKeys(ctx, opts.Name+"."+opts.LocalDomain, opts.Username)
+	keys, err := sb.SSHim.NewKeys(ctx, sandboxSSHHostname(opts.Name, opts.LocalDomain), opts.Username)
 	if err != nil {
 		slog.ErrorContext(ctx, "Boxer.NewSanbox: sshim.Povision", "error", err)
 		return sandtypes.MountSpec{}, nil, err, true
@@ -469,6 +469,14 @@ func (sb *Boxer) generateSSHKeysMountSpec(ctx context.Context, opts NewSandboxOp
 		return sandtypes.MountSpec{}, nil, fmt.Errorf("saveSSHKeys: %w", err), true
 	}
 	return sshKeysMountSpec, nil, nil, false
+}
+
+func sandboxSSHHostname(name, domain string) string {
+	domain = strings.Trim(domain, ".")
+	if domain == "" {
+		domain = runtimedeps.DefaultDNSDomain
+	}
+	return name + "." + domain
 }
 
 func (sb *Boxer) saveSSHKeys(keysDir string, keys *sshimmer.Keys) error {
@@ -621,6 +629,13 @@ func (sb *Boxer) RenameSandbox(ctx context.Context, oldName, newName string, pro
 
 	enableSSHAgent := sbox.Container != nil && sbox.Container.Configuration.SSH
 	oldRemoteName := sandboxRemoteName(sbox)
+	keys, err := sb.SSHim.NewKeys(ctx, sandboxSSHHostname(newName, sbox.DNSDomain), sbox.Username)
+	if err != nil {
+		return nil, fmt.Errorf("generate ssh keys after rename: %w", err)
+	}
+	if err := sb.saveSSHKeys(cloning.NewStandardPathRegistry(sbox.SandboxWorkDir).SSHKeysDir(), keys); err != nil {
+		return nil, fmt.Errorf("save ssh keys after rename: %w", err)
+	}
 
 	if sbox.ContainerID != "" {
 		fmt.Fprintf(progress, "[sand] deleting container %s\n", sbox.ContainerID)
@@ -801,19 +816,20 @@ func (sb *Boxer) sandboxFromDB(s *db.Sandbox) *sandtypes.Box {
 	mountRequests := mountRequestsFromNullString(s.MountSpecs)
 
 	return &sandtypes.Box{
-		ID:             s.ID,
-		Name:           name,
-		State:          state,
-		AgentType:      agentType,
-		ProfileName:    profileName,
-		ContainerID:    fromNullString(s.ContainerID),
-		HostOriginDir:  s.HostOriginDir,
-		SandboxWorkDir: s.SandboxWorkDir,
-		ImageName:      s.ImageName,
-		DNSDomain:      fromNullString(s.DnsDomain),
-		EnvFile:        fromNullString(s.EnvFile),
-		AllowedDomains: domainsFromNullString(s.AllowedDomains),
-		MountRequests:  mountRequests,
+		ID:                    s.ID,
+		Name:                  name,
+		State:                 state,
+		AgentType:             agentType,
+		ProfileName:           profileName,
+		ContainerID:           fromNullString(s.ContainerID),
+		ContainerBootstrapped: s.ContainerBootstrapped,
+		HostOriginDir:         s.HostOriginDir,
+		SandboxWorkDir:        s.SandboxWorkDir,
+		ImageName:             s.ImageName,
+		DNSDomain:             fromNullString(s.DnsDomain),
+		EnvFile:               fromNullString(s.EnvFile),
+		AllowedDomains:        domainsFromNullString(s.AllowedDomains),
+		MountRequests:         mountRequests,
 		OriginalGitDetails: &sandtypes.GitDetails{
 			RemoteOrigin: fromNullString(s.OriginalGitOrigin),
 			Branch:       fromNullString(s.OriginalGitBranch),
@@ -1162,7 +1178,10 @@ func (sber *Boxer) StartNewContainer(ctx context.Context, sb *sandtypes.Box, pro
 		return err
 	}
 
-	return sber.executeHooks(ctx, sb, hooks, progress)
+	if err := sber.executeHooks(ctx, sb, hooks, progress); err != nil {
+		return err
+	}
+	return sber.UpdateContainerBootstrapped(ctx, sb, true)
 }
 
 // StartExistingContainer starts an existing (previously-started) container instance.
@@ -1347,25 +1366,26 @@ func (sb *Boxer) SaveSandbox(ctx context.Context, sbox *sandtypes.Box) error {
 		sbox.ProfileName = sandtypes.DefaultProfileName
 	}
 	upsertParams := db.UpsertSandboxParams{
-		ID:              sbox.ID,
-		Name:            sbox.Name,
-		State:           sbox.State,
-		ContainerID:     toNullString(sbox.ContainerID),
-		HostOriginDir:   sbox.HostOriginDir,
-		SandboxWorkDir:  sbox.SandboxWorkDir,
-		ImageName:       sbox.ImageName,
-		DnsDomain:       toNullString(sbox.DNSDomain),
-		EnvFile:         toNullString(sbox.EnvFile),
-		AgentType:       toNullString(sbox.AgentType),
-		ProfileName:     toNullString(sbox.ProfileName),
-		AllowedDomains:  domainsToNullString(sbox.AllowedDomains),
-		MountSpecs:      mountRequestsToNullString(sbox.MountRequests),
-		Cpu:             toNullInt(sbox.CPUs),
-		MemoryMb:        toNullInt(sbox.MemoryMB),
-		DefaultUsername: toNullString(sbox.Username),
-		DefaultUid:      toNullString(sbox.Uid),
-		DeletedAt:       sql.NullTime{Time: sbox.DeletedAt, Valid: !sbox.DeletedAt.IsZero()},
-		TrashWorkDir:    toNullString(sbox.TrashWorkDir),
+		ID:                    sbox.ID,
+		Name:                  sbox.Name,
+		State:                 sbox.State,
+		ContainerID:           toNullString(sbox.ContainerID),
+		HostOriginDir:         sbox.HostOriginDir,
+		SandboxWorkDir:        sbox.SandboxWorkDir,
+		ImageName:             sbox.ImageName,
+		DnsDomain:             toNullString(sbox.DNSDomain),
+		EnvFile:               toNullString(sbox.EnvFile),
+		AgentType:             toNullString(sbox.AgentType),
+		ProfileName:           toNullString(sbox.ProfileName),
+		AllowedDomains:        domainsToNullString(sbox.AllowedDomains),
+		MountSpecs:            mountRequestsToNullString(sbox.MountRequests),
+		ContainerBootstrapped: sbox.ContainerBootstrapped,
+		Cpu:                   toNullInt(sbox.CPUs),
+		MemoryMb:              toNullInt(sbox.MemoryMB),
+		DefaultUsername:       toNullString(sbox.Username),
+		DefaultUid:            toNullString(sbox.Uid),
+		DeletedAt:             sql.NullTime{Time: sbox.DeletedAt, Valid: !sbox.DeletedAt.IsZero()},
+		TrashWorkDir:          toNullString(sbox.TrashWorkDir),
 	}
 	if sbox.OriginalGitDetails != nil {
 		upsertParams.OriginalGitOrigin = toNullString(sbox.OriginalGitDetails.RemoteOrigin)
@@ -1383,12 +1403,24 @@ func (sb *Boxer) SaveSandbox(ctx context.Context, sbox *sandtypes.Box) error {
 // UpdateContainerID updates the ContainerID field of a sandbox and persists it.
 func (sb *Boxer) UpdateContainerID(ctx context.Context, sbox *sandtypes.Box, containerID string) error {
 	sbox.ContainerID = containerID
+	sbox.ContainerBootstrapped = false
 	err := sb.queries.UpdateContainerID(ctx, db.UpdateContainerIDParams{
 		ContainerID: toNullString(containerID),
 		ID:          sbox.ID,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to update container ID: %w", err)
+	}
+	return nil
+}
+
+func (sb *Boxer) UpdateContainerBootstrapped(ctx context.Context, sbox *sandtypes.Box, bootstrapped bool) error {
+	sbox.ContainerBootstrapped = bootstrapped
+	if err := sb.queries.UpdateContainerBootstrapped(ctx, db.UpdateContainerBootstrappedParams{
+		ContainerBootstrapped: bootstrapped,
+		ID:                    sbox.ID,
+	}); err != nil {
+		return fmt.Errorf("failed to update container bootstrap state: %w", err)
 	}
 	return nil
 }

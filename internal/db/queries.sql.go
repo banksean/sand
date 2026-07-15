@@ -21,7 +21,7 @@ func (q *Queries) DeleteSandbox(ctx context.Context, id string) error {
 }
 
 const getActiveSandboxByName = `-- name: GetActiveSandboxByName :one
-SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains, cpu, memory_mb, default_username, default_uid, name, state, deleted_at, trash_work_dir, profile_name, mount_specs FROM sandboxes
+SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains, cpu, memory_mb, default_username, default_uid, name, state, deleted_at, trash_work_dir, profile_name, mount_specs, container_bootstrapped FROM sandboxes
 WHERE name = ? AND state = 'active'
 LIMIT 1
 `
@@ -55,12 +55,13 @@ func (q *Queries) GetActiveSandboxByName(ctx context.Context, name string) (Sand
 		&i.TrashWorkDir,
 		&i.ProfileName,
 		&i.MountSpecs,
+		&i.ContainerBootstrapped,
 	)
 	return i, err
 }
 
 const getSandboxByID = `-- name: GetSandboxByID :one
-SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains, cpu, memory_mb, default_username, default_uid, name, state, deleted_at, trash_work_dir, profile_name, mount_specs FROM sandboxes
+SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains, cpu, memory_mb, default_username, default_uid, name, state, deleted_at, trash_work_dir, profile_name, mount_specs, container_bootstrapped FROM sandboxes
 WHERE id = ?
 LIMIT 1
 `
@@ -94,12 +95,13 @@ func (q *Queries) GetSandboxByID(ctx context.Context, id string) (Sandbox, error
 		&i.TrashWorkDir,
 		&i.ProfileName,
 		&i.MountSpecs,
+		&i.ContainerBootstrapped,
 	)
 	return i, err
 }
 
 const getSandboxesByImage = `-- name: GetSandboxesByImage :many
-SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains, cpu, memory_mb, default_username, default_uid, name, state, deleted_at, trash_work_dir, profile_name, mount_specs FROM sandboxes
+SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains, cpu, memory_mb, default_username, default_uid, name, state, deleted_at, trash_work_dir, profile_name, mount_specs, container_bootstrapped FROM sandboxes
 WHERE image_name = ? AND state = 'active'
 ORDER BY created_at DESC
 `
@@ -139,6 +141,7 @@ func (q *Queries) GetSandboxesByImage(ctx context.Context, imageName string) ([]
 			&i.TrashWorkDir,
 			&i.ProfileName,
 			&i.MountSpecs,
+			&i.ContainerBootstrapped,
 		); err != nil {
 			return nil, err
 		}
@@ -154,7 +157,7 @@ func (q *Queries) GetSandboxesByImage(ctx context.Context, imageName string) ([]
 }
 
 const listDeletedSandboxes = `-- name: ListDeletedSandboxes :many
-SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains, cpu, memory_mb, default_username, default_uid, name, state, deleted_at, trash_work_dir, profile_name, mount_specs FROM sandboxes
+SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains, cpu, memory_mb, default_username, default_uid, name, state, deleted_at, trash_work_dir, profile_name, mount_specs, container_bootstrapped FROM sandboxes
 WHERE state = 'deleted'
 ORDER BY deleted_at DESC, created_at DESC
 `
@@ -194,6 +197,7 @@ func (q *Queries) ListDeletedSandboxes(ctx context.Context) ([]Sandbox, error) {
 			&i.TrashWorkDir,
 			&i.ProfileName,
 			&i.MountSpecs,
+			&i.ContainerBootstrapped,
 		); err != nil {
 			return nil, err
 		}
@@ -209,7 +213,7 @@ func (q *Queries) ListDeletedSandboxes(ctx context.Context) ([]Sandbox, error) {
 }
 
 const listSandboxes = `-- name: ListSandboxes :many
-SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains, cpu, memory_mb, default_username, default_uid, name, state, deleted_at, trash_work_dir, profile_name, mount_specs FROM sandboxes
+SELECT id, container_id, host_origin_dir, sandbox_work_dir, image_name, dns_domain, env_file, created_at, updated_at, agent_type, original_git_origin, original_git_branch, original_git_commit, original_git_is_dirty, allowed_domains, cpu, memory_mb, default_username, default_uid, name, state, deleted_at, trash_work_dir, profile_name, mount_specs, container_bootstrapped FROM sandboxes
 WHERE state = 'active'
 ORDER BY created_at DESC
 `
@@ -249,6 +253,7 @@ func (q *Queries) ListSandboxes(ctx context.Context) ([]Sandbox, error) {
 			&i.TrashWorkDir,
 			&i.ProfileName,
 			&i.MountSpecs,
+			&i.ContainerBootstrapped,
 		); err != nil {
 			return nil, err
 		}
@@ -300,9 +305,27 @@ func (q *Queries) SoftDeleteSandbox(ctx context.Context, arg SoftDeleteSandboxPa
 	return err
 }
 
+const updateContainerBootstrapped = `-- name: UpdateContainerBootstrapped :exec
+UPDATE sandboxes
+SET container_bootstrapped = ?,
+    updated_at = CURRENT_TIMESTAMP
+WHERE id = ?
+`
+
+type UpdateContainerBootstrappedParams struct {
+	ContainerBootstrapped bool   `json:"container_bootstrapped"`
+	ID                    string `json:"id"`
+}
+
+func (q *Queries) UpdateContainerBootstrapped(ctx context.Context, arg UpdateContainerBootstrappedParams) error {
+	_, err := q.db.ExecContext(ctx, updateContainerBootstrapped, arg.ContainerBootstrapped, arg.ID)
+	return err
+}
+
 const updateContainerID = `-- name: UpdateContainerID :exec
 UPDATE sandboxes
 SET container_id = ?,
+    container_bootstrapped = 0,
     updated_at = CURRENT_TIMESTAMP
 WHERE id = ?
 `
@@ -323,9 +346,9 @@ INSERT INTO sandboxes (
     image_name, dns_domain, env_file, agent_type, profile_name,
     original_git_origin, original_git_branch, original_git_commit,
     original_git_is_dirty, allowed_domains, mount_specs,
-    cpu, memory_mb, default_username, default_uid,
+    container_bootstrapped, cpu, memory_mb, default_username, default_uid,
     deleted_at, trash_work_dir
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(id) DO UPDATE SET
     name = excluded.name,
     state = excluded.state,
@@ -344,6 +367,7 @@ ON CONFLICT(id) DO UPDATE SET
     original_git_is_dirty = excluded.original_git_is_dirty,
     allowed_domains = excluded.allowed_domains,
     mount_specs = excluded.mount_specs,
+    container_bootstrapped = excluded.container_bootstrapped,
     cpu = excluded.cpu,
     memory_mb = excluded.memory_mb,
     default_username = excluded.default_username,
@@ -353,29 +377,30 @@ ON CONFLICT(id) DO UPDATE SET
 `
 
 type UpsertSandboxParams struct {
-	ID                 string         `json:"id"`
-	Name               string         `json:"name"`
-	State              string         `json:"state"`
-	ContainerID        sql.NullString `json:"container_id"`
-	HostOriginDir      string         `json:"host_origin_dir"`
-	SandboxWorkDir     string         `json:"sandbox_work_dir"`
-	ImageName          string         `json:"image_name"`
-	DnsDomain          sql.NullString `json:"dns_domain"`
-	EnvFile            sql.NullString `json:"env_file"`
-	AgentType          sql.NullString `json:"agent_type"`
-	ProfileName        sql.NullString `json:"profile_name"`
-	OriginalGitOrigin  sql.NullString `json:"original_git_origin"`
-	OriginalGitBranch  sql.NullString `json:"original_git_branch"`
-	OriginalGitCommit  sql.NullString `json:"original_git_commit"`
-	OriginalGitIsDirty bool           `json:"original_git_is_dirty"`
-	AllowedDomains     sql.NullString `json:"allowed_domains"`
-	MountSpecs         sql.NullString `json:"mount_specs"`
-	Cpu                sql.NullInt64  `json:"cpu"`
-	MemoryMb           sql.NullInt64  `json:"memory_mb"`
-	DefaultUsername    sql.NullString `json:"default_username"`
-	DefaultUid         sql.NullString `json:"default_uid"`
-	DeletedAt          sql.NullTime   `json:"deleted_at"`
-	TrashWorkDir       sql.NullString `json:"trash_work_dir"`
+	ID                    string         `json:"id"`
+	Name                  string         `json:"name"`
+	State                 string         `json:"state"`
+	ContainerID           sql.NullString `json:"container_id"`
+	HostOriginDir         string         `json:"host_origin_dir"`
+	SandboxWorkDir        string         `json:"sandbox_work_dir"`
+	ImageName             string         `json:"image_name"`
+	DnsDomain             sql.NullString `json:"dns_domain"`
+	EnvFile               sql.NullString `json:"env_file"`
+	AgentType             sql.NullString `json:"agent_type"`
+	ProfileName           sql.NullString `json:"profile_name"`
+	OriginalGitOrigin     sql.NullString `json:"original_git_origin"`
+	OriginalGitBranch     sql.NullString `json:"original_git_branch"`
+	OriginalGitCommit     sql.NullString `json:"original_git_commit"`
+	OriginalGitIsDirty    bool           `json:"original_git_is_dirty"`
+	AllowedDomains        sql.NullString `json:"allowed_domains"`
+	MountSpecs            sql.NullString `json:"mount_specs"`
+	ContainerBootstrapped bool           `json:"container_bootstrapped"`
+	Cpu                   sql.NullInt64  `json:"cpu"`
+	MemoryMb              sql.NullInt64  `json:"memory_mb"`
+	DefaultUsername       sql.NullString `json:"default_username"`
+	DefaultUid            sql.NullString `json:"default_uid"`
+	DeletedAt             sql.NullTime   `json:"deleted_at"`
+	TrashWorkDir          sql.NullString `json:"trash_work_dir"`
 }
 
 func (q *Queries) UpsertSandbox(ctx context.Context, arg UpsertSandboxParams) error {
@@ -397,6 +422,7 @@ func (q *Queries) UpsertSandbox(ctx context.Context, arg UpsertSandboxParams) er
 		arg.OriginalGitIsDirty,
 		arg.AllowedDomains,
 		arg.MountSpecs,
+		arg.ContainerBootstrapped,
 		arg.Cpu,
 		arg.MemoryMb,
 		arg.DefaultUsername,

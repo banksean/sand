@@ -555,7 +555,7 @@ func (d *Daemon) StartSandbox(ctx context.Context, opts StartSandboxOpts) error 
 	go d.serveInnieGRPCSocket(ctx, sbox.ID, grpcListener)
 
 	var startErr error
-	if needsRecreate {
+	if needsRecreate || !sbox.ContainerBootstrapped {
 		startErr = d.boxer.StartNewContainer(ctx, sbox, nil)
 	} else {
 		startErr = d.boxer.StartExistingContainer(ctx, sbox)

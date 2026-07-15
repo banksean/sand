@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS sandboxes (
     original_git_is_dirty BOOLEAN NOT NULL DEFAULT 0,
     allowed_domains TEXT,
     mount_specs TEXT,
+    container_bootstrapped BOOLEAN NOT NULL DEFAULT 1,
     default_username TEXT,
     default_uid TEXT,
     deleted_at DATETIME,
