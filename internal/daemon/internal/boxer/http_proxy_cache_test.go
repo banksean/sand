@@ -67,7 +67,7 @@ func TestHTTPProxyCacheEnsureCreatesAndStartsMissingContainer(t *testing.T) {
 				if opts.Entrypoint != "/bin/sh" {
 					t.Fatalf("entrypoint = %q", opts.Entrypoint)
 				}
-				if len(args) != 2 || args[0] != "-c" || !strings.Contains(args[1], "apt-get install -y --no-install-recommends -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold squid-openssl ca-certificates") || !strings.Contains(args[1], "security_file_certgen") {
+				if len(args) != 2 || args[0] != "-c" || !strings.Contains(args[1], "apt-get download squid-common squid-openssl") || !strings.Contains(args[1], "dpkg-deb -x squid-openssl_*.deb /") || !strings.Contains(args[1], "security_file_certgen") {
 					t.Fatalf("args = %#v", args)
 				}
 				return HTTPProxyCacheContainerName, nil

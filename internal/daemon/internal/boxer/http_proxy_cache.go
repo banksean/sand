@@ -56,9 +56,14 @@ const httpProxyCacheEntrypointScript = `set -eu
 mkdir -p /var/lib/squid /etc/squid/certs
 if ! command -v /usr/lib/squid/security_file_certgen >/dev/null 2>&1; then
 	if command -v apt-get >/dev/null 2>&1; then
-		export DEBIAN_FRONTEND=noninteractive
 		apt-get update
-		apt-get install -y --no-install-recommends -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold squid-openssl ca-certificates
+		tmp="$(mktemp -d)"
+		cd "$tmp"
+		apt-get download squid-common squid-openssl
+		dpkg-deb -x squid-common_*.deb /
+		dpkg-deb -x squid-openssl_*.deb /
+		cd /
+		rm -rf "$tmp"
 		rm -rf /var/lib/apt/lists/*
 	fi
 fi
