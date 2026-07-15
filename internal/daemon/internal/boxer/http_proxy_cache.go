@@ -90,9 +90,8 @@ if [ ! -d /var/lib/squid/ssl_db ]; then
 	/usr/lib/squid/security_file_certgen -c -s /var/lib/squid/ssl_db -M 4MB
 fi
 chown -R proxy:proxy /var/lib/squid /var/spool/squid 2>/dev/null || true
-/usr/sbin/squid -k parse -f /etc/squid/sand-squid.conf -NYC
 /usr/sbin/squid -z -f /etc/squid/sand-squid.conf -NYC
-exec /usr/sbin/squid -f /etc/squid/sand-squid.conf -NYC -d 1
+exec /usr/sbin/squid -f /etc/squid/sand-squid.conf -NYC
 `
 
 type HTTPProxyCacheStatus struct {
