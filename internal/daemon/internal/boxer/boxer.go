@@ -995,6 +995,7 @@ func (sb *Boxer) ensureSharedCacheMounts(cfg sandtypes.SharedCacheConfig, localD
 
 	if cfg.HTTPProxy {
 		mounts.HTTPProxyURL = httpProxyCacheURL(localDomain)
+		mounts.HTTPProxyCAHostPath = httpProxyCACertPath(sb.appRoot)
 	}
 
 	return mounts, nil
@@ -1028,6 +1029,9 @@ func (sber *Boxer) CreateContainer(ctx context.Context, sb *sandtypes.Box, enabl
 	volumeOpts := []string{}
 	volumeOpts = append(volumeOpts, runtimepaths.ContainerHTTPSocketPath(sb.ID)+":/run/host-services/sandd.sock")
 	volumeOpts = append(volumeOpts, runtimepaths.ContainerGRPCSocketPath(sb.ID)+":/run/host-services/sandd.grpc.sock")
+	if sb.SharedCacheMounts.HTTPProxyCAHostPath != "" {
+		volumeOpts = append(volumeOpts, sb.SharedCacheMounts.HTTPProxyCAHostPath+":"+sandtypes.HTTPProxyCACertContainerPath+":ro")
+	}
 
 	mgmtOpts := hostops.ManagementOptions{
 		Name:      sandboxContainerName(sb),

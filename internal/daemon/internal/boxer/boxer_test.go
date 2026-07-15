@@ -89,6 +89,9 @@ func TestEnsureSharedCacheMounts_HTTPProxyURL(t *testing.T) {
 	if mounts.HTTPProxyURL != "http://sand-http-cache.test.local:3128" {
 		t.Fatalf("http proxy URL = %q", mounts.HTTPProxyURL)
 	}
+	if mounts.HTTPProxyCAHostPath != "/tmp/sand-app/squid/squid.crt" {
+		t.Fatalf("http proxy CA host path = %q", mounts.HTTPProxyCAHostPath)
+	}
 }
 
 func TestEnsureSharedCacheMounts_HTTPProxyURLDefaultDomain(t *testing.T) {

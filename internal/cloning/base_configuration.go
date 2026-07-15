@@ -252,8 +252,12 @@ func (c *BaseContainerConfiguration) runDefaultContainerHook(ctx context.Context
 	runner.run("copying /root/.ssh to ~/.ssh", "copy /root/.ssh", "cp", "-r", "/root/.ssh", "/home/"+username+"/.ssh")
 
 	if sharedCaches.HTTPProxyURL != "" {
+		body := "write-http-proxy-env " + sharedCaches.HTTPProxyURL + "\n"
+		if sharedCaches.HTTPProxyCAHostPath != "" {
+			body = "write-http-proxy-env " + sharedCaches.HTTPProxyURL + " " + sandtypes.HTTPProxyCACertContainerPath + "\n"
+		}
 		runner.runScript("configuring shared HTTP proxy", "configure shared HTTP proxy", "http-proxy-env.txt",
-			"write-http-proxy-env "+sharedCaches.HTTPProxyURL+"\n")
+			body)
 	}
 
 	if sharedCaches.BazelRemoteCacheURL != "" {

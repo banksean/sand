@@ -186,6 +186,7 @@ message SharedCacheMounts {
   string agent_cache_host_dir = 3;
   string bazel_remote_cache_url = 4;
   string http_proxy_url = 5;
+  string http_proxy_ca_host_path = 6;
 }
 
 message GitDetails {

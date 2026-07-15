@@ -81,7 +81,7 @@ func TestXPCSnapshotToContainerPreservesLabelsAndImage(t *testing.T) {
 			ID: "sand-http-cache",
 			Labels: map[string]string{
 				"sand.service":         "http-proxy",
-				"sand.service.version": "1",
+				"sand.service.version": "2",
 			},
 			Image: xpc.ImageDescription{
 				Reference: "ubuntu/squid:6.6-24.04_beta",

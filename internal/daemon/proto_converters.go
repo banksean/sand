@@ -180,6 +180,7 @@ func sharedCacheMountsToProto(mounts sandtypes.SharedCacheMounts) *daemonpb.Shar
 		AgentCacheHostDir:   mounts.AgentCacheHostDir,
 		BazelRemoteCacheUrl: mounts.BazelRemoteCacheURL,
 		HttpProxyUrl:        mounts.HTTPProxyURL,
+		HttpProxyCaHostPath: mounts.HTTPProxyCAHostPath,
 	}
 }
 
@@ -193,6 +194,7 @@ func sharedCacheMountsFromProto(mounts *daemonpb.SharedCacheMounts) sandtypes.Sh
 		AgentCacheHostDir:   mounts.GetAgentCacheHostDir(),
 		BazelRemoteCacheURL: mounts.GetBazelRemoteCacheUrl(),
 		HTTPProxyURL:        mounts.GetHttpProxyUrl(),
+		HTTPProxyCAHostPath: mounts.GetHttpProxyCaHostPath(),
 	}
 }
 

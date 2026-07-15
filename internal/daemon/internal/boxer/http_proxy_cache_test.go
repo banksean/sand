@@ -50,8 +50,23 @@ func TestHTTPProxyCacheEnsureCreatesAndStartsMissingContainer(t *testing.T) {
 				if opts.Label[httpProxyCacheServiceLabel] != httpProxyCacheServiceValue {
 					t.Fatalf("service label = %v", opts.Label)
 				}
-				if len(opts.Volume) != 1 || !strings.Contains(opts.Volume[0], "target=/var/spool/squid") {
+				if len(opts.Volume) != 3 {
 					t.Fatalf("volume = %#v", opts.Volume)
+				}
+				for _, want := range []string{
+					"target=/var/spool/squid",
+					"target=/etc/squid/squid.conf",
+					"target=/etc/squid/certs/squid.pem",
+				} {
+					if !strings.Contains(strings.Join(opts.Volume, "\n"), want) {
+						t.Fatalf("volume missing %q: %#v", want, opts.Volume)
+					}
+				}
+				if opts.Entrypoint != "/bin/sh" {
+					t.Fatalf("entrypoint = %q", opts.Entrypoint)
+				}
+				if len(args) != 2 || args[0] != "-c" || !strings.Contains(args[1], "security_file_certgen") {
+					t.Fatalf("args = %#v", args)
 				}
 				return HTTPProxyCacheContainerName, nil
 			},
@@ -168,6 +183,40 @@ func TestHTTPProxyCacheClearDeletesContainerAndCacheDir(t *testing.T) {
 	}
 	if !deleted || !removed {
 		t.Fatalf("deleted=%v removed=%v", deleted, removed)
+	}
+}
+
+func TestHTTPProxyCacheEnsureWritesSquidCAAndConfig(t *testing.T) {
+	appRoot := t.TempDir()
+	b := &Boxer{
+		appRoot: appRoot,
+		FileOps: &hostops.MockFileOps{
+			MkdirAllFunc: os.MkdirAll,
+			WriteFileFunc: func(path string, data []byte, perm os.FileMode) error {
+				return os.WriteFile(path, data, perm)
+			},
+		},
+	}
+
+	if err := b.HTTPProxyCacheService().ensureSquidFiles(); err != nil {
+		t.Fatalf("ensureSquidFiles: %v", err)
+	}
+	for _, path := range []string{
+		httpProxySquidKeyPath(appRoot),
+		httpProxyCACertPath(appRoot),
+		httpProxySquidPEMPath(appRoot),
+		httpProxySquidConfigPath(appRoot),
+	} {
+		if _, err := os.Stat(path); err != nil {
+			t.Fatalf("expected %s to exist: %v", path, err)
+		}
+	}
+	config, err := os.ReadFile(httpProxySquidConfigPath(appRoot))
+	if err != nil {
+		t.Fatalf("read squid.conf: %v", err)
+	}
+	if !strings.Contains(string(config), "ssl-bump") || !strings.Contains(string(config), "ssl_bump bump all") {
+		t.Fatalf("squid config missing SSL bumping directives:\n%s", config)
 	}
 }
 

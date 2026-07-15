@@ -4,6 +4,8 @@ import (
 	"time"
 )
 
+const HTTPProxyCACertContainerPath = "/usr/local/share/ca-certificates/sand-http-cache.crt"
+
 // Box is a "sandbox" - it represents the connection between
 // - a local filesystem clone of a local dev workspace directory
 // - a local container instance (whose state is managed by a separate container service)
@@ -89,6 +91,7 @@ type SharedCacheMounts struct {
 	AgentCacheHostDir   string
 	BazelRemoteCacheURL string
 	HTTPProxyURL        string
+	HTTPProxyCAHostPath string
 }
 
 func SharedHTTPProxyEnv(proxyURL string) map[string]string {

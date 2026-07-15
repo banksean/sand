@@ -1593,6 +1593,7 @@ type SharedCacheMounts struct {
 	AgentCacheHostDir   string                 `protobuf:"bytes,3,opt,name=agent_cache_host_dir,json=agentCacheHostDir,proto3" json:"agent_cache_host_dir,omitempty"`
 	BazelRemoteCacheUrl string                 `protobuf:"bytes,4,opt,name=bazel_remote_cache_url,json=bazelRemoteCacheUrl,proto3" json:"bazel_remote_cache_url,omitempty"`
 	HttpProxyUrl        string                 `protobuf:"bytes,5,opt,name=http_proxy_url,json=httpProxyUrl,proto3" json:"http_proxy_url,omitempty"`
+	HttpProxyCaHostPath string                 `protobuf:"bytes,6,opt,name=http_proxy_ca_host_path,json=httpProxyCaHostPath,proto3" json:"http_proxy_ca_host_path,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -1658,6 +1659,13 @@ func (x *SharedCacheMounts) GetBazelRemoteCacheUrl() string {
 func (x *SharedCacheMounts) GetHttpProxyUrl() string {
 	if x != nil {
 		return x.HttpProxyUrl
+	}
+	return ""
+}
+
+func (x *SharedCacheMounts) GetHttpProxyCaHostPath() string {
+	if x != nil {
+		return x.HttpProxyCaHostPath
 	}
 	return ""
 }
@@ -3730,13 +3738,14 @@ const file_internal_daemon_daemonpb_daemon_proto_rawDesc = "" +
 	"\x05clone\x18\x04 \x01(\tR\x05clone\x12\x16\n" +
 	"\x06target\x18\x05 \x01(\tR\x06target\x12\x1b\n" +
 	"\tread_only\x18\x06 \x01(\bR\breadOnly\x12\x18\n" +
-	"\aruntime\x18\a \x01(\tR\aruntime\"\xfb\x01\n" +
+	"\aruntime\x18\a \x01(\tR\aruntime\"\xb1\x02\n" +
 	"\x11SharedCacheMounts\x12-\n" +
 	"\x13mise_cache_host_dir\x18\x01 \x01(\tR\x10miseCacheHostDir\x12+\n" +
 	"\x12apk_cache_host_dir\x18\x02 \x01(\tR\x0fapkCacheHostDir\x12/\n" +
 	"\x14agent_cache_host_dir\x18\x03 \x01(\tR\x11agentCacheHostDir\x123\n" +
 	"\x16bazel_remote_cache_url\x18\x04 \x01(\tR\x13bazelRemoteCacheUrl\x12$\n" +
-	"\x0ehttp_proxy_url\x18\x05 \x01(\tR\fhttpProxyUrl\"\xcd\x01\n" +
+	"\x0ehttp_proxy_url\x18\x05 \x01(\tR\fhttpProxyUrl\x124\n" +
+	"\x17http_proxy_ca_host_path\x18\x06 \x01(\tR\x13httpProxyCaHostPath\"\xcd\x01\n" +
 	"\n" +
 	"GitDetails\x12#\n" +
 	"\rremote_origin\x18\x01 \x01(\tR\fremoteOrigin\x12\x16\n" +

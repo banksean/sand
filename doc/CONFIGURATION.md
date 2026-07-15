@@ -93,9 +93,9 @@ caches:
 
 `bazel: true` configures new sandboxes to use a shared Bazel remote build cache at `http://sand-bazel-cache.<container-dns-domain>:8080`. Start that cache service separately with `scripts/bazel-remote-cache-poc.sh`; see [Bazel Remote Cache PoC](BAZEL_REMOTE_CACHE_POC.md).
 
-`http-proxy: true`, or `--caches-http-proxy`, configures new sandboxes to use a shared Squid HTTP proxy at `http://sand-http-cache.<container-dns-domain>:3128`. If no container DNS domain is configured, sand uses `dev.local`, so the default proxy URL is `http://sand-http-cache.dev.local:3128`. Sand starts the managed `sand-http-cache` service container on demand; manage it explicitly with `sand cache http-proxy status|start|stop|restart|clear`.
+`http-proxy: true`, or `--caches-http-proxy`, configures new sandboxes to use a shared Squid HTTP/HTTPS proxy cache at `http://sand-http-cache.<container-dns-domain>:3128`. If no container DNS domain is configured, sand uses `dev.local`, so the default proxy URL is `http://sand-http-cache.dev.local:3128`. Sand starts the managed `sand-http-cache` service container on demand; manage it explicitly with `sand cache http-proxy status|start|stop|restart|clear`.
 
-HTTPS traffic uses standard proxy `CONNECT` tunneling through the shared proxy. Sand does not install a CA, intercept TLS, or cache encrypted HTTPS payloads.
+For HTTPS caching, Sand creates a dedicated local proxy CA under the Sand app directory, configures Squid SSL bumping, mounts the CA certificate into new proxy-enabled sandboxes, and runs `update-ca-certificates` during first-start bootstrap. Sand's bundled images include `ca-certificates`; custom images must already provide `update-ca-certificates`, or provide `apk` or `apt-get` so Sand can install the `ca-certificates` package during bootstrap.
 
 ## Network filtering config
 

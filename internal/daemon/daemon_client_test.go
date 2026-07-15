@@ -327,6 +327,7 @@ func TestSharedCacheMountsProtoRoundTripIncludesHTTPProxyURL(t *testing.T) {
 		AgentCacheHostDir:   "/host/agents",
 		BazelRemoteCacheURL: "http://sand-bazel-cache.test.local:8080",
 		HTTPProxyURL:        "http://sand-http-cache.test.local:3128",
+		HTTPProxyCAHostPath: "/host/squid/squid.crt",
 	}
 
 	got := sharedCacheMountsFromProto(sharedCacheMountsToProto(mounts))

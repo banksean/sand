@@ -87,11 +87,15 @@ func writeManagedBazelrcCmd(exec sandtypes.HookStreamer) script.Cmd {
 }
 
 func writeHTTPProxyEnvCmd(exec sandtypes.HookStreamer) script.Cmd {
-	return script.Command(script.CmdUsage{Summary: "write shared HTTP proxy environment", Args: "proxy-url"}, func(s *script.State, args ...string) (script.WaitFunc, error) {
-		if len(args) != 1 {
+	return script.Command(script.CmdUsage{Summary: "write shared HTTP proxy environment", Args: "proxy-url [ca-cert-path]"}, func(s *script.State, args ...string) (script.WaitFunc, error) {
+		if len(args) < 1 || len(args) > 2 {
 			return nil, script.ErrUsage
 		}
-		err := writeHTTPProxyEnv(s.Context(), exec, args[0])
+		caCertPath := ""
+		if len(args) == 2 {
+			caCertPath = args[1]
+		}
+		err := writeHTTPProxyEnv(s.Context(), exec, args[0], caCertPath)
 		return func(*script.State) (string, string, error) {
 			return "", "", err
 		}, nil
@@ -183,10 +187,15 @@ func stripManagedBlock(s string) string {
 	return out.String()
 }
 
-func writeHTTPProxyEnv(ctx context.Context, exec sandtypes.HookStreamer, proxyURL string) error {
+func writeHTTPProxyEnv(ctx context.Context, exec sandtypes.HookStreamer, proxyURL, caCertPath string) error {
 	env := sandtypes.SharedHTTPProxyEnv(proxyURL)
 	if len(env) == 0 {
 		return nil
+	}
+	if caCertPath != "" {
+		if err := installHTTPProxyCA(ctx, exec, caCertPath); err != nil {
+			return err
+		}
 	}
 	keys := make([]string, 0, len(env))
 	for key := range env {
@@ -229,6 +238,33 @@ func writeHTTPProxyEnv(ctx context.Context, exec sandtypes.HookStreamer, proxyUR
 	}
 	if _, err := exec.Exec(ctx, "mv", tmp, "/etc/environment"); err != nil {
 		return fmt.Errorf("mv %s /etc/environment: %w", tmp, err)
+	}
+	return nil
+}
+
+func installHTTPProxyCA(ctx context.Context, exec sandtypes.HookStreamer, caCertPath string) error {
+	if _, err := exec.Exec(ctx, "test", "-f", caCertPath); err != nil {
+		return fmt.Errorf("shared HTTP proxy CA certificate is not mounted at %s: %w", caCertPath, err)
+	}
+	if !commandExists(ctx, exec, "update-ca-certificates") {
+		switch {
+		case commandExists(ctx, exec, "apk"):
+			if err := stream(ctx, exec, "apk", "add", "--no-cache", "ca-certificates"); err != nil {
+				return fmt.Errorf("install ca-certificates with apk: %w", err)
+			}
+		case commandExists(ctx, exec, "apt-get"):
+			if err := stream(ctx, exec, "apt-get", "update"); err != nil {
+				return fmt.Errorf("apt-get update for ca-certificates: %w", err)
+			}
+			if err := stream(ctx, exec, "apt-get", "install", "-y", "--no-install-recommends", "ca-certificates"); err != nil {
+				return fmt.Errorf("install ca-certificates with apt-get: %w", err)
+			}
+		default:
+			return fmt.Errorf("shared HTTP proxy HTTPS caching requires ca-certificates support: update-ca-certificates is missing and neither apk nor apt-get is available")
+		}
+	}
+	if err := stream(ctx, exec, "update-ca-certificates"); err != nil {
+		return fmt.Errorf("update CA certificates for shared HTTP proxy: %w", err)
 	}
 	return nil
 }

@@ -143,6 +143,100 @@ func TestExecuteErrorIncludesScriptLine(t *testing.T) {
 	}
 }
 
+func TestWriteHTTPProxyEnvInstallsExistingCAStore(t *testing.T) {
+	exec := &fakeStreamer{
+		execResults: map[string]fakeResult{
+			"test -f /usr/local/share/ca-certificates/sand-http-cache.crt": {out: "ok"},
+			"which update-ca-certificates":                                 {out: "/usr/sbin/update-ca-certificates"},
+		},
+	}
+
+	err := Execute(context.Background(), exec, "http-proxy.txt",
+		"write-http-proxy-env http://sand-http-cache.test.local:3128 /usr/local/share/ca-certificates/sand-http-cache.crt\n", io.Discard)
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if !containsCall(exec.calls, "stream:update-ca-certificates") {
+		t.Fatalf("calls = %#v, want update-ca-certificates", exec.calls)
+	}
+}
+
+func TestWriteHTTPProxyEnvInstallsCAStoreWithAPK(t *testing.T) {
+	exec := &fakeStreamer{
+		execResults: map[string]fakeResult{
+			"test -f /usr/local/share/ca-certificates/sand-http-cache.crt": {out: "ok"},
+			"which update-ca-certificates":                                 {err: errors.New("missing")},
+			"which apk":                                                    {out: "/sbin/apk"},
+		},
+	}
+
+	err := Execute(context.Background(), exec, "http-proxy.txt",
+		"write-http-proxy-env http://sand-http-cache.test.local:3128 /usr/local/share/ca-certificates/sand-http-cache.crt\n", io.Discard)
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	for _, want := range []string{
+		"stream:apk add --no-cache ca-certificates",
+		"stream:update-ca-certificates",
+	} {
+		if !containsCall(exec.calls, want) {
+			t.Fatalf("calls = %#v, want %q", exec.calls, want)
+		}
+	}
+}
+
+func TestWriteHTTPProxyEnvInstallsCAStoreWithAPT(t *testing.T) {
+	exec := &fakeStreamer{
+		execResults: map[string]fakeResult{
+			"test -f /usr/local/share/ca-certificates/sand-http-cache.crt": {out: "ok"},
+			"which update-ca-certificates":                                 {err: errors.New("missing")},
+			"which apk":                                                    {err: errors.New("missing")},
+			"which apt-get":                                                {out: "/usr/bin/apt-get"},
+		},
+	}
+
+	err := Execute(context.Background(), exec, "http-proxy.txt",
+		"write-http-proxy-env http://sand-http-cache.test.local:3128 /usr/local/share/ca-certificates/sand-http-cache.crt\n", io.Discard)
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	for _, want := range []string{
+		"stream:apt-get update",
+		"stream:apt-get install -y --no-install-recommends ca-certificates",
+		"stream:update-ca-certificates",
+	} {
+		if !containsCall(exec.calls, want) {
+			t.Fatalf("calls = %#v, want %q", exec.calls, want)
+		}
+	}
+}
+
+func TestWriteHTTPProxyEnvFailsWithoutCAStoreSupport(t *testing.T) {
+	exec := &fakeStreamer{
+		execResults: map[string]fakeResult{
+			"test -f /usr/local/share/ca-certificates/sand-http-cache.crt": {out: "ok"},
+			"which update-ca-certificates":                                 {err: errors.New("missing")},
+			"which apk":                                                    {err: errors.New("missing")},
+			"which apt-get":                                                {err: errors.New("missing")},
+		},
+	}
+
+	err := Execute(context.Background(), exec, "http-proxy.txt",
+		"write-http-proxy-env http://sand-http-cache.test.local:3128 /usr/local/share/ca-certificates/sand-http-cache.crt\n", io.Discard)
+	if err == nil || !strings.Contains(err.Error(), "requires ca-certificates support") {
+		t.Fatalf("Execute() error = %v, want ca-certificates support error", err)
+	}
+}
+
+func containsCall(calls []string, want string) bool {
+	for _, call := range calls {
+		if call == want {
+			return true
+		}
+	}
+	return false
+}
+
 func commandKey(cmd string, args ...string) string {
 	return strings.Join(append([]string{cmd}, args...), " ")
 }

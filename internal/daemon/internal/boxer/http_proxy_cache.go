@@ -2,11 +2,18 @@ package boxer
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -21,12 +28,38 @@ const (
 	HTTPProxyCacheContainerName = "sand-http-cache"
 	HTTPProxyCacheImage         = "docker.io/ubuntu/squid:6.6-24.04_beta"
 	HTTPProxyCachePort          = 3128
-	httpProxyCacheVersion       = "1"
+	httpProxyCacheVersion       = "2"
 	httpProxyCacheDirName       = "http-proxy"
+	httpProxySquidDirName       = "squid"
 	httpProxyCacheServiceLabel  = "sand.service"
 	httpProxyCacheVersionLabel  = "sand.service.version"
 	httpProxyCacheServiceValue  = "http-proxy"
 )
+
+const httpProxySquidConfig = `http_port 3128 ssl-bump generate-host-certificates=on dynamic_cert_mem_cache_size=4MB cert=/etc/squid/certs/squid.pem
+
+sslcrtd_program /usr/lib/squid/security_file_certgen -s /var/lib/squid/ssl_db -M 4MB
+sslcrtd_children 5
+
+acl step1 at_step SslBump1
+ssl_bump peek step1
+ssl_bump bump all
+
+cache_dir ufs /var/spool/squid 10000 16 256
+maximum_object_size 1024 MB
+cache_mem 256 MB
+
+http_access allow all
+`
+
+const httpProxyCacheEntrypointScript = `set -eu
+mkdir -p /var/lib/squid /etc/squid/certs
+if [ ! -d /var/lib/squid/ssl_db ]; then
+	/usr/lib/squid/security_file_certgen -c -s /var/lib/squid/ssl_db -M 4MB
+fi
+chown -R proxy:proxy /var/lib/squid /var/spool/squid 2>/dev/null || true
+exec /usr/sbin/squid -f /etc/squid/squid.conf -NYC
+`
 
 type HTTPProxyCacheStatus struct {
 	Name     string
@@ -63,6 +96,9 @@ func (s *HTTPProxyCacheService) Ensure(ctx context.Context, localDomain string, 
 	fmt.Fprintf(progress, "[sand] ensuring HTTP proxy cache service\n")
 	if err := s.boxer.EnsureImage(ctx, HTTPProxyCacheImage, progress); err != nil {
 		return fmt.Errorf("ensure HTTP proxy cache image: %w", err)
+	}
+	if err := s.ensureSquidFiles(); err != nil {
+		return err
 	}
 
 	ctr, err := s.inspect(ctx)
@@ -198,12 +234,23 @@ func (s *HTTPProxyCacheService) create(ctx context.Context, localDomain string) 
 				httpProxyCacheServiceLabel: httpProxyCacheServiceValue,
 				httpProxyCacheVersionLabel: httpProxyCacheVersion,
 			},
-			Volume: []string{sandtypes.MountSpec{
-				Source: cacheDir,
-				Target: "/var/spool/squid",
-			}.String()},
+			Volume: []string{
+				sandtypes.MountSpec{
+					Source: cacheDir,
+					Target: "/var/spool/squid",
+				}.String(),
+				sandtypes.MountSpec{
+					Source: httpProxySquidConfigPath(s.boxer.appRoot),
+					Target: "/etc/squid/squid.conf",
+				}.String(),
+				sandtypes.MountSpec{
+					Source: httpProxySquidPEMPath(s.boxer.appRoot),
+					Target: "/etc/squid/certs/squid.pem",
+				}.String(),
+			},
+			Entrypoint: "/bin/sh",
 		},
-	}, HTTPProxyCacheImage, nil)
+	}, HTTPProxyCacheImage, []string{"-c", httpProxyCacheEntrypointScript})
 	if err != nil {
 		return fmt.Errorf("create HTTP proxy cache container: %w", err)
 	}
@@ -226,6 +273,124 @@ func (s *HTTPProxyCacheService) inspect(ctx context.Context) (*sandtypes.Contain
 
 func (s *HTTPProxyCacheService) cacheDir() string {
 	return filepath.Join(s.boxer.appRoot, "caches", httpProxyCacheDirName)
+}
+
+func (s *HTTPProxyCacheService) ensureSquidFiles() error {
+	squidDir := filepath.Join(s.boxer.appRoot, httpProxySquidDirName)
+	if err := s.boxer.FileOps.MkdirAll(squidDir, 0o750); err != nil {
+		return fmt.Errorf("create HTTP proxy squid dir: %w", err)
+	}
+	if err := s.ensureSquidCA(); err != nil {
+		return err
+	}
+	if err := s.boxer.FileOps.WriteFile(httpProxySquidConfigPath(s.boxer.appRoot), []byte(httpProxySquidConfig), 0o644); err != nil {
+		return fmt.Errorf("write HTTP proxy squid config: %w", err)
+	}
+	return nil
+}
+
+func (s *HTTPProxyCacheService) ensureSquidCA() error {
+	keyPath := httpProxySquidKeyPath(s.boxer.appRoot)
+	crtPath := httpProxyCACertPath(s.boxer.appRoot)
+	pemPath := httpProxySquidPEMPath(s.boxer.appRoot)
+
+	keyPEM, certPEM, ok := readValidSquidCA(keyPath, crtPath)
+	if !ok {
+		var err error
+		keyPEM, certPEM, err = generateSquidCA()
+		if err != nil {
+			return err
+		}
+		if err := s.boxer.FileOps.WriteFile(keyPath, keyPEM, 0o600); err != nil {
+			return fmt.Errorf("write HTTP proxy CA key: %w", err)
+		}
+		if err := s.boxer.FileOps.WriteFile(crtPath, certPEM, 0o644); err != nil {
+			return fmt.Errorf("write HTTP proxy CA certificate: %w", err)
+		}
+	}
+	combined := append(append([]byte{}, keyPEM...), certPEM...)
+	if err := s.boxer.FileOps.WriteFile(pemPath, combined, 0o600); err != nil {
+		return fmt.Errorf("write HTTP proxy squid PEM: %w", err)
+	}
+	return nil
+}
+
+func readValidSquidCA(keyPath, certPath string) ([]byte, []byte, bool) {
+	keyPEM, err := os.ReadFile(keyPath)
+	if err != nil {
+		return nil, nil, false
+	}
+	certPEM, err := os.ReadFile(certPath)
+	if err != nil {
+		return nil, nil, false
+	}
+	keyBlock, _ := pem.Decode(keyPEM)
+	if keyBlock == nil || keyBlock.Type != "RSA PRIVATE KEY" {
+		return nil, nil, false
+	}
+	if _, err := x509.ParsePKCS1PrivateKey(keyBlock.Bytes); err != nil {
+		return nil, nil, false
+	}
+	certBlock, _ := pem.Decode(certPEM)
+	if certBlock == nil || certBlock.Type != "CERTIFICATE" {
+		return nil, nil, false
+	}
+	cert, err := x509.ParseCertificate(certBlock.Bytes)
+	if err != nil {
+		return nil, nil, false
+	}
+	now := time.Now()
+	if now.Before(cert.NotBefore) || now.After(cert.NotAfter) || !cert.IsCA {
+		return nil, nil, false
+	}
+	return keyPEM, certPEM, true
+}
+
+func generateSquidCA() ([]byte, []byte, error) {
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil, nil, fmt.Errorf("generate HTTP proxy CA key: %w", err)
+	}
+	serialLimit := new(big.Int).Lsh(big.NewInt(1), 128)
+	serial, err := rand.Int(rand.Reader, serialLimit)
+	if err != nil {
+		return nil, nil, fmt.Errorf("generate HTTP proxy CA serial: %w", err)
+	}
+	now := time.Now()
+	template := &x509.Certificate{
+		SerialNumber: serial,
+		Subject: pkix.Name{
+			CommonName: "Docker Caching Proxy CA",
+		},
+		NotBefore:             now.Add(-time.Hour),
+		NotAfter:              now.AddDate(10, 0, 0),
+		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+	}
+	certDER, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
+	if err != nil {
+		return nil, nil, fmt.Errorf("generate HTTP proxy CA certificate: %w", err)
+	}
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
+	return keyPEM, certPEM, nil
+}
+
+func httpProxySquidConfigPath(appRoot string) string {
+	return filepath.Join(appRoot, httpProxySquidDirName, "squid.conf")
+}
+
+func httpProxySquidKeyPath(appRoot string) string {
+	return filepath.Join(appRoot, httpProxySquidDirName, "squid.key")
+}
+
+func httpProxyCACertPath(appRoot string) string {
+	return filepath.Join(appRoot, httpProxySquidDirName, "squid.crt")
+}
+
+func httpProxySquidPEMPath(appRoot string) string {
+	return filepath.Join(appRoot, httpProxySquidDirName, "squid.pem")
 }
 
 func (s *HTTPProxyCacheService) waitReady(ctx context.Context) error {

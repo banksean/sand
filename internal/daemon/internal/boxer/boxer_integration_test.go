@@ -9,6 +9,7 @@ import (
 	"path"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -350,6 +351,37 @@ func TestBoxer_CreateContainerSSHAgentOptIn(t *testing.T) {
 		if got := call.ProcessOptions.EnvFile; got != "" {
 			t.Fatalf("create call %d unexpectedly passed env file %q", i, got)
 		}
+	}
+}
+
+func TestBoxer_CreateContainerMountsHTTPProxyCA(t *testing.T) {
+	ctx := context.Background()
+	var createOpts *hostops.CreateContainer
+	mockContainer := &hostops.MockContainerOps{
+		CreateFunc: func(ctx context.Context, opts *hostops.CreateContainer, image string, args []string) (string, error) {
+			createOpts = opts
+			return "test-container-123", nil
+		},
+	}
+	boxer := newTestBoxer(t, mockContainer, &mockImageOps{})
+	sbox := &sandtypes.Box{
+		ID:        "test-sandbox",
+		Name:      "friendly-name",
+		ImageName: "test-image:latest",
+		SharedCacheMounts: sandtypes.SharedCacheMounts{
+			HTTPProxyCAHostPath: "/tmp/sand-app/squid/squid.crt",
+		},
+	}
+
+	if err := boxer.CreateContainer(ctx, sbox, false); err != nil {
+		t.Fatalf("CreateContainer() error = %v", err)
+	}
+	if createOpts == nil {
+		t.Fatal("container was not created")
+	}
+	want := "/tmp/sand-app/squid/squid.crt:" + sandtypes.HTTPProxyCACertContainerPath + ":ro"
+	if !slices.Contains(createOpts.ManagementOptions.Volume, want) {
+		t.Fatalf("volume mounts = %#v, want %q", createOpts.ManagementOptions.Volume, want)
 	}
 }
 
