@@ -54,6 +54,29 @@ http_access allow all
 
 const httpProxyCacheEntrypointScript = `set -eu
 mkdir -p /var/lib/squid /etc/squid/certs
+if ! command -v /usr/lib/squid/security_file_certgen >/dev/null 2>&1; then
+	if command -v apt-get >/dev/null 2>&1; then
+		export DEBIAN_FRONTEND=noninteractive
+		apt-get update
+		apt-get install -y --no-install-recommends squid-openssl ca-certificates
+		rm -rf /var/lib/apt/lists/*
+	fi
+fi
+helper=""
+for candidate in /usr/lib/squid/security_file_certgen /usr/libexec/squid/security_file_certgen /usr/local/squid/libexec/security_file_certgen /usr/local/squid/libexec/ssl_crtd; do
+	if [ -x "$candidate" ]; then
+		helper="$candidate"
+		break
+	fi
+done
+if [ -z "$helper" ]; then
+	echo "sand-http-cache: missing Squid SSL certificate generator helper; install squid-openssl or provide security_file_certgen" >&2
+	exit 1
+fi
+if [ "$helper" != /usr/lib/squid/security_file_certgen ]; then
+	mkdir -p /usr/lib/squid
+	ln -sf "$helper" /usr/lib/squid/security_file_certgen
+fi
 if [ ! -d /var/lib/squid/ssl_db ]; then
 	/usr/lib/squid/security_file_certgen -c -s /var/lib/squid/ssl_db -M 4MB
 fi
@@ -239,14 +262,8 @@ func (s *HTTPProxyCacheService) create(ctx context.Context, localDomain string) 
 					Source: cacheDir,
 					Target: "/var/spool/squid",
 				}.String(),
-				sandtypes.MountSpec{
-					Source: httpProxySquidConfigPath(s.boxer.appRoot),
-					Target: "/etc/squid/squid.conf",
-				}.String(),
-				sandtypes.MountSpec{
-					Source: httpProxySquidPEMPath(s.boxer.appRoot),
-					Target: "/etc/squid/certs/squid.pem",
-				}.String(),
+				httpProxySquidConfigPath(s.boxer.appRoot) + ":/etc/squid/squid.conf:ro",
+				httpProxySquidPEMPath(s.boxer.appRoot) + ":/etc/squid/certs/squid.pem:ro",
 			},
 			Entrypoint: "/bin/sh",
 		},
@@ -394,7 +411,7 @@ func httpProxySquidPEMPath(appRoot string) string {
 }
 
 func (s *HTTPProxyCacheService) waitReady(ctx context.Context) error {
-	deadline, cancel := context.WithTimeout(ctx, 20*time.Second)
+	deadline, cancel := context.WithTimeout(ctx, 120*time.Second)
 	defer cancel()
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()

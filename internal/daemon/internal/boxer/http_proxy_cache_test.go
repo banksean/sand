@@ -53,19 +53,21 @@ func TestHTTPProxyCacheEnsureCreatesAndStartsMissingContainer(t *testing.T) {
 				if len(opts.Volume) != 3 {
 					t.Fatalf("volume = %#v", opts.Volume)
 				}
-				for _, want := range []string{
-					"target=/var/spool/squid",
-					"target=/etc/squid/squid.conf",
-					"target=/etc/squid/certs/squid.pem",
-				} {
-					if !strings.Contains(strings.Join(opts.Volume, "\n"), want) {
-						t.Fatalf("volume missing %q: %#v", want, opts.Volume)
-					}
+				if !strings.Contains(opts.Volume[0], "target=/var/spool/squid") {
+					t.Fatalf("cache volume = %q, want /var/spool/squid mount", opts.Volume[0])
+				}
+				wantConfigVolume := "/tmp/sand-app/squid/squid.conf:/etc/squid/squid.conf:ro"
+				if opts.Volume[1] != wantConfigVolume {
+					t.Fatalf("config volume = %q, want %q", opts.Volume[1], wantConfigVolume)
+				}
+				wantPEMVolume := "/tmp/sand-app/squid/squid.pem:/etc/squid/certs/squid.pem:ro"
+				if opts.Volume[2] != wantPEMVolume {
+					t.Fatalf("PEM volume = %q, want %q", opts.Volume[2], wantPEMVolume)
 				}
 				if opts.Entrypoint != "/bin/sh" {
 					t.Fatalf("entrypoint = %q", opts.Entrypoint)
 				}
-				if len(args) != 2 || args[0] != "-c" || !strings.Contains(args[1], "security_file_certgen") {
+				if len(args) != 2 || args[0] != "-c" || !strings.Contains(args[1], "apt-get install -y --no-install-recommends squid-openssl ca-certificates") || !strings.Contains(args[1], "security_file_certgen") {
 					t.Fatalf("args = %#v", args)
 				}
 				return HTTPProxyCacheContainerName, nil
