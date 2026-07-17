@@ -72,8 +72,13 @@ var definitions = []Definition{
 		GeneratedFiles: []GeneratedFile{{
 			Path: ".codex/config.toml",
 			Content: `[otel]
+exporter = { otlp-http = {
+  endpoint = "http://otel-collector.dev.local:4318/v1/logs",
+  protocol = "binary"
+}}
+
 trace_exporter = { otlp-http = {
-  endpoint = "http://tempo.dev.local:4318/v1/traces",
+  endpoint = "http://otel-collector.dev.local:4318/v1/traces",
   protocol = "binary"
 }}
 `,

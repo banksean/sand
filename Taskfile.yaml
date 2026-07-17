@@ -104,6 +104,8 @@ tasks:
   start-observability:
     deps:
       - tempo
+      - loki
+      - otel-collector
     cmds:
       - mkdir -p {{.OBSERVABILITY_DATA_DIR}}/grafana
       - echo "Starting grafana.{{.CONTAINER_DNS_DOMAIN}}"
@@ -117,7 +119,7 @@ tasks:
         --volume {{.OBSERVABILITY_DATA_DIR}}/grafana:/var/lib/grafana
         -e GF_USERS_ALLOW_SIGN_UP=false
         docker.io/grafana/grafana:latest
-      - echo "Waiting a bit for grafana to start, before POSTing the tempo datasource..."
+      - echo "Waiting a bit for grafana to start, before POSTing datasources..."
       - sleep 1
       - >-
         curl -H "Content-Type: application/json"
@@ -134,6 +136,17 @@ tasks:
           }
         }'
         http://admin:admin@grafana.{{.CONTAINER_DNS_DOMAIN}}:3000/api/datasources
+      - >-
+        curl -H "Content-Type: application/json"
+        -d '{
+          "name":"Loki",
+          "uid":"loki",
+          "type":"loki",
+          "url":"http://loki.{{.CONTAINER_DNS_DOMAIN}}:3100",
+          "access":"proxy",
+          "editable":true
+        }'
+        http://admin:admin@grafana.{{.CONTAINER_DNS_DOMAIN}}:3000/api/datasources
 
   tempo:
     cmds:
@@ -146,19 +159,50 @@ tasks:
         --cpus 2
         --memory 512M
         -p 3200:3200/tcp
-        -p 4317:4317/tcp
-        -p 4318:4318/tcp
         --volume {{.TASKFILE_DIR}}/observability/tempo.yaml:/etc/tempo.yaml:ro
         --volume {{.OBSERVABILITY_DATA_DIR}}/tempo:/var/tempo
         docker.io/grafana/tempo:latest
         -config.file=/etc/tempo.yaml
 
+  loki:
+    cmds:
+      - mkdir -p {{.OBSERVABILITY_DATA_DIR}}/loki
+      - echo "Starting loki.{{.CONTAINER_DNS_DOMAIN}}"
+      - >-
+        container run
+        --name loki
+        --detach
+        --cpus 2
+        --memory 512M
+        -p 3100:3100/tcp
+        --volume {{.TASKFILE_DIR}}/observability/loki.yaml:/etc/loki/loki.yaml:ro
+        --volume {{.OBSERVABILITY_DATA_DIR}}/loki:/loki
+        docker.io/grafana/loki:latest
+        -config.file=/etc/loki/loki.yaml
+
+  otel-collector:
+    cmds:
+      - echo "Starting otel-collector.{{.CONTAINER_DNS_DOMAIN}}"
+      - >-
+        container run
+        --name otel-collector
+        --detach
+        --cpus 2
+        --memory 512M
+        -p 4317:4317/tcp
+        -p 4318:4318/tcp
+        --volume {{.TASKFILE_DIR}}/observability/otel-collector.yaml:/etc/otelcol/config.yaml:ro
+        docker.io/otel/opentelemetry-collector-contrib:latest
+        --config=/etc/otelcol/config.yaml
+
   stop-observability:
     ignore_error: true
     cmds:
-      - echo "Stopping grafana and tempo..."
+      - echo "Stopping grafana, tempo, loki, and otel-collector..."
       - container rm -f grafana
       - container rm -f tempo
+      - container rm -f loki
+      - container rm -f otel-collector
 
   clear-observability:
     deps:

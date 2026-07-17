@@ -59,8 +59,10 @@ func TestCodexWorkspacePreparationWritesTelemetryConfigOnly(t *testing.T) {
 	configText := string(config)
 	for _, want := range []string{
 		"[otel]",
+		"exporter = { otlp-http = {",
+		`endpoint = "http://otel-collector.dev.local:4318/v1/logs"`,
 		"trace_exporter = { otlp-http = {",
-		`endpoint = "http://tempo.dev.local:4318/v1/traces"`,
+		`endpoint = "http://otel-collector.dev.local:4318/v1/traces"`,
 		`protocol = "binary"`,
 	} {
 		if !strings.Contains(configText, want) {
