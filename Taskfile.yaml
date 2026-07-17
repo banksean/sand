@@ -116,7 +116,7 @@ tasks:
         -p 3000:3000/tcp
         --volume {{.OBSERVABILITY_DATA_DIR}}/grafana:/var/lib/grafana
         -e GF_USERS_ALLOW_SIGN_UP=false
-        grafana/grafana:latest
+        docker.io/grafana/grafana:latest
       - echo "Waiting a bit for grafana to start, before POSTing the tempo datasource..."
       - sleep 1
       - >-
@@ -150,7 +150,7 @@ tasks:
         -p 4318:4318/tcp
         --volume {{.TASKFILE_DIR}}/observability/tempo.yaml:/etc/tempo.yaml:ro
         --volume {{.OBSERVABILITY_DATA_DIR}}/tempo:/var/tempo
-        grafana/tempo:latest
+        docker.io/grafana/tempo:latest
         -config.file=/etc/tempo.yaml
 
   stop-observability:
