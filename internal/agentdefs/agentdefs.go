@@ -69,6 +69,16 @@ var definitions = []Definition{
 			{"OPENAI_API_KEY"},
 		},
 		InteractiveCommand: "codex --dangerously-bypass-approvals-and-sandbox",
+		GeneratedFiles: []GeneratedFile{{
+			Path: ".codex/config.toml",
+			Content: `[otel]
+trace_exporter = { otlp-http = {
+  endpoint = "http://tempo.dev.local:4318/v1/traces",
+  protocol = "binary"
+}}
+`,
+			Mode: 0o600,
+		}},
 		Install: &InstallSpec{
 			Kind:    InstallerNPM,
 			Package: "@openai/codex",
