@@ -28,6 +28,22 @@ task build
 task test
 ```
 
+### Destructive smoke test
+
+This end-to-end smoke test removes sandboxes, sand configuration, local sand
+binaries, and sand state. It is excluded from normal test runs and requires an
+explicit build tag and environment gate:
+
+```sh
+SAND_DESTRUCTIVE_SMOKE_TEST=1 go test -tags destructive_smoke ./internal/smoketest -run TestDestructiveSmoke -timeout 2h -v
+```
+
+To include the optional VS Code launch step:
+
+```sh
+SAND_DESTRUCTIVE_SMOKE_TEST=1 SAND_DESTRUCTIVE_SMOKE_VSC=1 go test -tags destructive_smoke ./internal/smoketest -run TestDestructiveSmoke -timeout 2h -v
+```
+
 ### Install from source
 ```sh
 task install
