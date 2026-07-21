@@ -131,6 +131,39 @@ func effectiveAppBaseDir(configured string) (string, error) {
 	return appHomeDir()
 }
 
+var (
+	executablePath = os.Executable
+	lookPath       = exec.LookPath
+	statPath       = os.Stat
+)
+
+func isExecutableFile(info os.FileInfo) bool {
+	return !info.IsDir() && info.Mode()&0o111 != 0
+}
+
+func resolveSanddPath() (string, error) {
+	var tried []string
+	if sandPath, err := executablePath(); err == nil && sandPath != "" {
+		sibling := filepath.Join(filepath.Dir(sandPath), "sandd")
+		if info, err := statPath(sibling); err == nil && isExecutableFile(info) {
+			return sibling, nil
+		}
+		tried = append(tried, sibling)
+	}
+
+	if path, err := lookPath("sandd"); err == nil {
+		if info, err := statPath(path); err == nil && isExecutableFile(info) {
+			return path, nil
+		}
+		tried = append(tried, path)
+	}
+
+	if len(tried) == 0 {
+		return "", fmt.Errorf("sandd binary not found on PATH; install sandd with `task install` or Homebrew")
+	}
+	return "", fmt.Errorf("sandd binary not found or not executable (checked %s and PATH); install sandd with `task install` or Homebrew", strings.Join(tried, ", "))
+}
+
 // ensureDaemon attempts to verify that the sandd daemon is running, and if not,
 // starts a new instance of it.
 func ensureDaemon(ctx context.Context, appBaseDir string) error {
@@ -156,7 +189,11 @@ func ensureDaemon(ctx context.Context, appBaseDir string) error {
 	}
 
 	// Start daemon in background
-	cmd := exec.Command("sandd", "start", "--app-base-dir", appBaseDir)
+	sanddPath, err := resolveSanddPath()
+	if err != nil {
+		return err
+	}
+	cmd := exec.Command(sanddPath, "start", "--app-base-dir", appBaseDir)
 	slog.Info("EnsureDaemon", "cmd", strings.Join(cmd.Args, " "))
 	cmd.Stdout = nil
 	cmd.Stderr = nil
