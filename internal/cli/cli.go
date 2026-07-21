@@ -1,4 +1,4 @@
-// package cli contains reusable implemeations of cli subcommands.
+// package cli contains reusable implementations of cli subcommands.
 // The struct types contain field tags that github.com/alecthomas/kong reads and interprets
 // to provide automatic documentation, default flag values and so on.
 //

@@ -17,7 +17,7 @@ import (
 
 type ConfigCmd struct {
 	Ls ConfigLsCmd `cmd:"" help:"show effective configuration with sources"`
-	// TODOL: get, set, unset subcommands
+	// TODO: get, set, unset subcommands
 }
 
 type ConfigLsCmd struct{}

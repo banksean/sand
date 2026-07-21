@@ -179,7 +179,7 @@ func (d *Daemon) Shutdown(ctx context.Context) {
 		}
 	}
 
-	// Remove socket file. This mail fail in many cases since closing the listener appears
+	// Remove socket file. This may fail in many cases since closing the listener appears
 	// to remove the file automatically on MacOS. Therefore we ignore the err return value.
 	os.Remove(filepath.Join(d.AppBaseDir, defaultHTTPSocketFile))
 	os.Remove(d.GRPCSocketPath)

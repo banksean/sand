@@ -144,7 +144,7 @@ sand shell [flags] <SANDBOX-NAME>
 
 ## `sand exec`
 
-execute a single command in a sanbox
+execute a single command in a sandbox
 
 **Usage:**
 
@@ -318,7 +318,7 @@ sand doc
 
 ## `sand build-info`
 
-print version infomation about this command
+print version information about this command
 
 **Usage:**
 

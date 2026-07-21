@@ -40,7 +40,7 @@ type Outie struct {
 	New                cli.NewCmd                `cmd:"" help:"create a new sandbox and shell into its container"`
 	Oneshot            cli.OneshotCmd            `cmd:"" help:"run an AI agent non-interactively with a prompt"`
 	Shell              cli.ShellCmd              `cmd:"" help:"shell into a sandbox container (and start the container, if necessary)"`
-	Exec               cli.ExecCmd               `cmd:"" help:"execute a single command in a sanbox"`
+	Exec               cli.ExecCmd               `cmd:"" help:"execute a single command in a sandbox"`
 	Ls                 cli.LsCmd                 `cmd:"" help:"list sandboxes"`
 	Log                cli.SandboxLogCmd         `cmd:"" help:"print sandbox lifecycle and daemon events"`
 	Rm                 cli.RmCmd                 `cmd:"" help:"remove sandbox container and its clone directory"`
@@ -51,7 +51,7 @@ type Outie struct {
 	Git                cli.GitCmd                `cmd:"" help:"git operations with sandboxes"`
 	Cache              cli.CacheCmd              `cmd:"" help:"manage shared cache services"`
 	Doc                DocCmd                    `cmd:"" help:"print complete command help formatted as markdown"`
-	BuildInfo          cli.BuildInfoCmd          `cmd:"" help:"print version infomation about this command"`
+	BuildInfo          cli.BuildInfoCmd          `cmd:"" help:"print version information about this command"`
 	Vsc                cli.VscCmd                `cmd:"" help:"launch a vscode remote window connected to the sandbox's container"`
 	InstallEBPFSupport cli.InstallEBPFSupportCmd `cmd:"" help:"install the BPFFS-enabled kernel build"`
 	ExportFS           cli.ExportCmd             `cmd:"" help:"export a container's filesystem"`

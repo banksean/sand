@@ -44,7 +44,7 @@ type Innie struct {
 	Stop      cli.StopCmd       `cmd:"" help:"stop sandbox container"`
 	Git       cli.GitCmd        `cmd:"" help:"git operations with sandboxes"`
 	Cache     cli.CacheCmd      `cmd:"" help:"manage shared cache services"`
-	BuildInfo cli.BuildInfoCmd  `cmd:"" help:"print version infomation about this command"`
+	BuildInfo cli.BuildInfoCmd  `cmd:"" help:"print version information about this command"`
 	Vsc       cli.VscCmd        `cmd:"" help:"launch a vscode window on your host OS desktop, connected to this sandbox's container via ssh"`
 }
 
