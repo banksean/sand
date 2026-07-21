@@ -300,6 +300,10 @@ func main() {
 		fmt.Fprintf(os.Stderr, "unable to get application home directory: %v\n", err.Error())
 		os.Exit(1)
 	}
+	if err := os.MkdirAll(appBaseDir, 0o700); err != nil {
+		fmt.Fprintf(os.Stderr, "unable to create application home directory: %v\n", err.Error())
+		os.Exit(1)
+	}
 	cli.AppBaseDir = appBaseDir
 	slog.Info("main", "appBaseDir", appBaseDir)
 
