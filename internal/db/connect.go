@@ -12,6 +12,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 )
 
+//go:generate go run ./cmd/genschema
 //go:generate sh -c "sqlc generate"
 
 //go:embed migrations/*.sql

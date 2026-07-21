@@ -47,7 +47,7 @@ The CLI **never** imports daemon internals — only the `daemon.Client` interfac
 | `internal/applecontainer/` | Low-level wrapper around the `container` CLI; XPC protocol handler. |
 | `internal/cloning/` | Agent plugin registry (`registry.go`), workspace preparation, agent-specific container config. |
 | `internal/agentdefs/` | Agent definitions: auth requirements, install specs for each supported agent. |
-| `internal/db/` | SQLite schema (`schema.sql`), sqlc-generated queries (`queries.sql.go`), migrations. |
+| `internal/db/` | SQLite migrations, generated schema snapshot (`schema.sql`), sqlc-generated queries (`queries.sql.go`). |
 | `internal/sshimmer/` | Ed25519 SSH key provisioning for container access. |
 | `internal/sandboxlog/` | Log redaction handler that scrubs secrets. |
 | `internal/profiles/` | Per-sandbox env var and resource limit profiles. |
@@ -68,7 +68,7 @@ The CLI **never** imports daemon internals — only the `daemon.Client` interfac
 
 ## Database changes
 
-Edit `internal/db/schema.sql` or `internal/db/queries.sql`, then run `task generate` to regenerate `queries.sql.go` via sqlc. Migrations in `internal/db/migrations/` are applied automatically by Boxer on daemon startup.
+Edit `internal/db/migrations/` for schema changes or `internal/db/queries.sql` for query changes, then run `task generate`. `internal/db/schema.sql` is a generated snapshot from migrations and should not be edited by hand. Migrations are applied automatically by Boxer on daemon startup.
 
 ## Protobuf changes
 
