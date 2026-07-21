@@ -41,11 +41,14 @@ The CLI **never** imports daemon internals — only the `daemon.Client` interfac
 |---|---|
 | `internal/cli/` | One file per subcommand (`new_cmd.go`, `shell_cmd.go`, `git_cmd.go`, etc.). Commands are structs with kong field tags. |
 | `internal/daemon/` | gRPC server handlers (`daemon_grpc_unary.go`, `daemon_grpc_streams.go`), MCP integration (`mcp.go`). |
-| `internal/daemon/internal/boxer/` | Core orchestration: creates APFS clones, pulls images, creates containers, provisions SSH keys, runs hooks. |
+| `internal/daemon/internal/boxer/` | Sandbox repository/workspace manager: creates APFS clones, persists sandbox state, pulls images, provisions SSH keys, manages git mirrors, cleanup/trash. |
+| `internal/daemon/internal/lifecycle/` | Container lifecycle orchestration: creates/recreates containers, starts containers, runs container hooks, handles runtime mounts and socket volumes. |
 | `internal/daemon/daemonpb/` | Protobuf/gRPC definitions (`daemon.proto`) and generated Go bindings. |
 | `internal/hostops/` | Interfaces (`ContainerOps`, `ImageOps`, `GitOps`, `FileOps`) and their Apple Containerization implementations. |
 | `internal/applecontainer/` | Low-level wrapper around the `container` CLI; XPC protocol handler. |
-| `internal/cloning/` | Agent plugin registry (`registry.go`), workspace preparation, agent-specific container config. |
+| `internal/cloning/` | Workspace preparation: APFS clone setup, dotfile cloning, git mirror/remotes, sandbox path registry. |
+| `internal/agents/` | Agent registry and composition of workspace preparation, container runtime configuration, and auth requirements. |
+| `internal/containerruntime/` | Container runtime configuration: mounts, first-start hooks, recurring start hooks, agent install hooks. |
 | `internal/agentdefs/` | Agent definitions: auth requirements, install specs for each supported agent. |
 | `internal/db/` | SQLite migrations, generated schema snapshot (`schema.sql`), sqlc-generated queries (`queries.sql.go`). |
 | `internal/sshimmer/` | Ed25519 SSH key provisioning for container access. |
@@ -58,12 +61,12 @@ The CLI **never** imports daemon internals — only the `daemon.Client` interfac
 
 **Daemon is the source of truth.** All sandbox state lives in SQLite (soft-delete pattern: sandboxes are marked deleted, not dropped). The CLI is purely a thin transport layer.
 
-**Agent plugin system.** Adding a new agent means implementing the `AgentRegistry` interface in `internal/cloning/` and registering it in `internal/agentdefs/`. Each agent defines its auth flow, CLI install spec, and container setup hooks.
+**Agent plugin system.** Adding a built-in agent usually starts in `internal/agentdefs/`: define its auth flow, CLI install spec, generated files, and named start hooks. `internal/agents/` builds the registry from those definitions by composing `cloning.WorkspacePreparation` with `containerruntime.ContainerConfiguration`.
 
 **Execution flow for `sand new -a claude`:**
 1. CLI → gRPC RPC to daemon
-2. Boxer: APFS clone of project dir → pull/verify container image → create container with clone mounted at `/app`
-3. SSH shimmer provisions keys; agent setup hooks run inside container
+2. Boxer prepares the sandbox record and APFS clone, pulls/verifies the container image, and provisions SSH keys
+3. Lifecycle service creates/starts the container with the clone mounted at `/app`; container runtime hooks install/start agent support inside the container
 4. User shells in; container-side `sand` CLI communicates back to host daemon through container networking
 
 ## Database changes
