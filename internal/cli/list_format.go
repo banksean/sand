@@ -22,6 +22,8 @@ type lsRow struct {
 	Stats      *sandtypes.ContainerStats
 }
 
+const deletedSanboxesHeader = "--- deleted sandboxes (to remove: sand expunge [-f]) ---"
+
 func renderLsTable(w io.Writer, currentRows, otherRows, deletedRows []lsRow, long bool) error {
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	headings := []string{
@@ -51,7 +53,7 @@ func renderLsTable(w io.Writer, currentRows, otherRows, deletedRows []lsRow, lon
 		}
 	}
 	if len(deletedRows) > 0 {
-		if _, err := fmt.Fprintln(tw, "--- deleted sandboxes ---"); err != nil {
+		if _, err := fmt.Fprintln(tw, deletedSanboxesHeader); err != nil {
 			return err
 		}
 		if err := renderLsRows(tw, deletedRows, long); err != nil {
