@@ -13,7 +13,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/banksean/sand/internal/agents"
 	"github.com/banksean/sand/internal/cloning"
+	"github.com/banksean/sand/internal/containerruntime"
+	"github.com/banksean/sand/internal/daemon/internal/lifecycle"
 	"github.com/banksean/sand/internal/hostops"
 	"github.com/banksean/sand/internal/imageprogress"
 	"github.com/banksean/sand/internal/sandtypes"
@@ -153,7 +156,7 @@ func TestBoxer_NewSandbox_EndToEnd(t *testing.T) {
 			},
 		}
 		testConfig := &mockContainerConfiguration{}
-		boxer.AgentRegistry.Register(&cloning.AgentConfig{
+		boxer.AgentRegistry.Register(&agents.AgentConfig{
 			Name:          "test-agent",
 			Preparation:   testPrep,
 			Configuration: testConfig,
@@ -212,7 +215,7 @@ func TestBoxer_NewSandbox_EndToEnd(t *testing.T) {
 			},
 		}
 		testConfig := &mockContainerConfiguration{}
-		boxer.AgentRegistry.Register(&cloning.AgentConfig{
+		boxer.AgentRegistry.Register(&agents.AgentConfig{
 			Name:          "test-error-agent",
 			Preparation:   testPrep,
 			Configuration: testConfig,
@@ -266,7 +269,7 @@ func TestBoxer_NewSandbox_EndToEnd(t *testing.T) {
 				}, nil
 			},
 		}
-		boxer.AgentRegistry.Register(&cloning.AgentConfig{
+		boxer.AgentRegistry.Register(&agents.AgentConfig{
 			Name:          "test-snapshot-agent",
 			Preparation:   testPrep,
 			Configuration: &mockContainerConfiguration{},
@@ -316,10 +319,10 @@ func TestBoxer_CreateContainerSSHAgentOptIn(t *testing.T) {
 		MemoryMB: 1024,
 	}
 
-	if err := boxer.CreateContainer(ctx, sbox, false); err != nil {
+	if err := boxer.lifecycle().CreateContainer(ctx, sbox, false); err != nil {
 		t.Fatalf("CreateContainer(false) error = %v", err)
 	}
-	if err := boxer.CreateContainer(ctx, sbox, true); err != nil {
+	if err := boxer.lifecycle().CreateContainer(ctx, sbox, true); err != nil {
 		t.Fatalf("CreateContainer(true) error = %v", err)
 	}
 
@@ -373,7 +376,7 @@ func TestBoxer_CreateContainerMountsHTTPProxyCA(t *testing.T) {
 		},
 	}
 
-	if err := boxer.CreateContainer(ctx, sbox, false); err != nil {
+	if err := boxer.lifecycle().CreateContainer(ctx, sbox, false); err != nil {
 		t.Fatalf("CreateContainer() error = %v", err)
 	}
 	if createOpts == nil {
@@ -524,29 +527,29 @@ func (m *mockWorkspacePreparation) Prepare(ctx context.Context, req cloning.Clon
 }
 
 type mockContainerConfiguration struct {
-	getMountsFunc       func(artifacts cloning.CloneArtifacts) []sandtypes.MountSpec
-	getStartupHooksFunc func(artifacts cloning.CloneArtifacts) []sandtypes.ContainerHook
-	getStartHooksFunc   func(artifacts cloning.CloneArtifacts) []sandtypes.ContainerHook
+	getMountsFunc       func(artifacts containerruntime.Artifacts) []sandtypes.MountSpec
+	getStartupHooksFunc func(artifacts containerruntime.Artifacts) []sandtypes.ContainerHook
+	getStartHooksFunc   func(artifacts containerruntime.Artifacts) []sandtypes.ContainerHook
 }
 
-// GetStartHooks implements [cloning.ContainerConfiguration].
-func (m *mockContainerConfiguration) GetStartHooks(artifacts cloning.CloneArtifacts) []sandtypes.ContainerHook {
+// GetStartHooks implements [containerruntime.ContainerConfiguration].
+func (m *mockContainerConfiguration) GetStartHooks(artifacts containerruntime.Artifacts) []sandtypes.ContainerHook {
 	if m.getStartHooksFunc != nil {
 		return m.getStartHooksFunc(artifacts)
 	}
 	return []sandtypes.ContainerHook{}
 }
 
-var _ cloning.ContainerConfiguration = &mockContainerConfiguration{}
+var _ containerruntime.ContainerConfiguration = &mockContainerConfiguration{}
 
-func (m *mockContainerConfiguration) GetMounts(artifacts cloning.CloneArtifacts) []sandtypes.MountSpec {
+func (m *mockContainerConfiguration) GetMounts(artifacts containerruntime.Artifacts) []sandtypes.MountSpec {
 	if m.getMountsFunc != nil {
 		return m.getMountsFunc(artifacts)
 	}
 	return []sandtypes.MountSpec{}
 }
 
-func (m *mockContainerConfiguration) GetFirstStartHooks(artifacts cloning.CloneArtifacts) []sandtypes.ContainerHook {
+func (m *mockContainerConfiguration) GetFirstStartHooks(artifacts containerruntime.Artifacts) []sandtypes.ContainerHook {
 	if m.getStartupHooksFunc != nil {
 		return m.getStartupHooksFunc(artifacts)
 	}
@@ -565,7 +568,7 @@ func TestInnieSocketPermissionHookRunsRepairScript(t *testing.T) {
 		},
 	}
 
-	if err := innieSocketPermissionHook().Run(context.Background(), nil, streamer); err != nil {
+	if err := lifecycle.InnieSocketPermissionHook().Run(context.Background(), nil, streamer); err != nil {
 		t.Fatalf("innieSocketPermissionHook() error = %v", err)
 	}
 
@@ -597,7 +600,7 @@ func TestInnieSocketPermissionHookPropagatesExecError(t *testing.T) {
 		},
 	}
 
-	err := innieSocketPermissionHook().Run(context.Background(), nil, streamer)
+	err := lifecycle.InnieSocketPermissionHook().Run(context.Background(), nil, streamer)
 	if !errors.Is(err, expectedErr) {
 		t.Fatalf("innieSocketPermissionHook() error = %v, want %v", err, expectedErr)
 	}
@@ -615,10 +618,10 @@ func TestBoxer_StartContainersPrependInnieSocketPermissionHook(t *testing.T) {
 		{
 			name: "first start",
 			startFunc: func(boxer *Boxer, sbox *sandtypes.Box) error {
-				return boxer.StartNewContainer(context.Background(), sbox, nil)
+				return boxer.lifecycle().StartNewContainer(context.Background(), sbox, nil)
 			},
 			config: &mockContainerConfiguration{
-				getStartupHooksFunc: func(artifacts cloning.CloneArtifacts) []sandtypes.ContainerHook {
+				getStartupHooksFunc: func(artifacts containerruntime.Artifacts) []sandtypes.ContainerHook {
 					return []sandtypes.ContainerHook{agentHookForTest("agent first-start hook")}
 				},
 			},
@@ -626,10 +629,10 @@ func TestBoxer_StartContainersPrependInnieSocketPermissionHook(t *testing.T) {
 		{
 			name: "existing start",
 			startFunc: func(boxer *Boxer, sbox *sandtypes.Box) error {
-				return boxer.StartExistingContainer(context.Background(), sbox)
+				return boxer.lifecycle().StartExistingContainer(context.Background(), sbox)
 			},
 			config: &mockContainerConfiguration{
-				getStartHooksFunc: func(artifacts cloning.CloneArtifacts) []sandtypes.ContainerHook {
+				getStartHooksFunc: func(artifacts containerruntime.Artifacts) []sandtypes.ContainerHook {
 					return []sandtypes.ContainerHook{agentHookForTest("agent restart hook")}
 				},
 			},
@@ -644,7 +647,7 @@ func TestBoxer_StartContainersPrependInnieSocketPermissionHook(t *testing.T) {
 				},
 			}
 			boxer := newTestBoxer(t, mockContainer, &mockImageOps{})
-			boxer.AgentRegistry.Register(&cloning.AgentConfig{
+			boxer.AgentRegistry.Register(&agents.AgentConfig{
 				Name:          "default",
 				Configuration: tc.config,
 			})
@@ -1184,7 +1187,7 @@ func TestBoxer_ExecuteHooks_StreamsProgress(t *testing.T) {
 	}
 
 	var progress bytes.Buffer
-	err := boxer.executeHooks(ctx, &sandtypes.Box{
+	err := boxer.lifecycle().ExecuteHooks(ctx, &sandtypes.Box{
 		ID:          "test-sandbox",
 		ContainerID: "test-container",
 		EnvFile:     "/tmp/test.env",
@@ -1236,7 +1239,7 @@ func TestBoxer_ExecuteHooks_DoesNotPassEnvFileToExec(t *testing.T) {
 		}),
 	}
 
-	err := boxer.executeHooks(ctx, &sandtypes.Box{
+	err := boxer.lifecycle().ExecuteHooks(ctx, &sandtypes.Box{
 		ID:          "test-sandbox",
 		ContainerID: "test-container",
 		EnvFile:     "/tmp/test.env",

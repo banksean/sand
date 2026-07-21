@@ -8,7 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/banksean/sand/internal/cloning"
+	"github.com/banksean/sand/internal/agents"
+	"github.com/banksean/sand/internal/containerruntime"
 	"github.com/banksean/sand/internal/daemon"
 	"github.com/banksean/sand/internal/daemon/internal/boxer"
 	"github.com/banksean/sand/internal/hostops"
@@ -98,11 +99,11 @@ func StartDaemon(t testing.TB, deps Deps, configure func(context.Context, Sandbo
 
 // defaultRegistry returns an AgentRegistry with the "default" agent pre-registered
 // using the base container configuration (no mounts from scratch, no-op exec hooks).
-func defaultRegistry() *cloning.AgentRegistry {
-	r := cloning.NewAgentRegistry()
-	r.Register(&cloning.AgentConfig{
+func defaultRegistry() *agents.AgentRegistry {
+	r := agents.NewAgentRegistry()
+	r.Register(&agents.AgentConfig{
 		Name:          "default",
-		Configuration: cloning.NewBaseContainerConfiguration(),
+		Configuration: containerruntime.NewBaseContainerConfiguration(),
 	})
 	return r
 }

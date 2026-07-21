@@ -88,17 +88,15 @@ func TestPrepareMountRequestsClonesDirectories(t *testing.T) {
 	}
 }
 
-func TestEffectiveRuntimeMountsPrefersMountRequests(t *testing.T) {
-	box := &sandtypes.Box{
-		MountRequests: []sandtypes.MountRequest{{
-			Kind:    sandtypes.MountKindClone,
-			Runtime: "type=bind,source=/clone,target=/target,readonly",
-		}},
-	}
+func TestRuntimeMountRequestsUsesPersistedRuntimeMounts(t *testing.T) {
+	requests := []sandtypes.MountRequest{{
+		Kind:    sandtypes.MountKindClone,
+		Runtime: "type=bind,source=/clone,target=/target,readonly",
+	}}
 
-	got := effectiveRuntimeMounts(box)
+	got := sandtypes.RuntimeMountRequests(requests)
 	if len(got) != 1 || got[0] != "type=bind,source=/clone,target=/target,readonly" {
-		t.Fatalf("effectiveRuntimeMounts() = %+v", got)
+		t.Fatalf("RuntimeMountRequests() = %+v", got)
 	}
 }
 

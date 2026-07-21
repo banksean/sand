@@ -11,7 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/banksean/sand/internal/cloning"
+	"github.com/banksean/sand/internal/agents"
+	"github.com/banksean/sand/internal/containerruntime"
 	"github.com/banksean/sand/internal/daemon/internal/boxer"
 	"github.com/banksean/sand/internal/hostops"
 	"github.com/banksean/sand/internal/imageprogress"
@@ -341,8 +342,8 @@ func TestStartSandboxRecreatesStoppedContainerAfterSocketCreation(t *testing.T) 
 		},
 	}
 
-	registry := cloning.NewAgentRegistry()
-	registry.Register(&cloning.AgentConfig{
+	registry := agents.NewAgentRegistry()
+	registry.Register(&agents.AgentConfig{
 		Name:          "default",
 		Configuration: noHookContainerConfig{},
 	})
@@ -423,8 +424,8 @@ func TestStartSandboxRunsFirstStartHooksForUnbootstrappedContainer(t *testing.T)
 		},
 	}
 
-	registry := cloning.NewAgentRegistry()
-	registry.Register(&cloning.AgentConfig{
+	registry := agents.NewAgentRegistry()
+	registry.Register(&agents.AgentConfig{
 		Name:          "default",
 		Configuration: testBootstrapContainerConfig{},
 	})
@@ -501,8 +502,8 @@ func TestStartSandboxRunsRestartHooksForBootstrappedContainer(t *testing.T) {
 		},
 	}
 
-	registry := cloning.NewAgentRegistry()
-	registry.Register(&cloning.AgentConfig{
+	registry := agents.NewAgentRegistry()
+	registry.Register(&agents.AgentConfig{
 		Name:          "default",
 		Configuration: testBootstrapContainerConfig{},
 	})
@@ -570,8 +571,8 @@ func TestStartSandboxLeavesContainerUnbootstrappedWhenFirstStartHookFails(t *tes
 		},
 	}
 
-	registry := cloning.NewAgentRegistry()
-	registry.Register(&cloning.AgentConfig{
+	registry := agents.NewAgentRegistry()
+	registry.Register(&agents.AgentConfig{
 		Name:          "default",
 		Configuration: testBootstrapContainerConfig{firstStartErr: expectedErr},
 	})
@@ -614,15 +615,15 @@ func TestStartSandboxLeavesContainerUnbootstrappedWhenFirstStartHookFails(t *tes
 
 type noHookContainerConfig struct{}
 
-func (noHookContainerConfig) GetMounts(cloning.CloneArtifacts) []sandtypes.MountSpec {
+func (noHookContainerConfig) GetMounts(containerruntime.Artifacts) []sandtypes.MountSpec {
 	return nil
 }
 
-func (noHookContainerConfig) GetFirstStartHooks(cloning.CloneArtifacts) []sandtypes.ContainerHook {
+func (noHookContainerConfig) GetFirstStartHooks(containerruntime.Artifacts) []sandtypes.ContainerHook {
 	return nil
 }
 
-func (noHookContainerConfig) GetStartHooks(cloning.CloneArtifacts) []sandtypes.ContainerHook {
+func (noHookContainerConfig) GetStartHooks(containerruntime.Artifacts) []sandtypes.ContainerHook {
 	return nil
 }
 
@@ -630,11 +631,11 @@ type testBootstrapContainerConfig struct {
 	firstStartErr error
 }
 
-func (testBootstrapContainerConfig) GetMounts(cloning.CloneArtifacts) []sandtypes.MountSpec {
+func (testBootstrapContainerConfig) GetMounts(containerruntime.Artifacts) []sandtypes.MountSpec {
 	return nil
 }
 
-func (c testBootstrapContainerConfig) GetFirstStartHooks(cloning.CloneArtifacts) []sandtypes.ContainerHook {
+func (c testBootstrapContainerConfig) GetFirstStartHooks(containerruntime.Artifacts) []sandtypes.ContainerHook {
 	return []sandtypes.ContainerHook{
 		sandtypes.NewContainerHook("first-start-hook", func(ctx context.Context, ctr *sandtypes.Container, exec sandtypes.HookStreamer) error {
 			if c.firstStartErr != nil {
@@ -646,7 +647,7 @@ func (c testBootstrapContainerConfig) GetFirstStartHooks(cloning.CloneArtifacts)
 	}
 }
 
-func (testBootstrapContainerConfig) GetStartHooks(cloning.CloneArtifacts) []sandtypes.ContainerHook {
+func (testBootstrapContainerConfig) GetStartHooks(containerruntime.Artifacts) []sandtypes.ContainerHook {
 	return []sandtypes.ContainerHook{
 		sandtypes.NewContainerHook("restart-hook", func(ctx context.Context, ctr *sandtypes.Container, exec sandtypes.HookStreamer) error {
 			_, err := exec.Exec(ctx, "restart-hook")

@@ -9,7 +9,9 @@ import (
 	"testing"
 
 	"github.com/banksean/sand/internal/agentdefs"
+	"github.com/banksean/sand/internal/agents"
 	"github.com/banksean/sand/internal/cloning"
+	"github.com/banksean/sand/internal/containerruntime"
 	"github.com/banksean/sand/internal/daemon/internal/boxer"
 	"github.com/banksean/sand/internal/hostops"
 	"github.com/banksean/sand/internal/sandtypes"
@@ -415,7 +417,7 @@ func TestCreateSandboxRejectsUnknownAgentBeforeSandboxCreation(t *testing.T) {
 	}
 }
 
-func newRequirementTestDaemon(t *testing.T, registry *cloning.AgentRegistry, containerSvc *hostops.MockContainerOps) *Daemon {
+func newRequirementTestDaemon(t *testing.T, registry *agents.AgentRegistry, containerSvc *hostops.MockContainerOps) *Daemon {
 	t.Helper()
 
 	// Keep this short because it still appears in a few test fixture paths. Runtime
@@ -444,12 +446,12 @@ func newRequirementTestDaemon(t *testing.T, registry *cloning.AgentRegistry, con
 	return NewDaemonWithBoxer(appDir, "test", b)
 }
 
-func requirementTestRegistry() *cloning.AgentRegistry {
+func requirementTestRegistry() *agents.AgentRegistry {
 	prep := &requirementTestPreparation{cloneRoot: filepath.Join(os.TempDir(), "sand-requirement-test")}
-	config := cloning.NewBaseContainerConfiguration()
-	r := cloning.NewAgentRegistry()
+	config := containerruntime.NewBaseContainerConfiguration()
+	r := agents.NewAgentRegistry()
 	for _, definition := range agentdefs.All() {
-		r.Register(&cloning.AgentConfig{
+		r.Register(&agents.AgentConfig{
 			Name:          definition.Name,
 			Selectable:    definition.Selectable,
 			Preparation:   prep,
@@ -460,12 +462,12 @@ func requirementTestRegistry() *cloning.AgentRegistry {
 	return r
 }
 
-func requirementTestRequirements(definition agentdefs.Definition) cloning.AgentRequirements {
+func requirementTestRequirements(definition agentdefs.Definition) agents.AgentRequirements {
 	if len(definition.AuthEnvAnyOf) == 0 {
-		return cloning.AgentRequirements{}
+		return agents.AgentRequirements{}
 	}
-	return cloning.AgentRequirements{
-		Auth: &cloning.AuthRequirementSpec{
+	return agents.AgentRequirements{
+		Auth: &agents.AuthRequirementSpec{
 			EnvAnyOf: definition.AuthEnvAnyOf,
 		},
 	}

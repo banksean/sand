@@ -1,4 +1,4 @@
-package cloning
+package containerruntime
 
 import (
 	"context"
@@ -17,7 +17,7 @@ func TestDefinitionContainerConfigurationAddsInstallHookAfterBaseHook(t *testing
 	}
 	cfg := NewDefinitionContainerConfiguration(definition)
 
-	hooks := cfg.GetFirstStartHooks(CloneArtifacts{Username: "sean", Uid: "1000"})
+	hooks := cfg.GetFirstStartHooks(Artifacts{Username: "sean", Uid: "1000"})
 	gotNames := hookNames(hooks)
 	wantNames := []string{"default container bootstrap", "install codex agent"}
 	if !reflect.DeepEqual(gotNames, wantNames) {
@@ -54,12 +54,12 @@ func TestDefinitionContainerConfigurationKeepsOpenCodeTunnelAsRecurringHook(t *t
 	}
 	cfg := NewDefinitionContainerConfiguration(definition)
 
-	startHooks := cfg.GetStartHooks(CloneArtifacts{Username: "sean"})
+	startHooks := cfg.GetStartHooks(Artifacts{Username: "sean"})
 	if got, want := hookNames(startHooks), []string{"start sshd", "open remote ssh tunnel for chrome-devtools mcp"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("start hook names = %#v, want %#v", got, want)
 	}
 
-	firstStartHooks := cfg.GetFirstStartHooks(CloneArtifacts{Username: "sean", Uid: "1000"})
+	firstStartHooks := cfg.GetFirstStartHooks(Artifacts{Username: "sean", Uid: "1000"})
 	got := hookNames(firstStartHooks)
 	want := []string{"default container bootstrap", "install opencode agent", "open remote ssh tunnel for chrome-devtools mcp"}
 	if !reflect.DeepEqual(got, want) {

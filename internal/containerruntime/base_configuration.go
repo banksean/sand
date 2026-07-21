@@ -1,4 +1,4 @@
-package cloning
+package containerruntime
 
 import (
 	"bytes"
@@ -18,6 +18,8 @@ type BaseContainerConfiguration struct{}
 var _ ContainerConfiguration = &BaseContainerConfiguration{}
 
 const (
+	ContainerSideGitOrigin = "/run/git-origin-ro"
+
 	miseCachePath    = "/opt/tool-cache/mise"
 	goModCachePath   = miseCachePath + "/go/mod"
 	goBuildCachePath = miseCachePath + "/go/build"
@@ -149,20 +151,20 @@ func NewBaseContainerConfiguration() *BaseContainerConfiguration {
 	return &BaseContainerConfiguration{}
 }
 
-func (c *BaseContainerConfiguration) GetMounts(artifacts CloneArtifacts) []sandtypes.MountSpec {
+func (c *BaseContainerConfiguration) GetMounts(artifacts Artifacts) []sandtypes.MountSpec {
 	mounts := []sandtypes.MountSpec{
 		{
-			Source:   artifacts.PathRegistry.SSHKeysDir(),
+			Source:   artifacts.SSHKeysDir,
 			Target:   "/sshkeys",
 			ReadOnly: true,
 		},
 		{
-			Source:   artifacts.PathRegistry.DotfilesDir(),
+			Source:   artifacts.DotfilesDir,
 			Target:   "/dotfiles",
 			ReadOnly: true,
 		},
 		{
-			Source: artifacts.PathRegistry.WorkDir(),
+			Source: artifacts.WorkDir,
 			Target: "/app",
 		},
 	}
@@ -197,7 +199,7 @@ func (c *BaseContainerConfiguration) GetMounts(artifacts CloneArtifacts) []sandt
 	return mounts
 }
 
-func (c *BaseContainerConfiguration) GetStartHooks(artifacts CloneArtifacts) []sandtypes.ContainerHook {
+func (c *BaseContainerConfiguration) GetStartHooks(artifacts Artifacts) []sandtypes.ContainerHook {
 	return []sandtypes.ContainerHook{
 		sandtypes.NewContainerHook("start sshd", func(ctx context.Context, ctr *sandtypes.Container, exec sandtypes.HookStreamer) error {
 			flavor, err := c.detectBootstrapFlavor(ctx, exec)
@@ -215,7 +217,7 @@ func (c *BaseContainerConfiguration) GetStartHooks(artifacts CloneArtifacts) []s
 	}
 }
 
-func (c *BaseContainerConfiguration) GetFirstStartHooks(artifacts CloneArtifacts) []sandtypes.ContainerHook {
+func (c *BaseContainerConfiguration) GetFirstStartHooks(artifacts Artifacts) []sandtypes.ContainerHook {
 	return []sandtypes.ContainerHook{
 		c.defaultContainerHook(artifacts.Username, artifacts.Uid, artifacts.SharedCacheMounts),
 	}

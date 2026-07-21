@@ -1,10 +1,12 @@
-package cloning
+package agents
 
 import (
 	"path/filepath"
 	"sync"
 
 	"github.com/banksean/sand/internal/agentdefs"
+	"github.com/banksean/sand/internal/cloning"
+	"github.com/banksean/sand/internal/containerruntime"
 	"github.com/banksean/sand/internal/hostops"
 )
 
@@ -38,8 +40,8 @@ func newAgentConfigFromDefinition(definition agentdefs.Definition, cloneRoot str
 	return &AgentConfig{
 		Name:          definition.Name,
 		Selectable:    definition.Selectable,
-		Preparation:   NewDefinitionWorkspacePreparation(definition, cloneRoot, messenger, gitOps, fileOps),
-		Configuration: NewDefinitionContainerConfiguration(definition),
+		Preparation:   cloning.NewDefinitionWorkspacePreparation(definition, cloneRoot, messenger, gitOps, fileOps),
+		Configuration: containerruntime.NewDefinitionContainerConfiguration(definition),
 		Requirements:  requirementsForDefinition(definition),
 	}
 }

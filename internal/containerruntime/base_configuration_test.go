@@ -1,4 +1,4 @@
-package cloning
+package containerruntime
 
 import (
 	"context"
@@ -123,10 +123,12 @@ func TestDefaultContainerHook_UsesAlpineFlavorWhenAPKAvailable(t *testing.T) {
 
 func TestBaseContainerConfigurationMountsGitMirrorAsOrigin(t *testing.T) {
 	cfg := NewBaseContainerConfiguration()
-	mounts := cfg.GetMounts(CloneArtifacts{
+	mounts := cfg.GetMounts(Artifacts{
 		HostGitMirrorDir: "/host/mirrors/repo.git",
 		SandboxWorkDir:   "/host/sandboxes/one",
-		PathRegistry:     NewStandardPathRegistry("/host/sandboxes/one"),
+		WorkDir:          "/host/sandboxes/one/app",
+		DotfilesDir:      "/host/sandboxes/one/dotfiles",
+		SSHKeysDir:       "/host/sandboxes/one/sshkeys",
 	})
 
 	var found bool
@@ -148,9 +150,11 @@ func TestBaseContainerConfigurationMountsGitMirrorAsOrigin(t *testing.T) {
 
 func TestBaseContainerConfigurationSkipsOriginMountWithoutGitMirror(t *testing.T) {
 	cfg := NewBaseContainerConfiguration()
-	mounts := cfg.GetMounts(CloneArtifacts{
+	mounts := cfg.GetMounts(Artifacts{
 		SandboxWorkDir: "/host/sandboxes/one",
-		PathRegistry:   NewStandardPathRegistry("/host/sandboxes/one"),
+		WorkDir:        "/host/sandboxes/one/app",
+		DotfilesDir:    "/host/sandboxes/one/dotfiles",
+		SSHKeysDir:     "/host/sandboxes/one/sshkeys",
 	})
 
 	for _, mount := range mounts {
@@ -162,9 +166,11 @@ func TestBaseContainerConfigurationSkipsOriginMountWithoutGitMirror(t *testing.T
 
 func TestBaseContainerConfigurationMountsAgentCache(t *testing.T) {
 	cfg := NewBaseContainerConfiguration()
-	mounts := cfg.GetMounts(CloneArtifacts{
+	mounts := cfg.GetMounts(Artifacts{
 		SandboxWorkDir: "/host/sandboxes/one",
-		PathRegistry:   NewStandardPathRegistry("/host/sandboxes/one"),
+		WorkDir:        "/host/sandboxes/one/app",
+		DotfilesDir:    "/host/sandboxes/one/dotfiles",
+		SSHKeysDir:     "/host/sandboxes/one/sshkeys",
 		SharedCacheMounts: sandtypes.SharedCacheMounts{
 			AgentCacheHostDir: "/host/caches/agents",
 		},
@@ -195,7 +201,7 @@ func TestStartHook_PreparesSSHDForUbuntuFlavor(t *testing.T) {
 		},
 	}
 
-	hooks := cfg.GetStartHooks(CloneArtifacts{Uid: "1000"})
+	hooks := cfg.GetStartHooks(Artifacts{Uid: "1000"})
 	if len(hooks) != 1 {
 		t.Fatalf("GetStartHooks() len = %d, want 1", len(hooks))
 	}
@@ -221,7 +227,7 @@ func TestStartHook_SkipsSSHDPrepareForAlpineFlavor(t *testing.T) {
 		},
 	}
 
-	hooks := cfg.GetStartHooks(CloneArtifacts{Uid: "1000"})
+	hooks := cfg.GetStartHooks(Artifacts{Uid: "1000"})
 	if len(hooks) != 1 {
 		t.Fatalf("GetStartHooks() len = %d, want 1", len(hooks))
 	}

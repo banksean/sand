@@ -1,4 +1,4 @@
-package cloning
+package containerruntime
 
 import (
 	"bytes"
@@ -33,11 +33,11 @@ func NewDefinitionContainerConfiguration(definition agentdefs.Definition) *Defin
 
 var _ ContainerConfiguration = &DefinitionContainerConfiguration{}
 
-func (c *DefinitionContainerConfiguration) GetMounts(artifacts CloneArtifacts) []sandtypes.MountSpec {
+func (c *DefinitionContainerConfiguration) GetMounts(artifacts Artifacts) []sandtypes.MountSpec {
 	return c.base.GetMounts(artifacts)
 }
 
-func (c *DefinitionContainerConfiguration) GetFirstStartHooks(artifacts CloneArtifacts) []sandtypes.ContainerHook {
+func (c *DefinitionContainerConfiguration) GetFirstStartHooks(artifacts Artifacts) []sandtypes.ContainerHook {
 	hooks := c.base.GetFirstStartHooks(artifacts)
 	if c.install != nil {
 		hooks = append(hooks, c.installAgentHook())
@@ -46,7 +46,7 @@ func (c *DefinitionContainerConfiguration) GetFirstStartHooks(artifacts CloneArt
 	return hooks
 }
 
-func (c *DefinitionContainerConfiguration) GetStartHooks(artifacts CloneArtifacts) []sandtypes.ContainerHook {
+func (c *DefinitionContainerConfiguration) GetStartHooks(artifacts Artifacts) []sandtypes.ContainerHook {
 	return append(c.base.GetStartHooks(artifacts), c.namedHooks(artifacts)...)
 }
 
@@ -111,7 +111,7 @@ func validateInstallSpec(agentName string, install agentdefs.InstallSpec) error 
 	return nil
 }
 
-func (c *DefinitionContainerConfiguration) namedHooks(artifacts CloneArtifacts) []sandtypes.ContainerHook {
+func (c *DefinitionContainerConfiguration) namedHooks(artifacts Artifacts) []sandtypes.ContainerHook {
 	hooks := make([]sandtypes.ContainerHook, 0, len(c.startHooks))
 	for _, name := range c.startHooks {
 		switch name {

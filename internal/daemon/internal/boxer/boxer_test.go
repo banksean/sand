@@ -115,7 +115,7 @@ func TestEnsureSharedCacheMounts_HTTPProxyURLDefaultDomain(t *testing.T) {
 }
 
 func TestHookExecutionEnvIncludesHTTPProxy(t *testing.T) {
-	env := hookExecutionEnv(sandtypes.SharedCacheMounts{HTTPProxyURL: "http://sand-http-cache.test.local:3128"})
+	env := sandtypes.SharedHTTPProxyEnv("http://sand-http-cache.test.local:3128")
 
 	want := map[string]string{
 		"http_proxy":  "http://sand-http-cache.test.local:3128",
@@ -126,7 +126,7 @@ func TestHookExecutionEnvIncludesHTTPProxy(t *testing.T) {
 		"NO_PROXY":    "localhost,127.0.0.1,::1",
 	}
 	for key, value := range want {
-		if got := lookupEnvValue(env, key); got != value {
+		if got := env[key]; got != value {
 			t.Fatalf("%s = %q, want %q in %v", key, got, value, env)
 		}
 	}

@@ -1,9 +1,12 @@
-package cloning
+package agents
 
 import (
 	"fmt"
 	"sort"
 	"sync"
+
+	"github.com/banksean/sand/internal/cloning"
+	"github.com/banksean/sand/internal/containerruntime"
 )
 
 // AgentRequirements describes the optional launch requirements an agent declares.
@@ -25,8 +28,8 @@ type AuthRequirementSpec struct {
 type AgentConfig struct {
 	Name          string
 	Selectable    bool
-	Preparation   WorkspacePreparation
-	Configuration ContainerConfiguration
+	Preparation   cloning.WorkspacePreparation
+	Configuration containerruntime.ContainerConfiguration
 	Requirements  AgentRequirements
 }
 

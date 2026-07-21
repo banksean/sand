@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/banksean/sand/internal/cloning"
+	"github.com/banksean/sand/internal/agents"
 	"github.com/banksean/sand/internal/sandtypes"
 )
 
@@ -24,7 +24,7 @@ func (d *Daemon) validateSelectableAgent(agent string) error {
 	return err
 }
 
-func (d *Daemon) lookupSelectableAgent(agent string) (*cloning.AgentConfig, error) {
+func (d *Daemon) lookupSelectableAgent(agent string) (*agents.AgentConfig, error) {
 	if d.boxer == nil || d.boxer.AgentRegistry == nil {
 		return nil, fmt.Errorf("agent registry is not initialized")
 	}

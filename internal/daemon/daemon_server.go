@@ -18,6 +18,7 @@ import (
 
 	"github.com/banksean/sand/internal/daemon/daemonpb"
 	"github.com/banksean/sand/internal/daemon/internal/boxer"
+	"github.com/banksean/sand/internal/daemon/internal/lifecycle"
 	"github.com/banksean/sand/internal/profiles"
 	"github.com/banksean/sand/internal/runtimepaths"
 	"github.com/banksean/sand/internal/sandboxlog"
@@ -45,6 +46,7 @@ type Daemon struct {
 
 	hostMCP *HostMCP
 	boxer   *boxer.Boxer
+	runtime *lifecycle.Service
 
 	outieGRPCListener net.Listener
 
@@ -72,6 +74,7 @@ type Daemon struct {
 func NewDaemonWithBoxer(appBaseDir, localDomain string, b *boxer.Boxer) *Daemon {
 	d := NewDaemon(appBaseDir, localDomain)
 	d.boxer = b
+	d.initLifecycle()
 	return d
 }
 
@@ -87,6 +90,20 @@ func NewDaemon(appBaseDir, localDomain string) *Daemon {
 		innieServers:     map[string]*http.Server{},
 		innieGRPCServers: map[string]*grpc.Server{},
 	}
+}
+
+func (d *Daemon) initLifecycle() {
+	if d.boxer == nil {
+		d.runtime = nil
+		return
+	}
+	d.runtime = lifecycle.NewService(lifecycle.Deps{
+		AppRoot:          d.AppBaseDir,
+		ContainerService: d.boxer.ContainerService,
+		ImageService:     d.boxer.ImageService,
+		AgentRegistry:    d.boxer.AgentRegistry,
+		Store:            d.boxer,
+	})
 }
 
 // ServeUnixSocket serves the unix domain socket that sandd clients (the host-side CLI, e.g.) connect to.
@@ -127,6 +144,7 @@ func (d *Daemon) startDaemonServer(ctx context.Context) error {
 		}
 		d.boxer = sber
 	}
+	d.initLifecycle()
 	if err := d.boxer.Sync(ctx); err != nil {
 		return fmt.Errorf("failed to sync Boxer db with current environment state: %v\n", err)
 	}
@@ -544,7 +562,7 @@ func (d *Daemon) StartSandbox(ctx context.Context, opts StartSandboxOpts) error 
 	}
 
 	if needsRecreate {
-		if err := d.boxer.RecreateContainer(ctx, sbox, true); err != nil {
+		if err := d.runtime.RecreateContainer(ctx, sbox, true); err != nil {
 			_ = httpListener.Close()
 			_ = grpcListener.Close()
 			return err
@@ -556,9 +574,9 @@ func (d *Daemon) StartSandbox(ctx context.Context, opts StartSandboxOpts) error 
 
 	var startErr error
 	if needsRecreate || !sbox.ContainerBootstrapped {
-		startErr = d.boxer.StartNewContainer(ctx, sbox, nil)
+		startErr = d.runtime.StartNewContainer(ctx, sbox, nil)
 	} else {
-		startErr = d.boxer.StartExistingContainer(ctx, sbox)
+		startErr = d.runtime.StartExistingContainer(ctx, sbox)
 	}
 	if startErr != nil {
 		_ = httpListener.Close()
@@ -736,7 +754,7 @@ func (d *Daemon) createSandbox(ctx context.Context, opts CreateSandboxOpts, prog
 		go d.serveInnieHttpSocket(ctx, sbox.ID, unixListener)
 		go d.serveInnieGRPCSocket(ctx, sbox.ID, grpcListener)
 
-		err = d.boxer.CreateContainer(ctx, sbox, opts.SSHAgent)
+		err = d.runtime.CreateContainer(ctx, sbox, opts.SSHAgent)
 		if err != nil {
 			return nil, err
 		}
@@ -750,7 +768,7 @@ func (d *Daemon) createSandbox(ctx context.Context, opts CreateSandboxOpts, prog
 	}
 
 	if ctr.Status.State != "running" {
-		err := d.boxer.StartNewContainer(ctx, sbox, progress)
+		err := d.runtime.StartNewContainer(ctx, sbox, progress)
 		if err != nil {
 			return nil, err
 		}
