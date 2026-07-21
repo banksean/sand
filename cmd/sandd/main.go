@@ -254,6 +254,13 @@ func appHomeDir() (string, error) {
 	return appSupportDir, nil
 }
 
+func effectiveAppBaseDir(configured string) (string, error) {
+	if configured != "" {
+		return configured, nil
+	}
+	return appHomeDir()
+}
+
 const description = `Manage lightweight linux container sandboxes on MacOS.`
 
 func main() {
@@ -288,20 +295,17 @@ func main() {
 	cwd, err := os.Getwd()
 	slog.InfoContext(ctx, "sandd main", "version", versionInfo, "cwd", cwd, "error", err)
 
-	appBaseDir, err := appHomeDir()
+	appBaseDir, err := effectiveAppBaseDir(cli.AppBaseDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "unable to get application home directory: %v\n", err.Error())
 		os.Exit(1)
 	}
+	cli.AppBaseDir = appBaseDir
 	slog.Info("main", "appBaseDir", appBaseDir)
-
-	if cli.AppBaseDir == "" {
-		cli.AppBaseDir = appBaseDir
-	}
 
 	err = kongCtx.Run(&App{
 		Context:    ctx,
-		AppBaseDir: appBaseDir,
+		AppBaseDir: cli.AppBaseDir,
 		LogFile:    cli.LogFile,
 		LogLevel:   cli.LogLevel,
 		CloneRoot:  cli.AppBaseDir,

@@ -20,12 +20,24 @@ import (
 )
 
 type sandboxNamePredictor struct {
-	mc daemon.Client
+	mc        daemon.Client
+	clientFor func() (daemon.Client, error)
 }
 
 // Predict implements [complete.Predictor].
 func (s *sandboxNamePredictor) Predict(args complete.Args) []string {
-	sandboxes, err := s.mc.ListSandboxes(context.Background())
+	mc := s.mc
+	if mc == nil && s.clientFor != nil {
+		var err error
+		mc, err = s.clientFor()
+		if err != nil {
+			return nil
+		}
+	}
+	if mc == nil {
+		return nil
+	}
+	sandboxes, err := mc.ListSandboxes(context.Background())
 	if err != nil {
 		return nil
 	}
@@ -38,6 +50,10 @@ func (s *sandboxNamePredictor) Predict(args complete.Args) []string {
 
 func NewSandboxNamePredictor(mc daemon.Client) complete.Predictor {
 	return &sandboxNamePredictor{mc: mc}
+}
+
+func NewLazySandboxNamePredictor(clientFor func() (daemon.Client, error)) complete.Predictor {
+	return &sandboxNamePredictor{clientFor: clientFor}
 }
 
 func buildInteractiveEnv(hostname string, scrubSSHAgent bool, extraEnv map[string]string) map[string]string {

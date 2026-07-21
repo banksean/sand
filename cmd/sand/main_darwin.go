@@ -124,6 +124,13 @@ func appHomeDir() (string, error) {
 	return appSupportDir, nil
 }
 
+func effectiveAppBaseDir(configured string) (string, error) {
+	if configured != "" {
+		return configured, nil
+	}
+	return appHomeDir()
+}
+
 // ensureDaemon attempts to verify that the sandd daemon is running, and if not,
 // starts a new instance of it.
 func ensureDaemon(ctx context.Context, appBaseDir string) error {
@@ -221,32 +228,14 @@ func main() {
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	appBaseDir, err := appHomeDir()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "unable to get application home directory: %v\n", err.Error())
-		os.Exit(1)
-	}
-
-	shutdownTracing, tracingEnabled, err := observability.InitTracing(ctx, "sand-cli")
-	if err != nil {
-		slog.WarnContext(ctx, "failed to initialize tracing", "error", err)
-	}
-	if tracingEnabled {
-		defer func() {
-			if err := observability.Shutdown(ctx, shutdownTracing); err != nil {
-				slog.WarnContext(ctx, "failed to shutdown tracing", "error", err)
-			}
-		}()
-	}
-
-	predictorMC, err := daemon.NewUnixSocketClient(ctx, appBaseDir)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to create sandd client, error: %v\n", err)
-		os.Exit(1)
-	}
-	namePredictor := cli.NewSandboxNamePredictor(predictorMC)
-
 	kongApp := kong.Must(&app)
+	namePredictor := cli.NewLazySandboxNamePredictor(func() (daemon.Client, error) {
+		appBaseDir, err := effectiveAppBaseDir(app.AppBaseDir)
+		if err != nil {
+			return nil, err
+		}
+		return daemon.NewUnixSocketClient(context.Background(), appBaseDir)
+	})
 	kongcompletion.Register(kongApp, kongcompletion.WithPredictor("sandbox-name", namePredictor))
 	kongConfigPaths := []string{"~/.sand.yaml"}
 	if p := cli.FindProjectConfig(); p != "" {
@@ -263,6 +252,13 @@ func main() {
 		kong.Description(description),
 	)
 
+	appBaseDir, err := effectiveAppBaseDir(app.AppBaseDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "unable to get application home directory: %v\n", err.Error())
+		os.Exit(1)
+	}
+	app.AppBaseDir = appBaseDir
+
 	if app.DryRun {
 		appJSON, err := json.MarshalIndent(app, "", "  ")
 		if err != nil {
@@ -273,6 +269,18 @@ func main() {
 	}
 
 	app.initSlog()
+
+	shutdownTracing, tracingEnabled, err := observability.InitTracing(ctx, "sand-cli")
+	if err != nil {
+		slog.WarnContext(ctx, "failed to initialize tracing", "error", err)
+	}
+	if tracingEnabled {
+		defer func() {
+			if err := observability.Shutdown(ctx, shutdownTracing); err != nil {
+				slog.WarnContext(ctx, "failed to shutdown tracing", "error", err)
+			}
+		}()
+	}
 
 	if err := runtimedeps.VerifyWithOptions(ctx,
 		appBaseDir,
@@ -297,10 +305,6 @@ func main() {
 	if err := ensureDaemon(ctx, appBaseDir); err != nil {
 		fmt.Fprintf(os.Stderr, "daemon not running, and failed to start it. error: %v\n", err)
 		os.Exit(1)
-	}
-
-	if app.AppBaseDir == "" {
-		app.AppBaseDir = appBaseDir
 	}
 
 	mc, err := daemon.NewUnixSocketClient(ctx, appBaseDir)
