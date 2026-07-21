@@ -158,7 +158,7 @@ func (sb *Boxer) Close() error {
 	return nil
 }
 
-func (sb *Boxer) lifecycle() *lifecycle.Service {
+func (sb *Boxer) newLifecycleService() *lifecycle.Service {
 	return lifecycle.NewService(lifecycle.Deps{
 		AppRoot:          sb.appRoot,
 		ContainerService: sb.ContainerService,
@@ -569,7 +569,7 @@ func (sb *Boxer) RenameSandbox(ctx context.Context, oldName, newName string, pro
 	}
 
 	fmt.Fprintf(progress, "[sand] creating container %s\n", newName)
-	if err := sb.lifecycle().CreateContainer(ctx, sbox, enableSSHAgent); err != nil {
+	if err := sb.newLifecycleService().CreateContainer(ctx, sbox, enableSSHAgent); err != nil {
 		return nil, fmt.Errorf("create container after rename: %w", err)
 	}
 	if err := sb.UpdateContainerID(ctx, sbox, sbox.ContainerID); err != nil {

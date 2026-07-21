@@ -319,10 +319,10 @@ func TestBoxer_CreateContainerSSHAgentOptIn(t *testing.T) {
 		MemoryMB: 1024,
 	}
 
-	if err := boxer.lifecycle().CreateContainer(ctx, sbox, false); err != nil {
+	if err := boxer.newLifecycleService().CreateContainer(ctx, sbox, false); err != nil {
 		t.Fatalf("CreateContainer(false) error = %v", err)
 	}
-	if err := boxer.lifecycle().CreateContainer(ctx, sbox, true); err != nil {
+	if err := boxer.newLifecycleService().CreateContainer(ctx, sbox, true); err != nil {
 		t.Fatalf("CreateContainer(true) error = %v", err)
 	}
 
@@ -376,7 +376,7 @@ func TestBoxer_CreateContainerMountsHTTPProxyCA(t *testing.T) {
 		},
 	}
 
-	if err := boxer.lifecycle().CreateContainer(ctx, sbox, false); err != nil {
+	if err := boxer.newLifecycleService().CreateContainer(ctx, sbox, false); err != nil {
 		t.Fatalf("CreateContainer() error = %v", err)
 	}
 	if createOpts == nil {
@@ -618,7 +618,7 @@ func TestBoxer_StartContainersPrependInnieSocketPermissionHook(t *testing.T) {
 		{
 			name: "first start",
 			startFunc: func(boxer *Boxer, sbox *sandtypes.Box) error {
-				return boxer.lifecycle().StartNewContainer(context.Background(), sbox, nil)
+				return boxer.newLifecycleService().StartNewContainer(context.Background(), sbox, nil)
 			},
 			config: &mockContainerConfiguration{
 				getStartupHooksFunc: func(artifacts containerruntime.Artifacts) []sandtypes.ContainerHook {
@@ -629,7 +629,7 @@ func TestBoxer_StartContainersPrependInnieSocketPermissionHook(t *testing.T) {
 		{
 			name: "existing start",
 			startFunc: func(boxer *Boxer, sbox *sandtypes.Box) error {
-				return boxer.lifecycle().StartExistingContainer(context.Background(), sbox)
+				return boxer.newLifecycleService().StartExistingContainer(context.Background(), sbox)
 			},
 			config: &mockContainerConfiguration{
 				getStartHooksFunc: func(artifacts containerruntime.Artifacts) []sandtypes.ContainerHook {
@@ -1187,7 +1187,7 @@ func TestBoxer_ExecuteHooks_StreamsProgress(t *testing.T) {
 	}
 
 	var progress bytes.Buffer
-	err := boxer.lifecycle().ExecuteHooks(ctx, &sandtypes.Box{
+	err := boxer.newLifecycleService().ExecuteHooks(ctx, &sandtypes.Box{
 		ID:          "test-sandbox",
 		ContainerID: "test-container",
 		EnvFile:     "/tmp/test.env",
@@ -1239,7 +1239,7 @@ func TestBoxer_ExecuteHooks_DoesNotPassEnvFileToExec(t *testing.T) {
 		}),
 	}
 
-	err := boxer.lifecycle().ExecuteHooks(ctx, &sandtypes.Box{
+	err := boxer.newLifecycleService().ExecuteHooks(ctx, &sandtypes.Box{
 		ID:          "test-sandbox",
 		ContainerID: "test-container",
 		EnvFile:     "/tmp/test.env",
