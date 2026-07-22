@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -141,7 +140,7 @@ func InnieSocketPermissionHook() sandtypes.ContainerHook {
 }
 
 func hookExecutionEnv(sharedCaches sandtypes.SharedCacheMounts) []string {
-	env := os.Environ()
+	env := []string{}
 	for key, value := range sandtypes.SharedHTTPProxyEnv(sharedCaches.HTTPProxyURL) {
 		env = setEnvValue(env, key, value)
 	}

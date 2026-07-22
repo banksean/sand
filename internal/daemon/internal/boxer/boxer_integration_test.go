@@ -1161,6 +1161,7 @@ func TestBoxer_ExecuteHooks_StreamsProgress(t *testing.T) {
 	ctx := context.Background()
 
 	var execStreamCalls []string
+	var execStreamEnv [][]string
 	var execStreamEnvFiles []string
 	var execStreamTTY []bool
 	mockContainer := &hostops.MockContainerOps{
@@ -1169,6 +1170,7 @@ func TestBoxer_ExecuteHooks_StreamsProgress(t *testing.T) {
 		},
 		ExecStreamFunc: func(ctx context.Context, opts *hostops.ExecContainer, containerID, cmd string, env []string, stdin io.Reader, stdout, stderr io.Writer, cmdArgs ...string) (func() error, error) {
 			execStreamCalls = append(execStreamCalls, cmd)
+			execStreamEnv = append(execStreamEnv, append([]string{}, env...))
 			execStreamEnvFiles = append(execStreamEnvFiles, opts.ProcessOptions.EnvFile)
 			execStreamTTY = append(execStreamTTY, opts.ProcessOptions.TTY)
 			if _, err := io.WriteString(stdout, "warming cache\n"); err != nil {
@@ -1188,9 +1190,10 @@ func TestBoxer_ExecuteHooks_StreamsProgress(t *testing.T) {
 
 	var progress bytes.Buffer
 	err := boxer.newLifecycleService().ExecuteHooks(ctx, &sandtypes.Box{
-		ID:          "test-sandbox",
-		ContainerID: "test-container",
-		EnvFile:     "/tmp/test.env",
+		ID:                "test-sandbox",
+		ContainerID:       "test-container",
+		EnvFile:           "/tmp/test.env",
+		SharedCacheMounts: sandtypes.SharedCacheMounts{HTTPProxyURL: "http://sand-http-cache.test.local:3128"},
 	}, hooks, &progress)
 	if err != nil {
 		t.Fatalf("executeHooks() error = %v", err)
@@ -1201,6 +1204,17 @@ func TestBoxer_ExecuteHooks_StreamsProgress(t *testing.T) {
 	}
 	if len(execStreamEnvFiles) != 1 || execStreamEnvFiles[0] != "" {
 		t.Fatalf("executeHooks() ExecStream env files = %v, want [\"\"]", execStreamEnvFiles)
+	}
+	if len(execStreamEnv) != 1 {
+		t.Fatalf("executeHooks() ExecStream env calls = %d, want 1", len(execStreamEnv))
+	}
+	for _, key := range []string{"http_proxy", "HTTP_PROXY", "https_proxy", "HTTPS_PROXY"} {
+		if got := lookupEnvValue(execStreamEnv[0], key); got != "http://sand-http-cache.test.local:3128" {
+			t.Fatalf("executeHooks() ExecStream %s = %q, want proxy URL in %v", key, got, execStreamEnv[0])
+		}
+	}
+	if got := lookupEnvValue(execStreamEnv[0], "NO_PROXY"); got != "localhost,127.0.0.1,::1" {
+		t.Fatalf("executeHooks() ExecStream NO_PROXY = %q, want localhost list", got)
 	}
 	if len(execStreamTTY) != 1 || execStreamTTY[0] {
 		t.Fatalf("executeHooks() ExecStream TTY = %v, want [false]", execStreamTTY)
@@ -1220,6 +1234,7 @@ func TestBoxer_ExecuteHooks_DoesNotPassEnvFileToExec(t *testing.T) {
 
 	var execEnvFiles []string
 	var execTTY []bool
+	var execEnv [][]string
 	mockContainer := &hostops.MockContainerOps{
 		InspectFunc: func(ctx context.Context, containerID string) ([]sandtypes.Container, error) {
 			return []sandtypes.Container{{Status: sandtypes.ContainerStatus{State: "running"}}}, nil
@@ -1227,6 +1242,7 @@ func TestBoxer_ExecuteHooks_DoesNotPassEnvFileToExec(t *testing.T) {
 		ExecFunc: func(ctx context.Context, opts *hostops.ExecContainer, containerID, cmd string, env []string, args ...string) (string, error) {
 			execEnvFiles = append(execEnvFiles, opts.ProcessOptions.EnvFile)
 			execTTY = append(execTTY, opts.ProcessOptions.TTY)
+			execEnv = append(execEnv, append([]string{}, env...))
 			return "", nil
 		},
 	}
@@ -1240,9 +1256,10 @@ func TestBoxer_ExecuteHooks_DoesNotPassEnvFileToExec(t *testing.T) {
 	}
 
 	err := boxer.newLifecycleService().ExecuteHooks(ctx, &sandtypes.Box{
-		ID:          "test-sandbox",
-		ContainerID: "test-container",
-		EnvFile:     "/tmp/test.env",
+		ID:                "test-sandbox",
+		ContainerID:       "test-container",
+		EnvFile:           "/tmp/test.env",
+		SharedCacheMounts: sandtypes.SharedCacheMounts{HTTPProxyURL: "http://sand-http-cache.test.local:3128"},
 	}, hooks, nil)
 	if err != nil {
 		t.Fatalf("executeHooks() error = %v", err)
@@ -1250,6 +1267,17 @@ func TestBoxer_ExecuteHooks_DoesNotPassEnvFileToExec(t *testing.T) {
 
 	if len(execEnvFiles) != 1 || execEnvFiles[0] != "" {
 		t.Fatalf("executeHooks() Exec env files = %v, want [\"\"]", execEnvFiles)
+	}
+	if len(execEnv) != 1 {
+		t.Fatalf("executeHooks() Exec env calls = %d, want 1", len(execEnv))
+	}
+	for _, key := range []string{"http_proxy", "HTTP_PROXY", "https_proxy", "HTTPS_PROXY"} {
+		if got := lookupEnvValue(execEnv[0], key); got != "http://sand-http-cache.test.local:3128" {
+			t.Fatalf("executeHooks() Exec %s = %q, want proxy URL in %v", key, got, execEnv[0])
+		}
+	}
+	if got := lookupEnvValue(execEnv[0], "no_proxy"); got != "localhost,127.0.0.1,::1" {
+		t.Fatalf("executeHooks() Exec no_proxy = %q, want localhost list", got)
 	}
 	if len(execTTY) != 1 || execTTY[0] {
 		t.Fatalf("executeHooks() Exec TTY = %v, want [false]", execTTY)

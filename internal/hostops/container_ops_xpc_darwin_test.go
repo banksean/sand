@@ -177,6 +177,32 @@ func TestApplyExecOptionsWrapsCommandWithShell(t *testing.T) {
 	}
 }
 
+func TestMergeEnvironmentOverridesExistingKeys(t *testing.T) {
+	got := mergeEnvironment(
+		[]string{
+			"PATH=/usr/bin",
+			"HTTP_PROXY=http://older-proxy:3128",
+			"HTTP_PROXY=http://old-proxy:3128",
+			"NO_PROXY=example.test",
+		},
+		[]string{
+			"HTTP_PROXY=http://sand-http-cache.test.local:3128",
+			"https_proxy=http://sand-http-cache.test.local:3128",
+			"NO_PROXY=localhost,127.0.0.1,::1",
+		},
+	)
+
+	want := []string{
+		"PATH=/usr/bin",
+		"HTTP_PROXY=http://sand-http-cache.test.local:3128",
+		"NO_PROXY=localhost,127.0.0.1,::1",
+		"https_proxy=http://sand-http-cache.test.local:3128",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("mergeEnvironment() = %#v, want %#v", got, want)
+	}
+}
+
 func TestCreateProcessConfigUsesImageEntrypointAndCmd(t *testing.T) {
 	cfg, err := createProcessConfig(ProcessOptions{}, ManagementOptions{}, nil, &sandtypes.ImageVariantContainerConfig{
 		Entrypoint: []string{"/usr/sbin/squid"},

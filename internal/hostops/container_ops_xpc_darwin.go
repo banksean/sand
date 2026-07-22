@@ -183,6 +183,7 @@ func (o *xpcContainerOps) ExecStream(ctx context.Context, opts *ExecContainer, c
 	if err := applyExecOptions(&cfg, opts.ProcessOptions, cmd, args); err != nil {
 		return nil, err
 	}
+	cfg.Environment = mergeEnvironment(cfg.Environment, env)
 
 	stdio, cleanup, err := processFiles(stdin, stdout, stderr, cfg.Terminal)
 	if err != nil {
@@ -402,6 +403,25 @@ func applyExecOptions(cfg *xpc.ProcessConfiguration, process ProcessOptions, cmd
 		cfg.User = xpc.RawProcessUser(process.UID)
 	}
 	return nil
+}
+
+func mergeEnvironment(base, overrides []string) []string {
+	merged := make([]string, 0, len(base)+len(overrides))
+	indexes := make(map[string]int, len(base)+len(overrides))
+	for _, entry := range append(append([]string{}, base...), overrides...) {
+		key, _, found := strings.Cut(entry, "=")
+		if !found {
+			merged = append(merged, entry)
+			continue
+		}
+		if i, ok := indexes[key]; ok {
+			merged[i] = entry
+			continue
+		}
+		indexes[key] = len(merged)
+		merged = append(merged, entry)
+	}
+	return merged
 }
 
 func processEnvironment(process ProcessOptions, imageConfig *sandtypes.ImageVariantContainerConfig) ([]string, error) {
