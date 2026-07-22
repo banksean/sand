@@ -71,8 +71,8 @@ type ManagementOptions struct {
 	Mount []string `flag:"--mount"`
 	// Name uses the specified name as the container ID
 	Name string `flag:"--name"`
-	// Netowrk attaches the container to a network
-	Netowrk string `flag:"--network"`
+	// Network attaches the container to a network
+	Network string `flag:"--network"`
 	// NoDNS disables DNS configuration in the container
 	NoDNS bool `flag:"--no-dns"`
 	// OS sets OS if image can target multiple operating systems (default: linux)

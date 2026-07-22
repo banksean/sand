@@ -12,8 +12,6 @@ const HTTPProxyCACertContainerPath = "/usr/local/share/ca-certificates/sand-http
 //
 // At startup, the sand/daemon#Daemon server will synchronize its internal database with the current
 // observed state of the local filesystem clone root and the local container service.
-//
-// TODO: Move this struct to package sandtypes, but make sure all the instances of it are treated as dumb structs first.
 type Box struct {
 	// ID is an opaque identifier for the sandbox
 	ID string

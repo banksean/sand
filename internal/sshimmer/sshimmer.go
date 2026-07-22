@@ -135,7 +135,7 @@ func (s *LocalSSHimmer) NewKeys(ctx context.Context, hostName, username string) 
 		return nil, fmt.Errorf("couldn't create user identity from %s: %w", s.userIdentityPath+"-"+username, err)
 	}
 
-	// Issue a user certificate (TODO: skip this if the user key cert file already exits)
+	// Issue a user certificate (TODO: skip this if the user key cert file already exists)
 	userCert, err := s.issueUserCertificate(userPubKey, username)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't issue user cert: %w", err)

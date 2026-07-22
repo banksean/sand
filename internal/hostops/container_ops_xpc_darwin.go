@@ -97,7 +97,7 @@ func (o *xpcContainerOps) Create(ctx context.Context, opts *CreateContainer, ima
 		}
 		cfg.PublishedPorts = []xpc.PublishPort{publishedPort}
 	}
-	cfg.Networks = defaultNetworkAttachments(id, opts.DNSDomain, opts.Netowrk)
+	cfg.Networks = defaultNetworkAttachments(id, opts.DNSDomain, opts.Network)
 	if !opts.NoDNS {
 		cfg.DNS = &xpc.DNSConfiguration{
 			Nameservers:   stringList(opts.DNS),
