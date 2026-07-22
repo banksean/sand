@@ -556,7 +556,7 @@ func TestBoxer_RecoverRestoresDeletedSandboxWithCollisionName(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := boxer.Recover(ctx, id)
+	got, err := boxer.Recover(ctx, "123456789abc")
 	if err != nil {
 		t.Fatalf("Recover() error = %v", err)
 	}
@@ -575,6 +575,30 @@ func TestBoxer_RecoverRestoresDeletedSandboxWithCollisionName(t *testing.T) {
 	loaded, err := boxer.Get(ctx, got.Name)
 	if err != nil || loaded == nil || loaded.State != "active" || loaded.ContainerID != "recovered-container" {
 		t.Fatalf("loaded recovered sandbox = %+v, error = %v", loaded, err)
+	}
+}
+
+func TestBoxer_RecoverRejectsAmbiguousIDSuffix(t *testing.T) {
+	ctx := context.Background()
+	boxer := newTestBoxer(t, &hostops.MockContainerOps{}, &mockImageOps{})
+	ids := []string{
+		"11111111-1111-1111-1111-a550b1e88a08",
+		"22222222-2222-2222-2222-a550b1e88a08",
+	}
+	for _, id := range ids {
+		if err := boxer.SaveSandbox(ctx, &sandtypes.Box{ID: id, Name: id, State: "deleted"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	_, err := boxer.Recover(ctx, "a550b1e88a08")
+	if err == nil || !strings.Contains(err.Error(), "ambiguous") {
+		t.Fatalf("Recover() error = %v, want ambiguous suffix error", err)
+	}
+	for _, id := range ids {
+		if !strings.Contains(err.Error(), id) {
+			t.Fatalf("Recover() error = %q, want matching ID %q", err, id)
+		}
 	}
 }
 

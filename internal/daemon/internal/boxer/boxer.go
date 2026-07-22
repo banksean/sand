@@ -666,7 +666,31 @@ func (sb *Boxer) Recover(ctx context.Context, id string) (*sandtypes.Box, error)
 	ctx = sandboxlog.WithSandboxID(ctx, id)
 	sandbox, err := sb.queries.GetSandboxByID(ctx, id)
 	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("sandbox not found: %s", id)
+		deleted, listErr := sb.queries.ListDeletedSandboxes(ctx)
+		if listErr != nil {
+			return nil, fmt.Errorf("find deleted sandbox by ID suffix: %w", listErr)
+		}
+		matches := make([]db.Sandbox, 0, 1)
+		for _, candidate := range deleted {
+			if strings.HasSuffix(candidate.ID, id) {
+				matches = append(matches, candidate)
+			}
+		}
+		switch len(matches) {
+		case 0:
+			return nil, fmt.Errorf("sandbox not found: %s", id)
+		case 1:
+			sandbox = matches[0]
+			id = sandbox.ID
+			ctx = sandboxlog.WithSandboxID(ctx, id)
+			err = nil
+		default:
+			matchingIDs := make([]string, len(matches))
+			for i := range matches {
+				matchingIDs[i] = matches[i].ID
+			}
+			return nil, fmt.Errorf("sandbox ID suffix %q is ambiguous; matches: %s", id, strings.Join(matchingIDs, ", "))
+		}
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sandbox by id: %w", err)
