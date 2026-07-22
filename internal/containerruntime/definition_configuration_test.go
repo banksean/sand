@@ -40,7 +40,7 @@ func TestDefinitionContainerConfigurationAddsInstallHookAfterBaseHook(t *testing
 		"exec:which apt-get",
 		"stream:apt-get update",
 		"stream:apt-get install -y --no-install-recommends nodejs npm",
-		"stream:npm install -g @openai/codex@0.137.0",
+		"stream:npm install -g @openai/codex@0.145.0",
 	}
 	if !reflect.DeepEqual(exec.calls, wantCalls) {
 		t.Fatalf("install hook calls = %#v, want %#v", exec.calls, wantCalls)
@@ -76,7 +76,7 @@ func TestAgentInstallHookScriptUsesOpenCodeCommand(t *testing.T) {
 	if err != nil {
 		t.Fatalf("agentInstallHookScript() error = %v", err)
 	}
-	want := "install-opencode-agent opencode 1.14.48\n"
+	want := "install-opencode-agent opencode 1.18.4\n"
 	if script != want {
 		t.Fatalf("opencode install script = %q, want %q", script, want)
 	}
