@@ -828,7 +828,7 @@ func domainsFromNullString(ns sql.NullString) []string {
 	return domains
 }
 
-func (sb *Boxer) getContainer(ctx context.Context, containerID string) (interface{}, error) {
+func (sb *Boxer) getContainer(ctx context.Context, containerID string) (*sandtypes.Container, error) {
 	ctrs, err := sb.ContainerService.Inspect(ctx, containerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to inspect container for sandbox %s: %w", containerID, err)
@@ -848,7 +848,7 @@ func (sb *Boxer) GetContainer(ctx context.Context, containerID string) (*sandtyp
 	if ctr == nil {
 		return nil, nil
 	}
-	return ctr.(*sandtypes.Container), nil
+	return ctr, nil
 }
 
 func (sb *Boxer) GetContainerStats(ctx context.Context, containerID ...string) ([]sandtypes.ContainerStats, error) {
