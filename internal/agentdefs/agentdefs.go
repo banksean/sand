@@ -58,7 +58,7 @@ var definitions = []Definition{
 		Install: &InstallSpec{
 			Kind:    InstallerNPM,
 			Package: "@anthropic-ai/claude-code",
-			Version: "2.1.165",
+			Version: "2.1.217",
 			Command: "claude",
 		},
 	},
@@ -87,7 +87,7 @@ trace_exporter = { otlp-http = {
 		Install: &InstallSpec{
 			Kind:    InstallerNPM,
 			Package: "@openai/codex",
-			Version: "0.137.0",
+			Version: "0.145.0",
 			Command: "codex",
 		},
 	},
@@ -103,7 +103,7 @@ trace_exporter = { otlp-http = {
 		Install: &InstallSpec{
 			Kind:    InstallerNPM,
 			Package: "@google/gemini-cli",
-			Version: "0.45.2",
+			Version: "0.51.0",
 			Command: "gemini",
 		},
 	},
@@ -130,7 +130,7 @@ trace_exporter = { otlp-http = {
 		}},
 		Install: &InstallSpec{
 			Kind:    InstallerOpenCode,
-			Version: "1.14.48",
+			Version: "1.18.4",
 			Command: "opencode",
 		},
 		StartHooks: []string{HookOpenCodeTunnel},
