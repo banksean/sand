@@ -148,7 +148,7 @@ func (s *LocalSSHimmer) NewKeys(ctx context.Context, hostName, username string) 
 		return nil, fmt.Errorf("writeSandSSHConfig: %w", err)
 	}
 
-	slog.InfoContext(ctx, "LocalSSHimmer wrote sand ssh confg")
+	slog.InfoContext(ctx, "LocalSSHimmer wrote sand ssh config")
 	ret := &Keys{
 		HostKey:     hostPrivKey,
 		HostKeyPub:  ssh.MarshalAuthorizedKey(hostPubKey),
@@ -339,7 +339,7 @@ func (s *LocalSSHimmer) getOrCreateCA(path string) (ssh.Signer, ssh.PublicKey, e
 	// Write the CA public key. First convert to ssh public key:
 	caPublicKey, err := s.kg.ConvertToSSHPublicKey(pub)
 	if err != nil {
-		return nil, nil, fmt.Errorf("convertiung to ssh public key: %w", err)
+		return nil, nil, fmt.Errorf("converting to ssh public key: %w", err)
 	}
 	// Then write the converted public key.
 	caPubKeyBytes := ssh.MarshalAuthorizedKey(caPublicKey)
@@ -391,7 +391,7 @@ func CheckForIncludeWithFS(ctx context.Context, fs FileSystem) (func() error, er
 		if os.IsNotExist(err) {
 			return nil, fs.SafeWriteFile(defaultSSHPath, []byte(sandSSHPathInclude+"\n"), 0o644)
 		}
-		return nil, fmt.Errorf("⚠️  SSH connections are disabled. cannot open SSH config file: %s: %w", defaultSSHPath, err)
+		return nil, fmt.Errorf("SSH connections are disabled. cannot open SSH config file: %s: %w", defaultSSHPath, err)
 	}
 
 	// Parse the config file
@@ -427,7 +427,7 @@ func CheckForIncludeWithFS(ctx context.Context, fs FileSystem) (func() error, er
 	}
 
 	if firstNonIncludePos != nil && firstNonIncludePos.Line < sandInludePos.Line {
-		fmt.Printf("⚠️  SSH confg warning: the location of the Include statement for sand's ssh config on line %d of %s may prevent ssh from working with sand containers. try moving it to the top of the file (before any 'Host' lines) if ssh isn't working for you.\n", sandInludePos.Line, defaultSSHPath)
+		fmt.Printf("SSH config warning: the location of the Include statement for sand's ssh config on line %d of %s may prevent ssh from working with sand containers. try moving it to the top of the file (before any 'Host' lines) if ssh isn't working for you.\n", sandInludePos.Line, defaultSSHPath)
 	}
 	return nil, nil
 }

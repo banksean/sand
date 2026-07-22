@@ -373,7 +373,7 @@ func (sb *Boxer) NewSandbox(ctx context.Context, opts NewSandboxOpts) (*sandtype
 func (sb *Boxer) generateSSHKeysMountSpec(ctx context.Context, opts NewSandboxOpts, artifacts *cloning.CloneArtifacts) (sandtypes.MountSpec, *sandtypes.Box, error, bool) {
 	keys, err := sb.SSHim.NewKeys(ctx, sandboxSSHHostname(opts.Name, opts.LocalDomain), opts.Username)
 	if err != nil {
-		slog.ErrorContext(ctx, "Boxer.NewSanbox: sshim.Povision", "error", err)
+		slog.ErrorContext(ctx, "Boxer.NewSandbox: sshim.NewKeys", "error", err)
 		return sandtypes.MountSpec{}, nil, err, true
 	}
 

@@ -167,7 +167,7 @@ func TestRenderLsTableIncludesDeletedSectionAfterActiveRows(t *testing.T) {
 	currentIndex := strings.Index(out, "current")
 	otherDelimiterIndex := strings.Index(out, "--- other sandboxes ---")
 	otherIndex := strings.Index(out, "other")
-	deletedDelimiterIndex := strings.Index(out, deletedSanboxesHeader)
+	deletedDelimiterIndex := strings.Index(out, deletedSandboxesHeader)
 	deletedIndex := strings.Index(out, "deleted-id")
 	if currentIndex < 0 || otherDelimiterIndex < 0 || otherIndex < 0 || deletedDelimiterIndex < 0 || deletedIndex < 0 {
 		t.Fatalf("renderLsTable output missing expected rows or delimiters:\n%s", out)
