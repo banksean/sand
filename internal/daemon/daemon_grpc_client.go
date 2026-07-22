@@ -246,6 +246,14 @@ func (c *GRPCClient) RenameSandbox(ctx context.Context, oldName, newName string)
 	return box, nil
 }
 
+func (c *GRPCClient) RecoverSandbox(ctx context.Context, id string) (*sandtypes.Box, error) {
+	resp, err := c.client.RecoverSandbox(ctx, &daemonpb.IDRequest{Id: id})
+	if err != nil {
+		return nil, err
+	}
+	return sandboxFromProto(resp.GetBox()), nil
+}
+
 func (c *GRPCClient) CreateSandbox(ctx context.Context, opts CreateSandboxOpts, w io.Writer) (*sandtypes.Box, error) {
 	stream, err := c.client.CreateSandbox(ctx, createSandboxOptsToProto(opts))
 	if err != nil {

@@ -2,6 +2,7 @@ package boxer
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	_ "embed"
 	"encoding/json"
@@ -655,6 +656,141 @@ func (sb *Boxer) Expunge(ctx context.Context, id string) error {
 	}
 	if err := sb.queries.DeleteSandbox(ctx, id); err != nil {
 		return fmt.Errorf("delete sandbox %s from database: %w", id, err)
+	}
+	return nil
+}
+
+// Recover restores a soft-deleted sandbox's workspace and recreates its
+// container. The replacement container is deliberately left stopped.
+func (sb *Boxer) Recover(ctx context.Context, id string) (*sandtypes.Box, error) {
+	ctx = sandboxlog.WithSandboxID(ctx, id)
+	sandbox, err := sb.queries.GetSandboxByID(ctx, id)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("sandbox not found: %s", id)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sandbox by id: %w", err)
+	}
+	sbox := sb.sandboxFromDB(&sandbox)
+	if sbox.State != "deleted" {
+		return nil, fmt.Errorf("sandbox %s is %s, not deleted", id, sbox.State)
+	}
+	if sbox.TrashWorkDir == "" {
+		return nil, fmt.Errorf("sandbox %s has no trashed workspace to recover", id)
+	}
+	if fi, err := sb.FileOps.Stat(sbox.TrashWorkDir); err != nil {
+		return nil, fmt.Errorf("stat trashed workspace %s: %w", sbox.TrashWorkDir, err)
+	} else if !fi.IsDir() {
+		return nil, fmt.Errorf("trashed workspace %s is not a directory", sbox.TrashWorkDir)
+	}
+	if _, err := sb.FileOps.Stat(sbox.SandboxWorkDir); err == nil {
+		return nil, fmt.Errorf("sandbox workspace destination already exists: %s", sbox.SandboxWorkDir)
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return nil, fmt.Errorf("stat sandbox workspace destination %s: %w", sbox.SandboxWorkDir, err)
+	}
+
+	name, err := sb.recoveredSandboxName(ctx, sbox.Name, sbox.ID)
+	if err != nil {
+		return nil, err
+	}
+	originalTrashDir := sbox.TrashWorkDir
+	if err := sb.moveDirectory(ctx, originalTrashDir, sbox.SandboxWorkDir); err != nil {
+		return nil, fmt.Errorf("restore sandbox workspace: %w", err)
+	}
+
+	rollback := func(cause error) error {
+		if sbox.ContainerID != "" {
+			if out, deleteErr := sb.ContainerService.Delete(ctx, nil, sbox.ContainerID); deleteErr != nil {
+				cause = errors.Join(cause, fmt.Errorf("delete replacement container: %w (%s)", deleteErr, out))
+			}
+			sbox.ContainerID = ""
+		}
+		if moveErr := sb.moveDirectory(ctx, sbox.SandboxWorkDir, originalTrashDir); moveErr != nil {
+			cause = errors.Join(cause, fmt.Errorf("return workspace to trash: %w", moveErr))
+		}
+		return cause
+	}
+
+	sbox.Name = name
+	sbox.ContainerBootstrapped = false
+	sb.hydrateMounts(sbox, "")
+	keys, err := sb.SSHim.NewKeys(ctx, sandboxSSHHostname(name, sbox.DNSDomain), sbox.Username)
+	if err != nil {
+		return nil, rollback(fmt.Errorf("generate ssh keys for recovered sandbox: %w", err))
+	}
+	if err := sb.saveSSHKeys(cloning.NewStandardPathRegistry(sbox.SandboxWorkDir).SSHKeysDir(), keys); err != nil {
+		return nil, rollback(fmt.Errorf("save ssh keys for recovered sandbox: %w", err))
+	}
+	if err := sb.newLifecycleService().CreateContainer(ctx, sbox, false); err != nil {
+		return nil, rollback(err)
+	}
+	if err := sb.queries.RecoverSandbox(ctx, db.RecoverSandboxParams{
+		Name:        name,
+		ContainerID: toNullString(sbox.ContainerID),
+		ID:          id,
+	}); err != nil {
+		return nil, rollback(fmt.Errorf("recover sandbox in database: %w", err))
+	}
+
+	sbox.State = "active"
+	sbox.DeletedAt = time.Time{}
+	sbox.TrashWorkDir = ""
+	if sbox.HostOriginDir != "" {
+		remote := cloning.ClonedWorkDirGitRemotePrefix + name
+		if sb.GitOps.RemoteURL(ctx, sbox.HostOriginDir, remote) != "" {
+			if err := sb.GitOps.RemoveRemote(ctx, sbox.HostOriginDir, remote); err != nil {
+				slog.WarnContext(ctx, "Boxer.Recover remove stale git remote", "remote", remote, "error", err)
+			} else if err := sb.GitOps.AddRemote(ctx, sbox.HostOriginDir, remote, filepath.Join(sbox.SandboxWorkDir, "app")); err != nil {
+				slog.WarnContext(ctx, "Boxer.Recover restore git remote", "remote", remote, "error", err)
+			}
+		} else if err := sb.GitOps.AddRemote(ctx, sbox.HostOriginDir, remote, filepath.Join(sbox.SandboxWorkDir, "app")); err != nil {
+			slog.WarnContext(ctx, "Boxer.Recover restore git remote", "remote", remote, "error", err)
+		}
+	}
+	return sbox, nil
+}
+
+func (sb *Boxer) recoveredSandboxName(ctx context.Context, originalName, id string) (string, error) {
+	if existing, err := sb.queries.GetActiveSandboxByName(ctx, originalName); err == sql.ErrNoRows {
+		return originalName, nil
+	} else if err != nil {
+		return "", fmt.Errorf("check active sandbox name: %w", err)
+	} else if existing.ID == id {
+		return originalName, nil
+	}
+
+	idChars := strings.ReplaceAll(strings.ToLower(id), "-", "")
+	if !regexp.MustCompile(`^[a-z0-9]{8,}$`).MatchString(idChars) {
+		hash := sha256.Sum256([]byte(id))
+		idChars = fmt.Sprintf("%x", hash[:])
+	}
+	suffix := idChars[:8]
+	for attempt := 0; ; attempt++ {
+		tail := "-" + suffix
+		if attempt > 0 {
+			tail = fmt.Sprintf("-%s-%d", suffix, attempt+1)
+		}
+		maxOriginal := 63 - len("recovered-") - len(tail)
+		trimmed := strings.Trim(originalName[:min(len(originalName), maxOriginal)], "-")
+		candidate := "recovered-" + trimmed + tail
+		if _, err := sb.queries.GetActiveSandboxByName(ctx, candidate); err == sql.ErrNoRows {
+			return candidate, nil
+		} else if err != nil {
+			return "", fmt.Errorf("check recovered sandbox name: %w", err)
+		}
+	}
+}
+
+func (sb *Boxer) moveDirectory(ctx context.Context, src, dst string) error {
+	if err := sb.FileOps.Rename(src, dst); err == nil {
+		return nil
+	}
+	if err := sb.FileOps.Copy(ctx, src, dst); err != nil {
+		_ = sb.FileOps.RemoveAll(dst)
+		return fmt.Errorf("copy %s to %s: %w", src, dst, err)
+	}
+	if err := sb.FileOps.RemoveAll(src); err != nil {
+		return fmt.Errorf("remove %s after copy: %w", src, err)
 	}
 	return nil
 }

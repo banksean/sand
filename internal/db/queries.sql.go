@@ -268,6 +268,29 @@ func (q *Queries) ListSandboxes(ctx context.Context) ([]Sandbox, error) {
 	return items, nil
 }
 
+const recoverSandbox = `-- name: RecoverSandbox :exec
+UPDATE sandboxes
+SET name = ?,
+    state = 'active',
+    container_id = ?,
+    container_bootstrapped = 0,
+    deleted_at = NULL,
+    trash_work_dir = NULL,
+    updated_at = CURRENT_TIMESTAMP
+WHERE id = ? AND state = 'deleted'
+`
+
+type RecoverSandboxParams struct {
+	Name        string         `json:"name"`
+	ContainerID sql.NullString `json:"container_id"`
+	ID          string         `json:"id"`
+}
+
+func (q *Queries) RecoverSandbox(ctx context.Context, arg RecoverSandboxParams) error {
+	_, err := q.db.ExecContext(ctx, recoverSandbox, arg.Name, arg.ContainerID, arg.ID)
+	return err
+}
+
 const renameSandbox = `-- name: RenameSandbox :exec
 UPDATE sandboxes
 SET name = ?,

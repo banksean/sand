@@ -45,6 +45,7 @@ type Outie struct {
 	Log                cli.SandboxLogCmd         `cmd:"" help:"print sandbox lifecycle and daemon events"`
 	Rm                 cli.RmCmd                 `cmd:"" help:"remove sandbox container and its clone directory"`
 	Expunge            cli.ExpungeCmd            `cmd:"" help:"hard-delete soft-deleted sandboxes"`
+	Recover            cli.RecoverCmd            `cmd:"" help:"recover a soft-deleted sandbox"`
 	Stop               cli.StopCmd               `cmd:"" help:"stop sandbox container"`
 	Start              cli.StartCmd              `cmd:"" help:"start sandbox container"`
 	Rename             cli.RenameCmd             `cmd:"" help:"rename a stopped sandbox"`

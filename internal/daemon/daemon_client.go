@@ -20,6 +20,7 @@ type Client interface {
 	GetSandbox(ctx context.Context, name string) (*sandtypes.Box, error)
 	RemoveSandbox(ctx context.Context, name string) error
 	ExpungeSandbox(ctx context.Context, id string) error
+	RecoverSandbox(ctx context.Context, id string) (*sandtypes.Box, error)
 	StopSandbox(ctx context.Context, name string) error
 	StartSandbox(ctx context.Context, opts StartSandboxOpts) error
 	SyncHostGitMirror(ctx context.Context, name string) (string, error)

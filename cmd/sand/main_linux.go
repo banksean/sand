@@ -41,6 +41,7 @@ type Innie struct {
 	Log       cli.SandboxLogCmd `cmd:"" help:"print sandbox lifecycle and daemon events"`
 	Rm        cli.RmCmd         `cmd:"" help:"remove sandbox container and its clone directory"`
 	Expunge   cli.ExpungeCmd    `cmd:"" help:"hard-delete soft-deleted sandboxes"`
+	Recover   cli.RecoverCmd    `cmd:"" help:"recover a soft-deleted sandbox"`
 	Stop      cli.StopCmd       `cmd:"" help:"stop sandbox container"`
 	Git       cli.GitCmd        `cmd:"" help:"git operations with sandboxes"`
 	Cache     cli.CacheCmd      `cmd:"" help:"manage shared cache services"`

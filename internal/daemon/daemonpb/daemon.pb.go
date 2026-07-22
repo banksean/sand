@@ -3304,6 +3304,50 @@ func (x *RenameSandboxResponse) GetBox() *Sandbox {
 	return nil
 }
 
+type RecoverSandboxResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Box           *Sandbox               `protobuf:"bytes,1,opt,name=box,proto3" json:"box,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RecoverSandboxResponse) Reset() {
+	*x = RecoverSandboxResponse{}
+	mi := &file_internal_daemon_daemonpb_daemon_proto_msgTypes[51]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RecoverSandboxResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RecoverSandboxResponse) ProtoMessage() {}
+
+func (x *RecoverSandboxResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_daemon_daemonpb_daemon_proto_msgTypes[51]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RecoverSandboxResponse.ProtoReflect.Descriptor instead.
+func (*RecoverSandboxResponse) Descriptor() ([]byte, []int) {
+	return file_internal_daemon_daemonpb_daemon_proto_rawDescGZIP(), []int{51}
+}
+
+func (x *RecoverSandboxResponse) GetBox() *Sandbox {
+	if x != nil {
+		return x.Box
+	}
+	return nil
+}
+
 type EnsureImageRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ImageName     string                 `protobuf:"bytes,1,opt,name=image_name,json=imageName,proto3" json:"image_name,omitempty"`
@@ -3313,7 +3357,7 @@ type EnsureImageRequest struct {
 
 func (x *EnsureImageRequest) Reset() {
 	*x = EnsureImageRequest{}
-	mi := &file_internal_daemon_daemonpb_daemon_proto_msgTypes[51]
+	mi := &file_internal_daemon_daemonpb_daemon_proto_msgTypes[52]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3325,7 +3369,7 @@ func (x *EnsureImageRequest) String() string {
 func (*EnsureImageRequest) ProtoMessage() {}
 
 func (x *EnsureImageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_daemon_daemonpb_daemon_proto_msgTypes[51]
+	mi := &file_internal_daemon_daemonpb_daemon_proto_msgTypes[52]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3338,7 +3382,7 @@ func (x *EnsureImageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EnsureImageRequest.ProtoReflect.Descriptor instead.
 func (*EnsureImageRequest) Descriptor() ([]byte, []int) {
-	return file_internal_daemon_daemonpb_daemon_proto_rawDescGZIP(), []int{51}
+	return file_internal_daemon_daemonpb_daemon_proto_rawDescGZIP(), []int{52}
 }
 
 func (x *EnsureImageRequest) GetImageName() string {
@@ -3363,7 +3407,7 @@ type EnsureImageResponse struct {
 
 func (x *EnsureImageResponse) Reset() {
 	*x = EnsureImageResponse{}
-	mi := &file_internal_daemon_daemonpb_daemon_proto_msgTypes[52]
+	mi := &file_internal_daemon_daemonpb_daemon_proto_msgTypes[53]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3375,7 +3419,7 @@ func (x *EnsureImageResponse) String() string {
 func (*EnsureImageResponse) ProtoMessage() {}
 
 func (x *EnsureImageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_daemon_daemonpb_daemon_proto_msgTypes[52]
+	mi := &file_internal_daemon_daemonpb_daemon_proto_msgTypes[53]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3388,7 +3432,7 @@ func (x *EnsureImageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EnsureImageResponse.ProtoReflect.Descriptor instead.
 func (*EnsureImageResponse) Descriptor() ([]byte, []int) {
-	return file_internal_daemon_daemonpb_daemon_proto_rawDescGZIP(), []int{52}
+	return file_internal_daemon_daemonpb_daemon_proto_rawDescGZIP(), []int{53}
 }
 
 func (x *EnsureImageResponse) GetEvent() isEnsureImageResponse_Event {
@@ -3485,7 +3529,7 @@ type ImagePullProgressUpdate struct {
 
 func (x *ImagePullProgressUpdate) Reset() {
 	*x = ImagePullProgressUpdate{}
-	mi := &file_internal_daemon_daemonpb_daemon_proto_msgTypes[53]
+	mi := &file_internal_daemon_daemonpb_daemon_proto_msgTypes[54]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3497,7 +3541,7 @@ func (x *ImagePullProgressUpdate) String() string {
 func (*ImagePullProgressUpdate) ProtoMessage() {}
 
 func (x *ImagePullProgressUpdate) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_daemon_daemonpb_daemon_proto_msgTypes[53]
+	mi := &file_internal_daemon_daemonpb_daemon_proto_msgTypes[54]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3510,7 +3554,7 @@ func (x *ImagePullProgressUpdate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ImagePullProgressUpdate.ProtoReflect.Descriptor instead.
 func (*ImagePullProgressUpdate) Descriptor() ([]byte, []int) {
-	return file_internal_daemon_daemonpb_daemon_proto_rawDescGZIP(), []int{53}
+	return file_internal_daemon_daemonpb_daemon_proto_rawDescGZIP(), []int{54}
 }
 
 func (x *ImagePullProgressUpdate) GetDescription() string {
@@ -3876,6 +3920,8 @@ const file_internal_daemon_daemonpb_daemon_proto_rawDesc = "" +
 	"\bold_name\x18\x01 \x01(\tR\aoldName\x12\x19\n" +
 	"\bnew_name\x18\x02 \x01(\tR\anewName\"B\n" +
 	"\x15RenameSandboxResponse\x12)\n" +
+	"\x03box\x18\x01 \x01(\v2\x17.sand.daemon.v1.SandboxR\x03box\"C\n" +
+	"\x16RecoverSandboxResponse\x12)\n" +
 	"\x03box\x18\x01 \x01(\v2\x17.sand.daemon.v1.SandboxR\x03box\"3\n" +
 	"\x12EnsureImageRequest\x12\x1d\n" +
 	"\n" +
@@ -3923,7 +3969,7 @@ const file_internal_daemon_daemonpb_daemon_proto_rawDesc = "" +
 	"\t_add_sizeB\v\n" +
 	"\t_set_sizeB\x11\n" +
 	"\x0f_add_total_sizeB\x11\n" +
-	"\x0f_set_total_size2\x90\x0e\n" +
+	"\x0f_set_total_size2\xe5\x0e\n" +
 	"\rDaemonService\x12A\n" +
 	"\x04Ping\x12\x1b.sand.daemon.v1.PingRequest\x1a\x1c.sand.daemon.v1.PingResponse\x12J\n" +
 	"\aVersion\x12\x1e.sand.daemon.v1.VersionRequest\x1a\x1f.sand.daemon.v1.VersionResponse\x12K\n" +
@@ -3935,7 +3981,8 @@ const file_internal_daemon_daemonpb_daemon_proto_rawDesc = "" +
 	"\n" +
 	"GetSandbox\x12\x19.sand.daemon.v1.IDRequest\x1a\".sand.daemon.v1.GetSandboxResponse\x12J\n" +
 	"\rRemoveSandbox\x12\x19.sand.daemon.v1.IDRequest\x1a\x1e.sand.daemon.v1.StatusResponse\x12K\n" +
-	"\x0eExpungeSandbox\x12\x19.sand.daemon.v1.IDRequest\x1a\x1e.sand.daemon.v1.StatusResponse\x12H\n" +
+	"\x0eExpungeSandbox\x12\x19.sand.daemon.v1.IDRequest\x1a\x1e.sand.daemon.v1.StatusResponse\x12S\n" +
+	"\x0eRecoverSandbox\x12\x19.sand.daemon.v1.IDRequest\x1a&.sand.daemon.v1.RecoverSandboxResponse\x12H\n" +
 	"\vStopSandbox\x12\x19.sand.daemon.v1.IDRequest\x1a\x1e.sand.daemon.v1.StatusResponse\x12S\n" +
 	"\fStartSandbox\x12#.sand.daemon.v1.StartSandboxRequest\x1a\x1e.sand.daemon.v1.StatusResponse\x12Y\n" +
 	"\x11SyncHostGitMirror\x12\x19.sand.daemon.v1.IDRequest\x1a).sand.daemon.v1.SyncHostGitMirrorResponse\x12t\n" +
@@ -3961,7 +4008,7 @@ func file_internal_daemon_daemonpb_daemon_proto_rawDescGZIP() []byte {
 	return file_internal_daemon_daemonpb_daemon_proto_rawDescData
 }
 
-var file_internal_daemon_daemonpb_daemon_proto_msgTypes = make([]protoimpl.MessageInfo, 55)
+var file_internal_daemon_daemonpb_daemon_proto_msgTypes = make([]protoimpl.MessageInfo, 56)
 var file_internal_daemon_daemonpb_daemon_proto_goTypes = []any{
 	(*PingRequest)(nil),                   // 0: sand.daemon.v1.PingRequest
 	(*PingResponse)(nil),                  // 1: sand.daemon.v1.PingResponse
@@ -4014,21 +4061,22 @@ var file_internal_daemon_daemonpb_daemon_proto_goTypes = []any{
 	(*CreateSandboxResponse)(nil),         // 48: sand.daemon.v1.CreateSandboxResponse
 	(*RenameSandboxRequest)(nil),          // 49: sand.daemon.v1.RenameSandboxRequest
 	(*RenameSandboxResponse)(nil),         // 50: sand.daemon.v1.RenameSandboxResponse
-	(*EnsureImageRequest)(nil),            // 51: sand.daemon.v1.EnsureImageRequest
-	(*EnsureImageResponse)(nil),           // 52: sand.daemon.v1.EnsureImageResponse
-	(*ImagePullProgressUpdate)(nil),       // 53: sand.daemon.v1.ImagePullProgressUpdate
-	nil,                                   // 54: sand.daemon.v1.ResolveAgentLaunchEnvResponse.EnvEntry
-	(*timestamppb.Timestamp)(nil),         // 55: google.protobuf.Timestamp
+	(*RecoverSandboxResponse)(nil),        // 51: sand.daemon.v1.RecoverSandboxResponse
+	(*EnsureImageRequest)(nil),            // 52: sand.daemon.v1.EnsureImageRequest
+	(*EnsureImageResponse)(nil),           // 53: sand.daemon.v1.EnsureImageResponse
+	(*ImagePullProgressUpdate)(nil),       // 54: sand.daemon.v1.ImagePullProgressUpdate
+	nil,                                   // 55: sand.daemon.v1.ResolveAgentLaunchEnvResponse.EnvEntry
+	(*timestamppb.Timestamp)(nil),         // 56: google.protobuf.Timestamp
 }
 var file_internal_daemon_daemonpb_daemon_proto_depIdxs = []int32{
 	24, // 0: sand.daemon.v1.ListSandboxesResponse.boxes:type_name -> sand.daemon.v1.Sandbox
 	24, // 1: sand.daemon.v1.GetSandboxResponse.box:type_name -> sand.daemon.v1.Sandbox
 	18, // 2: sand.daemon.v1.ResolveAgentLaunchEnvRequest.profile_env:type_name -> sand.daemon.v1.EnvPolicy
-	54, // 3: sand.daemon.v1.ResolveAgentLaunchEnvResponse.env:type_name -> sand.daemon.v1.ResolveAgentLaunchEnvResponse.EnvEntry
+	55, // 3: sand.daemon.v1.ResolveAgentLaunchEnvResponse.env:type_name -> sand.daemon.v1.ResolveAgentLaunchEnvResponse.EnvEntry
 	19, // 4: sand.daemon.v1.EnvPolicy.files:type_name -> sand.daemon.v1.EnvFileRef
 	20, // 5: sand.daemon.v1.EnvPolicy.vars:type_name -> sand.daemon.v1.EnvVarRule
 	45, // 6: sand.daemon.v1.StatsResponse.stats:type_name -> sand.daemon.v1.ContainerStats
-	55, // 7: sand.daemon.v1.Sandbox.deleted_at:type_name -> google.protobuf.Timestamp
+	56, // 7: sand.daemon.v1.Sandbox.deleted_at:type_name -> google.protobuf.Timestamp
 	25, // 8: sand.daemon.v1.Sandbox.mounts:type_name -> sand.daemon.v1.MountSpec
 	26, // 9: sand.daemon.v1.Sandbox.mount_requests:type_name -> sand.daemon.v1.MountRequest
 	27, // 10: sand.daemon.v1.Sandbox.shared_cache_mounts:type_name -> sand.daemon.v1.SharedCacheMounts
@@ -4053,54 +4101,57 @@ var file_internal_daemon_daemonpb_daemon_proto_depIdxs = []int32{
 	46, // 29: sand.daemon.v1.CreateSandboxRequest.shared_caches:type_name -> sand.daemon.v1.SharedCacheConfig
 	24, // 30: sand.daemon.v1.CreateSandboxResponse.box:type_name -> sand.daemon.v1.Sandbox
 	24, // 31: sand.daemon.v1.RenameSandboxResponse.box:type_name -> sand.daemon.v1.Sandbox
-	53, // 32: sand.daemon.v1.EnsureImageResponse.pull_progress:type_name -> sand.daemon.v1.ImagePullProgressUpdate
-	0,  // 33: sand.daemon.v1.DaemonService.Ping:input_type -> sand.daemon.v1.PingRequest
-	2,  // 34: sand.daemon.v1.DaemonService.Version:input_type -> sand.daemon.v1.VersionRequest
-	8,  // 35: sand.daemon.v1.DaemonService.Shutdown:input_type -> sand.daemon.v1.ShutdownRequest
-	9,  // 36: sand.daemon.v1.DaemonService.LogSandbox:input_type -> sand.daemon.v1.IDRequest
-	11, // 37: sand.daemon.v1.DaemonService.ListSandboxes:input_type -> sand.daemon.v1.ListSandboxesRequest
-	11, // 38: sand.daemon.v1.DaemonService.ListDeletedSandboxes:input_type -> sand.daemon.v1.ListSandboxesRequest
-	9,  // 39: sand.daemon.v1.DaemonService.GetSandbox:input_type -> sand.daemon.v1.IDRequest
-	9,  // 40: sand.daemon.v1.DaemonService.RemoveSandbox:input_type -> sand.daemon.v1.IDRequest
-	9,  // 41: sand.daemon.v1.DaemonService.ExpungeSandbox:input_type -> sand.daemon.v1.IDRequest
-	9,  // 42: sand.daemon.v1.DaemonService.StopSandbox:input_type -> sand.daemon.v1.IDRequest
-	14, // 43: sand.daemon.v1.DaemonService.StartSandbox:input_type -> sand.daemon.v1.StartSandboxRequest
-	9,  // 44: sand.daemon.v1.DaemonService.SyncHostGitMirror:input_type -> sand.daemon.v1.IDRequest
-	16, // 45: sand.daemon.v1.DaemonService.ResolveAgentLaunchEnv:input_type -> sand.daemon.v1.ResolveAgentLaunchEnvRequest
-	21, // 46: sand.daemon.v1.DaemonService.ExportImage:input_type -> sand.daemon.v1.ExportImageRequest
-	22, // 47: sand.daemon.v1.DaemonService.Stats:input_type -> sand.daemon.v1.StatsRequest
-	9,  // 48: sand.daemon.v1.DaemonService.VSC:input_type -> sand.daemon.v1.IDRequest
-	47, // 49: sand.daemon.v1.DaemonService.CreateSandbox:input_type -> sand.daemon.v1.CreateSandboxRequest
-	49, // 50: sand.daemon.v1.DaemonService.RenameSandbox:input_type -> sand.daemon.v1.RenameSandboxRequest
-	51, // 51: sand.daemon.v1.DaemonService.EnsureImage:input_type -> sand.daemon.v1.EnsureImageRequest
-	5,  // 52: sand.daemon.v1.DaemonService.HTTPProxyCache:input_type -> sand.daemon.v1.HTTPProxyCacheRequest
-	6,  // 53: sand.daemon.v1.DaemonService.HTTPProxyCacheStatus:input_type -> sand.daemon.v1.HTTPProxyCacheStatusRequest
-	1,  // 54: sand.daemon.v1.DaemonService.Ping:output_type -> sand.daemon.v1.PingResponse
-	3,  // 55: sand.daemon.v1.DaemonService.Version:output_type -> sand.daemon.v1.VersionResponse
-	4,  // 56: sand.daemon.v1.DaemonService.Shutdown:output_type -> sand.daemon.v1.StatusResponse
-	10, // 57: sand.daemon.v1.DaemonService.LogSandbox:output_type -> sand.daemon.v1.LogSandboxResponse
-	12, // 58: sand.daemon.v1.DaemonService.ListSandboxes:output_type -> sand.daemon.v1.ListSandboxesResponse
-	12, // 59: sand.daemon.v1.DaemonService.ListDeletedSandboxes:output_type -> sand.daemon.v1.ListSandboxesResponse
-	13, // 60: sand.daemon.v1.DaemonService.GetSandbox:output_type -> sand.daemon.v1.GetSandboxResponse
-	4,  // 61: sand.daemon.v1.DaemonService.RemoveSandbox:output_type -> sand.daemon.v1.StatusResponse
-	4,  // 62: sand.daemon.v1.DaemonService.ExpungeSandbox:output_type -> sand.daemon.v1.StatusResponse
-	4,  // 63: sand.daemon.v1.DaemonService.StopSandbox:output_type -> sand.daemon.v1.StatusResponse
-	4,  // 64: sand.daemon.v1.DaemonService.StartSandbox:output_type -> sand.daemon.v1.StatusResponse
-	15, // 65: sand.daemon.v1.DaemonService.SyncHostGitMirror:output_type -> sand.daemon.v1.SyncHostGitMirrorResponse
-	17, // 66: sand.daemon.v1.DaemonService.ResolveAgentLaunchEnv:output_type -> sand.daemon.v1.ResolveAgentLaunchEnvResponse
-	4,  // 67: sand.daemon.v1.DaemonService.ExportImage:output_type -> sand.daemon.v1.StatusResponse
-	23, // 68: sand.daemon.v1.DaemonService.Stats:output_type -> sand.daemon.v1.StatsResponse
-	4,  // 69: sand.daemon.v1.DaemonService.VSC:output_type -> sand.daemon.v1.StatusResponse
-	48, // 70: sand.daemon.v1.DaemonService.CreateSandbox:output_type -> sand.daemon.v1.CreateSandboxResponse
-	50, // 71: sand.daemon.v1.DaemonService.RenameSandbox:output_type -> sand.daemon.v1.RenameSandboxResponse
-	52, // 72: sand.daemon.v1.DaemonService.EnsureImage:output_type -> sand.daemon.v1.EnsureImageResponse
-	4,  // 73: sand.daemon.v1.DaemonService.HTTPProxyCache:output_type -> sand.daemon.v1.StatusResponse
-	7,  // 74: sand.daemon.v1.DaemonService.HTTPProxyCacheStatus:output_type -> sand.daemon.v1.HTTPProxyCacheStatusResponse
-	54, // [54:75] is the sub-list for method output_type
-	33, // [33:54] is the sub-list for method input_type
-	33, // [33:33] is the sub-list for extension type_name
-	33, // [33:33] is the sub-list for extension extendee
-	0,  // [0:33] is the sub-list for field type_name
+	24, // 32: sand.daemon.v1.RecoverSandboxResponse.box:type_name -> sand.daemon.v1.Sandbox
+	54, // 33: sand.daemon.v1.EnsureImageResponse.pull_progress:type_name -> sand.daemon.v1.ImagePullProgressUpdate
+	0,  // 34: sand.daemon.v1.DaemonService.Ping:input_type -> sand.daemon.v1.PingRequest
+	2,  // 35: sand.daemon.v1.DaemonService.Version:input_type -> sand.daemon.v1.VersionRequest
+	8,  // 36: sand.daemon.v1.DaemonService.Shutdown:input_type -> sand.daemon.v1.ShutdownRequest
+	9,  // 37: sand.daemon.v1.DaemonService.LogSandbox:input_type -> sand.daemon.v1.IDRequest
+	11, // 38: sand.daemon.v1.DaemonService.ListSandboxes:input_type -> sand.daemon.v1.ListSandboxesRequest
+	11, // 39: sand.daemon.v1.DaemonService.ListDeletedSandboxes:input_type -> sand.daemon.v1.ListSandboxesRequest
+	9,  // 40: sand.daemon.v1.DaemonService.GetSandbox:input_type -> sand.daemon.v1.IDRequest
+	9,  // 41: sand.daemon.v1.DaemonService.RemoveSandbox:input_type -> sand.daemon.v1.IDRequest
+	9,  // 42: sand.daemon.v1.DaemonService.ExpungeSandbox:input_type -> sand.daemon.v1.IDRequest
+	9,  // 43: sand.daemon.v1.DaemonService.RecoverSandbox:input_type -> sand.daemon.v1.IDRequest
+	9,  // 44: sand.daemon.v1.DaemonService.StopSandbox:input_type -> sand.daemon.v1.IDRequest
+	14, // 45: sand.daemon.v1.DaemonService.StartSandbox:input_type -> sand.daemon.v1.StartSandboxRequest
+	9,  // 46: sand.daemon.v1.DaemonService.SyncHostGitMirror:input_type -> sand.daemon.v1.IDRequest
+	16, // 47: sand.daemon.v1.DaemonService.ResolveAgentLaunchEnv:input_type -> sand.daemon.v1.ResolveAgentLaunchEnvRequest
+	21, // 48: sand.daemon.v1.DaemonService.ExportImage:input_type -> sand.daemon.v1.ExportImageRequest
+	22, // 49: sand.daemon.v1.DaemonService.Stats:input_type -> sand.daemon.v1.StatsRequest
+	9,  // 50: sand.daemon.v1.DaemonService.VSC:input_type -> sand.daemon.v1.IDRequest
+	47, // 51: sand.daemon.v1.DaemonService.CreateSandbox:input_type -> sand.daemon.v1.CreateSandboxRequest
+	49, // 52: sand.daemon.v1.DaemonService.RenameSandbox:input_type -> sand.daemon.v1.RenameSandboxRequest
+	52, // 53: sand.daemon.v1.DaemonService.EnsureImage:input_type -> sand.daemon.v1.EnsureImageRequest
+	5,  // 54: sand.daemon.v1.DaemonService.HTTPProxyCache:input_type -> sand.daemon.v1.HTTPProxyCacheRequest
+	6,  // 55: sand.daemon.v1.DaemonService.HTTPProxyCacheStatus:input_type -> sand.daemon.v1.HTTPProxyCacheStatusRequest
+	1,  // 56: sand.daemon.v1.DaemonService.Ping:output_type -> sand.daemon.v1.PingResponse
+	3,  // 57: sand.daemon.v1.DaemonService.Version:output_type -> sand.daemon.v1.VersionResponse
+	4,  // 58: sand.daemon.v1.DaemonService.Shutdown:output_type -> sand.daemon.v1.StatusResponse
+	10, // 59: sand.daemon.v1.DaemonService.LogSandbox:output_type -> sand.daemon.v1.LogSandboxResponse
+	12, // 60: sand.daemon.v1.DaemonService.ListSandboxes:output_type -> sand.daemon.v1.ListSandboxesResponse
+	12, // 61: sand.daemon.v1.DaemonService.ListDeletedSandboxes:output_type -> sand.daemon.v1.ListSandboxesResponse
+	13, // 62: sand.daemon.v1.DaemonService.GetSandbox:output_type -> sand.daemon.v1.GetSandboxResponse
+	4,  // 63: sand.daemon.v1.DaemonService.RemoveSandbox:output_type -> sand.daemon.v1.StatusResponse
+	4,  // 64: sand.daemon.v1.DaemonService.ExpungeSandbox:output_type -> sand.daemon.v1.StatusResponse
+	51, // 65: sand.daemon.v1.DaemonService.RecoverSandbox:output_type -> sand.daemon.v1.RecoverSandboxResponse
+	4,  // 66: sand.daemon.v1.DaemonService.StopSandbox:output_type -> sand.daemon.v1.StatusResponse
+	4,  // 67: sand.daemon.v1.DaemonService.StartSandbox:output_type -> sand.daemon.v1.StatusResponse
+	15, // 68: sand.daemon.v1.DaemonService.SyncHostGitMirror:output_type -> sand.daemon.v1.SyncHostGitMirrorResponse
+	17, // 69: sand.daemon.v1.DaemonService.ResolveAgentLaunchEnv:output_type -> sand.daemon.v1.ResolveAgentLaunchEnvResponse
+	4,  // 70: sand.daemon.v1.DaemonService.ExportImage:output_type -> sand.daemon.v1.StatusResponse
+	23, // 71: sand.daemon.v1.DaemonService.Stats:output_type -> sand.daemon.v1.StatsResponse
+	4,  // 72: sand.daemon.v1.DaemonService.VSC:output_type -> sand.daemon.v1.StatusResponse
+	48, // 73: sand.daemon.v1.DaemonService.CreateSandbox:output_type -> sand.daemon.v1.CreateSandboxResponse
+	50, // 74: sand.daemon.v1.DaemonService.RenameSandbox:output_type -> sand.daemon.v1.RenameSandboxResponse
+	53, // 75: sand.daemon.v1.DaemonService.EnsureImage:output_type -> sand.daemon.v1.EnsureImageResponse
+	4,  // 76: sand.daemon.v1.DaemonService.HTTPProxyCache:output_type -> sand.daemon.v1.StatusResponse
+	7,  // 77: sand.daemon.v1.DaemonService.HTTPProxyCacheStatus:output_type -> sand.daemon.v1.HTTPProxyCacheStatusResponse
+	56, // [56:78] is the sub-list for method output_type
+	34, // [34:56] is the sub-list for method input_type
+	34, // [34:34] is the sub-list for extension type_name
+	34, // [34:34] is the sub-list for extension extendee
+	0,  // [0:34] is the sub-list for field type_name
 }
 
 func init() { file_internal_daemon_daemonpb_daemon_proto_init() }
@@ -4113,20 +4164,20 @@ func file_internal_daemon_daemonpb_daemon_proto_init() {
 		(*CreateSandboxResponse_Box)(nil),
 		(*CreateSandboxResponse_Error)(nil),
 	}
-	file_internal_daemon_daemonpb_daemon_proto_msgTypes[52].OneofWrappers = []any{
+	file_internal_daemon_daemonpb_daemon_proto_msgTypes[53].OneofWrappers = []any{
 		(*EnsureImageResponse_Progress)(nil),
 		(*EnsureImageResponse_Error)(nil),
 		(*EnsureImageResponse_Ok)(nil),
 		(*EnsureImageResponse_PullProgress)(nil),
 	}
-	file_internal_daemon_daemonpb_daemon_proto_msgTypes[53].OneofWrappers = []any{}
+	file_internal_daemon_daemonpb_daemon_proto_msgTypes[54].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_daemon_daemonpb_daemon_proto_rawDesc), len(file_internal_daemon_daemonpb_daemon_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   55,
+			NumMessages:   56,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -72,6 +72,17 @@ SET name = ?,
     updated_at = CURRENT_TIMESTAMP
 WHERE id = ? AND state = 'active';
 
+-- name: RecoverSandbox :exec
+UPDATE sandboxes
+SET name = ?,
+    state = 'active',
+    container_id = ?,
+    container_bootstrapped = 0,
+    deleted_at = NULL,
+    trash_work_dir = NULL,
+    updated_at = CURRENT_TIMESTAMP
+WHERE id = ? AND state = 'deleted';
+
 -- name: SoftDeleteSandbox :exec
 UPDATE sandboxes
 SET state = 'deleted',

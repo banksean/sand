@@ -870,6 +870,10 @@ func (d *Daemon) ExpungeSandbox(ctx context.Context, id string) error {
 	return d.boxer.Expunge(ctx, id)
 }
 
+func (d *Daemon) RecoverSandbox(ctx context.Context, id string) (*sandtypes.Box, error) {
+	return d.boxer.Recover(ctx, id)
+}
+
 func (d *Daemon) RenameSandbox(ctx context.Context, oldName, newName string) (*sandtypes.Box, error) {
 	return d.boxer.RenameSandbox(ctx, oldName, newName, io.Discard)
 }

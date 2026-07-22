@@ -80,6 +80,14 @@ func (s *daemonGRPCServer) ExpungeSandbox(ctx context.Context, req *daemonpb.IDR
 	return okStatus(), nil
 }
 
+func (s *daemonGRPCServer) RecoverSandbox(ctx context.Context, req *daemonpb.IDRequest) (*daemonpb.RecoverSandboxResponse, error) {
+	sbox, err := s.daemon.RecoverSandbox(ctx, req.GetId())
+	if err != nil {
+		return nil, err
+	}
+	return &daemonpb.RecoverSandboxResponse{Box: sandboxToProto(sbox)}, nil
+}
+
 func (s *daemonGRPCServer) StopSandbox(ctx context.Context, req *daemonpb.IDRequest) (*daemonpb.StatusResponse, error) {
 	id := req.GetId()
 	ctx = sandboxlog.WithSandboxID(ctx, id)

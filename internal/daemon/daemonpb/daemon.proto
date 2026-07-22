@@ -16,6 +16,7 @@ service DaemonService {
   rpc GetSandbox(IDRequest) returns (GetSandboxResponse);
   rpc RemoveSandbox(IDRequest) returns (StatusResponse);
   rpc ExpungeSandbox(IDRequest) returns (StatusResponse);
+  rpc RecoverSandbox(IDRequest) returns (RecoverSandboxResponse);
   rpc StopSandbox(IDRequest) returns (StatusResponse);
   rpc StartSandbox(StartSandboxRequest) returns (StatusResponse);
   rpc SyncHostGitMirror(IDRequest) returns (SyncHostGitMirrorResponse);
@@ -353,6 +354,10 @@ message RenameSandboxRequest {
 }
 
 message RenameSandboxResponse {
+  Sandbox box = 1;
+}
+
+message RecoverSandboxResponse {
   Sandbox box = 1;
 }
 

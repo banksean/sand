@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/banksean/sand/internal/agents"
 	"github.com/banksean/sand/internal/cloning"
@@ -508,6 +509,134 @@ func TestBoxer_RenameSandboxRegeneratesSSHKeysAndMarksReplacementUnbootstrapped(
 	}
 	if loaded.ContainerBootstrapped {
 		t.Fatal("ContainerBootstrapped = true, want false after rename replacement")
+	}
+}
+
+func recoveryFileOps() hostops.FileOps {
+	return &hostops.MockFileOps{
+		MkdirAllFunc:  os.MkdirAll,
+		StatFunc:      os.Stat,
+		LstatFunc:     os.Lstat,
+		CreateFunc:    os.Create,
+		RenameFunc:    os.Rename,
+		RemoveAllFunc: os.RemoveAll,
+		WriteFileFunc: os.WriteFile,
+	}
+}
+
+func TestBoxer_RecoverRestoresDeletedSandboxWithCollisionName(t *testing.T) {
+	ctx := context.Background()
+	var createdName string
+	mockContainer := &hostops.MockContainerOps{
+		CreateFunc: func(_ context.Context, opts *hostops.CreateContainer, _ string, _ []string) (string, error) {
+			createdName = opts.ManagementOptions.Name
+			return "recovered-container", nil
+		},
+	}
+	boxer := newTestBoxer(t, mockContainer, &mockImageOps{})
+	boxer.FileOps = recoveryFileOps()
+
+	root := t.TempDir()
+	workDir := filepath.Join(root, "workspace")
+	trashDir := filepath.Join(root, "trash")
+	if err := os.MkdirAll(filepath.Join(trashDir, "app"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(trashDir, "app", "saved.txt"), []byte("saved"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := boxer.SaveSandbox(ctx, &sandtypes.Box{ID: "active-id", Name: "project", State: "active", ImageName: "image"}); err != nil {
+		t.Fatal(err)
+	}
+	id := "12345678-1234-1234-1234-123456789abc"
+	if err := boxer.SaveSandbox(ctx, &sandtypes.Box{
+		ID: id, Name: "project", State: "deleted", ImageName: "image",
+		SandboxWorkDir: workDir, TrashWorkDir: trashDir, DeletedAt: time.Now(),
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := boxer.Recover(ctx, id)
+	if err != nil {
+		t.Fatalf("Recover() error = %v", err)
+	}
+	if got.Name != "recovered-project-12345678" || createdName != got.Name {
+		t.Fatalf("recovered name = %q, container name = %q", got.Name, createdName)
+	}
+	if got.State != "active" || got.TrashWorkDir != "" || !got.DeletedAt.IsZero() || got.ContainerID != "recovered-container" {
+		t.Fatalf("recovered sandbox = %+v", got)
+	}
+	if data, err := os.ReadFile(filepath.Join(workDir, "app", "saved.txt")); err != nil || string(data) != "saved" {
+		t.Fatalf("restored data = %q, error = %v", data, err)
+	}
+	if _, err := os.Stat(trashDir); !os.IsNotExist(err) {
+		t.Fatalf("trash directory still exists: %v", err)
+	}
+	loaded, err := boxer.Get(ctx, got.Name)
+	if err != nil || loaded == nil || loaded.State != "active" || loaded.ContainerID != "recovered-container" {
+		t.Fatalf("loaded recovered sandbox = %+v, error = %v", loaded, err)
+	}
+}
+
+func TestBoxer_RecoverRollsWorkspaceBackOnContainerFailure(t *testing.T) {
+	ctx := context.Background()
+	mockContainer := &hostops.MockContainerOps{
+		CreateFunc: func(context.Context, *hostops.CreateContainer, string, []string) (string, error) {
+			return "", errors.New("create failed")
+		},
+	}
+	boxer := newTestBoxer(t, mockContainer, &mockImageOps{})
+	boxer.FileOps = recoveryFileOps()
+	root := t.TempDir()
+	workDir := filepath.Join(root, "workspace")
+	trashDir := filepath.Join(root, "trash")
+	if err := os.MkdirAll(filepath.Join(trashDir, "app"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	id := "abcdef01-1234-1234-1234-123456789abc"
+	if err := boxer.SaveSandbox(ctx, &sandtypes.Box{
+		ID: id, Name: "project", State: "deleted", ImageName: "image",
+		SandboxWorkDir: workDir, TrashWorkDir: trashDir, DeletedAt: time.Now(),
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := boxer.Recover(ctx, id); err == nil || !strings.Contains(err.Error(), "create failed") {
+		t.Fatalf("Recover() error = %v", err)
+	}
+	if _, err := os.Stat(trashDir); err != nil {
+		t.Fatalf("trash directory was not restored: %v", err)
+	}
+	if _, err := os.Stat(workDir); !os.IsNotExist(err) {
+		t.Fatalf("workspace destination remains after rollback: %v", err)
+	}
+	deleted, err := boxer.ListDeleted(ctx)
+	if err != nil || len(deleted) != 1 || deleted[0].ID != id {
+		t.Fatalf("deleted sandboxes = %+v, error = %v", deleted, err)
+	}
+}
+
+func TestBoxer_RecoveredSandboxNameTruncatesAndAvoidsSecondaryCollision(t *testing.T) {
+	ctx := context.Background()
+	boxer := newTestBoxer(t, &hostops.MockContainerOps{}, &mockImageOps{})
+	original := strings.Repeat("a", 63)
+	firstCandidate := "recovered-" + strings.Repeat("a", 44) + "-12345678"
+	for id, name := range map[string]string{
+		"active-original":  original,
+		"active-generated": firstCandidate,
+	} {
+		if err := boxer.SaveSandbox(ctx, &sandtypes.Box{ID: id, Name: name, State: "active"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	got, err := boxer.recoveredSandboxName(ctx, original, "12345678-1234-1234-1234-123456789abc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "recovered-" + strings.Repeat("a", 42) + "-12345678-2"
+	if got != want || len(got) != 63 {
+		t.Fatalf("recoveredSandboxName() = %q (len %d), want %q", got, len(got), want)
 	}
 }
 
