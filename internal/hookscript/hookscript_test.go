@@ -176,7 +176,7 @@ func TestWriteHTTPProxyEnvInstallsCAStoreWithAPK(t *testing.T) {
 		t.Fatalf("Execute() error = %v", err)
 	}
 	for _, want := range []string{
-		"stream:apk add --no-cache ca-certificates",
+		"stream:apk --no-check-certificate add --no-cache ca-certificates",
 		"stream:update-ca-certificates",
 	} {
 		if !containsCall(exec.calls, want) {
@@ -201,8 +201,8 @@ func TestWriteHTTPProxyEnvInstallsCAStoreWithAPT(t *testing.T) {
 		t.Fatalf("Execute() error = %v", err)
 	}
 	for _, want := range []string{
-		"stream:apt-get update",
-		"stream:apt-get install -y --no-install-recommends ca-certificates",
+		"stream:apt-get -o Acquire::https::Verify-Peer=false -o Acquire::https::Verify-Host=false update",
+		"stream:apt-get -o Acquire::https::Verify-Peer=false -o Acquire::https::Verify-Host=false install -y --no-install-recommends ca-certificates",
 		"stream:update-ca-certificates",
 	} {
 		if !containsCall(exec.calls, want) {

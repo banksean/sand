@@ -249,14 +249,18 @@ func installHTTPProxyCA(ctx context.Context, exec sandtypes.HookStreamer, caCert
 	if !commandExists(ctx, exec, "update-ca-certificates") {
 		switch {
 		case commandExists(ctx, exec, "apk"):
-			if err := stream(ctx, exec, "apk", "add", "--no-cache", "ca-certificates"); err != nil {
+			if err := stream(ctx, exec, "apk", "--no-check-certificate", "add", "--no-cache", "ca-certificates"); err != nil {
 				return fmt.Errorf("install ca-certificates with apk: %w", err)
 			}
 		case commandExists(ctx, exec, "apt-get"):
-			if err := stream(ctx, exec, "apt-get", "update"); err != nil {
+			aptTLSBootstrapOptions := []string{
+				"-o", "Acquire::https::Verify-Peer=false",
+				"-o", "Acquire::https::Verify-Host=false",
+			}
+			if err := stream(ctx, exec, "apt-get", append(aptTLSBootstrapOptions, "update")...); err != nil {
 				return fmt.Errorf("apt-get update for ca-certificates: %w", err)
 			}
-			if err := stream(ctx, exec, "apt-get", "install", "-y", "--no-install-recommends", "ca-certificates"); err != nil {
+			if err := stream(ctx, exec, "apt-get", append(aptTLSBootstrapOptions, "install", "-y", "--no-install-recommends", "ca-certificates")...); err != nil {
 				return fmt.Errorf("install ca-certificates with apt-get: %w", err)
 			}
 		default:
