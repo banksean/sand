@@ -14,6 +14,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     procps \
     sudo \
     tmux \
+    unzip \
+    vim \
     zsh \
   && rm -rf /var/lib/apt/lists/*
 
@@ -46,6 +48,17 @@ RUN mkdir -p /root/.ssh && \
   chmod 600 /root/.ssh/config
 
 COPY sshd_config /etc/ssh/sshd_config
+
+ARG ZSH_IN_DOCKER_VERSION=1.2.1
+RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/v${ZSH_IN_DOCKER_VERSION}/zsh-in-docker.sh)" -- \
+  -p git \
+  -p fzf \
+  -a "source /usr/share/doc/fzf/examples/key-bindings.zsh" \
+  -a "source /usr/share/doc/fzf/examples/completion.zsh" \
+  -a "export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhistory/.bash_history" \
+  -a '[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh'
+
+RUN curl -s https://ohmyposh.dev/install.sh | bash -s -- -d /usr/local/bin
 
 # Install innie (container-side sand cli binary)
 ARG SAND_CLI_VERSION
