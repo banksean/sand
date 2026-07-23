@@ -220,6 +220,9 @@ func TestHTTPProxyCacheEnsureWritesSquidCAAndConfig(t *testing.T) {
 	if !strings.Contains(string(config), "ssl-bump") || !strings.Contains(string(config), "ssl_bump bump all") {
 		t.Fatalf("squid config missing SSL bumping directives:\n%s", config)
 	}
+	if !strings.Contains(string(config), "http_upgrade_request_protocols websocket allow all") {
+		t.Fatalf("squid config missing WebSocket upgrade directive:\n%s", config)
+	}
 }
 
 func imageServiceWithHTTPProxyCacheImage() *mockImageOps {

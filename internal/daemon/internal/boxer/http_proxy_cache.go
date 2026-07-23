@@ -45,6 +45,8 @@ acl step1 at_step SslBump1
 ssl_bump peek step1
 ssl_bump bump all
 
+http_upgrade_request_protocols websocket allow all
+
 cache_dir ufs /var/spool/squid 10000 16 256
 maximum_object_size 1024 MB
 cache_mem 256 MB
