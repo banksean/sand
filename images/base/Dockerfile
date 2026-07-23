@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     openssh-client \
     openssh-server \
     procps \
+    ripgrep \
     sudo \
     tmux \
     unzip \
