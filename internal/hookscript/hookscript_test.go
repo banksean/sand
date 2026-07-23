@@ -228,6 +228,110 @@ func TestWriteHTTPProxyEnvFailsWithoutCAStoreSupport(t *testing.T) {
 	}
 }
 
+func TestInstallNPMAgentUsesCachedPinnedNodeAndWritesWrapper(t *testing.T) {
+	const nodeDir = "/opt/sand-agent-cache/node/22.23.1/linux-x64"
+	exec := &fakeStreamer{
+		execResults: map[string]fakeResult{
+			"which claude":                  {err: errors.New("missing")},
+			"uname -m":                      {out: "x86_64\n"},
+			nodeDir + "/bin/node --version": {out: "v22.23.1\n"},
+		},
+	}
+
+	err := installNPMAgent(context.Background(), exec, "claude", "@anthropic-ai/claude-code", "2.1.217")
+	if err != nil {
+		t.Fatalf("installNPMAgent() error = %v", err)
+	}
+
+	npmCall := "stream:env PATH=" + nodeDir + "/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin " +
+		nodeDir + "/bin/npm install -g --prefix /usr/local/lib/sand-npm-agents/claude @anthropic-ai/claude-code@2.1.217"
+	if !containsCall(exec.calls, npmCall) {
+		t.Fatalf("calls = %#v, want %q", exec.calls, npmCall)
+	}
+	wrapper := exec.inputs["stream-input:tee /usr/local/bin/claude.sand.tmp"]
+	wantWrapper := "#!/bin/sh\nexec " + nodeDir + "/bin/node /usr/local/lib/sand-npm-agents/claude/bin/claude \"$@\"\n"
+	if wrapper != wantWrapper {
+		t.Fatalf("wrapper = %q, want %q", wrapper, wantWrapper)
+	}
+	for _, call := range exec.calls {
+		if strings.Contains(call, "apt-get") || strings.Contains(call, "apk add") {
+			t.Fatalf("installer used distribution Node packages: %q", call)
+		}
+	}
+}
+
+func TestEnsureNPMAgentNodeDownloadsAndVerifiesArchive(t *testing.T) {
+	const (
+		checksum = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+		archive  = "node-v22.23.1-linux-arm64.tar.gz"
+		stage    = "/tmp/node-download/runtime"
+	)
+	exec := &fakeStreamer{
+		execResults: map[string]fakeResult{
+			"uname -m": {out: "aarch64\n"},
+			"test -x /opt/sand-agent-cache/node/22.23.1/linux-arm64/bin/node": {err: errors.New("missing")},
+			"test -e /opt/sand-agent-cache/node/22.23.1/linux-arm64":          {err: errors.New("missing")},
+			"mktemp -d": {out: "/tmp/node-download\n"},
+			"curl -fsSL https://nodejs.org/download/release/v22.23.1/SHASUMS256.txt": {out: checksum + "  " + archive + "\n"},
+			"sha256sum /tmp/node-download/" + archive:                                {out: checksum + "  /tmp/node-download/" + archive + "\n"},
+			stage + "/bin/node --version":                                            {out: "v22.23.1\n"},
+		},
+	}
+
+	got, err := ensureNPMAgentNode(context.Background(), exec)
+	if err != nil {
+		t.Fatalf("ensureNPMAgentNode() error = %v", err)
+	}
+	want := "/opt/sand-agent-cache/node/22.23.1/linux-arm64"
+	if got != want {
+		t.Fatalf("ensureNPMAgentNode() = %q, want %q", got, want)
+	}
+	for _, call := range []string{
+		"stream:curl -fsSL -o /tmp/node-download/" + archive + " https://nodejs.org/download/release/v22.23.1/" + archive,
+		"stream:tar -xzf /tmp/node-download/" + archive + " -C " + stage + " --strip-components=1",
+		"mv " + stage + " " + want,
+	} {
+		if !containsCall(exec.calls, call) {
+			t.Fatalf("calls = %#v, want %q", exec.calls, call)
+		}
+	}
+}
+
+func TestEnsureNPMAgentNodeRejectsChecksumMismatch(t *testing.T) {
+	const archive = "node-v22.23.1-linux-x64.tar.gz"
+	exec := &fakeStreamer{
+		execResults: map[string]fakeResult{
+			"uname -m": {out: "x86_64"},
+			"test -x /opt/sand-agent-cache/node/22.23.1/linux-x64/bin/node": {err: errors.New("missing")},
+			"test -e /opt/sand-agent-cache/node/22.23.1/linux-x64":          {err: errors.New("missing")},
+			"mktemp -d": {out: "/tmp/node-download"},
+			"curl -fsSL https://nodejs.org/download/release/v22.23.1/SHASUMS256.txt": {out: strings.Repeat("a", 64) + "  " + archive},
+			"sha256sum /tmp/node-download/" + archive:                                {out: strings.Repeat("b", 64) + "  archive"},
+		},
+	}
+
+	_, err := ensureNPMAgentNode(context.Background(), exec)
+	if err == nil || !strings.Contains(err.Error(), "checksum mismatch") {
+		t.Fatalf("ensureNPMAgentNode() error = %v, want checksum mismatch", err)
+	}
+}
+
+func TestNodeArchiveArchRejectsUnsupportedArchitecture(t *testing.T) {
+	_, err := nodeArchiveArch("riscv64")
+	if err == nil || !strings.Contains(err.Error(), "unavailable") {
+		t.Fatalf("nodeArchiveArch() error = %v, want unavailable", err)
+	}
+}
+
+func TestAgentCacheRootFallsBackWhenSharedCacheIsUnavailable(t *testing.T) {
+	exec := &fakeStreamer{execResults: map[string]fakeResult{
+		"test -d /opt/sand-agent-cache": {err: errors.New("missing")},
+	}}
+	if got := agentCacheRoot(context.Background(), exec); got != "/tmp/sand-agent-cache" {
+		t.Fatalf("agentCacheRoot() = %q, want /tmp/sand-agent-cache", got)
+	}
+}
+
 func containsCall(calls []string, want string) bool {
 	for _, call := range calls {
 		if call == want {

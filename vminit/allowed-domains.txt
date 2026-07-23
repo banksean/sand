@@ -4,6 +4,7 @@ api.github.com
 github.com
 www.github.com
 registry.npmjs.org
+nodejs.org
 www.gitlab.com
 api.openai.com
 api.anthropic.com

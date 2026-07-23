@@ -18,6 +18,8 @@ import (
 const (
 	bazelrcManagedStart = "# sand bazel remote cache start"
 	bazelrcManagedEnd   = "# sand bazel remote cache end"
+	npmAgentNodeVersion = "22.23.1"
+	nodeDownloadBaseURL = "https://nodejs.org/download/release"
 )
 
 // Execute runs a small container-oriented script against exec. The engine is
@@ -308,19 +310,159 @@ func installNPMAgent(ctx context.Context, exec sandtypes.HookStreamer, command, 
 	if commandExists(ctx, exec, command) {
 		return nil
 	}
-	if commandExists(ctx, exec, "apk") {
-		if err := stream(ctx, exec, "apk", "add", "--no-cache", "nodejs", "npm"); err != nil {
-			return err
-		}
-	} else if commandExists(ctx, exec, "apt-get") {
-		if err := stream(ctx, exec, "apt-get", "update"); err != nil {
-			return err
-		}
-		if err := stream(ctx, exec, "apt-get", "install", "-y", "--no-install-recommends", "nodejs", "npm"); err != nil {
-			return err
+	nodeDir, err := ensureNPMAgentNode(ctx, exec)
+	if err != nil {
+		return err
+	}
+
+	installPrefix := "/usr/local/lib/sand-npm-agents/" + command
+	if _, err := exec.Exec(ctx, "mkdir", "-p", installPrefix); err != nil {
+		return fmt.Errorf("create npm agent install prefix: %w", err)
+	}
+	nodeBinDir := nodeDir + "/bin"
+	installPath := nodeBinDir + ":/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+	if err := stream(ctx, exec, "env", "PATH="+installPath, nodeBinDir+"/npm", "install", "-g", "--prefix", installPrefix, pkg+"@"+version); err != nil {
+		return err
+	}
+
+	wrapperPath := "/usr/local/bin/" + command
+	wrapper := "#!/bin/sh\nexec " + nodeBinDir + "/node " + installPrefix + "/bin/" + command + " \"$@\"\n"
+	tmpWrapper := wrapperPath + ".sand.tmp"
+	if err := exec.ExecStreamInput(ctx, strings.NewReader(wrapper), io.Discard, io.Discard, "tee", tmpWrapper); err != nil {
+		return fmt.Errorf("write %s: %w", tmpWrapper, err)
+	}
+	if _, err := exec.Exec(ctx, "chmod", "0755", tmpWrapper); err != nil {
+		return fmt.Errorf("chmod %s: %w", tmpWrapper, err)
+	}
+	if _, err := exec.Exec(ctx, "mv", tmpWrapper, wrapperPath); err != nil {
+		return fmt.Errorf("install %s wrapper: %w", command, err)
+	}
+	return nil
+}
+
+func ensureNPMAgentNode(ctx context.Context, exec sandtypes.HookStreamer) (string, error) {
+	archOut, err := exec.Exec(ctx, "uname", "-m")
+	if err != nil {
+		return "", fmt.Errorf("uname -m: %w", err)
+	}
+	archiveArch, err := nodeArchiveArch(strings.TrimSpace(archOut))
+	if err != nil {
+		return "", err
+	}
+
+	cacheRoot := agentCacheRoot(ctx, exec)
+	runtimeDir := cacheRoot + "/node/" + npmAgentNodeVersion + "/linux-" + archiveArch
+	if nodeRuntimeValid(ctx, exec, runtimeDir) {
+		return runtimeDir, nil
+	}
+	if _, err := exec.Exec(ctx, "mkdir", "-p", path.Dir(runtimeDir)); err != nil {
+		return "", fmt.Errorf("create Node cache parent: %w", err)
+	}
+	lockDir := runtimeDir + ".lock"
+	if err := acquireLock(ctx, exec, lockDir); err != nil {
+		return "", err
+	}
+	defer exec.Exec(context.WithoutCancel(ctx), "rm", "-rf", lockDir) //nolint:errcheck
+	if nodeRuntimeValid(ctx, exec, runtimeDir) {
+		return runtimeDir, nil
+	}
+	if _, err := exec.Exec(ctx, "test", "-e", runtimeDir); err == nil {
+		if _, err := exec.Exec(ctx, "rm", "-rf", runtimeDir); err != nil {
+			return "", fmt.Errorf("remove invalid cached Node runtime: %w", err)
 		}
 	}
-	return stream(ctx, exec, "npm", "install", "-g", pkg+"@"+version)
+
+	tmpDir, err := exec.Exec(ctx, "mktemp", "-d")
+	if err != nil {
+		return "", fmt.Errorf("mktemp -d: %w", err)
+	}
+	tmpDir = strings.TrimSpace(tmpDir)
+	if tmpDir == "" {
+		return "", fmt.Errorf("mktemp -d returned an empty path")
+	}
+	defer exec.Exec(context.WithoutCancel(ctx), "rm", "-rf", tmpDir) //nolint:errcheck
+
+	archive := fmt.Sprintf("node-v%s-linux-%s.tar.gz", npmAgentNodeVersion, archiveArch)
+	releaseURL := nodeDownloadBaseURL + "/v" + npmAgentNodeVersion
+	checksums, err := exec.Exec(ctx, "curl", "-fsSL", releaseURL+"/SHASUMS256.txt")
+	if err != nil {
+		return "", fmt.Errorf("download Node checksums: %w", err)
+	}
+	wantChecksum, err := checksumForArchive(checksums, archive)
+	if err != nil {
+		return "", err
+	}
+	archivePath := tmpDir + "/" + archive
+	if err := stream(ctx, exec, "curl", "-fsSL", "-o", archivePath, releaseURL+"/"+archive); err != nil {
+		return "", fmt.Errorf("download Node %s: %w", npmAgentNodeVersion, err)
+	}
+	checksumOut, err := exec.Exec(ctx, "sha256sum", archivePath)
+	if err != nil {
+		return "", fmt.Errorf("checksum Node archive: %w", err)
+	}
+	gotChecksum := strings.Fields(checksumOut)
+	if len(gotChecksum) == 0 || gotChecksum[0] != wantChecksum {
+		return "", fmt.Errorf("Node archive checksum mismatch")
+	}
+
+	stagedDir := tmpDir + "/runtime"
+	if _, err := exec.Exec(ctx, "mkdir", "-p", stagedDir); err != nil {
+		return "", fmt.Errorf("create staged Node runtime: %w", err)
+	}
+	if err := stream(ctx, exec, "tar", "-xzf", archivePath, "-C", stagedDir, "--strip-components=1"); err != nil {
+		return "", fmt.Errorf("extract Node archive: %w", err)
+	}
+	if !nodeRuntimeValid(ctx, exec, stagedDir) {
+		return "", fmt.Errorf("downloaded Node runtime is not v%s", npmAgentNodeVersion)
+	}
+	if _, err := exec.Exec(ctx, "mv", stagedDir, runtimeDir); err != nil {
+		return "", fmt.Errorf("publish Node runtime: %w", err)
+	}
+	return runtimeDir, nil
+}
+
+func agentCacheRoot(ctx context.Context, exec sandtypes.HookStreamer) string {
+	const shared = "/opt/sand-agent-cache"
+	if _, err := exec.Exec(ctx, "test", "-d", shared); err != nil {
+		return "/tmp/sand-agent-cache"
+	}
+	if _, err := exec.Exec(ctx, "test", "-w", shared); err != nil {
+		return "/tmp/sand-agent-cache"
+	}
+	return shared
+}
+
+func nodeRuntimeValid(ctx context.Context, exec sandtypes.HookStreamer, runtimeDir string) bool {
+	node := runtimeDir + "/bin/node"
+	if _, err := exec.Exec(ctx, "test", "-x", node); err != nil {
+		return false
+	}
+	version, err := exec.Exec(ctx, node, "--version")
+	return err == nil && strings.TrimSpace(version) == "v"+npmAgentNodeVersion
+}
+
+func nodeArchiveArch(arch string) (string, error) {
+	switch arch {
+	case "x86_64", "amd64":
+		return "x64", nil
+	case "aarch64", "arm64":
+		return "arm64", nil
+	default:
+		return "", fmt.Errorf("Node %s is unavailable for architecture %q", npmAgentNodeVersion, arch)
+	}
+}
+
+func checksumForArchive(checksums, archive string) (string, error) {
+	for _, line := range strings.Split(checksums, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 2 && strings.TrimPrefix(fields[1], "*") == archive {
+			if len(fields[0]) != 64 {
+				break
+			}
+			return fields[0], nil
+		}
+	}
+	return "", fmt.Errorf("Node checksum manifest does not contain %s", archive)
 }
 
 func installOpenCodeAgent(ctx context.Context, exec sandtypes.HookStreamer, command, version string) error {

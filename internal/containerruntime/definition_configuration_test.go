@@ -26,9 +26,9 @@ func TestDefinitionContainerConfigurationAddsInstallHookAfterBaseHook(t *testing
 
 	exec := &fakeHookStreamer{
 		execResults: map[string]fakeExecResult{
-			commandKey("which", "codex"):   {err: errors.New("codex not found")},
-			commandKey("which", "apk"):     {err: errors.New("apk not found")},
-			commandKey("which", "apt-get"): {out: "/usr/bin/apt-get"},
+			commandKey("which", "codex"): {err: errors.New("codex not found")},
+			commandKey("uname", "-m"):    {out: "x86_64\n"},
+			commandKey("/opt/sand-agent-cache/node/22.23.1/linux-x64/bin/node", "--version"): {out: "v22.23.1\n"},
 		},
 	}
 	if err := hooks[1].Run(context.Background(), nil, exec); err != nil {
@@ -36,11 +36,16 @@ func TestDefinitionContainerConfigurationAddsInstallHookAfterBaseHook(t *testing
 	}
 	wantCalls := []string{
 		"exec:which codex",
-		"exec:which apk",
-		"exec:which apt-get",
-		"stream:apt-get update",
-		"stream:apt-get install -y --no-install-recommends nodejs npm",
-		"stream:npm install -g @openai/codex@0.145.0",
+		"exec:uname -m",
+		"exec:test -d /opt/sand-agent-cache",
+		"exec:test -w /opt/sand-agent-cache",
+		"exec:test -x /opt/sand-agent-cache/node/22.23.1/linux-x64/bin/node",
+		"exec:/opt/sand-agent-cache/node/22.23.1/linux-x64/bin/node --version",
+		"exec:mkdir -p /usr/local/lib/sand-npm-agents/codex",
+		"stream:env PATH=/opt/sand-agent-cache/node/22.23.1/linux-x64/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin /opt/sand-agent-cache/node/22.23.1/linux-x64/bin/npm install -g --prefix /usr/local/lib/sand-npm-agents/codex @openai/codex@0.145.0",
+		"stream-input:tee /usr/local/bin/codex.sand.tmp",
+		"exec:chmod 0755 /usr/local/bin/codex.sand.tmp",
+		"exec:mv /usr/local/bin/codex.sand.tmp /usr/local/bin/codex",
 	}
 	if !reflect.DeepEqual(exec.calls, wantCalls) {
 		t.Fatalf("install hook calls = %#v, want %#v", exec.calls, wantCalls)
