@@ -321,12 +321,32 @@ func installNPMAgent(ctx context.Context, exec sandtypes.HookStreamer, command, 
 	}
 	nodeBinDir := nodeDir + "/bin"
 	installPath := nodeBinDir + ":/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-	if err := stream(ctx, exec, "env", "PATH="+installPath, nodeBinDir+"/npm", "install", "-g", "--prefix", installPrefix, pkg+"@"+version); err != nil {
+	installArgs := []string{"PATH=" + installPath}
+	nodeExtraCA := ""
+	if _, err := exec.Exec(ctx, "test", "-f", sandtypes.HTTPProxyCACertContainerPath); err == nil {
+		nodeExtraCA = sandtypes.HTTPProxyCACertContainerPath
+		installArgs = append(installArgs, "NODE_EXTRA_CA_CERTS="+nodeExtraCA)
+	}
+	installArgs = append(installArgs, nodeBinDir+"/npm", "install", "-g", "--prefix", installPrefix, pkg+"@"+version)
+	if err := stream(ctx, exec, "env", installArgs...); err != nil {
 		return err
 	}
 
 	wrapperPath := "/usr/local/bin/" + command
-	wrapper := "#!/bin/sh\nexec " + nodeBinDir + "/node " + installPrefix + "/bin/" + command + " \"$@\"\n"
+	wrapper := "#!/bin/sh\n"
+	if nodeExtraCA != "" {
+		wrapper += "export NODE_EXTRA_CA_CERTS=" + nodeExtraCA + "\n"
+	}
+	agentEntry := installPrefix + "/bin/" + command
+	entryHeader, err := exec.Exec(ctx, "head", "-c", "4", agentEntry)
+	if err != nil {
+		return fmt.Errorf("inspect npm agent entrypoint: %w", err)
+	}
+	if strings.HasPrefix(entryHeader, "\x7fELF") {
+		wrapper += "exec " + agentEntry + " \"$@\"\n"
+	} else {
+		wrapper += "exec " + nodeBinDir + "/node " + agentEntry + " \"$@\"\n"
+	}
 	tmpWrapper := wrapperPath + ".sand.tmp"
 	if err := exec.ExecStreamInput(ctx, strings.NewReader(wrapper), io.Discard, io.Discard, "tee", tmpWrapper); err != nil {
 		return fmt.Errorf("write %s: %w", tmpWrapper, err)

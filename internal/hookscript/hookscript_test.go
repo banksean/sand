@@ -7,6 +7,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/banksean/sand/internal/sandtypes"
 )
 
 type fakeStreamer struct {
@@ -235,6 +237,7 @@ func TestInstallNPMAgentUsesCachedPinnedNodeAndWritesWrapper(t *testing.T) {
 			"which claude":                  {err: errors.New("missing")},
 			"uname -m":                      {out: "x86_64\n"},
 			nodeDir + "/bin/node --version": {out: "v22.23.1\n"},
+			"head -c 4 /usr/local/lib/sand-npm-agents/claude/bin/claude": {out: "\x7fELF"},
 		},
 	}
 
@@ -244,12 +247,14 @@ func TestInstallNPMAgentUsesCachedPinnedNodeAndWritesWrapper(t *testing.T) {
 	}
 
 	npmCall := "stream:env PATH=" + nodeDir + "/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin " +
-		nodeDir + "/bin/npm install -g --prefix /usr/local/lib/sand-npm-agents/claude @anthropic-ai/claude-code@2.1.217"
+		"NODE_EXTRA_CA_CERTS=/usr/local/share/ca-certificates/sand-http-cache.crt " + nodeDir +
+		"/bin/npm install -g --prefix /usr/local/lib/sand-npm-agents/claude @anthropic-ai/claude-code@2.1.217"
 	if !containsCall(exec.calls, npmCall) {
 		t.Fatalf("calls = %#v, want %q", exec.calls, npmCall)
 	}
 	wrapper := exec.inputs["stream-input:tee /usr/local/bin/claude.sand.tmp"]
-	wantWrapper := "#!/bin/sh\nexec " + nodeDir + "/bin/node /usr/local/lib/sand-npm-agents/claude/bin/claude \"$@\"\n"
+	wantWrapper := "#!/bin/sh\nexport NODE_EXTRA_CA_CERTS=/usr/local/share/ca-certificates/sand-http-cache.crt\n" +
+		"exec /usr/local/lib/sand-npm-agents/claude/bin/claude \"$@\"\n"
 	if wrapper != wantWrapper {
 		t.Fatalf("wrapper = %q, want %q", wrapper, wantWrapper)
 	}
@@ -257,6 +262,28 @@ func TestInstallNPMAgentUsesCachedPinnedNodeAndWritesWrapper(t *testing.T) {
 		if strings.Contains(call, "apt-get") || strings.Contains(call, "apk add") {
 			t.Fatalf("installer used distribution Node packages: %q", call)
 		}
+	}
+}
+
+func TestInstallNPMAgentOmitsExtraCAWhenProxyCertificateIsAbsent(t *testing.T) {
+	const nodeDir = "/opt/sand-agent-cache/node/22.23.1/linux-x64"
+	exec := &fakeStreamer{execResults: map[string]fakeResult{
+		"which codex":                   {err: errors.New("missing")},
+		"uname -m":                      {out: "x86_64"},
+		nodeDir + "/bin/node --version": {out: "v22.23.1"},
+		"test -f " + sandtypes.HTTPProxyCACertContainerPath: {err: errors.New("missing")},
+	}}
+
+	if err := installNPMAgent(context.Background(), exec, "codex", "@openai/codex", "0.145.0"); err != nil {
+		t.Fatalf("installNPMAgent() error = %v", err)
+	}
+	wrapper := exec.inputs["stream-input:tee /usr/local/bin/codex.sand.tmp"]
+	if strings.Contains(wrapper, "NODE_EXTRA_CA_CERTS") {
+		t.Fatalf("wrapper unexpectedly configures a missing proxy CA: %q", wrapper)
+	}
+	wantExec := "exec " + nodeDir + "/bin/node /usr/local/lib/sand-npm-agents/codex/bin/codex \"$@\""
+	if !strings.Contains(wrapper, wantExec) {
+		t.Fatalf("JavaScript agent wrapper = %q, want %q", wrapper, wantExec)
 	}
 }
 
