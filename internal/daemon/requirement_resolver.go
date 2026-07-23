@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/banksean/sand/internal/agents"
@@ -159,18 +160,55 @@ func processEnvAllowed(name string, processEnvNames map[string]struct{}) bool {
 	return ok
 }
 
+func findEnvFilePath(startPath string) string {
+	if startPath == "" {
+		return ""
+	}
+	if _, err := os.Stat(startPath); err == nil {
+		return startPath
+	}
+
+	dir := filepath.Dir(startPath)
+	filename := filepath.Base(startPath)
+
+	for {
+		targetPath := filepath.Join(dir, filename)
+		if _, err := os.Stat(targetPath); err == nil {
+			return targetPath
+		}
+
+		gitPath := filepath.Join(dir, ".git")
+		if _, err := os.Stat(gitPath); err == nil {
+			break
+		}
+
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+
+	return ""
+}
+
 func loadEnvFileValues(path string) (map[string]string, error) {
 	values := make(map[string]string)
 	if path == "" {
 		return values, nil
 	}
 
-	f, err := os.Open(path)
+	resolvedPath := findEnvFilePath(path)
+	if resolvedPath == "" {
+		return values, nil
+	}
+
+	f, err := os.Open(resolvedPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return values, nil
 		}
-		return nil, fmt.Errorf("reading env file %q: %w", path, err)
+		return nil, fmt.Errorf("reading env file %q: %w", resolvedPath, err)
 	}
 	defer f.Close()
 
@@ -203,7 +241,7 @@ func loadEnvFileValues(path string) (map[string]string, error) {
 	}
 
 	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("reading env file %q: %w", path, err)
+		return nil, fmt.Errorf("reading env file %q: %w", resolvedPath, err)
 	}
 	return values, nil
 }

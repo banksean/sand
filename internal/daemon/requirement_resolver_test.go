@@ -271,6 +271,84 @@ func TestLoadEnvFileValuesParsesExportAndQuotedValues(t *testing.T) {
 	}
 }
 
+func TestResolveCreateSandboxRequirementsTraversesParentDirsForEnvFile(t *testing.T) {
+	t.Setenv("OPENAI_API_KEY", "")
+
+	// Create a nested directory structure:
+	// tempDir/
+	//   .env (contains OPENAI_API_KEY=parent-val)
+	//   images/
+	//     (no .env here)
+	tempDir := t.TempDir()
+	nestedDir := filepath.Join(tempDir, "images")
+	if err := os.MkdirAll(nestedDir, 0o755); err != nil {
+		t.Fatalf("os.MkdirAll: %v", err)
+	}
+
+	parentEnvFile := filepath.Join(tempDir, ".env")
+	if err := os.WriteFile(parentEnvFile, []byte("OPENAI_API_KEY=parent-val\n"), 0o644); err != nil {
+		t.Fatalf("os.WriteFile: %v", err)
+	}
+
+	d := newRequirementTestDaemon(t, requirementTestRegistry(), &hostops.MockContainerOps{})
+
+	// Attempt resolving from the subdirectory nestedDir/
+	nestedEnvFile := filepath.Join(nestedDir, ".env")
+	caps, err := d.resolveCreateSandboxRequirements(CreateSandboxOpts{
+		Agent:   "codex",
+		EnvFile: nestedEnvFile,
+	})
+	if err != nil {
+		t.Fatalf("resolveCreateSandboxRequirements returned error: %v", err)
+	}
+	if !caps.AuthRequired || !caps.AuthAvailable {
+		t.Fatalf("resolved requirements = %+v, want auth required and available", caps)
+	}
+	if got := caps.AuthEnv["OPENAI_API_KEY"]; got != "parent-val" {
+		t.Fatalf("resolved OPENAI_API_KEY = %q, want %q", got, "parent-val")
+	}
+}
+
+func TestResolveCreateSandboxRequirementsStopsAtGitRoot(t *testing.T) {
+	t.Setenv("OPENAI_API_KEY", "")
+
+	// tempDir/
+	//   .env (contains OPENAI_API_KEY=top-level-val)
+	//   project/
+	//     .git/ (marks git root)
+	//     images/
+	//       (no .env here)
+	tempDir := t.TempDir()
+	projectDir := filepath.Join(tempDir, "project")
+	nestedDir := filepath.Join(projectDir, "images")
+	if err := os.MkdirAll(filepath.Join(projectDir, ".git"), 0o755); err != nil {
+		t.Fatalf("os.MkdirAll for .git: %v", err)
+	}
+	if err := os.MkdirAll(nestedDir, 0o755); err != nil {
+		t.Fatalf("os.MkdirAll: %v", err)
+	}
+
+	topEnvFile := filepath.Join(tempDir, ".env")
+	if err := os.WriteFile(topEnvFile, []byte("OPENAI_API_KEY=top-level-val\n"), 0o644); err != nil {
+		t.Fatalf("os.WriteFile: %v", err)
+	}
+
+	d := newRequirementTestDaemon(t, requirementTestRegistry(), &hostops.MockContainerOps{})
+
+	// Attempt resolving from the subdirectory nestedDir/
+	nestedEnvFile := filepath.Join(nestedDir, ".env")
+	caps, err := d.resolveCreateSandboxRequirements(CreateSandboxOpts{
+		Agent:   "codex",
+		EnvFile: nestedEnvFile,
+	})
+	if err == nil {
+		t.Fatalf("expected error because lookup should stop at .git and not find OPENAI_API_KEY")
+	}
+	if caps.AuthAvailable {
+		t.Fatalf("expected AuthAvailable = false")
+	}
+}
+
 func TestCreateSandboxRejectsMissingAuthBeforeSandboxCreation(t *testing.T) {
 	t.Setenv("OPENAI_API_KEY", "")
 	var createCalls int
