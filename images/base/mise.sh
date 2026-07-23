@@ -1,19 +1,11 @@
 #!/bin/zsh
 set -e
 
-# Redirect mise to store everything in our shared host mount
+# Redirect mise to store everything in our shared host mount.
 export MISE_DATA_DIR="/opt/tool-cache/mise"
 export MISE_CONFIG_DIR="/opt/tool-cache/mise/config"
 export MISE_CACHE_DIR="/opt/tool-cache/mise/cache"
 export MISE_STATE_DIR="/opt/tool-cache/mise/state"
-
-# Since we're running Alpine, we don't have glibc so the offocial node builds won't work.
-# Setting the following vars tell mise to use community-provided musl builds,
-# and to download them rather than try to compile from source (which is a whole
-# other shitshow).
-export MISE_NODE_MIRROR_URL="https://unofficial-builds.nodejs.org/download/release/"
-export MISE_NODE_FLAVOR="musl"
-export MISE_NODE_COMPILE="false"
 
 has_project_file() {
     local filename="$1"
@@ -31,23 +23,24 @@ has_project_file() {
         \) -prune \) \
         -o \( -type f -name "$filename" -print -quit \) | grep -q .
 }
-# Automatically install runtimes defined in .tool-versions or mise.toml
+
+# Automatically install runtimes defined in .tool-versions or mise.toml.
 if [ -f ".tool-versions" ] || [ -f "mise.toml" ]; then
-    echo "🛠 Detecting runtimes from config..."
+    echo "Detecting runtimes from config..."
     if [ -f "mise.toml" ]; then
         mise trust ./mise.toml
     fi
     mise install -y
     eval "$(mise activate zsh)"
 else
-    # Fallback: if no config file, manually inject based on file detection
+    # Fallback: if no config file, manually inject based on file detection.
     has_project_file "package.json" && mise use --global node@latest
     has_project_file "go.mod" && mise use --global go@latest
     has_project_file "requirements.txt" && mise use --global python@3.11
     eval "$(mise activate zsh)"
 fi
 
-# Set language-specific caches within the same shared mount
+# Set language-specific caches within the same shared mount.
 export GOMODCACHE="$MISE_DATA_DIR/go/mod"
 export GOCACHE="$MISE_DATA_DIR/go/build"
 export PIP_CACHE_DIR="/opt/tool-cache/python/pip"
@@ -63,10 +56,8 @@ export PIP_CACHE_DIR="/opt/tool-cache/python/pip"
   echo "export MISE_CONFIG_DIR=\"$MISE_CONFIG_DIR\""
   echo "export MISE_CACHE_DIR=\"$MISE_CACHE_DIR\""
   echo "export MISE_STATE_DIR=\"$MISE_STATE_DIR\""
-  # Add any other dynamic vars here
 } > /etc/shared_env.sh
 
-# Make it readable by everyone
 chmod 644 /etc/shared_env.sh
- 
+
 exec "$@"

@@ -22,5 +22,3 @@ sandless:
 ubuntu-sand:
 	$(BUILD_CMD) $(SAND_CLI_BUILD_ARG) -t ubuntu-sand ubuntu-sand/
 
-bookworm:
-	$(BUILD_CMD) $(SAND_CLI_BUILD_ARG) -t bookworm:local bookworm/

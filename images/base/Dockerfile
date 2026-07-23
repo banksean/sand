@@ -1,37 +1,23 @@
-FROM docker.io/library/alpine
+FROM docker.io/library/debian:bookworm-slim
 
 ARG TZ
 ENV TZ="$TZ"
 
-RUN apk add --no-cache \
-  bash \
-  curl \
-  delta \
-  doas \
-  fzf \
-  git \
-  github-cli \
-  gnupg \
-  htop \
-  iproute2 \
-  ipset \
-  iptables \
-  jq \
-  less \
-  libgcc \
-  libstdc++ \
-  man-db \
-  make \
-  nano \
-  openssh-client \
-  openssh-server \
-  procps \
-  ripgrep \
-  sudo \
-  tmux \
-  unzip \
-  vim \
-  zsh
+# Keep this to sandbox/bootstrap dependencies. Project toolchains are installed
+# on demand through mise or the cached apt proxy.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    git \
+    openssh-client \
+    openssh-server \
+    procps \
+    sudo \
+    tmux \
+    unzip \
+    vim \
+    zsh \
+  && rm -rf /var/lib/apt/lists/*
 
 RUN ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') && \
   curl -fsSL -o /tmp/atch.tgz "https://github.com/mobydeck/atch/releases/latest/download/atch-linux-${ARCH}.tgz" && \
@@ -50,8 +36,6 @@ RUN mkdir -p /commandhistory && \
   chown -R root /commandhistory
 
 ENV SHELL=/bin/zsh
-ENV EDITOR=nano
-ENV VISUAL=nano
 
 # Configure SSH for GitHub authentication
 # TODO: move this to a container hook so it runs for the actual user name instead of root.
@@ -63,22 +47,7 @@ RUN mkdir -p /root/.ssh && \
   printf "Host github.com\n\tPubkeyAuthentication yes\n" > /root/.ssh/config && \
   chmod 600 /root/.ssh/config
 
-ADD sshd_config /etc/ssh/sshd_config
-
-# Install innie (container-side sand cli binary)
-ARG SAND_CLI_VERSION
-RUN ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') && \
-  wget "https://github.com/banksean/sand/releases/download/${SAND_CLI_VERSION}/innie_linux_${ARCH}.tar.gz" && \
-  tar -C /usr/local/bin -xzf "innie_linux_${ARCH}.tar.gz" && \
-  mv /usr/local/bin/innie /usr/local/bin/sand && \
-  rm "innie_linux_${ARCH}.tar.gz"
-
-# This is common in Docker to avoid interactive password prompts
-# TODO: nix this, just use doas instead.
-RUN echo '%wheel ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/wheel
-
-# Use doas instead of sudo since we're on alpine:
-RUN echo 'permit nopass :wheel' > /etc/doas.d/doas.conf
+COPY sshd_config /etc/ssh/sshd_config
 
 ARG ZSH_IN_DOCKER_VERSION=1.2.1
 RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/v${ZSH_IN_DOCKER_VERSION}/zsh-in-docker.sh)" -- \
@@ -91,9 +60,23 @@ RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/
 
 RUN curl -s https://ohmyposh.dev/install.sh | bash -s -- -d /usr/local/bin
 
+# Install innie (container-side sand cli binary)
+ARG SAND_CLI_VERSION
+RUN ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') && \
+  curl -fsSL -o /tmp/innie.tgz \
+    "https://github.com/banksean/sand/releases/download/${SAND_CLI_VERSION}/innie_linux_${ARCH}.tar.gz" && \
+  tar -C /usr/local/bin -xzf /tmp/innie.tgz && \
+  mv /usr/local/bin/innie /usr/local/bin/sand && \
+  rm /tmp/innie.tgz
+
+# This is common in Docker to avoid interactive password prompts.
+RUN echo '%sudo ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/sudo && \
+  echo '%wheel ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/wheel && \
+  chmod 0440 /etc/sudoers.d/sudo /etc/sudoers.d/wheel
+
 # Install mise
-RUN curl https://mise.jdx.dev/install.sh | sh
-RUN cp /root/.local/bin/mise /usr/local/bin/mise
+RUN curl -fsSL https://mise.jdx.dev/install.sh | sh && \
+  mv /root/.local/bin/mise /usr/local/bin/mise
 
 ENV PATH="/root/.local/share/mise/bin:$PATH"
 
