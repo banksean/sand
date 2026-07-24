@@ -16,9 +16,9 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/banksean/sand/internal/daemon/boxer"
 	"github.com/banksean/sand/internal/daemon/daemonpb"
-	"github.com/banksean/sand/internal/daemon/internal/boxer"
-	"github.com/banksean/sand/internal/daemon/internal/lifecycle"
+	"github.com/banksean/sand/internal/daemon/lifecycle"
 	"github.com/banksean/sand/internal/profiles"
 	"github.com/banksean/sand/internal/runtimepaths"
 	"github.com/banksean/sand/internal/sandboxlog"

@@ -13,7 +13,7 @@ import (
 
 	"github.com/banksean/sand/internal/agents"
 	"github.com/banksean/sand/internal/containerruntime"
-	"github.com/banksean/sand/internal/daemon/internal/boxer"
+	"github.com/banksean/sand/internal/daemon/boxer"
 	"github.com/banksean/sand/internal/hostops"
 	"github.com/banksean/sand/internal/imageprogress"
 	"github.com/banksean/sand/internal/runtimepaths"

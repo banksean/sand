@@ -17,7 +17,7 @@ import (
 	"github.com/banksean/sand/internal/agents"
 	"github.com/banksean/sand/internal/cloning"
 	"github.com/banksean/sand/internal/containerruntime"
-	"github.com/banksean/sand/internal/daemon/internal/lifecycle"
+	"github.com/banksean/sand/internal/daemon/lifecycle"
 	"github.com/banksean/sand/internal/hostops"
 	"github.com/banksean/sand/internal/imageprogress"
 	"github.com/banksean/sand/internal/sandtypes"

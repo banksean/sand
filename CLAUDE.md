@@ -41,8 +41,8 @@ The CLI **never** imports daemon internals — only the `daemon.Client` interfac
 |---|---|
 | `internal/cli/` | One file per subcommand (`new_cmd.go`, `shell_cmd.go`, `git_cmd.go`, etc.). Commands are structs with kong field tags. |
 | `internal/daemon/` | gRPC server handlers (`daemon_grpc_unary.go`, `daemon_grpc_streams.go`), MCP integration (`mcp.go`). |
-| `internal/daemon/internal/boxer/` | Sandbox repository/workspace manager: creates APFS clones, persists sandbox state, pulls images, provisions SSH keys, manages git mirrors, cleanup/trash. |
-| `internal/daemon/internal/lifecycle/` | Container lifecycle orchestration: creates/recreates containers, starts containers, runs container hooks, handles runtime mounts and socket volumes. |
+| `internal/daemon/boxer/` | Sandbox repository/workspace manager: creates APFS clones, persists sandbox state, pulls images, provisions SSH keys, manages git mirrors, cleanup/trash. |
+| `internal/daemon/lifecycle/` | Container lifecycle orchestration: creates/recreates containers, starts containers, runs container hooks, handles runtime mounts and socket volumes. |
 | `internal/daemon/daemonpb/` | Protobuf/gRPC definitions (`daemon.proto`) and generated Go bindings. |
 | `internal/hostops/` | Interfaces (`ContainerOps`, `ImageOps`, `GitOps`, `FileOps`) and their Apple Containerization implementations. |
 | `internal/applecontainer/` | Low-level wrapper around the `container` CLI; XPC protocol handler. |
