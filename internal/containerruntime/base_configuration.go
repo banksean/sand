@@ -27,12 +27,10 @@ const (
 	agentCachePath   = "/opt/sand-agent-cache"
 )
 
-type containerBootstrapFlavor struct {
-	name             string
-	hookName         string
-	createUser       func(*containerHookRunner, string, string)
-	linkPackageCache func(*containerHookRunner, sandtypes.SharedCacheMounts)
-	prepareSSHD      func(*containerHookRunner)
+type containerBootstrapFlavor interface {
+	createUser(*containerHookRunner, string, string)
+	linkPackageCache(*containerHookRunner, sandtypes.SharedCacheMounts)
+	prepareSSHD(*containerHookRunner)
 }
 
 type containerHookRunner struct {
@@ -98,30 +96,20 @@ func (r *containerHookRunner) err() error {
 	return errors.Join(r.errs...)
 }
 
-var alpineBootstrapFlavor = containerBootstrapFlavor{
-	name:             "alpine",
-	hookName:         "defaultAlpineContainerHook",
-	createUser:       alpineCreateUser,
-	linkPackageCache: alpineLinkPackageCache,
-	prepareSSHD:      alpinePrepareSSHD,
-}
+type alpineBootstrap struct{}
+type ubuntuBootstrap struct{}
 
-var ubuntuBootstrapFlavor = containerBootstrapFlavor{
-	name:             "ubuntu",
-	hookName:         "defaultUbuntuContainerHook",
-	createUser:       ubuntuCreateUser,
-	linkPackageCache: ubuntuLinkPackageCache,
-	prepareSSHD:      ubuntuPrepareSSHD,
-}
+var alpineBootstrapFlavor containerBootstrapFlavor = &alpineBootstrap{}
+var ubuntuBootstrapFlavor containerBootstrapFlavor = &ubuntuBootstrap{}
 
-func alpineCreateUser(r *containerHookRunner, username, uid string) {
+func (b *alpineBootstrap) createUser(r *containerHookRunner, username, uid string) {
 	r.run("adding group for user", "addgroup", "addgroup", "-g", uid, username)
 	r.run("creating user", "useradd", "adduser", "-u", uid, "-D", "-G", username, "-s", "/bin/zsh", username)
 	r.run("unlocking account", "passwd -u", "passwd", "-u", username)
 	r.run("adding user to wheel", "addgroup", "addgroup", username, "wheel")
 }
 
-func alpineLinkPackageCache(r *containerHookRunner, sharedCaches sandtypes.SharedCacheMounts) {
+func (b *alpineBootstrap) linkPackageCache(r *containerHookRunner, sharedCaches sandtypes.SharedCacheMounts) {
 	if sharedCaches.APKCacheHostDir == "" {
 		return
 	}
@@ -130,9 +118,9 @@ func alpineLinkPackageCache(r *containerHookRunner, sharedCaches sandtypes.Share
 	}
 }
 
-func alpinePrepareSSHD(r *containerHookRunner) {}
+func (b *alpineBootstrap) prepareSSHD(r *containerHookRunner) {}
 
-func ubuntuCreateUser(r *containerHookRunner, username, uid string) {
+func (b *ubuntuBootstrap) createUser(r *containerHookRunner, username, uid string) {
 	r.run("adding group for user", "groupadd", "groupadd", "-g", uid, username)
 	r.run("creating user", "useradd", "useradd", "-u", uid, "-g", username, "-s", "/bin/zsh", username)
 	r.run("unlocking account", "passwd -d", "passwd", "-d", username)
@@ -140,9 +128,10 @@ func ubuntuCreateUser(r *containerHookRunner, username, uid string) {
 	r.run("making user home dir", "making user home dir", "mkdir", "-p", "/home/"+username)
 }
 
-func ubuntuLinkPackageCache(r *containerHookRunner, sharedCaches sandtypes.SharedCacheMounts) {}
+func (b *ubuntuBootstrap) linkPackageCache(r *containerHookRunner, sharedCaches sandtypes.SharedCacheMounts) {
+}
 
-func ubuntuPrepareSSHD(r *containerHookRunner) {
+func (b *ubuntuBootstrap) prepareSSHD(r *containerHookRunner) {
 	r.run("creating /run/sshd", "creating /run/sshd", "mkdir", "-p", "/run/sshd")
 }
 
@@ -206,7 +195,7 @@ func (c *BaseContainerConfiguration) GetStartHooks(artifacts Artifacts) []sandty
 			if err != nil {
 				return err
 			}
-			runner := newContainerHookRunner(ctx, exec, flavor.hookName, artifacts.Uid)
+			runner := newContainerHookRunner(ctx, exec, "bootstrap", artifacts.Uid)
 
 			flavor.prepareSSHD(runner)
 
@@ -241,12 +230,12 @@ func (c *BaseContainerConfiguration) detectBootstrapFlavor(ctx context.Context, 
 	return ubuntuBootstrapFlavor, nil
 }
 
-func (c *BaseContainerConfiguration) runDefaultContainerHook(ctx context.Context, ctr *sandtypes.Container, exec sandtypes.HookStreamer, flavor containerBootstrapFlavor, username, uid string, sharedCaches sandtypes.SharedCacheMounts) error {
-	runner := newContainerHookRunner(ctx, exec, flavor.hookName, username)
+func (c *BaseContainerConfiguration) runDefaultContainerHook(ctx context.Context, ctr *sandtypes.Container, exec sandtypes.HookStreamer, bootstrapStrategy containerBootstrapFlavor, username, uid string, sharedCaches sandtypes.SharedCacheMounts) error {
+	runner := newContainerHookRunner(ctx, exec, "bootstrapStrategy", username)
 
 	// We create a group and a user with the same name and uid as the the host user.
 	// This avoids potential permissions issues with volumes mounted from host.
-	flavor.createUser(runner, username, uid)
+	bootstrapStrategy.createUser(runner, username, uid)
 
 	runner.run("copying dotfiles", "copy dotfiles", "cp", "-r", "/dotfiles/.", "/home/"+username+"/.")
 
@@ -281,7 +270,7 @@ func (c *BaseContainerConfiguration) runDefaultContainerHook(ctx context.Context
 	runner.run("chown homedir", "chown", "chown", "-R", username+":"+username,
 		"/home/"+username)
 
-	flavor.linkPackageCache(runner, sharedCaches)
+	bootstrapStrategy.linkPackageCache(runner, sharedCaches)
 
 	// mise.sh exports GOMODCACHE/GOCACHE directly, and these symlinks keep
 	// direct process execs aligned with the same mise-backed cache paths.
@@ -300,7 +289,7 @@ func (c *BaseContainerConfiguration) runDefaultContainerHook(ctx context.Context
 		"/etc/ssh/ssh_host_key.pub-cert",
 		"/etc/ssh/user_ca.pub")
 
-	flavor.prepareSSHD(runner)
+	bootstrapStrategy.prepareSSHD(runner)
 
 	// Start sshd
 	runner.run("starting sshd", "start sshd", "/usr/sbin/sshd", "-f", "/etc/ssh/sshd_config")
@@ -318,6 +307,6 @@ func (c *BaseContainerConfiguration) runDefaultContainerHook(ctx context.Context
 	// not be pushing to origin from the sandbox:
 	runner.run("set git origin", "disble pushing to origin", "git", "remote", "set-url", "--push", "origin", "DISABLED")
 
-	slog.InfoContext(ctx, flavor.hookName+" completed", "hook", "default container bootstrap", "flavor", flavor.name)
+	slog.InfoContext(ctx, "bootstrapStrategy completed", "hook", "default container bootstrap")
 	return runner.err()
 }
