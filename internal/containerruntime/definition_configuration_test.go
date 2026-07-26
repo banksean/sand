@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"slices"
 	"testing"
 
 	"github.com/banksean/sand/internal/agentdefs"
@@ -69,6 +70,28 @@ func TestDefinitionContainerConfigurationMountsNativeSessionStore(t *testing.T) 
 		if mount.Target == want.Target {
 			t.Fatal("legacy artifacts unexpectedly received a session mount")
 		}
+	}
+}
+
+func TestDefinitionContainerConfigurationBootstrapSkipsSessionMountDuringChown(t *testing.T) {
+	cfg := NewDefinitionContainerConfiguration(agentdefs.Definition{
+		Name:        "codex",
+		SessionPath: ".codex/sessions",
+	})
+	exec := &fakeHookStreamer{}
+	hooks := cfg.GetFirstStartHooks(Artifacts{
+		Username:          "sean",
+		Uid:               "1000",
+		SessionArchiveDir: "/host/agent-sessions/codex",
+	})
+
+	if err := hooks[0].Run(context.Background(), nil, exec); err != nil {
+		t.Fatalf("bootstrap hook failed: %v", err)
+	}
+
+	want := "exec:find /home/sean -path /home/sean/.codex/sessions -prune -o -exec chown sean:sean {} ;"
+	if !slices.Contains(exec.calls, want) {
+		t.Fatalf("bootstrap calls do not exclude the session mount\n got: %#v\nwant: %q", exec.calls, want)
 	}
 }
 

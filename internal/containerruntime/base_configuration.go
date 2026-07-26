@@ -208,18 +208,18 @@ func (c *BaseContainerConfiguration) GetStartHooks(artifacts Artifacts) []sandty
 
 func (c *BaseContainerConfiguration) GetFirstStartHooks(artifacts Artifacts) []sandtypes.ContainerHook {
 	return []sandtypes.ContainerHook{
-		c.defaultContainerHook(artifacts.Username, artifacts.Uid, artifacts.SharedCacheMounts),
+		c.defaultContainerHook(artifacts.Username, artifacts.Uid, artifacts.SharedCacheMounts, artifacts.HomeChownExclusions),
 	}
 }
 
-func (c *BaseContainerConfiguration) defaultContainerHook(username, uid string, sharedCaches sandtypes.SharedCacheMounts) sandtypes.ContainerHook {
+func (c *BaseContainerConfiguration) defaultContainerHook(username, uid string, sharedCaches sandtypes.SharedCacheMounts, homeChownExclusions []string) sandtypes.ContainerHook {
 	return sandtypes.NewContainerHook("default container bootstrap", func(ctx context.Context, ctr *sandtypes.Container, exec sandtypes.HookStreamer) error {
 		flavor, err := c.detectBootstrapFlavor(ctx, exec)
 		if err != nil {
 			return err
 		}
 
-		return c.runDefaultContainerHook(ctx, ctr, exec, flavor, username, uid, sharedCaches)
+		return c.runDefaultContainerHook(ctx, ctr, exec, flavor, username, uid, sharedCaches, homeChownExclusions)
 	})
 }
 
@@ -230,7 +230,7 @@ func (c *BaseContainerConfiguration) detectBootstrapFlavor(ctx context.Context, 
 	return ubuntuBootstrapFlavor, nil
 }
 
-func (c *BaseContainerConfiguration) runDefaultContainerHook(ctx context.Context, ctr *sandtypes.Container, exec sandtypes.HookStreamer, bootstrapStrategy containerBootstrapFlavor, username, uid string, sharedCaches sandtypes.SharedCacheMounts) error {
+func (c *BaseContainerConfiguration) runDefaultContainerHook(ctx context.Context, ctr *sandtypes.Container, exec sandtypes.HookStreamer, bootstrapStrategy containerBootstrapFlavor, username, uid string, sharedCaches sandtypes.SharedCacheMounts, homeChownExclusions []string) error {
 	runner := newContainerHookRunner(ctx, exec, "bootstrapStrategy", username)
 
 	// We create a group and a user with the same name and uid as the the host user.
@@ -267,8 +267,17 @@ func (c *BaseContainerConfiguration) runDefaultContainerHook(ctx context.Context
 	}
 
 	// Fix ownership
-	runner.run("chown homedir", "chown", "chown", "-R", username+":"+username,
-		"/home/"+username)
+	if len(homeChownExclusions) == 0 {
+		runner.run("chown homedir", "chown", "chown", "-R", username+":"+username,
+			"/home/"+username)
+	} else {
+		args := []string{"find", "/home/" + username}
+		for _, path := range homeChownExclusions {
+			args = append(args, "-path", path, "-prune", "-o")
+		}
+		args = append(args, "-exec", "chown", username+":"+username, "{}", ";")
+		runner.run("chown homedir", "chown", args...)
+	}
 
 	bootstrapStrategy.linkPackageCache(runner, sharedCaches)
 

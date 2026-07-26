@@ -85,7 +85,7 @@ func TestDefaultContainerHook_UsesAlpineFlavorWhenAPKAvailable(t *testing.T) {
 	hook := cfg.defaultContainerHook("sean", "1000", sandtypes.SharedCacheMounts{
 		MiseCacheHostDir: "/host/mise",
 		APKCacheHostDir:  "/host/apk",
-	})
+	}, nil)
 
 	if err := hook.Run(context.Background(), nil, exec); err != nil {
 		t.Fatalf("hook.Run() error = %v", err)
@@ -258,7 +258,7 @@ func TestDefaultContainerHook_UsesUbuntuFlavorWhenAPKUnavailable(t *testing.T) {
 
 	hook := cfg.defaultContainerHook("sean", "1000", sandtypes.SharedCacheMounts{
 		MiseCacheHostDir: "/host/mise",
-	})
+	}, nil)
 
 	if err := hook.Run(context.Background(), nil, exec); err != nil {
 		t.Fatalf("hook.Run() error = %v", err)
@@ -308,7 +308,7 @@ func TestDefaultContainerHook_ConfiguresBazelRemoteCacheWhenEnabled(t *testing.T
 
 	hook := cfg.defaultContainerHook("sean", "1000", sandtypes.SharedCacheMounts{
 		BazelRemoteCacheURL: "http://sand-bazel-cache.test.local:8080",
-	})
+	}, nil)
 
 	if err := hook.Run(context.Background(), nil, exec); err != nil {
 		t.Fatalf("hook.Run() error = %v", err)
@@ -343,7 +343,7 @@ func TestDefaultContainerHook_ConfiguresSharedHTTPProxyWhenEnabled(t *testing.T)
 
 	hook := cfg.defaultContainerHook("sean", "1000", sandtypes.SharedCacheMounts{
 		HTTPProxyURL: "http://sand-http-cache.test.local:3128",
-	})
+	}, nil)
 
 	if err := hook.Run(context.Background(), nil, exec); err != nil {
 		t.Fatalf("hook.Run() error = %v", err)
@@ -414,7 +414,7 @@ func TestRunDefaultContainerHook_JoinsStepErrors(t *testing.T) {
 
 	err := cfg.runDefaultContainerHook(context.Background(), nil, exec, alpineBootstrapFlavor, "sean", "1000", sandtypes.SharedCacheMounts{
 		MiseCacheHostDir: "/host/mise",
-	})
+	}, nil)
 	if err == nil {
 		t.Fatal("runDefaultContainerHook() error = nil, want joined error")
 	}

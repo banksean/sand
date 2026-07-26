@@ -47,7 +47,12 @@ func (c *DefinitionContainerConfiguration) GetMounts(artifacts Artifacts) []sand
 }
 
 func (c *DefinitionContainerConfiguration) GetFirstStartHooks(artifacts Artifacts) []sandtypes.ContainerHook {
-	hooks := c.base.GetFirstStartHooks(artifacts)
+	baseArtifacts := artifacts
+	if c.sessionPath != "" && artifacts.SessionArchiveDir != "" {
+		baseArtifacts.HomeChownExclusions = append(baseArtifacts.HomeChownExclusions,
+			"/home/"+artifacts.Username+"/"+c.sessionPath)
+	}
+	hooks := c.base.GetFirstStartHooks(baseArtifacts)
 	if c.install != nil {
 		hooks = append(hooks, c.installAgentHook())
 	}

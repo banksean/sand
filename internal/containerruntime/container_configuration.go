@@ -14,6 +14,9 @@ type Artifacts struct {
 	Uid               string
 	SharedCacheMounts sandtypes.SharedCacheMounts
 	SessionArchiveDir string
+	// HomeChownExclusions contains container paths beneath the user's home that
+	// bootstrap must not traverse because they are backed by host mounts.
+	HomeChownExclusions []string
 }
 
 // ContainerConfiguration handles container runtime configuration such as
