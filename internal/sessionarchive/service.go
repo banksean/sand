@@ -699,6 +699,7 @@ func firstString(v map[string]any, keys ...string) string {
 	}
 	return ""
 }
+
 func firstValue(v map[string]any, keys ...string) any {
 	for _, k := range keys {
 		if value, ok := v[k]; ok {
@@ -707,6 +708,7 @@ func firstValue(v map[string]any, keys ...string) any {
 	}
 	return nil
 }
+
 func rawValue(v any) json.RawMessage {
 	if v == nil {
 		return nil

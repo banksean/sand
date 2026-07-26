@@ -78,8 +78,10 @@ func (c *SessionExportCmd) Run(cctx *CLIContext) error {
 	return cctx.Daemon.ExportAgentSession(cctx.Context, c.ID, c.Format, path)
 }
 
-var sessionRmStdin io.Reader = os.Stdin
-var sessionRmStdout io.Writer = os.Stdout
+var (
+	sessionRmStdin  io.Reader = os.Stdin
+	sessionRmStdout io.Writer = os.Stdout
+)
 
 type SessionRmCmd struct {
 	ID    string `arg:"" help:"session ID or unambiguous prefix"`

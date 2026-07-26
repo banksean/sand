@@ -96,11 +96,15 @@ func (r *containerHookRunner) err() error {
 	return errors.Join(r.errs...)
 }
 
-type alpineBootstrap struct{}
-type ubuntuBootstrap struct{}
+type (
+	alpineBootstrap struct{}
+	ubuntuBootstrap struct{}
+)
 
-var alpineBootstrapFlavor containerBootstrapFlavor = &alpineBootstrap{}
-var ubuntuBootstrapFlavor containerBootstrapFlavor = &ubuntuBootstrap{}
+var (
+	alpineBootstrapFlavor containerBootstrapFlavor = &alpineBootstrap{}
+	ubuntuBootstrapFlavor containerBootstrapFlavor = &ubuntuBootstrap{}
+)
 
 func (b *alpineBootstrap) createUser(r *containerHookRunner, username, uid string) {
 	r.run("adding group for user", "addgroup", "addgroup", "-g", uid, username)

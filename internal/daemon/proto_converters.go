@@ -111,10 +111,12 @@ func timeFromProto(ts *timestamppb.Timestamp) time.Time {
 }
 
 func agentSessionToProto(session sandtypes.AgentSession) *daemonpb.AgentSession {
-	return &daemonpb.AgentSession{Id: session.ID, AgentType: session.AgentType, NativeSessionId: session.NativeSessionID,
+	return &daemonpb.AgentSession{
+		Id: session.ID, AgentType: session.AgentType, NativeSessionId: session.NativeSessionID,
 		Title: session.Title, Status: session.Status, SandboxIds: append([]string(nil), session.SandboxIDs...),
 		SandboxNames: append([]string(nil), session.SandboxNames...), SizeBytes: session.SizeBytes,
-		StartedAt: timeToProto(session.StartedAt), UpdatedAt: timeToProto(session.UpdatedAt)}
+		StartedAt: timeToProto(session.StartedAt), UpdatedAt: timeToProto(session.UpdatedAt),
+	}
 }
 
 func agentSessionsToProto(sessions []sandtypes.AgentSession) []*daemonpb.AgentSession {
@@ -129,10 +131,12 @@ func agentSessionFromProto(session *daemonpb.AgentSession) sandtypes.AgentSessio
 	if session == nil {
 		return sandtypes.AgentSession{}
 	}
-	return sandtypes.AgentSession{ID: session.GetId(), AgentType: session.GetAgentType(), NativeSessionID: session.GetNativeSessionId(),
+	return sandtypes.AgentSession{
+		ID: session.GetId(), AgentType: session.GetAgentType(), NativeSessionID: session.GetNativeSessionId(),
 		Title: session.GetTitle(), Status: session.GetStatus(), SandboxIDs: append([]string(nil), session.GetSandboxIds()...),
 		SandboxNames: append([]string(nil), session.GetSandboxNames()...), SizeBytes: session.GetSizeBytes(),
-		StartedAt: timeFromProto(session.GetStartedAt()), UpdatedAt: timeFromProto(session.GetUpdatedAt())}
+		StartedAt: timeFromProto(session.GetStartedAt()), UpdatedAt: timeFromProto(session.GetUpdatedAt()),
+	}
 }
 
 func agentSessionsFromProto(sessions []*daemonpb.AgentSession) []sandtypes.AgentSession {
