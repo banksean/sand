@@ -16,25 +16,34 @@ import (
 // DefinitionContainerConfiguration combines the shared base container setup
 // with hooks declared by an agent definition.
 type DefinitionContainerConfiguration struct {
-	base       *BaseContainerConfiguration
-	agentName  string
-	install    *agentdefs.InstallSpec
-	startHooks []string
+	base        *BaseContainerConfiguration
+	agentName   string
+	install     *agentdefs.InstallSpec
+	startHooks  []string
+	sessionPath string
 }
 
 func NewDefinitionContainerConfiguration(definition agentdefs.Definition) *DefinitionContainerConfiguration {
 	return &DefinitionContainerConfiguration{
-		base:       NewBaseContainerConfiguration(),
-		agentName:  definition.Name,
-		install:    definition.Install,
-		startHooks: definition.StartHooks,
+		base:        NewBaseContainerConfiguration(),
+		agentName:   definition.Name,
+		install:     definition.Install,
+		startHooks:  definition.StartHooks,
+		sessionPath: definition.SessionPath,
 	}
 }
 
 var _ ContainerConfiguration = &DefinitionContainerConfiguration{}
 
 func (c *DefinitionContainerConfiguration) GetMounts(artifacts Artifacts) []sandtypes.MountSpec {
-	return c.base.GetMounts(artifacts)
+	mounts := c.base.GetMounts(artifacts)
+	if c.sessionPath != "" && artifacts.SessionArchiveDir != "" {
+		mounts = append(mounts, sandtypes.MountSpec{
+			Source: artifacts.SessionArchiveDir,
+			Target: "/home/" + artifacts.Username + "/" + c.sessionPath,
+		})
+	}
+	return mounts
 }
 
 func (c *DefinitionContainerConfiguration) GetFirstStartHooks(artifacts Artifacts) []sandtypes.ContainerHook {

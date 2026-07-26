@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
@@ -8,6 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/banksean/sand/internal/cli/agentlaunch"
 	"github.com/banksean/sand/internal/daemon"
 	"github.com/goombaio/namegenerator"
 )
@@ -16,9 +18,10 @@ type ExecCmd struct {
 	SandboxCreationFlags
 	ProjectEnvFlag
 	SandboxNameFlag
-	Username string   `help:"name of user to exec as (defaults to $USER)"`
-	Uid      string   `help:"id of user to exec as (defaults to $UID)"`
-	Arg      []string `arg:"" passthrough:"" help:"command args to exec in the container"`
+	Username  string   `help:"name of user to exec as (defaults to $USER)"`
+	Uid       string   `help:"id of user to exec as (defaults to $UID)"`
+	Arg       []string `arg:"" passthrough:"" help:"command args to exec in the container"`
+	NoArchive bool     `help:"use ephemeral state if this command starts the sandbox's declared agent"`
 }
 
 func (c *ExecCmd) Run(cctx *CLIContext) error {
@@ -104,7 +107,27 @@ func (c *ExecCmd) Run(cctx *CLIContext) error {
 		return err
 	}
 	defer projectEnv.Cleanup()
-	out, err := runSSHOutput(ctx, sbox, projectEnv.EnvFile, projectEnv.Env, c.Arg[0], args...)
+	env := projectEnv.Env
+	if c.NoArchive && sbox.AgentType != "" && sbox.AgentType != "default" {
+		env = mergeEnv(env, agentlaunch.EphemeralSessionEnv(sbox.AgentType, sbox.ID))
+	}
+	launchID := ""
+	if !c.NoArchive && sbox.SessionArchiveEnabled && sbox.AgentType != "default" {
+		launchID, err = mc.BeginAgentSessionLaunch(ctx, sbox.Name)
+		if err != nil {
+			return fmt.Errorf("begin agent session archive: %w", err)
+		}
+	}
+	out, err := runSSHOutput(ctx, sbox, projectEnv.EnvFile, env, c.Arg[0], args...)
+	if launchID != "" {
+		archiveCtx := context.WithoutCancel(ctx)
+		if endErr := mc.EndAgentSessionLaunch(archiveCtx, launchID); endErr != nil {
+			return endErr
+		}
+		if syncErr := mc.SyncAgentSessions(archiveCtx, sbox.Name); syncErr != nil {
+			return syncErr
+		}
+	}
 	if err != nil {
 		slog.ErrorContext(ctx, "sbox.exec", "error", err, "out", out)
 	}

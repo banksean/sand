@@ -236,6 +236,58 @@ func (s *daemonGRPCServer) HTTPProxyCacheStatus(ctx context.Context, _ *daemonpb
 	}, nil
 }
 
+func (s *daemonGRPCServer) SyncAgentSessions(ctx context.Context, req *daemonpb.IDRequest) (*daemonpb.StatusResponse, error) {
+	if err := s.daemon.SyncAgentSessions(ctx, req.GetId()); err != nil {
+		return nil, err
+	}
+	return okStatus(), nil
+}
+
+func (s *daemonGRPCServer) ListAgentSessions(ctx context.Context, req *daemonpb.ListAgentSessionsRequest) (*daemonpb.ListAgentSessionsResponse, error) {
+	sessions, err := s.daemon.ListAgentSessions(ctx, req.GetAgentType(), req.GetSandbox())
+	if err != nil {
+		return nil, err
+	}
+	return &daemonpb.ListAgentSessionsResponse{Sessions: agentSessionsToProto(sessions)}, nil
+}
+
+func (s *daemonGRPCServer) GetAgentSession(ctx context.Context, req *daemonpb.IDRequest) (*daemonpb.GetAgentSessionResponse, error) {
+	session, err := s.daemon.GetAgentSession(ctx, req.GetId())
+	if err != nil {
+		return nil, err
+	}
+	return &daemonpb.GetAgentSessionResponse{Session: agentSessionToProto(session)}, nil
+}
+
+func (s *daemonGRPCServer) ExportAgentSession(ctx context.Context, req *daemonpb.ExportAgentSessionRequest) (*daemonpb.StatusResponse, error) {
+	if err := s.daemon.ExportAgentSession(ctx, req.GetId(), req.GetFormat(), req.GetDestinationPath()); err != nil {
+		return nil, err
+	}
+	return okStatus(), nil
+}
+
+func (s *daemonGRPCServer) DeleteAgentSession(ctx context.Context, req *daemonpb.IDRequest) (*daemonpb.StatusResponse, error) {
+	if err := s.daemon.DeleteAgentSession(ctx, req.GetId()); err != nil {
+		return nil, err
+	}
+	return okStatus(), nil
+}
+
+func (s *daemonGRPCServer) BeginAgentSessionLaunch(ctx context.Context, req *daemonpb.BeginAgentSessionLaunchRequest) (*daemonpb.BeginAgentSessionLaunchResponse, error) {
+	id, err := s.daemon.BeginAgentSessionLaunch(ctx, req.GetSandbox())
+	if err != nil {
+		return nil, err
+	}
+	return &daemonpb.BeginAgentSessionLaunchResponse{LaunchId: id}, nil
+}
+
+func (s *daemonGRPCServer) EndAgentSessionLaunch(ctx context.Context, req *daemonpb.IDRequest) (*daemonpb.StatusResponse, error) {
+	if err := s.daemon.EndAgentSessionLaunch(ctx, req.GetId()); err != nil {
+		return nil, err
+	}
+	return okStatus(), nil
+}
+
 func okStatus() *daemonpb.StatusResponse {
 	return &daemonpb.StatusResponse{Status: "ok"}
 }

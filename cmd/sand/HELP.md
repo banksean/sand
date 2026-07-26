@@ -94,6 +94,7 @@ sand new [flags] [SANDBOX-NAME]
 - `-b, --branch` - create a new git branch, with the same name as the sandbox, inside the sandbox _container_ (not on your host workdir) (default: `false`)
 - `--username` _`STRING`_ - name of default user to create (defaults to $USER)
 - `--uid` _`STRING`_ - id of default user to create (defaults to $UID)
+- `--no-archive` - run this agent with ephemeral session state instead of archiving its transcript
 
 ## `sand oneshot`
 
@@ -123,6 +124,7 @@ sand oneshot [flags] <PROMPT>
 - `--uid` _`STRING`_ - id of default user to create (defaults to $UID)
 - `-n, --sandbox-name` _`<name>`_ - name of the sandbox to use (generated if omitted)
 - `--stop` - stop the container when the command completes
+- `--no-archive` - run with ephemeral session state instead of archiving the transcript
 
 ## `sand shell`
 
@@ -141,6 +143,7 @@ sand shell [flags] <SANDBOX-NAME>
 - `--atch` - create or reconnect to a container-side atch session
 - `--project-env` - pass project-scoped profile env to plain shell/exec/git commands
 - `--ssh-agent` - enable ssh-agent forwarding for the container
+- `--no-archive` - use ephemeral state for the sandbox's declared agent in this shell
 
 ## `sand exec`
 
@@ -168,6 +171,7 @@ sand exec [flags] <SANDBOX-NAME> <ARG>...
 - `--project-env` - pass project-scoped profile env to plain shell/exec/git commands
 - `--username` _`STRING`_ - name of user to exec as (defaults to $USER)
 - `--uid` _`STRING`_ - id of user to exec as (defaults to $UID)
+- `--no-archive` - use ephemeral state if this command starts the sandbox's declared agent
 
 ## `sand ls`
 
@@ -393,3 +397,25 @@ show effective configuration with sources
 ```
 sand config ls
 ```
+
+## `sand session`
+
+list, inspect, export, or delete archived agent sessions
+
+Session archives contain unredacted prompts, responses, and tool inputs/results and may contain secrets.
+
+### `sand session ls`
+
+List archived sessions. Supports `--agent`, `--sandbox`, and `--json` filters/output.
+
+### `sand session show <ID>`
+
+Show a normalized transcript. Use `--format text` (default) or `--format json`.
+
+### `sand session export <ID>`
+
+Export with `--format raw|jsonl|markdown -o <host-path>`. Raw exports are gzip-compressed tar archives containing the manifest and native transcript artifacts.
+
+### `sand session rm <ID>`
+
+Permanently remove a session archive. Use `-f` to skip confirmation.

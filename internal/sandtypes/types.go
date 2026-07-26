@@ -7,7 +7,22 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 )
+
+// AgentSession is archived agent conversation metadata returned by sandd.
+type AgentSession struct {
+	ID              string    `json:"id"`
+	AgentType       string    `json:"agent_type"`
+	NativeSessionID string    `json:"native_session_id"`
+	Title           string    `json:"title,omitempty"`
+	Status          string    `json:"status"`
+	SandboxIDs      []string  `json:"sandbox_ids"`
+	SandboxNames    []string  `json:"sandbox_names"`
+	SizeBytes       int64     `json:"size_bytes"`
+	StartedAt       time.Time `json:"started_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
+}
 
 // MountSpec describes a bind mount that should be attached to a container.
 type MountSpec struct {

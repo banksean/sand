@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/banksean/sand/internal/agentdefs"
 	"github.com/banksean/sand/internal/agents"
 	"github.com/banksean/sand/internal/cloning"
 	"github.com/banksean/sand/internal/containerruntime"
@@ -53,7 +54,7 @@ type Boxer struct {
 	httpProxyService *HTTPProxyCacheService
 }
 
-func runtimeArtifactsFromClone(artifacts *cloning.CloneArtifacts) containerruntime.Artifacts {
+func runtimeArtifactsFromClone(artifacts *cloning.CloneArtifacts, sessionArchiveDir string) containerruntime.Artifacts {
 	return containerruntime.Artifacts{
 		SandboxWorkDir:    artifacts.SandboxWorkDir,
 		WorkDir:           artifacts.PathRegistry.WorkDir(),
@@ -63,6 +64,7 @@ func runtimeArtifactsFromClone(artifacts *cloning.CloneArtifacts) containerrunti
 		Username:          artifacts.Username,
 		Uid:               artifacts.Uid,
 		SharedCacheMounts: artifacts.SharedCacheMounts,
+		SessionArchiveDir: sessionArchiveDir,
 	}
 }
 
@@ -77,6 +79,9 @@ type BoxerDeps struct {
 	AgentRegistry    *agents.AgentRegistry
 	Messenger        hostops.UserMessenger
 }
+
+// DB exposes the daemon-owned database to sibling daemon services.
+func (sb *Boxer) DB() *sql.DB { return sb.sqlDB }
 
 // NewBoxerWithDeps creates a Boxer with explicitly provided dependencies and a fresh
 // SQLite database at appRoot. The appRoot directory is created with os.MkdirAll,
@@ -230,8 +235,7 @@ func (b *Boxer) SyncHostGitMirror(ctx context.Context, sb *sandtypes.Box) (strin
 
 func (b *Boxer) hydrateMounts(sb *sandtypes.Box, hostGitMirrorDir string) {
 	pathRegistry := cloning.NewStandardPathRegistry(sb.SandboxWorkDir)
-	baseConfig := containerruntime.NewBaseContainerConfiguration()
-	sb.Mounts = baseConfig.GetMounts(containerruntime.Artifacts{
+	artifacts := containerruntime.Artifacts{
 		HostGitMirrorDir:  hostGitMirrorDir,
 		SandboxWorkDir:    sb.SandboxWorkDir,
 		WorkDir:           pathRegistry.WorkDir(),
@@ -240,7 +244,13 @@ func (b *Boxer) hydrateMounts(sb *sandtypes.Box, hostGitMirrorDir string) {
 		Username:          sb.Username,
 		Uid:               sb.Uid,
 		SharedCacheMounts: sb.SharedCacheMounts,
-	})
+	}
+	if sb.SessionArchiveEnabled {
+		artifacts.SessionArchiveDir = filepath.Join(b.appRoot, "agent-sessions", "native", sb.ID, sb.AgentType)
+		sb.Mounts = b.AgentRegistry.Get(sb.AgentType).Configuration.GetMounts(artifacts)
+		return
+	}
+	sb.Mounts = containerruntime.NewBaseContainerConfiguration().GetMounts(artifacts)
 }
 
 // NewSandboxOpts holds the parameters for creating a new sandbox.
@@ -301,8 +311,20 @@ func (sb *Boxer) NewSandbox(ctx context.Context, opts NewSandboxOpts) (*sandtype
 		return nil, err
 	}
 
+	// Session archives live outside the sandbox workspace so rm/expunge cannot remove them.
+	// Only new sandboxes opt in; database rows created by earlier versions default false.
+	var sessionArchiveDir string
+	archiveEnabled := false
+	if definition, ok := agentdefs.Lookup(opts.AgentType); ok && definition.SessionPath != "" {
+		sessionArchiveDir = filepath.Join(sb.appRoot, "agent-sessions", "native", opts.ID, opts.AgentType)
+		if err := sb.FileOps.MkdirAll(sessionArchiveDir, 0o700); err != nil {
+			return nil, fmt.Errorf("create agent session archive: %w", err)
+		}
+		archiveEnabled = true
+	}
+
 	// Get mounts and hooks from configuration
-	mounts := agentConfig.Configuration.GetMounts(runtimeArtifactsFromClone(artifacts))
+	mounts := agentConfig.Configuration.GetMounts(runtimeArtifactsFromClone(artifacts, sessionArchiveDir))
 	mountRequests, err := sb.prepareMountRequests(ctx, artifacts.PathRegistry, opts.Mounts, opts.CloneMounts)
 	if err != nil {
 		return nil, err
@@ -338,24 +360,25 @@ func (sb *Boxer) NewSandbox(ctx context.Context, opts NewSandboxOpts) (*sandtype
 	}
 
 	ret := &sandtypes.Box{
-		ID:                opts.ID,
-		Name:              opts.Name,
-		State:             "active",
-		AgentType:         opts.AgentType,
-		ProfileName:       opts.ProfileName,
-		HostOriginDir:     hostWorkDir,
-		SandboxWorkDir:    artifacts.SandboxWorkDir,
-		ImageName:         opts.ImageName,
-		DNSDomain:         opts.LocalDomain,
-		EnvFile:           envFile,
-		AllowedDomains:    opts.AllowedDomains,
-		MountRequests:     mountRequests,
-		SharedCacheMounts: sharedCacheMounts,
-		Mounts:            append(mounts, sshKeysMountSpec),
-		CPUs:              opts.CPUs,
-		MemoryMB:          opts.Memory,
-		Username:          opts.Username,
-		Uid:               opts.Uid,
+		ID:                    opts.ID,
+		Name:                  opts.Name,
+		State:                 "active",
+		AgentType:             opts.AgentType,
+		ProfileName:           opts.ProfileName,
+		HostOriginDir:         hostWorkDir,
+		SandboxWorkDir:        artifacts.SandboxWorkDir,
+		ImageName:             opts.ImageName,
+		DNSDomain:             opts.LocalDomain,
+		EnvFile:               envFile,
+		AllowedDomains:        opts.AllowedDomains,
+		MountRequests:         mountRequests,
+		SharedCacheMounts:     sharedCacheMounts,
+		Mounts:                append(mounts, sshKeysMountSpec),
+		CPUs:                  opts.CPUs,
+		MemoryMB:              opts.Memory,
+		Username:              opts.Username,
+		Uid:                   opts.Uid,
+		SessionArchiveEnabled: archiveEnabled,
 		OriginalGitDetails: &sandtypes.GitDetails{
 			RemoteOrigin: gitRemote,
 			Branch:       gitBranch,
@@ -895,6 +918,7 @@ func (sb *Boxer) sandboxFromDB(s *db.Sandbox) *sandtypes.Box {
 		ProfileName:           profileName,
 		ContainerID:           fromNullString(s.ContainerID),
 		ContainerBootstrapped: s.ContainerBootstrapped,
+		SessionArchiveEnabled: s.SessionArchiveEnabled,
 		HostOriginDir:         s.HostOriginDir,
 		SandboxWorkDir:        s.SandboxWorkDir,
 		ImageName:             s.ImageName,
@@ -1200,6 +1224,7 @@ func (sb *Boxer) SaveSandbox(ctx context.Context, sbox *sandtypes.Box) error {
 		DefaultUid:            toNullString(sbox.Uid),
 		DeletedAt:             sql.NullTime{Time: sbox.DeletedAt, Valid: !sbox.DeletedAt.IsZero()},
 		TrashWorkDir:          toNullString(sbox.TrashWorkDir),
+		SessionArchiveEnabled: sbox.SessionArchiveEnabled,
 	}
 	if sbox.OriginalGitDetails != nil {
 		upsertParams.OriginalGitOrigin = toNullString(sbox.OriginalGitDetails.RemoteOrigin)

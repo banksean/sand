@@ -29,6 +29,14 @@ service DaemonService {
   rpc EnsureImage(EnsureImageRequest) returns (stream EnsureImageResponse);
   rpc HTTPProxyCache(HTTPProxyCacheRequest) returns (StatusResponse);
   rpc HTTPProxyCacheStatus(HTTPProxyCacheStatusRequest) returns (HTTPProxyCacheStatusResponse);
+  rpc SyncAgentSessions(IDRequest) returns (StatusResponse);
+  rpc ListAgentSessions(ListAgentSessionsRequest) returns (ListAgentSessionsResponse);
+  rpc GetAgentSession(IDRequest) returns (GetAgentSessionResponse);
+  rpc ReadAgentSession(ReadAgentSessionRequest) returns (stream DataChunk);
+  rpc ExportAgentSession(ExportAgentSessionRequest) returns (StatusResponse);
+  rpc DeleteAgentSession(IDRequest) returns (StatusResponse);
+  rpc BeginAgentSessionLaunch(BeginAgentSessionLaunchRequest) returns (BeginAgentSessionLaunchResponse);
+  rpc EndAgentSessionLaunch(IDRequest) returns (StatusResponse);
 }
 
 message PingRequest {}
@@ -75,6 +83,55 @@ message IDRequest {
 
 message LogSandboxResponse {
   bytes data = 1;
+}
+
+message DataChunk {
+  bytes data = 1;
+}
+
+message AgentSession {
+  string id = 1;
+  string agent_type = 2;
+  string native_session_id = 3;
+  string title = 4;
+  string status = 5;
+  repeated string sandbox_ids = 6;
+  repeated string sandbox_names = 7;
+  int64 size_bytes = 8;
+  google.protobuf.Timestamp started_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
+}
+
+message ListAgentSessionsRequest {
+  string agent_type = 1;
+  string sandbox = 2;
+}
+
+message ListAgentSessionsResponse {
+  repeated AgentSession sessions = 1;
+}
+
+message GetAgentSessionResponse {
+  AgentSession session = 1;
+}
+
+message ReadAgentSessionRequest {
+  string id = 1;
+  string format = 2;
+}
+
+message ExportAgentSessionRequest {
+  string id = 1;
+  string format = 2;
+  string destination_path = 3;
+}
+
+message BeginAgentSessionLaunchRequest {
+  string sandbox = 1;
+}
+
+message BeginAgentSessionLaunchResponse {
+  string launch_id = 1;
 }
 
 message ListSandboxesRequest {}
@@ -163,6 +220,7 @@ message Sandbox {
   GitDetails original_git_details = 24;
   GitDetails current_git_details = 25;
   Container container = 26;
+  bool session_archive_enabled = 27;
 }
 
 message MountSpec {

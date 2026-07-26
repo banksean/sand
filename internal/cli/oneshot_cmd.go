@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
@@ -24,6 +25,7 @@ type OneshotCmd struct {
 	SandboxName string `short:"n" placeholder:"<name>" help:"name of the sandbox to use (generated if omitted)"`
 	Stop        bool   `help:"stop the container when the command completes"`
 	Prompt      string `arg:"" help:"prompt to pass to the agent"`
+	NoArchive   bool   `help:"run with ephemeral session state instead of archiving the transcript"`
 }
 
 func (c *OneshotCmd) Run(cctx *CLIContext) error {
@@ -119,12 +121,38 @@ func (c *OneshotCmd) Run(cctx *CLIContext) error {
 		return err
 	}
 	env := mergeEnv(authEnv)
+	if c.Agent != sbox.AgentType && !c.NoArchive {
+		return fmt.Errorf("sandbox %s archives its declared %s agent, not %s; create a matching sandbox or use --no-archive", sbox.Name, sbox.AgentType, c.Agent)
+	}
+	if !sbox.SessionArchiveEnabled && !c.NoArchive {
+		return fmt.Errorf("sandbox %s was created without agent session archival support; create a new sandbox or use --no-archive", sbox.Name)
+	}
+	if c.NoArchive {
+		env = mergeEnv(env, agentlaunch.EphemeralSessionEnv(c.Agent, sbox.ID))
+	}
 	if env == nil {
 		env = map[string]string{}
 	}
 	env["SAND_ONESHOT_PROMPT"] = c.Prompt
-	if err := runSSHStream(ctx, sbox, true, "", env, "/bin/sh", "-c", agentCmd); err != nil {
-		return fmt.Errorf("starting agent in sandbox %s: %w", sbox.ID, err)
+	launchID := ""
+	if !c.NoArchive {
+		launchID, err = mc.BeginAgentSessionLaunch(ctx, sbox.Name)
+		if err != nil {
+			return fmt.Errorf("begin agent session archive: %w", err)
+		}
+	}
+	runErr := runSSHStream(ctx, sbox, true, "", env, "/bin/sh", "-c", agentCmd)
+	if launchID != "" {
+		archiveCtx := context.WithoutCancel(ctx)
+		if err := mc.EndAgentSessionLaunch(archiveCtx, launchID); err != nil {
+			return fmt.Errorf("end agent session archive: %w", err)
+		}
+		if err := mc.SyncAgentSessions(archiveCtx, sbox.Name); err != nil {
+			return fmt.Errorf("archive agent session: %w", err)
+		}
+	}
+	if runErr != nil {
+		return fmt.Errorf("starting agent in sandbox %s: %w", sbox.ID, runErr)
 	}
 
 	if c.Stop {

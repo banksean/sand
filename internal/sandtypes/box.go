@@ -27,6 +27,9 @@ type Box struct {
 	ContainerID string
 	// ContainerBootstrapped tracks whether first-start hooks have successfully run for the current container.
 	ContainerBootstrapped bool
+	// SessionArchiveEnabled is set only for sandboxes created with session archival support.
+	// It deliberately defaults false for sandboxes created by older sand versions.
+	SessionArchiveEnabled bool
 	// HostOriginDir is the origin of the sandbox, from which we clone its contents
 	HostOriginDir string
 	// SandboxWorkDir is the host OS filesystem path containing the sandbox's c-o-w clone of hostOriginDir.

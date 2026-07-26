@@ -19,28 +19,36 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	DaemonService_Ping_FullMethodName                  = "/sand.daemon.v1.DaemonService/Ping"
-	DaemonService_Version_FullMethodName               = "/sand.daemon.v1.DaemonService/Version"
-	DaemonService_Shutdown_FullMethodName              = "/sand.daemon.v1.DaemonService/Shutdown"
-	DaemonService_LogSandbox_FullMethodName            = "/sand.daemon.v1.DaemonService/LogSandbox"
-	DaemonService_ListSandboxes_FullMethodName         = "/sand.daemon.v1.DaemonService/ListSandboxes"
-	DaemonService_ListDeletedSandboxes_FullMethodName  = "/sand.daemon.v1.DaemonService/ListDeletedSandboxes"
-	DaemonService_GetSandbox_FullMethodName            = "/sand.daemon.v1.DaemonService/GetSandbox"
-	DaemonService_RemoveSandbox_FullMethodName         = "/sand.daemon.v1.DaemonService/RemoveSandbox"
-	DaemonService_ExpungeSandbox_FullMethodName        = "/sand.daemon.v1.DaemonService/ExpungeSandbox"
-	DaemonService_RecoverSandbox_FullMethodName        = "/sand.daemon.v1.DaemonService/RecoverSandbox"
-	DaemonService_StopSandbox_FullMethodName           = "/sand.daemon.v1.DaemonService/StopSandbox"
-	DaemonService_StartSandbox_FullMethodName          = "/sand.daemon.v1.DaemonService/StartSandbox"
-	DaemonService_SyncHostGitMirror_FullMethodName     = "/sand.daemon.v1.DaemonService/SyncHostGitMirror"
-	DaemonService_ResolveAgentLaunchEnv_FullMethodName = "/sand.daemon.v1.DaemonService/ResolveAgentLaunchEnv"
-	DaemonService_ExportImage_FullMethodName           = "/sand.daemon.v1.DaemonService/ExportImage"
-	DaemonService_Stats_FullMethodName                 = "/sand.daemon.v1.DaemonService/Stats"
-	DaemonService_VSC_FullMethodName                   = "/sand.daemon.v1.DaemonService/VSC"
-	DaemonService_CreateSandbox_FullMethodName         = "/sand.daemon.v1.DaemonService/CreateSandbox"
-	DaemonService_RenameSandbox_FullMethodName         = "/sand.daemon.v1.DaemonService/RenameSandbox"
-	DaemonService_EnsureImage_FullMethodName           = "/sand.daemon.v1.DaemonService/EnsureImage"
-	DaemonService_HTTPProxyCache_FullMethodName        = "/sand.daemon.v1.DaemonService/HTTPProxyCache"
-	DaemonService_HTTPProxyCacheStatus_FullMethodName  = "/sand.daemon.v1.DaemonService/HTTPProxyCacheStatus"
+	DaemonService_Ping_FullMethodName                    = "/sand.daemon.v1.DaemonService/Ping"
+	DaemonService_Version_FullMethodName                 = "/sand.daemon.v1.DaemonService/Version"
+	DaemonService_Shutdown_FullMethodName                = "/sand.daemon.v1.DaemonService/Shutdown"
+	DaemonService_LogSandbox_FullMethodName              = "/sand.daemon.v1.DaemonService/LogSandbox"
+	DaemonService_ListSandboxes_FullMethodName           = "/sand.daemon.v1.DaemonService/ListSandboxes"
+	DaemonService_ListDeletedSandboxes_FullMethodName    = "/sand.daemon.v1.DaemonService/ListDeletedSandboxes"
+	DaemonService_GetSandbox_FullMethodName              = "/sand.daemon.v1.DaemonService/GetSandbox"
+	DaemonService_RemoveSandbox_FullMethodName           = "/sand.daemon.v1.DaemonService/RemoveSandbox"
+	DaemonService_ExpungeSandbox_FullMethodName          = "/sand.daemon.v1.DaemonService/ExpungeSandbox"
+	DaemonService_RecoverSandbox_FullMethodName          = "/sand.daemon.v1.DaemonService/RecoverSandbox"
+	DaemonService_StopSandbox_FullMethodName             = "/sand.daemon.v1.DaemonService/StopSandbox"
+	DaemonService_StartSandbox_FullMethodName            = "/sand.daemon.v1.DaemonService/StartSandbox"
+	DaemonService_SyncHostGitMirror_FullMethodName       = "/sand.daemon.v1.DaemonService/SyncHostGitMirror"
+	DaemonService_ResolveAgentLaunchEnv_FullMethodName   = "/sand.daemon.v1.DaemonService/ResolveAgentLaunchEnv"
+	DaemonService_ExportImage_FullMethodName             = "/sand.daemon.v1.DaemonService/ExportImage"
+	DaemonService_Stats_FullMethodName                   = "/sand.daemon.v1.DaemonService/Stats"
+	DaemonService_VSC_FullMethodName                     = "/sand.daemon.v1.DaemonService/VSC"
+	DaemonService_CreateSandbox_FullMethodName           = "/sand.daemon.v1.DaemonService/CreateSandbox"
+	DaemonService_RenameSandbox_FullMethodName           = "/sand.daemon.v1.DaemonService/RenameSandbox"
+	DaemonService_EnsureImage_FullMethodName             = "/sand.daemon.v1.DaemonService/EnsureImage"
+	DaemonService_HTTPProxyCache_FullMethodName          = "/sand.daemon.v1.DaemonService/HTTPProxyCache"
+	DaemonService_HTTPProxyCacheStatus_FullMethodName    = "/sand.daemon.v1.DaemonService/HTTPProxyCacheStatus"
+	DaemonService_SyncAgentSessions_FullMethodName       = "/sand.daemon.v1.DaemonService/SyncAgentSessions"
+	DaemonService_ListAgentSessions_FullMethodName       = "/sand.daemon.v1.DaemonService/ListAgentSessions"
+	DaemonService_GetAgentSession_FullMethodName         = "/sand.daemon.v1.DaemonService/GetAgentSession"
+	DaemonService_ReadAgentSession_FullMethodName        = "/sand.daemon.v1.DaemonService/ReadAgentSession"
+	DaemonService_ExportAgentSession_FullMethodName      = "/sand.daemon.v1.DaemonService/ExportAgentSession"
+	DaemonService_DeleteAgentSession_FullMethodName      = "/sand.daemon.v1.DaemonService/DeleteAgentSession"
+	DaemonService_BeginAgentSessionLaunch_FullMethodName = "/sand.daemon.v1.DaemonService/BeginAgentSessionLaunch"
+	DaemonService_EndAgentSessionLaunch_FullMethodName   = "/sand.daemon.v1.DaemonService/EndAgentSessionLaunch"
 )
 
 // DaemonServiceClient is the client API for DaemonService service.
@@ -69,6 +77,14 @@ type DaemonServiceClient interface {
 	EnsureImage(ctx context.Context, in *EnsureImageRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[EnsureImageResponse], error)
 	HTTPProxyCache(ctx context.Context, in *HTTPProxyCacheRequest, opts ...grpc.CallOption) (*StatusResponse, error)
 	HTTPProxyCacheStatus(ctx context.Context, in *HTTPProxyCacheStatusRequest, opts ...grpc.CallOption) (*HTTPProxyCacheStatusResponse, error)
+	SyncAgentSessions(ctx context.Context, in *IDRequest, opts ...grpc.CallOption) (*StatusResponse, error)
+	ListAgentSessions(ctx context.Context, in *ListAgentSessionsRequest, opts ...grpc.CallOption) (*ListAgentSessionsResponse, error)
+	GetAgentSession(ctx context.Context, in *IDRequest, opts ...grpc.CallOption) (*GetAgentSessionResponse, error)
+	ReadAgentSession(ctx context.Context, in *ReadAgentSessionRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[DataChunk], error)
+	ExportAgentSession(ctx context.Context, in *ExportAgentSessionRequest, opts ...grpc.CallOption) (*StatusResponse, error)
+	DeleteAgentSession(ctx context.Context, in *IDRequest, opts ...grpc.CallOption) (*StatusResponse, error)
+	BeginAgentSessionLaunch(ctx context.Context, in *BeginAgentSessionLaunchRequest, opts ...grpc.CallOption) (*BeginAgentSessionLaunchResponse, error)
+	EndAgentSessionLaunch(ctx context.Context, in *IDRequest, opts ...grpc.CallOption) (*StatusResponse, error)
 }
 
 type daemonServiceClient struct {
@@ -317,6 +333,95 @@ func (c *daemonServiceClient) HTTPProxyCacheStatus(ctx context.Context, in *HTTP
 	return out, nil
 }
 
+func (c *daemonServiceClient) SyncAgentSessions(ctx context.Context, in *IDRequest, opts ...grpc.CallOption) (*StatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StatusResponse)
+	err := c.cc.Invoke(ctx, DaemonService_SyncAgentSessions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *daemonServiceClient) ListAgentSessions(ctx context.Context, in *ListAgentSessionsRequest, opts ...grpc.CallOption) (*ListAgentSessionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListAgentSessionsResponse)
+	err := c.cc.Invoke(ctx, DaemonService_ListAgentSessions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *daemonServiceClient) GetAgentSession(ctx context.Context, in *IDRequest, opts ...grpc.CallOption) (*GetAgentSessionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetAgentSessionResponse)
+	err := c.cc.Invoke(ctx, DaemonService_GetAgentSession_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *daemonServiceClient) ReadAgentSession(ctx context.Context, in *ReadAgentSessionRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[DataChunk], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &DaemonService_ServiceDesc.Streams[2], DaemonService_ReadAgentSession_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[ReadAgentSessionRequest, DataChunk]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type DaemonService_ReadAgentSessionClient = grpc.ServerStreamingClient[DataChunk]
+
+func (c *daemonServiceClient) ExportAgentSession(ctx context.Context, in *ExportAgentSessionRequest, opts ...grpc.CallOption) (*StatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StatusResponse)
+	err := c.cc.Invoke(ctx, DaemonService_ExportAgentSession_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *daemonServiceClient) DeleteAgentSession(ctx context.Context, in *IDRequest, opts ...grpc.CallOption) (*StatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StatusResponse)
+	err := c.cc.Invoke(ctx, DaemonService_DeleteAgentSession_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *daemonServiceClient) BeginAgentSessionLaunch(ctx context.Context, in *BeginAgentSessionLaunchRequest, opts ...grpc.CallOption) (*BeginAgentSessionLaunchResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BeginAgentSessionLaunchResponse)
+	err := c.cc.Invoke(ctx, DaemonService_BeginAgentSessionLaunch_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *daemonServiceClient) EndAgentSessionLaunch(ctx context.Context, in *IDRequest, opts ...grpc.CallOption) (*StatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StatusResponse)
+	err := c.cc.Invoke(ctx, DaemonService_EndAgentSessionLaunch_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DaemonServiceServer is the server API for DaemonService service.
 // All implementations must embed UnimplementedDaemonServiceServer
 // for forward compatibility.
@@ -343,6 +448,14 @@ type DaemonServiceServer interface {
 	EnsureImage(*EnsureImageRequest, grpc.ServerStreamingServer[EnsureImageResponse]) error
 	HTTPProxyCache(context.Context, *HTTPProxyCacheRequest) (*StatusResponse, error)
 	HTTPProxyCacheStatus(context.Context, *HTTPProxyCacheStatusRequest) (*HTTPProxyCacheStatusResponse, error)
+	SyncAgentSessions(context.Context, *IDRequest) (*StatusResponse, error)
+	ListAgentSessions(context.Context, *ListAgentSessionsRequest) (*ListAgentSessionsResponse, error)
+	GetAgentSession(context.Context, *IDRequest) (*GetAgentSessionResponse, error)
+	ReadAgentSession(*ReadAgentSessionRequest, grpc.ServerStreamingServer[DataChunk]) error
+	ExportAgentSession(context.Context, *ExportAgentSessionRequest) (*StatusResponse, error)
+	DeleteAgentSession(context.Context, *IDRequest) (*StatusResponse, error)
+	BeginAgentSessionLaunch(context.Context, *BeginAgentSessionLaunchRequest) (*BeginAgentSessionLaunchResponse, error)
+	EndAgentSessionLaunch(context.Context, *IDRequest) (*StatusResponse, error)
 	mustEmbedUnimplementedDaemonServiceServer()
 }
 
@@ -418,6 +531,30 @@ func (UnimplementedDaemonServiceServer) HTTPProxyCache(context.Context, *HTTPPro
 }
 func (UnimplementedDaemonServiceServer) HTTPProxyCacheStatus(context.Context, *HTTPProxyCacheStatusRequest) (*HTTPProxyCacheStatusResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method HTTPProxyCacheStatus not implemented")
+}
+func (UnimplementedDaemonServiceServer) SyncAgentSessions(context.Context, *IDRequest) (*StatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SyncAgentSessions not implemented")
+}
+func (UnimplementedDaemonServiceServer) ListAgentSessions(context.Context, *ListAgentSessionsRequest) (*ListAgentSessionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListAgentSessions not implemented")
+}
+func (UnimplementedDaemonServiceServer) GetAgentSession(context.Context, *IDRequest) (*GetAgentSessionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetAgentSession not implemented")
+}
+func (UnimplementedDaemonServiceServer) ReadAgentSession(*ReadAgentSessionRequest, grpc.ServerStreamingServer[DataChunk]) error {
+	return status.Error(codes.Unimplemented, "method ReadAgentSession not implemented")
+}
+func (UnimplementedDaemonServiceServer) ExportAgentSession(context.Context, *ExportAgentSessionRequest) (*StatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ExportAgentSession not implemented")
+}
+func (UnimplementedDaemonServiceServer) DeleteAgentSession(context.Context, *IDRequest) (*StatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteAgentSession not implemented")
+}
+func (UnimplementedDaemonServiceServer) BeginAgentSessionLaunch(context.Context, *BeginAgentSessionLaunchRequest) (*BeginAgentSessionLaunchResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method BeginAgentSessionLaunch not implemented")
+}
+func (UnimplementedDaemonServiceServer) EndAgentSessionLaunch(context.Context, *IDRequest) (*StatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method EndAgentSessionLaunch not implemented")
 }
 func (UnimplementedDaemonServiceServer) mustEmbedUnimplementedDaemonServiceServer() {}
 func (UnimplementedDaemonServiceServer) testEmbeddedByValue()                       {}
@@ -822,6 +959,143 @@ func _DaemonService_HTTPProxyCacheStatus_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DaemonService_SyncAgentSessions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(IDRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DaemonServiceServer).SyncAgentSessions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DaemonService_SyncAgentSessions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DaemonServiceServer).SyncAgentSessions(ctx, req.(*IDRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DaemonService_ListAgentSessions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListAgentSessionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DaemonServiceServer).ListAgentSessions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DaemonService_ListAgentSessions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DaemonServiceServer).ListAgentSessions(ctx, req.(*ListAgentSessionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DaemonService_GetAgentSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(IDRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DaemonServiceServer).GetAgentSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DaemonService_GetAgentSession_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DaemonServiceServer).GetAgentSession(ctx, req.(*IDRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DaemonService_ReadAgentSession_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(ReadAgentSessionRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(DaemonServiceServer).ReadAgentSession(m, &grpc.GenericServerStream[ReadAgentSessionRequest, DataChunk]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type DaemonService_ReadAgentSessionServer = grpc.ServerStreamingServer[DataChunk]
+
+func _DaemonService_ExportAgentSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ExportAgentSessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DaemonServiceServer).ExportAgentSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DaemonService_ExportAgentSession_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DaemonServiceServer).ExportAgentSession(ctx, req.(*ExportAgentSessionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DaemonService_DeleteAgentSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(IDRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DaemonServiceServer).DeleteAgentSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DaemonService_DeleteAgentSession_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DaemonServiceServer).DeleteAgentSession(ctx, req.(*IDRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DaemonService_BeginAgentSessionLaunch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BeginAgentSessionLaunchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DaemonServiceServer).BeginAgentSessionLaunch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DaemonService_BeginAgentSessionLaunch_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DaemonServiceServer).BeginAgentSessionLaunch(ctx, req.(*BeginAgentSessionLaunchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DaemonService_EndAgentSessionLaunch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(IDRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DaemonServiceServer).EndAgentSessionLaunch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DaemonService_EndAgentSessionLaunch_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DaemonServiceServer).EndAgentSessionLaunch(ctx, req.(*IDRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // DaemonService_ServiceDesc is the grpc.ServiceDesc for DaemonService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -909,6 +1183,34 @@ var DaemonService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "HTTPProxyCacheStatus",
 			Handler:    _DaemonService_HTTPProxyCacheStatus_Handler,
 		},
+		{
+			MethodName: "SyncAgentSessions",
+			Handler:    _DaemonService_SyncAgentSessions_Handler,
+		},
+		{
+			MethodName: "ListAgentSessions",
+			Handler:    _DaemonService_ListAgentSessions_Handler,
+		},
+		{
+			MethodName: "GetAgentSession",
+			Handler:    _DaemonService_GetAgentSession_Handler,
+		},
+		{
+			MethodName: "ExportAgentSession",
+			Handler:    _DaemonService_ExportAgentSession_Handler,
+		},
+		{
+			MethodName: "DeleteAgentSession",
+			Handler:    _DaemonService_DeleteAgentSession_Handler,
+		},
+		{
+			MethodName: "BeginAgentSessionLaunch",
+			Handler:    _DaemonService_BeginAgentSessionLaunch_Handler,
+		},
+		{
+			MethodName: "EndAgentSessionLaunch",
+			Handler:    _DaemonService_EndAgentSessionLaunch_Handler,
+		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
@@ -919,6 +1221,11 @@ var DaemonService_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "EnsureImage",
 			Handler:       _DaemonService_EnsureImage_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "ReadAgentSession",
+			Handler:       _DaemonService_ReadAgentSession_Handler,
 			ServerStreams: true,
 		},
 	},

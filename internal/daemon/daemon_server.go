@@ -23,6 +23,7 @@ import (
 	"github.com/banksean/sand/internal/runtimepaths"
 	"github.com/banksean/sand/internal/sandboxlog"
 	"github.com/banksean/sand/internal/sandtypes"
+	"github.com/banksean/sand/internal/sessionarchive"
 	"github.com/banksean/sand/internal/version"
 	"github.com/google/uuid"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
@@ -44,9 +45,10 @@ type Daemon struct {
 	LocalDomain    string
 	LogFile        string
 
-	hostMCP *HostMCP
-	boxer   *boxer.Boxer
-	runtime *lifecycle.Service
+	hostMCP  *HostMCP
+	boxer    *boxer.Boxer
+	runtime  *lifecycle.Service
+	sessions *sessionarchive.Service
 
 	outieGRPCListener net.Listener
 
@@ -104,6 +106,7 @@ func (d *Daemon) initLifecycle() {
 		AgentRegistry:    d.boxer.AgentRegistry,
 		Store:            d.boxer,
 	})
+	d.sessions = sessionarchive.New(d.AppBaseDir, d.boxer.DB())
 }
 
 // ServeUnixSocket serves the unix domain socket that sandd clients (the host-side CLI, e.g.) connect to.
@@ -147,6 +150,9 @@ func (d *Daemon) startDaemonServer(ctx context.Context) error {
 	d.initLifecycle()
 	if err := d.boxer.Sync(ctx); err != nil {
 		return fmt.Errorf("failed to sync Boxer db with current environment state: %v\n", err)
+	}
+	if err := d.syncAllAgentSessions(ctx); err != nil {
+		return fmt.Errorf("failed to sync agent session archives: %w", err)
 	}
 	// Handle cleanup on shutdown
 	go d.waitForShutdown(ctx)
@@ -464,11 +470,20 @@ func (d *Daemon) StopSandbox(ctx context.Context, name string) error {
 		return fmt.Errorf("sandbox not found: %s", name)
 	}
 	ctx = sandboxlog.WithSandboxID(ctx, sbox.ID)
+	if err := d.sessions.Sync(ctx, sbox); err != nil {
+		return fmt.Errorf("archive agent sessions before stop: %w", err)
+	}
 	if err := d.stopInnieServer(ctx, sbox.ID); err != nil {
 		return err
 	}
 
-	return d.boxer.StopContainer(ctx, sbox)
+	if err := d.boxer.StopContainer(ctx, sbox); err != nil {
+		return err
+	}
+	if err := d.sessions.EndSandboxLaunches(ctx, sbox.ID); err != nil {
+		return fmt.Errorf("close agent session launches: %w", err)
+	}
+	return nil
 }
 
 func (d *Daemon) createContainerSocket(ctx context.Context, id string) (net.Listener, error) {
@@ -845,6 +860,9 @@ func (d *Daemon) RemoveSandbox(ctx context.Context, name string) error {
 		return fmt.Errorf("sandbox not found: %s", name)
 	}
 	ctx = sandboxlog.WithSandboxID(ctx, sbox.ID)
+	if err := d.sessions.Sync(ctx, sbox); err != nil {
+		return fmt.Errorf("archive agent sessions before remove: %w", err)
+	}
 	if err := d.stopInnieServer(ctx, sbox.ID); err != nil {
 		return err
 	}
@@ -861,7 +879,16 @@ func (d *Daemon) RemoveSandbox(ctx context.Context, name string) error {
 			return err
 		}
 	}
-	return d.boxer.SoftDelete(ctx, sbox)
+	if err := d.boxer.SoftDelete(ctx, sbox); err != nil {
+		return err
+	}
+	if err := d.sessions.EndSandboxLaunches(ctx, sbox.ID); err != nil {
+		return fmt.Errorf("close agent session launches: %w", err)
+	}
+	if err := d.sessions.ScrubCredentials(sbox); err != nil {
+		return fmt.Errorf("remove archived agent credentials: %w", err)
+	}
+	return nil
 }
 
 // ExpungeSandbox hard-deletes a single soft-deleted sandbox by ID.

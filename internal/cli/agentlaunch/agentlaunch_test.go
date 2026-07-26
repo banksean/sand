@@ -2,6 +2,7 @@ package agentlaunch
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -183,6 +184,26 @@ func TestBuildOneShotExec(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Fatalf("expected %q, got %q", tt.want, got)
+			}
+		})
+	}
+}
+
+func TestEphemeralSessionEnvUsesAgentNativeRoots(t *testing.T) {
+	tests := map[string]string{
+		"codex":    "CODEX_HOME",
+		"claude":   "CLAUDE_CONFIG_DIR",
+		"gemini":   "HOME",
+		"opencode": "XDG_DATA_HOME",
+	}
+	for agent, key := range tests {
+		t.Run(agent, func(t *testing.T) {
+			env := EphemeralSessionEnv(agent, "sandbox-1")
+			if env[key] == "" {
+				t.Fatalf("%s environment = %v", agent, env)
+			}
+			if got := env[key]; !strings.HasPrefix(got, "/tmp/sand-no-archive/sandbox-1/") {
+				t.Fatalf("%s = %q", key, got)
 			}
 		})
 	}

@@ -160,7 +160,7 @@ func setEnvValue(env []string, key, value string) []string {
 
 func runtimeArtifactsFromBox(sb *sandtypes.Box) containerruntime.Artifacts {
 	pathRegistry := cloning.NewStandardPathRegistry(sb.SandboxWorkDir)
-	return containerruntime.Artifacts{
+	artifacts := containerruntime.Artifacts{
 		SandboxWorkDir:    sb.SandboxWorkDir,
 		WorkDir:           pathRegistry.WorkDir(),
 		DotfilesDir:       pathRegistry.DotfilesDir(),
@@ -169,6 +169,10 @@ func runtimeArtifactsFromBox(sb *sandtypes.Box) containerruntime.Artifacts {
 		Uid:               sb.Uid,
 		SharedCacheMounts: sb.SharedCacheMounts,
 	}
+	if sb.SessionArchiveEnabled {
+		artifacts.SessionArchiveDir = filepath.Join(filepath.Dir(filepath.Dir(sb.SandboxWorkDir)), "agent-sessions", "native", sb.ID, sb.AgentType)
+	}
+	return artifacts
 }
 
 func (s *Service) EffectiveMounts(sb *sandtypes.Box) []sandtypes.MountSpec {
@@ -180,14 +184,18 @@ func (s *Service) EffectiveMounts(sb *sandtypes.Box) []sandtypes.MountSpec {
 	}
 
 	pathRegistry := cloning.NewStandardPathRegistry(sb.SandboxWorkDir)
-	baseConfig := containerruntime.NewBaseContainerConfiguration()
-	return baseConfig.GetMounts(containerruntime.Artifacts{
+	artifacts := containerruntime.Artifacts{
 		SandboxWorkDir:    sb.SandboxWorkDir,
 		WorkDir:           pathRegistry.WorkDir(),
 		DotfilesDir:       pathRegistry.DotfilesDir(),
 		SSHKeysDir:        pathRegistry.SSHKeysDir(),
 		SharedCacheMounts: sb.SharedCacheMounts,
-	})
+	}
+	if sb.SessionArchiveEnabled {
+		artifacts.SessionArchiveDir = filepath.Join(s.AppRoot, "agent-sessions", "native", sb.ID, sb.AgentType)
+		return s.AgentRegistry.Get(sb.AgentType).Configuration.GetMounts(artifacts)
+	}
+	return containerruntime.NewBaseContainerConfiguration().GetMounts(artifacts)
 }
 
 func (s *Service) CreateContainer(ctx context.Context, sb *sandtypes.Box, enableSSHAgent bool) error {

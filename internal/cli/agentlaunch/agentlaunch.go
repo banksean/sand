@@ -2,9 +2,27 @@ package agentlaunch
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/banksean/sand/internal/agentdefs"
 )
+
+// EphemeralSessionEnv redirects an opted-out launch away from host-mounted native stores.
+func EphemeralSessionEnv(agent, sandboxID string) map[string]string {
+	root := filepath.Join("/tmp", "sand-no-archive", sandboxID, agent)
+	switch agent {
+	case "codex":
+		return map[string]string{"CODEX_HOME": root}
+	case "claude":
+		return map[string]string{"CLAUDE_CONFIG_DIR": root}
+	case "gemini":
+		return map[string]string{"HOME": root}
+	case "opencode":
+		return map[string]string{"XDG_DATA_HOME": filepath.Join(root, "data"), "XDG_CONFIG_HOME": filepath.Join(root, "config")}
+	default:
+		return map[string]string{"HOME": root}
+	}
+}
 
 func BuildInteractiveExec(agent, shell, sandboxID, hostname string, tmux, atch bool) (string, []string, error) {
 	if tmux && atch {

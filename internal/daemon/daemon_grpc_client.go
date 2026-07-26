@@ -234,6 +234,72 @@ func (c *GRPCClient) HTTPProxyCacheStatus(ctx context.Context) (HTTPProxyCacheSt
 	}, nil
 }
 
+func (c *GRPCClient) SyncAgentSessions(ctx context.Context, sandbox string) error {
+	_, err := c.client.SyncAgentSessions(ctx, &daemonpb.IDRequest{Id: sandbox})
+	return err
+}
+
+func (c *GRPCClient) ListAgentSessions(ctx context.Context, opts ListAgentSessionsOpts) ([]sandtypes.AgentSession, error) {
+	resp, err := c.client.ListAgentSessions(ctx, &daemonpb.ListAgentSessionsRequest{AgentType: opts.Agent, Sandbox: opts.Sandbox})
+	if err != nil {
+		return nil, err
+	}
+	return agentSessionsFromProto(resp.GetSessions()), nil
+}
+
+func (c *GRPCClient) GetAgentSession(ctx context.Context, id string) (sandtypes.AgentSession, error) {
+	resp, err := c.client.GetAgentSession(ctx, &daemonpb.IDRequest{Id: id})
+	if err != nil {
+		return sandtypes.AgentSession{}, err
+	}
+	return agentSessionFromProto(resp.GetSession()), nil
+}
+
+func (c *GRPCClient) ReadAgentSession(ctx context.Context, id, format string, w io.Writer) error {
+	stream, err := c.client.ReadAgentSession(ctx, &daemonpb.ReadAgentSessionRequest{Id: id, Format: format})
+	if err != nil {
+		return err
+	}
+	if w == nil {
+		w = io.Discard
+	}
+	for {
+		chunk, err := stream.Recv()
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if _, err := w.Write(chunk.GetData()); err != nil {
+			return err
+		}
+	}
+}
+
+func (c *GRPCClient) ExportAgentSession(ctx context.Context, id, format, destination string) error {
+	_, err := c.client.ExportAgentSession(ctx, &daemonpb.ExportAgentSessionRequest{Id: id, Format: format, DestinationPath: destination})
+	return err
+}
+
+func (c *GRPCClient) DeleteAgentSession(ctx context.Context, id string) error {
+	_, err := c.client.DeleteAgentSession(ctx, &daemonpb.IDRequest{Id: id})
+	return err
+}
+
+func (c *GRPCClient) BeginAgentSessionLaunch(ctx context.Context, sandbox string) (string, error) {
+	resp, err := c.client.BeginAgentSessionLaunch(ctx, &daemonpb.BeginAgentSessionLaunchRequest{Sandbox: sandbox})
+	if err != nil {
+		return "", err
+	}
+	return resp.GetLaunchId(), nil
+}
+
+func (c *GRPCClient) EndAgentSessionLaunch(ctx context.Context, launchID string) error {
+	_, err := c.client.EndAgentSessionLaunch(ctx, &daemonpb.IDRequest{Id: launchID})
+	return err
+}
+
 func (c *GRPCClient) RenameSandbox(ctx context.Context, oldName, newName string) (*sandtypes.Box, error) {
 	resp, err := c.client.RenameSandbox(ctx, &daemonpb.RenameSandboxRequest{
 		OldName: oldName,

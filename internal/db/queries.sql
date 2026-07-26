@@ -25,8 +25,8 @@ INSERT INTO sandboxes (
     original_git_origin, original_git_branch, original_git_commit,
     original_git_is_dirty, allowed_domains, mount_specs,
     container_bootstrapped, cpu, memory_mb, default_username, default_uid,
-    deleted_at, trash_work_dir
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    deleted_at, trash_work_dir, session_archive_enabled
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(id) DO UPDATE SET
     name = excluded.name,
     state = excluded.state,
@@ -51,7 +51,8 @@ ON CONFLICT(id) DO UPDATE SET
     default_username = excluded.default_username,
     default_uid = excluded.default_uid,
     deleted_at = excluded.deleted_at,
-    trash_work_dir = excluded.trash_work_dir;
+    trash_work_dir = excluded.trash_work_dir,
+    session_archive_enabled = excluded.session_archive_enabled;
 
 -- name: UpdateContainerID :exec
 UPDATE sandboxes

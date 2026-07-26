@@ -57,6 +57,7 @@ func sandboxToProto(box *sandtypes.Box) *daemonpb.Sandbox {
 		OriginalGitDetails:    gitDetailsToProto(box.OriginalGitDetails),
 		CurrentGitDetails:     gitDetailsToProto(box.CurrentGitDetails),
 		Container:             containerToProto(box.Container),
+		SessionArchiveEnabled: box.SessionArchiveEnabled,
 	}
 }
 
@@ -91,6 +92,7 @@ func sandboxFromProto(box *daemonpb.Sandbox) *sandtypes.Box {
 		OriginalGitDetails:    gitDetailsFromProto(box.GetOriginalGitDetails()),
 		CurrentGitDetails:     gitDetailsFromProto(box.GetCurrentGitDetails()),
 		Container:             containerFromProto(box.GetContainer()),
+		SessionArchiveEnabled: box.GetSessionArchiveEnabled(),
 	}
 }
 
@@ -106,6 +108,39 @@ func timeFromProto(ts *timestamppb.Timestamp) time.Time {
 		return time.Time{}
 	}
 	return ts.AsTime()
+}
+
+func agentSessionToProto(session sandtypes.AgentSession) *daemonpb.AgentSession {
+	return &daemonpb.AgentSession{Id: session.ID, AgentType: session.AgentType, NativeSessionId: session.NativeSessionID,
+		Title: session.Title, Status: session.Status, SandboxIds: append([]string(nil), session.SandboxIDs...),
+		SandboxNames: append([]string(nil), session.SandboxNames...), SizeBytes: session.SizeBytes,
+		StartedAt: timeToProto(session.StartedAt), UpdatedAt: timeToProto(session.UpdatedAt)}
+}
+
+func agentSessionsToProto(sessions []sandtypes.AgentSession) []*daemonpb.AgentSession {
+	out := make([]*daemonpb.AgentSession, 0, len(sessions))
+	for _, session := range sessions {
+		out = append(out, agentSessionToProto(session))
+	}
+	return out
+}
+
+func agentSessionFromProto(session *daemonpb.AgentSession) sandtypes.AgentSession {
+	if session == nil {
+		return sandtypes.AgentSession{}
+	}
+	return sandtypes.AgentSession{ID: session.GetId(), AgentType: session.GetAgentType(), NativeSessionID: session.GetNativeSessionId(),
+		Title: session.GetTitle(), Status: session.GetStatus(), SandboxIDs: append([]string(nil), session.GetSandboxIds()...),
+		SandboxNames: append([]string(nil), session.GetSandboxNames()...), SizeBytes: session.GetSizeBytes(),
+		StartedAt: timeFromProto(session.GetStartedAt()), UpdatedAt: timeFromProto(session.GetUpdatedAt())}
+}
+
+func agentSessionsFromProto(sessions []*daemonpb.AgentSession) []sandtypes.AgentSession {
+	out := make([]sandtypes.AgentSession, 0, len(sessions))
+	for _, session := range sessions {
+		out = append(out, agentSessionFromProto(session))
+	}
+	return out
 }
 
 func mountSpecsToProto(mounts []sandtypes.MountSpec) []*daemonpb.MountSpec {

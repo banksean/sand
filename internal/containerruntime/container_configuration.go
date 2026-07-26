@@ -13,6 +13,7 @@ type Artifacts struct {
 	Username          string
 	Uid               string
 	SharedCacheMounts sandtypes.SharedCacheMounts
+	SessionArchiveDir string
 }
 
 // ContainerConfiguration handles container runtime configuration such as

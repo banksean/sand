@@ -19,6 +19,11 @@ type Definition struct {
 	GeneratedFiles     []GeneratedFile
 	Install            *InstallSpec
 	StartHooks         []string
+	// SessionPath is the agent's native session store, relative to the container user's home.
+	// An empty value means the agent has no native session archive adapter.
+	SessionPath string
+	// SessionFormat selects the built-in discovery and normalization adapter.
+	SessionFormat string
 }
 
 // GeneratedFile is non-secret startup state written below the sandbox dotfiles
@@ -61,6 +66,8 @@ var definitions = []Definition{
 			Version: "2.1.217",
 			Command: "claude",
 		},
+		SessionPath:   ".claude/projects",
+		SessionFormat: "claude-jsonl",
 	},
 	{
 		Name:       "codex",
@@ -90,6 +97,8 @@ trace_exporter = { otlp-http = {
 			Version: "0.145.0",
 			Command: "codex",
 		},
+		SessionPath:   ".codex/sessions",
+		SessionFormat: "codex-jsonl",
 	},
 	{
 		Name:       "gemini",
@@ -106,6 +115,8 @@ trace_exporter = { otlp-http = {
 			Version: "0.51.0",
 			Command: "gemini",
 		},
+		SessionPath:   ".gemini/tmp",
+		SessionFormat: "gemini-json",
 	},
 	{
 		Name:       "opencode",
@@ -133,7 +144,9 @@ trace_exporter = { otlp-http = {
 			Version: "1.18.4",
 			Command: "opencode",
 		},
-		StartHooks: []string{HookOpenCodeTunnel},
+		StartHooks:    []string{HookOpenCodeTunnel},
+		SessionPath:   ".local/share/opencode",
+		SessionFormat: "opencode-sqlite",
 	},
 }
 

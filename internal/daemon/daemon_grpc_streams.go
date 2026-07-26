@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"io"
 	"log/slog"
 	"sync"
 
@@ -8,6 +9,25 @@ import (
 	"github.com/banksean/sand/internal/imageprogress"
 	"github.com/banksean/sand/internal/sandtypes"
 )
+
+type grpcAgentSessionWriter struct {
+	stream daemonpb.DaemonService_ReadAgentSessionServer
+}
+
+func (w *grpcAgentSessionWriter) Write(p []byte) (int, error) {
+	const chunkSize = 64 * 1024
+	total := len(p)
+	for len(p) > 0 {
+		n := min(len(p), chunkSize)
+		if err := w.stream.Send(&daemonpb.DataChunk{Data: append([]byte(nil), p[:n]...)}); err != nil {
+			return 0, err
+		}
+		p = p[n:]
+	}
+	return total, nil
+}
+
+var _ io.Writer = (*grpcAgentSessionWriter)(nil)
 
 type grpcCreateSandboxProgressWriter struct {
 	stream daemonpb.DaemonService_CreateSandboxServer
@@ -119,6 +139,10 @@ func (s *daemonGRPCServer) EnsureImage(req *daemonpb.EnsureImageRequest, stream 
 	return stream.Send(&daemonpb.EnsureImageResponse{
 		Event: &daemonpb.EnsureImageResponse_Ok{Ok: true},
 	})
+}
+
+func (s *daemonGRPCServer) ReadAgentSession(req *daemonpb.ReadAgentSessionRequest, stream daemonpb.DaemonService_ReadAgentSessionServer) error {
+	return s.daemon.ReadAgentSession(stream.Context(), req.GetId(), req.GetFormat(), &grpcAgentSessionWriter{stream: stream})
 }
 
 func createSandboxOptsToProto(opts CreateSandboxOpts) *daemonpb.CreateSandboxRequest {

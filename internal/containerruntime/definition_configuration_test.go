@@ -54,6 +54,24 @@ func TestDefinitionContainerConfigurationAddsInstallHookAfterBaseHook(t *testing
 	}
 }
 
+func TestDefinitionContainerConfigurationMountsNativeSessionStore(t *testing.T) {
+	definition, _ := agentdefs.Lookup("codex")
+	cfg := NewDefinitionContainerConfiguration(definition)
+	mounts := cfg.GetMounts(Artifacts{Username: "sean", SessionArchiveDir: "/host/agent-sessions/codex"})
+	got := mounts[len(mounts)-1]
+	want := sandtypes.MountSpec{Source: "/host/agent-sessions/codex", Target: "/home/sean/.codex/sessions"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("session mount = %#v, want %#v", got, want)
+	}
+
+	withoutArchive := cfg.GetMounts(Artifacts{Username: "sean"})
+	for _, mount := range withoutArchive {
+		if mount.Target == want.Target {
+			t.Fatal("legacy artifacts unexpectedly received a session mount")
+		}
+	}
+}
+
 func TestDefinitionContainerConfigurationKeepsOpenCodeTunnelAsRecurringHook(t *testing.T) {
 	definition, ok := agentdefs.Lookup("opencode")
 	if !ok {

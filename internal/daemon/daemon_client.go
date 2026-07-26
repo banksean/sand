@@ -35,6 +35,19 @@ type Client interface {
 	EnsureImage(ctx context.Context, imageName string, w io.Writer) error
 	HTTPProxyCache(ctx context.Context, action string) error
 	HTTPProxyCacheStatus(ctx context.Context) (HTTPProxyCacheStatus, error)
+	SyncAgentSessions(ctx context.Context, sandbox string) error
+	ListAgentSessions(ctx context.Context, opts ListAgentSessionsOpts) ([]sandtypes.AgentSession, error)
+	GetAgentSession(ctx context.Context, id string) (sandtypes.AgentSession, error)
+	ReadAgentSession(ctx context.Context, id, format string, w io.Writer) error
+	ExportAgentSession(ctx context.Context, id, format, destination string) error
+	DeleteAgentSession(ctx context.Context, id string) error
+	BeginAgentSessionLaunch(ctx context.Context, sandbox string) (string, error)
+	EndAgentSessionLaunch(ctx context.Context, launchID string) error
+}
+
+type ListAgentSessionsOpts struct {
+	Agent   string
+	Sandbox string
 }
 
 type HTTPProxyCacheStatus struct {

@@ -6,7 +6,39 @@ package db
 
 import (
 	"database/sql"
+	"time"
 )
+
+type AgentSession struct {
+	ID              string       `json:"id"`
+	AgentType       string       `json:"agent_type"`
+	NativeSessionID string       `json:"native_session_id"`
+	Title           string       `json:"title"`
+	Status          string       `json:"status"`
+	NormalizedPath  string       `json:"normalized_path"`
+	SizeBytes       int64        `json:"size_bytes"`
+	StartedAt       sql.NullTime `json:"started_at"`
+	UpdatedAt       time.Time    `json:"updated_at"`
+	AdapterVersion  int64        `json:"adapter_version"`
+}
+
+type AgentSessionLaunch struct {
+	ID        string       `json:"id"`
+	SandboxID string       `json:"sandbox_id"`
+	AgentType string       `json:"agent_type"`
+	StartedAt time.Time    `json:"started_at"`
+	EndedAt   sql.NullTime `json:"ended_at"`
+}
+
+type AgentSessionSource struct {
+	SessionID   string    `json:"session_id"`
+	SandboxID   string    `json:"sandbox_id"`
+	SandboxName string    `json:"sandbox_name"`
+	NativePath  string    `json:"native_path"`
+	RawPath     string    `json:"raw_path"`
+	SizeBytes   int64     `json:"size_bytes"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
 
 type Sandbox struct {
 	ID                    string         `json:"id"`
@@ -35,4 +67,5 @@ type Sandbox struct {
 	ProfileName           sql.NullString `json:"profile_name"`
 	MountSpecs            sql.NullString `json:"mount_specs"`
 	ContainerBootstrapped bool           `json:"container_bootstrapped"`
+	SessionArchiveEnabled bool           `json:"session_archive_enabled"`
 }

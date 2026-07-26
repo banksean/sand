@@ -1,10 +1,12 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os/user"
 
+	"github.com/banksean/sand/internal/cli/agentlaunch"
 	"github.com/banksean/sand/internal/daemon"
 )
 
@@ -13,6 +15,7 @@ type ShellCmd struct {
 	ProjectEnvFlag
 	SSHAgent bool `help:"enable ssh-agent forwarding for the container"`
 	SandboxNameFlag
+	NoArchive bool `help:"use ephemeral state for the sandbox's declared agent in this shell"`
 }
 
 func (c *ShellCmd) Run(cctx *CLIContext) error {
@@ -64,6 +67,9 @@ func (c *ShellCmd) Run(cctx *CLIContext) error {
 	if c.Tmux && c.Atch {
 		return fmt.Errorf("--tmux and --atch cannot be used together")
 	}
+	if c.NoArchive && (c.Tmux || c.Atch) {
+		return fmt.Errorf("--no-archive cannot reconnect to persistent tmux or atch sessions")
+	}
 	if c.Tmux {
 		shell = "/usr/bin/tmux"
 		args = []string{"new-session", "-A"}
@@ -77,5 +83,28 @@ func (c *ShellCmd) Run(cctx *CLIContext) error {
 		return err
 	}
 	defer projectEnv.Cleanup()
-	return runShell(ctx, sbox, shell, args, false, projectEnv.EnvFile, projectEnv.Env)
+	env := projectEnv.Env
+	if c.NoArchive && sbox.AgentType != "" && sbox.AgentType != "default" {
+		env = mergeEnv(env, agentlaunch.EphemeralSessionEnv(sbox.AgentType, sbox.ID))
+	}
+	launchID := ""
+	if !c.NoArchive && sbox.SessionArchiveEnabled && sbox.AgentType != "default" {
+		launchID, err = mc.BeginAgentSessionLaunch(ctx, sbox.Name)
+		if err != nil {
+			return fmt.Errorf("begin agent session archive: %w", err)
+		}
+	}
+	runErr := runShell(ctx, sbox, shell, args, false, projectEnv.EnvFile, env)
+	if launchID != "" {
+		archiveCtx := context.WithoutCancel(ctx)
+		if !c.Tmux && !c.Atch {
+			if err := mc.EndAgentSessionLaunch(archiveCtx, launchID); err != nil {
+				return err
+			}
+		}
+		if err := mc.SyncAgentSessions(archiveCtx, sbox.Name); err != nil {
+			return err
+		}
+	}
+	return runErr
 }

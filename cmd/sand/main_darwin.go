@@ -58,6 +58,7 @@ type Outie struct {
 	ExportFS           cli.ExportCmd             `cmd:"" help:"export a container's filesystem"`
 	Stats              cli.StatsCmd              `cmd:"" help:"list container stats for sandboxes"`
 	Config             cli.ConfigCmd             `cmd:"" help:"list, get, or set default values for flags"`
+	Session            cli.SessionCmd            `cmd:"" help:"list, inspect, export, or delete archived agent sessions"`
 }
 
 func (c *Outie) initSlog() {

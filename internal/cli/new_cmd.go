@@ -29,6 +29,7 @@ type NewCmd struct {
 	Username    string `help:"name of default user to create (defaults to $USER)"`
 	Uid         string `help:"id of default user to create (defaults to $UID)"`
 	SandboxName string `arg:"" optional:"" help:"name of the sandbox to create"`
+	NoArchive   bool   `help:"run this agent with ephemeral session state instead of archiving its transcript"`
 }
 
 func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
@@ -187,9 +188,18 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 
 	var agentEnv map[string]string
 	if c.Agent != "" {
+		if c.Agent != sbox.AgentType && !c.NoArchive {
+			return fmt.Errorf("sandbox %s archives its declared %s agent, not %s; create a matching sandbox or use --no-archive", sbox.Name, sbox.AgentType, c.Agent)
+		}
+		if !sbox.SessionArchiveEnabled && !c.NoArchive {
+			return fmt.Errorf("sandbox %s was created without agent session archival support; create a new sandbox or use --no-archive", sbox.Name)
+		}
 		agentEnv, err = resolveAgentLaunchEnv(ctx, mc, c.Agent, sbox)
 		if err != nil {
 			return err
+		}
+		if c.NoArchive {
+			agentEnv = mergeEnv(agentEnv, agentlaunch.EphemeralSessionEnv(c.Agent, sbox.ID))
 		}
 	}
 
@@ -202,8 +212,27 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 		defer shellEnv.Cleanup()
 	}
 
-	if err := runShell(ctx, sbox, shell, args, c.Agent != "", shellEnv.EnvFile, mergeEnv(shellEnv.Env, agentEnv)); err != nil {
-		return err
+	launchID := ""
+	if c.Agent != "" && !c.NoArchive {
+		launchID, err = mc.BeginAgentSessionLaunch(ctx, sbox.Name)
+		if err != nil {
+			return fmt.Errorf("begin agent session archive: %w", err)
+		}
+	}
+	runErr := runShell(ctx, sbox, shell, args, c.Agent != "", shellEnv.EnvFile, mergeEnv(shellEnv.Env, agentEnv))
+	if launchID != "" {
+		archiveCtx := context.WithoutCancel(ctx)
+		if !c.Tmux && !c.Atch {
+			if err := mc.EndAgentSessionLaunch(archiveCtx, launchID); err != nil {
+				return fmt.Errorf("end agent session archive: %w", err)
+			}
+		}
+		if err := mc.SyncAgentSessions(archiveCtx, sbox.Name); err != nil {
+			return fmt.Errorf("archive agent session: %w", err)
+		}
+	}
+	if runErr != nil {
+		return runErr
 	}
 
 	if c.Rm {
