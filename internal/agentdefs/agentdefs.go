@@ -140,7 +140,8 @@ trace_exporter = { otlp-http = {
 			Mode: 0o700,
 		}},
 		Install: &InstallSpec{
-			Kind:    InstallerOpenCode,
+			Kind:    InstallerNPM,
+			Package: "opencode-ai",
 			Version: "1.18.4",
 			Command: "opencode",
 		},

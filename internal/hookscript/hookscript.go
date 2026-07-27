@@ -37,12 +37,11 @@ func Execute(ctx context.Context, exec sandtypes.HookStreamer, name, body string
 func NewEngine(exec sandtypes.HookStreamer) *script.Engine {
 	return &script.Engine{
 		Cmds: map[string]script.Cmd{
-			"exec":                   execCmd(exec),
-			"stream":                 streamCmd(exec),
-			"write-managed-bazelrc":  writeManagedBazelrcCmd(exec),
-			"write-http-proxy-env":   writeHTTPProxyEnvCmd(exec),
-			"install-npm-agent":      installNPMAgentCmd(exec),
-			"install-opencode-agent": installOpenCodeAgentCmd(exec),
+			"exec":                  execCmd(exec),
+			"stream":                streamCmd(exec),
+			"write-managed-bazelrc": writeManagedBazelrcCmd(exec),
+			"write-http-proxy-env":  writeHTTPProxyEnvCmd(exec),
+			"install-npm-agent":     installNPMAgentCmd(exec),
 		},
 		Conds: map[string]script.Cond{
 			"cmd":    commandExistsCond(exec),
@@ -110,18 +109,6 @@ func installNPMAgentCmd(exec sandtypes.HookStreamer) script.Cmd {
 			return nil, script.ErrUsage
 		}
 		err := installNPMAgent(s.Context(), exec, args[0], args[1], args[2])
-		return func(*script.State) (string, string, error) {
-			return "", "", err
-		}, nil
-	})
-}
-
-func installOpenCodeAgentCmd(exec sandtypes.HookStreamer) script.Cmd {
-	return script.Command(script.CmdUsage{Summary: "install opencode if missing", Args: "command version"}, func(s *script.State, args ...string) (script.WaitFunc, error) {
-		if len(args) != 2 {
-			return nil, script.ErrUsage
-		}
-		err := installOpenCodeAgent(s.Context(), exec, args[0], args[1])
 		return func(*script.State) (string, string, error) {
 			return "", "", err
 		}, nil
@@ -485,83 +472,6 @@ func checksumForArchive(checksums, archive string) (string, error) {
 	return "", fmt.Errorf("Node checksum manifest does not contain %s", archive)
 }
 
-func installOpenCodeAgent(ctx context.Context, exec sandtypes.HookStreamer, command, version string) error {
-	if commandExists(ctx, exec, command) {
-		return nil
-	}
-	if commandExists(ctx, exec, "apk") {
-		if err := stream(ctx, exec, "apk", "add", "--no-cache", "curl", "bash", "git", "libc6-compat", "libstdc++"); err != nil {
-			return err
-		}
-	} else if commandExists(ctx, exec, "apt-get") {
-		if err := stream(ctx, exec, "apt-get", "update"); err != nil {
-			return err
-		}
-		if err := stream(ctx, exec, "apt-get", "install", "-y", "--no-install-recommends", "curl", "bash", "git", "libc6", "libstdc++6"); err != nil {
-			return err
-		}
-	}
-
-	archOut, err := exec.Exec(ctx, "uname", "-m")
-	if err != nil {
-		return fmt.Errorf("uname -m: %w", err)
-	}
-	arch := normalizeArch(strings.TrimSpace(archOut))
-	cacheRoot := "/opt/sand-agent-cache"
-	if _, err := exec.Exec(ctx, "test", "-d", cacheRoot); err != nil {
-		cacheRoot = "/tmp/sand-agent-cache"
-	} else if _, err := exec.Exec(ctx, "test", "-w", cacheRoot); err != nil {
-		cacheRoot = "/tmp/sand-agent-cache"
-	}
-	cacheDir := cacheRoot + "/opencode/" + version + "/" + arch
-	lockDir := cacheDir + ".lock"
-	if _, err := exec.Exec(ctx, "mkdir", "-p", path.Dir(cacheDir)); err != nil {
-		return fmt.Errorf("mkdir %s: %w", path.Dir(cacheDir), err)
-	}
-	if err := acquireLock(ctx, exec, lockDir); err != nil {
-		return err
-	}
-	defer exec.Exec(context.WithoutCancel(ctx), "rm", "-rf", lockDir) //nolint:errcheck
-
-	cachedBin := cacheDir + "/opencode"
-	if _, err := exec.Exec(ctx, "test", "-x", cachedBin); err != nil {
-		tmpHome, err := exec.Exec(ctx, "mktemp", "-d")
-		if err != nil {
-			return fmt.Errorf("mktemp -d: %w", err)
-		}
-		tmpHome = strings.TrimSpace(tmpHome)
-		defer exec.Exec(context.WithoutCancel(ctx), "rm", "-rf", tmpHome) //nolint:errcheck
-
-		installer, err := exec.Exec(ctx, "curl", "-fsSL", "https://opencode.ai/install")
-		if err != nil {
-			return fmt.Errorf("download opencode installer: %w", err)
-		}
-		if err := exec.ExecStreamInput(ctx, strings.NewReader(installer), io.Discard, io.Discard, "env", "HOME="+tmpHome, "bash", "-s", "--", "--version", version); err != nil {
-			return fmt.Errorf("run opencode installer: %w", err)
-		}
-		if _, err := exec.Exec(ctx, "mkdir", "-p", cacheDir); err != nil {
-			return fmt.Errorf("mkdir %s: %w", cacheDir, err)
-		}
-		tmpBin := cacheDir + "/opencode.tmp"
-		if _, err := exec.Exec(ctx, "cp", tmpHome+"/.opencode/bin/opencode", tmpBin); err != nil {
-			return fmt.Errorf("copy opencode to cache: %w", err)
-		}
-		if _, err := exec.Exec(ctx, "chmod", "+x", tmpBin); err != nil {
-			return fmt.Errorf("chmod cached opencode: %w", err)
-		}
-		if _, err := exec.Exec(ctx, "mv", tmpBin, cachedBin); err != nil {
-			return fmt.Errorf("publish cached opencode: %w", err)
-		}
-	}
-	if _, err := exec.Exec(ctx, "cp", cachedBin, "/usr/local/bin/opencode"); err != nil {
-		return fmt.Errorf("install opencode: %w", err)
-	}
-	if _, err := exec.Exec(ctx, "chmod", "+x", "/usr/local/bin/opencode"); err != nil {
-		return fmt.Errorf("chmod /usr/local/bin/opencode: %w", err)
-	}
-	return nil
-}
-
 func commandExists(ctx context.Context, exec sandtypes.HookStreamer, command string) bool {
 	_, err := exec.Exec(ctx, "which", command)
 	return err == nil
@@ -577,17 +487,6 @@ func stream(ctx context.Context, exec sandtypes.HookStreamer, command string, ar
 		return fmt.Errorf("%s: %w", strings.Join(append([]string{command}, args...), " "), err)
 	}
 	return nil
-}
-
-func normalizeArch(arch string) string {
-	switch arch {
-	case "x86_64":
-		return "amd64"
-	case "aarch64":
-		return "arm64"
-	default:
-		return arch
-	}
 }
 
 func acquireLock(ctx context.Context, exec sandtypes.HookStreamer, lockDir string) error {

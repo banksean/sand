@@ -189,7 +189,7 @@ func (o *xpcContainerOps) ExecStream(ctx context.Context, opts *ExecContainer, c
 	if err != nil {
 		return nil, err
 	}
-	slog.InfoContext(ctx, "xpcContainerOps.ExecStream stdio prepared",
+	slog.DebugContext(ctx, "xpcContainerOps.ExecStream stdio prepared",
 		"containerID", containerID,
 		"processID", processID,
 		"terminal", cfg.Terminal,
@@ -201,7 +201,6 @@ func (o *xpcContainerOps) ExecStream(ctx context.Context, opts *ExecContainer, c
 		cleanup()
 		return nil, err
 	}
-	slog.InfoContext(ctx, "xpcContainerOps.ExecStream process created", "containerID", containerID, "processID", processID)
 
 	var savedState *term.State
 	if stdinFile, ok := stdin.(*os.File); ok && term.IsTerminal(int(stdinFile.Fd())) {
@@ -210,7 +209,7 @@ func (o *xpcContainerOps) ExecStream(ctx context.Context, opts *ExecContainer, c
 			cleanup()
 			return nil, fmt.Errorf("making terminal raw: %w", err)
 		}
-		slog.InfoContext(ctx, "xpcContainerOps.ExecStream terminal raw mode enabled",
+		slog.DebugContext(ctx, "xpcContainerOps.ExecStream terminal raw mode enabled",
 			"containerID", containerID,
 			"processID", processID,
 			"stdinFD", int(stdinFile.Fd()))
@@ -219,7 +218,7 @@ func (o *xpcContainerOps) ExecStream(ctx context.Context, opts *ExecContainer, c
 		if savedState != nil {
 			if stdinFile, ok := stdin.(*os.File); ok {
 				_ = term.Restore(int(stdinFile.Fd()), savedState)
-				slog.InfoContext(ctx, "xpcContainerOps.ExecStream terminal restored",
+				slog.DebugContext(ctx, "xpcContainerOps.ExecStream terminal restored",
 					"containerID", containerID,
 					"processID", processID,
 					"stdinFD", int(stdinFile.Fd()))
@@ -237,7 +236,7 @@ func (o *xpcContainerOps) ExecStream(ctx context.Context, opts *ExecContainer, c
 			case <-done:
 				return
 			case sig := <-sigCh:
-				slog.InfoContext(ctx, "xpcContainerOps.ExecStream signal received",
+				slog.DebugContext(ctx, "xpcContainerOps.ExecStream signal received",
 					"containerID", containerID,
 					"processID", processID,
 					"signal", sig.String())
@@ -262,23 +261,20 @@ func (o *xpcContainerOps) ExecStream(ctx context.Context, opts *ExecContainer, c
 		cleanup()
 		return nil, err
 	}
-	slog.InfoContext(ctx, "xpcContainerOps.ExecStream process started", "containerID", containerID, "processID", processID)
 
 	return func() error {
-		slog.InfoContext(ctx, "xpcContainerOps.ExecStream waiting", "containerID", containerID, "processID", processID)
 		defer func() {
 			close(done)
 			restore()
 			cleanup()
-			slog.InfoContext(ctx, "xpcContainerOps.ExecStream cleanup complete", "containerID", containerID, "processID", processID)
 		}()
 		code, err := o.client.WaitProcess(ctx, containerID, processID)
 		if err != nil {
-			slog.WarnContext(ctx, "xpcContainerOps.ExecStream wait failed", "containerID", containerID, "processID", processID, "error", err)
+			slog.ErrorContext(ctx, "xpcContainerOps.ExecStream wait failed", "containerID", containerID, "processID", processID, "cmd", cmd, "error", err)
 			return err
 		}
-		slog.InfoContext(ctx, "xpcContainerOps.ExecStream process exited", "containerID", containerID, "processID", processID, "exitCode", code)
 		if code != 0 {
+			slog.ErrorContext(ctx, "xpcContainerOps.ExecStream process exited", "containerID", containerID, "processID", processID, "cmd", cmd, "exitCode", code)
 			return fmt.Errorf("process exited with code %d", code)
 		}
 		return nil

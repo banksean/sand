@@ -93,8 +93,6 @@ func agentInstallHookScript(agentName string, install agentdefs.InstallSpec) (st
 	switch install.Kind {
 	case agentdefs.InstallerNPM:
 		return fmt.Sprintf("install-npm-agent %s %s %s\n", install.Command, install.Package, install.Version), nil
-	case agentdefs.InstallerOpenCode:
-		return fmt.Sprintf("install-opencode-agent %s %s\n", install.Command, install.Version), nil
 	default:
 		return "", fmt.Errorf("unknown installer kind %q for agent %q", install.Kind, agentName)
 	}

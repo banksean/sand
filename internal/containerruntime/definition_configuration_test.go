@@ -115,21 +115,6 @@ func TestDefinitionContainerConfigurationKeepsOpenCodeTunnelAsRecurringHook(t *t
 	}
 }
 
-func TestAgentInstallHookScriptUsesOpenCodeCommand(t *testing.T) {
-	definition, ok := agentdefs.Lookup("opencode")
-	if !ok {
-		t.Fatal("missing opencode definition")
-	}
-	script, err := agentInstallHookScript(definition.Name, *definition.Install)
-	if err != nil {
-		t.Fatalf("agentInstallHookScript() error = %v", err)
-	}
-	want := "install-opencode-agent opencode 1.18.4\n"
-	if script != want {
-		t.Fatalf("opencode install script = %q, want %q", script, want)
-	}
-}
-
 func TestAgentInstallScriptRejectsUnsafeSpec(t *testing.T) {
 	_, err := agentInstallHookScript("bad agent", agentdefs.InstallSpec{
 		Kind:    agentdefs.InstallerNPM,
