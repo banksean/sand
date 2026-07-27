@@ -190,7 +190,7 @@ func discover(root, format string) ([]string, error) {
 				paths = append(paths, path)
 			}
 		case "gemini-json":
-			if strings.HasSuffix(name, ".json") && strings.Contains(filepath.ToSlash(path), "/chats/") {
+			if strings.HasSuffix(name, ".jsonl") && strings.Contains(filepath.ToSlash(path), "/chats/") {
 				paths = append(paths, path)
 			}
 		case "opencode-sqlite":

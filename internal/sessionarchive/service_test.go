@@ -99,6 +99,76 @@ func TestDiscoverFiltersAgentState(t *testing.T) {
 	}
 }
 
+func TestDiscoverGeminiJSONLSessions(t *testing.T) {
+	root := t.TempDir()
+	chatsDir := filepath.Join(root, "project-hash", "chats")
+	logsDir := filepath.Join(root, "project-hash", "logs")
+	if err := os.MkdirAll(chatsDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(logsDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for path, data := range map[string]string{
+		filepath.Join(chatsDir, "session-current.jsonl"): `{"sessionId":"current"}` + "\n",
+		filepath.Join(chatsDir, "session-legacy.json"):   `{"sessionId":"legacy"}` + "\n",
+		filepath.Join(logsDir, "session-log.jsonl"):      `{"sessionId":"log"}` + "\n",
+	} {
+		if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	paths, err := discover(root, "gemini-json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(paths) != 1 || filepath.Base(paths[0]) != "session-current.jsonl" {
+		t.Fatalf("paths = %v", paths)
+	}
+}
+
+func TestServiceSyncGeminiJSONLSession(t *testing.T) {
+	root := t.TempDir()
+	database, err := db.Connect(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	service := New(root, database)
+	box := &sandtypes.Box{ID: "box-gemini", Name: "gemini-demo", AgentType: "gemini", SandboxWorkDir: filepath.Join(root, "clones", "box-gemini"), SessionArchiveEnabled: true}
+	chatsDir := filepath.Join(NativeDir(root, box.ID, box.AgentType), "project-hash", "chats")
+	if err := os.MkdirAll(chatsDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	nativePath := filepath.Join(chatsDir, "session-2026-07-27T12-00-12345678.jsonl")
+	data := strings.Join([]string{
+		`{"sessionId":"12345678-1234-1234-1234-123456789abc","projectHash":"project-hash","startTime":"2026-07-27T12:00:00Z","lastUpdated":"2026-07-27T12:01:00Z"}`,
+		`{"id":"message-1","timestamp":"2026-07-27T12:00:00Z","type":"user","content":"fix the Gemini session listing"}`,
+		`{"id":"message-2","timestamp":"2026-07-27T12:01:00Z","type":"gemini","content":"I will inspect it."}`,
+	}, "\n") + "\n"
+	if err := os.WriteFile(nativePath, []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := service.Sync(context.Background(), box); err != nil {
+		t.Fatal(err)
+	}
+	sessions, err := service.List(context.Background(), "gemini", "gemini-demo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sessions) != 1 {
+		t.Fatalf("sessions = %d, want 1", len(sessions))
+	}
+	if sessions[0].Status != "complete" {
+		t.Fatalf("status = %q, want complete", sessions[0].Status)
+	}
+	if sessions[0].Title != "fix the Gemini session listing" {
+		t.Fatalf("title = %q", sessions[0].Title)
+	}
+}
+
 func TestStableIDSeparatesAgentTypes(t *testing.T) {
 	if stableID("claude", "same") == stableID("codex", "same") {
 		t.Fatal("stable IDs collided across agent types")
