@@ -11,6 +11,8 @@ It may seem odd for `sand` to have an "observability" package since `sand` is a 
 
 The `sand` and `sandd` executables include OpenTelemetry instrumentation to generate and export traces for some common operations (at time of this writing, it's limited only to gRPC client/server stub call sites).
 
+`sandd` also bridges its `slog` output to an OTLP log exporter, so every log message it writes to its local log file is also exported for collection in Grafana/Loki. This is enabled by the same `OTEL_EXPORTER_OTLP_ENDPOINT` env var used for traces (or `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT`/`OTEL_LOGS_EXPORTER` if you want to configure logs independently of traces) — see [`internal/observability/logging.go`](../internal/observability/logging.go).
+
 [`../Taskfile.yaml`](../Taskfile.yaml) includes helper tasks to start a local OpenTelemetry Collector, Tempo, Loki, and Grafana stack. The collector receives OTLP data, forwards traces to Tempo, and forwards logs to Loki.
 
 ```sh

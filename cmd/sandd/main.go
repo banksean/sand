@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -193,7 +194,7 @@ func (c *DaemonCmd) stopDaemon(ctx context.Context, server *daemon.Daemon) error
 	return nil
 }
 
-func (c *DaemonCmd) initSlog() {
+func (c *DaemonCmd) initSlog(ctx context.Context) (func(context.Context) error, bool) {
 	var level slog.Level
 	switch c.LogLevel {
 	case "debug":
@@ -230,10 +231,22 @@ func (c *DaemonCmd) initSlog() {
 	if err != nil {
 		panic(err)
 	}
+
+	otelHandler, shutdownLogging, loggingEnabled, err := observability.InitLogging(ctx, "sandd")
+	if err != nil {
+		// slog isn't set up yet at this point, so fall back to the standard logger.
+		log.Printf("failed to initialize log export: %v", err)
+	}
+	if loggingEnabled {
+		handler = sandboxlog.NewMultiHandler(handler, otelHandler)
+	}
+
 	handler = sandboxlog.NewRedactionHandler(sandboxlog.NewContextHandler(handler))
 	logger := slog.New(handler)
 	slog.SetDefault(logger)
-	slog.Info("daemon slog initialized")
+	slog.Info("daemon slog initialized", "otlpLoggingEnabled", loggingEnabled)
+
+	return shutdownLogging, loggingEnabled
 }
 
 func appHomeDir() (string, error) {
@@ -277,7 +290,14 @@ func main() {
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	cli.initSlog()
+	shutdownLogging, loggingEnabled := cli.initSlog(ctx)
+	if loggingEnabled {
+		defer func() {
+			if err := observability.Shutdown(ctx, shutdownLogging); err != nil {
+				slog.WarnContext(ctx, "failed to shutdown log export", "error", err)
+			}
+		}()
+	}
 	versionInfo := version.Get()
 
 	shutdownTracing, tracingEnabled, err := observability.InitTracing(ctx, "sandd")
