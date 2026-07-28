@@ -25,6 +25,8 @@ import (
 	"github.com/banksean/sand/internal/sandboxlog"
 	"github.com/banksean/sand/internal/version"
 	kongcompletion "github.com/jotaen/kong-completion"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 type Outie struct {
@@ -355,6 +357,19 @@ func main() {
 		ctx, cancel = context.WithTimeout(ctx, app.Timeout)
 		defer cancel()
 	}
+
+	tracer := otel.Tracer("sand CLI")
+	ctx, rootSpan := tracer.Start(ctx, "sand")
+	defer rootSpan.End()
+	cwd, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to get cwd, error: %v\n", err)
+		os.Exit(1)
+	}
+	rootSpan.SetAttributes(
+		attribute.String("cwd", cwd),
+		attribute.StringSlice("args", kongCtx.Args),
+	)
 
 	err = kongCtx.Run(&cli.CLIContext{
 		Daemon:       mc,
