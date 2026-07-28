@@ -3,7 +3,10 @@ package cli
 import (
 	"bytes"
 	"context"
+	"errors"
+	"io"
 	"testing"
+	"time"
 
 	"github.com/banksean/sand/internal/daemon/daemontest"
 	"github.com/banksean/sand/internal/sandtypes"
@@ -59,6 +62,43 @@ func TestRmCmd_ConfirmedAllOnlyRemovesApprovedSandboxes(t *testing.T) {
 	}
 }
 
+func TestRmCmd_ContextCancellationAbortsPrompt(t *testing.T) {
+	cctx := newTestCLIContext(t, func(ctx context.Context, s daemontest.SandboxStore) {
+		s.SaveSandbox(ctx, newTestBox("target"))
+	})
+
+	// A stdin that never produces input or EOF, simulating a user who hasn't
+	// answered the prompt yet.
+	pr, pw := io.Pipe()
+	t.Cleanup(func() { pw.Close() })
+	restoreRmCmdIO(t, pr, &bytes.Buffer{})
+
+	ctx, cancel := context.WithCancel(cctx.Context)
+	cctx.Context = ctx
+	cancel() // simulate Ctrl-C firing before the user responds
+
+	done := make(chan error, 1)
+	cmd := &RmCmd{MultiSandboxNameFlags: MultiSandboxNameFlags{SandboxNames: []string{"target"}}}
+	go func() { done <- cmd.Run(cctx) }()
+
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("Run() error = %v, want context.Canceled", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Run() did not return after context cancellation; Ctrl-C would not abort the prompt")
+	}
+
+	boxes, err := cctx.Daemon.ListSandboxes(context.Background())
+	if err != nil {
+		t.Fatalf("ListSandboxes() error = %v", err)
+	}
+	if len(boxes) != 1 || boxes[0].ID != "target" {
+		t.Fatalf("expected target to remain since the prompt was cancelled, got %v", testBoxIDs(boxes))
+	}
+}
+
 func newTestCLIContext(t *testing.T, configure func(context.Context, daemontest.SandboxStore)) *CLIContext {
 	t.Helper()
 	client := daemontest.StartDaemon(t, daemontest.Deps{}, configure)
@@ -79,7 +119,7 @@ func newTestBox(id string) *sandtypes.Box {
 	}
 }
 
-func restoreRmCmdIO(t *testing.T, stdin *bytes.Buffer, stdout *bytes.Buffer) {
+func restoreRmCmdIO(t *testing.T, stdin io.Reader, stdout *bytes.Buffer) {
 	t.Helper()
 
 	prevIn := rmCmdStdin

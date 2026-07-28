@@ -95,8 +95,9 @@ func (c *SessionRmCmd) Run(cctx *CLIContext) error {
 	}
 	if !c.Force {
 		fmt.Fprintf(sessionRmStdout, "delete archived %s session %.12s (%s) [y/N]? ", session.AgentType, session.ID, session.Title)
-		text, err := bufio.NewReader(sessionRmStdin).ReadString('\n')
+		text, err := readPromptLine(cctx.Context, bufio.NewReader(sessionRmStdin))
 		if err != nil && !errors.Is(err, io.EOF) {
+			fmt.Fprintln(sessionRmStdout)
 			return err
 		}
 		if !isYes(text) {

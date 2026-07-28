@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -53,7 +54,7 @@ func (c *RmCmd) Run(cctx *CLIContext) error {
 		reader := bufio.NewReader(rmCmdStdin)
 		confirmed := make([]rmTarget, 0, len(targets))
 		for _, target := range targets {
-			ok, err := confirmSandboxRemoval(target.name, reader, rmCmdStdout)
+			ok, err := confirmSandboxRemoval(ctx, target.name, reader, rmCmdStdout)
 			if err != nil {
 				return err
 			}
@@ -104,11 +105,12 @@ func (c *RmCmd) Run(cctx *CLIContext) error {
 	return nil
 }
 
-func confirmSandboxRemoval(id string, reader *bufio.Reader, stdout io.Writer) (bool, error) {
+func confirmSandboxRemoval(ctx context.Context, id string, reader *bufio.Reader, stdout io.Writer) (bool, error) {
 	fmt.Fprintf(stdout, "remove %s [y/N]? ", id)
 
-	text, err := reader.ReadString('\n')
+	text, err := readPromptLine(ctx, reader)
 	if err != nil && !errors.Is(err, io.EOF) {
+		fmt.Fprintln(stdout)
 		return false, fmt.Errorf("couldn't read from stdin: %w", err)
 	}
 

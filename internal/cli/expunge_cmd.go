@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -66,7 +67,7 @@ func (c *ExpungeCmd) Run(cctx *CLIContext) error {
 		reader := bufio.NewReader(expungeCmdStdin)
 		confirmed := make([]expungeTarget, 0, len(targets))
 		for _, target := range targets {
-			ok, err := confirmSandboxExpunge(target.row, reader, expungeCmdStdout)
+			ok, err := confirmSandboxExpunge(ctx, target.row, reader, expungeCmdStdout)
 			if err != nil {
 				return err
 			}
@@ -102,11 +103,12 @@ func (c *ExpungeCmd) Run(cctx *CLIContext) error {
 	return nil
 }
 
-func confirmSandboxExpunge(row lsRow, reader *bufio.Reader, stdout io.Writer) (bool, error) {
+func confirmSandboxExpunge(ctx context.Context, row lsRow, reader *bufio.Reader, stdout io.Writer) (bool, error) {
 	fmt.Fprintf(stdout, "expunge %s [y/N]? ", formatExpungeSummary(row))
 
-	text, err := reader.ReadString('\n')
+	text, err := readPromptLine(ctx, reader)
 	if err != nil && !errors.Is(err, io.EOF) {
+		fmt.Fprintln(stdout)
 		return false, fmt.Errorf("couldn't read from stdin: %w", err)
 	}
 

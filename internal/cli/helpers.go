@@ -287,6 +287,29 @@ var (
 	checkSSHReachability = sshimmer.CheckSSHReachability
 )
 
+// readPromptLine reads a line from reader, but returns ctx.Err() as soon as ctx
+// is cancelled (e.g. Ctrl-C during a "[y/N]?" prompt) instead of blocking until
+// the user actually responds. The underlying read on os.Stdin can't be
+// interrupted directly, so it keeps running in the background; that's fine
+// since the process exits shortly after this returns.
+func readPromptLine(ctx context.Context, reader *bufio.Reader) (string, error) {
+	type result struct {
+		text string
+		err  error
+	}
+	ch := make(chan result, 1)
+	go func() {
+		text, err := reader.ReadString('\n')
+		ch <- result{text, err}
+	}()
+	select {
+	case <-ctx.Done():
+		return "", ctx.Err()
+	case r := <-ch:
+		return r.text, r.err
+	}
+}
+
 // runShell executes an interactive shell or command in sbox's container over SSH,
 // connecting the current process's stdin/stdout/stderr. Non-zero shell exit is
 // logged but not returned as an error — an interactive session ending with a
@@ -375,8 +398,9 @@ func ensureSSHReachability(ctx context.Context, hostname string) error {
 	if os.Getenv("SMOKE_TEST") == "" {
 		reader := bufio.NewReader(os.Stdin)
 		fmt.Printf("\nTo enable you to use ssh to connect to local sand containers, we need to add one line to the top of your ssh config. Proceed [y/N]? ")
-		text, err := reader.ReadString('\n')
+		text, err := readPromptLine(ctx, reader)
 		if err != nil {
+			fmt.Println()
 			return fmt.Errorf("couldn't read from stdin: %w", err)
 		}
 		text = strings.TrimSpace(strings.ToLower(text))
