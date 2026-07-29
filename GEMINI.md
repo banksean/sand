@@ -6,7 +6,7 @@ This file provides guidance to the Gemini CLI (or any Gemini-based AI agent) whe
 
 `sand` creates lightweight, disposable Linux sandboxes for AI coding agents on Apple Silicon Macs. It uses APFS copy-on-write clones for fast filesystem isolation and Apple Containerization (Kata-based) for hardware-level process isolation. The primary use case is running AI agents (such as Gemini, Claude Code, Codex, opencode) against a cloned project without risk to the host filesystem.
 
-**Platform requirements:** macOS 26+, Apple Silicon, Apple `container` CLI v1.1.0.
+**Platform requirements:** macOS 26+, Apple Silicon, Apple `container` CLI v1.2.0.
 
 ## Build and development commands
 
