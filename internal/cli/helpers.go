@@ -287,6 +287,14 @@ var (
 	checkSSHReachability = sshimmer.CheckSSHReachability
 )
 
+type sshAgentPolicy int
+
+const (
+	sshAgentDefault sshAgentPolicy = iota
+	sshAgentForward
+	sshAgentDisable
+)
+
 // readPromptLine reads a line from reader, but returns ctx.Err() as soon as ctx
 // is cancelled (e.g. Ctrl-C during a "[y/N]?" prompt) instead of blocking until
 // the user actually responds. The underlying read on os.Stdin can't be
@@ -314,7 +322,7 @@ func readPromptLine(ctx context.Context, reader *bufio.Reader) (string, error) {
 // connecting the current process's stdin/stdout/stderr. Non-zero shell exit is
 // logged but not returned as an error — an interactive session ending with a
 // non-zero code is not a CLI failure.
-func runShell(ctx context.Context, sbox *sandtypes.Box, shell string, args []string, scrubSSHAgent bool, envFile string, extraEnv map[string]string) error {
+func runShell(ctx context.Context, sbox *sandtypes.Box, shell string, args []string, sshAgent sshAgentPolicy, envFile string, extraEnv map[string]string) error {
 	if sbox.Container == nil {
 		return fmt.Errorf("sandbox %s has no container", sbox.ID)
 	}
@@ -323,11 +331,11 @@ func runShell(ctx context.Context, sbox *sandtypes.Box, shell string, args []str
 		return err
 	}
 
-	env, err := interactiveSSHEnv(hostname, scrubSSHAgent, envFile, mergeEnv(sandboxProxyEnv(sbox), extraEnv))
+	env, err := interactiveSSHEnv(hostname, sshAgent == sshAgentDisable, envFile, mergeEnv(sandboxProxyEnv(sbox), extraEnv))
 	if err != nil {
 		return err
 	}
-	cmd := sshStreamCommand(ctx, hostname, true, env, shell, args)
+	cmd := sshStreamCommand(ctx, hostname, true, sshAgent, env, shell, args)
 	slog.InfoContext(ctx, "runShell: ssh", "sandbox", sbox.ID, "hostname", hostname, "shell", shell)
 	if err := cmd.Run(); err != nil {
 		slog.WarnContext(ctx, "runShell: shell exited with error", "sandbox", sbox.ID, "error", err)
@@ -365,7 +373,7 @@ func runSSHStream(ctx context.Context, sbox *sandtypes.Box, tty bool, envFile st
 	if err != nil {
 		return err
 	}
-	cmd := sshStreamCommand(ctx, hostname, tty, env, shell, args)
+	cmd := sshStreamCommand(ctx, hostname, tty, sshAgentDisable, env, shell, args)
 	slog.InfoContext(ctx, "runSSHStream: ssh", "sandbox", sbox.ID, "hostname", hostname, "shell", shell, "tty", tty)
 	return cmd.Run()
 }
@@ -374,10 +382,16 @@ func sshOutputCommand(ctx context.Context, hostname string, env map[string]strin
 	return sshCommand(ctx, "ssh", hostname, remoteInteractiveCommand(env, shell, args))
 }
 
-func sshStreamCommand(ctx context.Context, hostname string, tty bool, env map[string]string, shell string, args []string) *exec.Cmd {
+func sshStreamCommand(ctx context.Context, hostname string, tty bool, sshAgent sshAgentPolicy, env map[string]string, shell string, args []string) *exec.Cmd {
 	sshArgs := []string{}
 	if tty {
 		sshArgs = append(sshArgs, "-tt")
+	}
+	switch sshAgent {
+	case sshAgentForward:
+		sshArgs = append(sshArgs, "-A")
+	case sshAgentDisable:
+		sshArgs = append(sshArgs, "-a")
 	}
 	sshArgs = append(sshArgs, hostname, remoteInteractiveCommand(env, shell, args))
 	cmd := sshCommand(ctx, "ssh", sshArgs...)

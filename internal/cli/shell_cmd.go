@@ -94,7 +94,11 @@ func (c *ShellCmd) Run(cctx *CLIContext) error {
 			return fmt.Errorf("begin agent session archive: %w", err)
 		}
 	}
-	runErr := runShell(ctx, sbox, shell, args, false, projectEnv.EnvFile, env)
+	sshAgent := sshAgentDefault
+	if c.SSHAgent {
+		sshAgent = sshAgentForward
+	}
+	runErr := runShell(ctx, sbox, shell, args, sshAgent, projectEnv.EnvFile, env)
 	if launchID != "" {
 		archiveCtx := context.WithoutCancel(ctx)
 		if !c.Tmux && !c.Atch {

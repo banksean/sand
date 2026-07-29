@@ -219,7 +219,14 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 			return fmt.Errorf("begin agent session archive: %w", err)
 		}
 	}
-	runErr := runShell(ctx, sbox, shell, args, c.Agent != "", shellEnv.EnvFile, mergeEnv(shellEnv.Env, agentEnv))
+	sshAgent := sshAgentDefault
+	if c.SSHAgent {
+		sshAgent = sshAgentForward
+	}
+	if c.Agent != "" {
+		sshAgent = sshAgentDisable
+	}
+	runErr := runShell(ctx, sbox, shell, args, sshAgent, shellEnv.EnvFile, mergeEnv(shellEnv.Env, agentEnv))
 	if launchID != "" {
 		archiveCtx := context.WithoutCancel(ctx)
 		if !c.Tmux && !c.Atch {

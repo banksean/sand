@@ -1,13 +1,37 @@
 package cli
 
 import (
+	"context"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/banksean/sand/internal/sandtypes"
 )
+
+func TestSSHStreamCommandAgentForwarding(t *testing.T) {
+	tests := []struct {
+		name       string
+		policy     sshAgentPolicy
+		wantPrefix []string
+	}{
+		{name: "default", policy: sshAgentDefault, wantPrefix: []string{"-tt", "box.local"}},
+		{name: "forward", policy: sshAgentForward, wantPrefix: []string{"-tt", "-A", "box.local"}},
+		{name: "disable", policy: sshAgentDisable, wantPrefix: []string{"-tt", "-a", "box.local"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := sshStreamCommand(context.Background(), "box.local", true, tt.policy, nil, "/bin/sh", nil)
+			got := cmd.Args[1 : 1+len(tt.wantPrefix)]
+			if !reflect.DeepEqual(got, tt.wantPrefix) {
+				t.Fatalf("ssh args prefix = %#v, want %#v", got, tt.wantPrefix)
+			}
+		})
+	}
+}
 
 func TestBuildInteractiveEnv(t *testing.T) {
 	t.Run("default shell env", func(t *testing.T) {
