@@ -28,7 +28,7 @@ const (
 	HTTPProxyCacheContainerName = "sand-http-cache"
 	HTTPProxyCacheImage         = "docker.io/ubuntu/squid:6.6-24.04_beta"
 	HTTPProxyCachePort          = 3128
-	httpProxyCacheVersion       = "3"
+	httpProxyCacheVersion       = "4"
 	httpProxyCacheDirName       = "http-proxy"
 	httpProxySquidDirName       = "squid"
 	httpProxyLogDirName         = "http-proxy"
@@ -55,8 +55,9 @@ cache_mem 256 MB
 strip_query_terms on
 log_mime_hdrs off
 logformat sand %ts.%03tu duration_ms=%tr client=%>a cache=%Ss status=%>Hs bytes=%<st method=%rm url=%ru hierarchy=%Sh peer=%<a content_type=%mt dns_ms=%dt error=%err_code
-access_log stdio:/var/log/squid/access.log sand
+access_log stdio:/var/log/squid/access.log logformat=sand rotate=5
 cache_log /var/log/squid/cache.log
+logfile_rotate 5
 
 http_access allow all
 `
@@ -100,6 +101,16 @@ if [ ! -d /var/lib/squid/ssl_db ]; then
 fi
 chown -R proxy:proxy /var/lib/squid /var/spool/squid /var/log/squid 2>/dev/null || true
 /usr/sbin/squid -z -f /etc/squid/sand-squid.conf -NYC
+(
+	while sleep 60; do
+		for log_file in /var/log/squid/access.log /var/log/squid/cache.log; do
+			if [ -f "$log_file" ] && [ "$(wc -c < "$log_file")" -ge 26214400 ]; then
+				/usr/sbin/squid -k rotate -f /etc/squid/sand-squid.conf || true
+				break
+			fi
+		done
+	done
+) &
 exec /usr/sbin/squid -f /etc/squid/sand-squid.conf -NYC
 `
 

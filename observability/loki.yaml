@@ -14,6 +14,13 @@ common:
     kvstore:
       store: inmemory
 
+compactor:
+  working_directory: /loki/compactor
+  compaction_interval: 10m
+  retention_enabled: true
+  retention_delete_delay: 2h
+  delete_request_store: filesystem
+
 schema_config:
   configs:
     - from: 2024-01-01
@@ -26,3 +33,4 @@ schema_config:
 
 limits_config:
   allow_structured_metadata: true
+  retention_period: 168h

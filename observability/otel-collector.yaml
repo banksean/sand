@@ -7,7 +7,7 @@ receivers:
         endpoint: 0.0.0.0:4318
   filelog/squid:
     include:
-      - /var/log/squid/*.log
+      - /var/log/squid/*.log*
     start_at: beginning
     storage: file_storage
 

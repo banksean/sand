@@ -257,12 +257,18 @@ func TestHTTPProxyCacheEnsureWritesSquidCAAndConfig(t *testing.T) {
 	for _, directive := range []string{
 		"strip_query_terms on",
 		"log_mime_hdrs off",
-		"access_log stdio:/var/log/squid/access.log sand",
+		"access_log stdio:/var/log/squid/access.log logformat=sand rotate=5",
 		"cache_log /var/log/squid/cache.log",
+		"logfile_rotate 5",
 	} {
 		if !strings.Contains(string(config), directive) {
 			t.Fatalf("squid config missing %q directive:\n%s", directive, config)
 		}
+	}
+	if !strings.Contains(httpProxyCacheEntrypointScript, `wc -c < "$log_file"`) ||
+		!strings.Contains(httpProxyCacheEntrypointScript, "-ge 26214400") ||
+		!strings.Contains(httpProxyCacheEntrypointScript, "squid -k rotate") {
+		t.Fatalf("HTTP proxy entrypoint is missing size-based log rotation:\n%s", httpProxyCacheEntrypointScript)
 	}
 }
 

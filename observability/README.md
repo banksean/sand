@@ -35,7 +35,7 @@ sand ls
 
 Then navigate to http://grafana.dev.local:3000/a/grafana-exploretraces-app/explore (you can substitute whatever `container system property get dns.domain` returns for `dev.local` in that URL, if it isn't `dev.local`) to verify that the `sand ls` invocation generated a trace. Use Grafana Explore with the Loki datasource to inspect collected logs.
 
-To inspect Squid logs, enable or start the HTTP proxy, generate a proxied request, and query `{service_name="sand-http-cache"}` in Grafana Explore. Squid strips URL query strings and does not log request headers. After upgrading an existing proxy, run `sand cache http-proxy clear` followed by `sand cache http-proxy start` once so its container gets the log mount. The task reads proxy logs from the default Sand app directory, `~/Library/Application Support/Sand`; if Sand uses a custom app base directory, start observability with `SAND_APP_BASE_DIR=/path/to/Sand`.
+To inspect Squid logs, enable or start the HTTP proxy, generate a proxied request, and query `{service_name="sand-http-cache"}` in Grafana Explore. Squid strips URL query strings and does not log request headers. Its access and diagnostic files rotate at approximately 25 MiB with five old generations retained, and Loki retains ingested logs for seven days. After upgrading an existing proxy, run `sand cache http-proxy clear` followed by `sand cache http-proxy start` once so its container gets the log mount. The task reads proxy logs from the default Sand app directory, `~/Library/Application Support/Sand`; if Sand uses a custom app base directory, start observability with `SAND_APP_BASE_DIR=/path/to/Sand`.
 
 ## Configuration
 
