@@ -6,6 +6,7 @@ vars:
   DAEMON_PROTO: internal/daemon/daemonpb/daemon.proto
   DAEMON_PROTO_OUT_DIR: .
   OBSERVABILITY_DATA_DIR: '{{.TASKFILE_DIR}}/.observability-data'
+  SAND_APP_BASE_DIR: '{{.SAND_APP_BASE_DIR | default (printf "%s/Library/Application Support/Sand" .HOME)}}'
   CONTAINER_DNS_DOMAIN: '{{.CONTAINER_DNS_DOMAIN | default "dev.local"}}'
   GIT_REPO:
     sh: git remote get-url origin
@@ -182,6 +183,8 @@ tasks:
 
   otel-collector:
     cmds:
+      - mkdir -p "{{.OBSERVABILITY_DATA_DIR}}/otel-collector"
+      - mkdir -p "{{.SAND_APP_BASE_DIR}}/logs/http-proxy"
       - echo "Starting otel-collector.{{.CONTAINER_DNS_DOMAIN}}"
       - >-
         container run
@@ -192,6 +195,8 @@ tasks:
         -p 4317:4317/tcp
         -p 4318:4318/tcp
         --volume {{.TASKFILE_DIR}}/observability/otel-collector.yaml:/etc/otelcol/config.yaml:ro
+        --volume "{{.OBSERVABILITY_DATA_DIR}}/otel-collector:/var/lib/otelcol"
+        --volume "{{.SAND_APP_BASE_DIR}}/logs/http-proxy:/var/log/squid:ro"
         docker.io/otel/opentelemetry-collector-contrib:latest
         --config=/etc/otelcol/config.yaml
 

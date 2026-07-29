@@ -28,9 +28,10 @@ const (
 	HTTPProxyCacheContainerName = "sand-http-cache"
 	HTTPProxyCacheImage         = "docker.io/ubuntu/squid:6.6-24.04_beta"
 	HTTPProxyCachePort          = 3128
-	httpProxyCacheVersion       = "2"
+	httpProxyCacheVersion       = "3"
 	httpProxyCacheDirName       = "http-proxy"
 	httpProxySquidDirName       = "squid"
+	httpProxyLogDirName         = "http-proxy"
 	httpProxyCacheServiceLabel  = "sand.service"
 	httpProxyCacheVersionLabel  = "sand.service.version"
 	httpProxyCacheServiceValue  = "http-proxy"
@@ -51,11 +52,17 @@ cache_dir ufs /var/spool/squid 10000 16 256
 maximum_object_size 1024 MB
 cache_mem 256 MB
 
+strip_query_terms on
+log_mime_hdrs off
+logformat sand %ts.%03tu duration_ms=%tr client=%>a cache=%Ss status=%>Hs bytes=%<st method=%rm url=%ru hierarchy=%Sh peer=%<a content_type=%mt dns_ms=%dt error=%err_code
+access_log stdio:/var/log/squid/access.log sand
+cache_log /var/log/squid/cache.log
+
 http_access allow all
 `
 
 const httpProxyCacheEntrypointScript = `set -eu
-mkdir -p /var/lib/squid /etc/squid/certs
+mkdir -p /var/lib/squid /etc/squid/certs /var/log/squid
 if ! command -v /usr/lib/squid/security_file_certgen >/dev/null 2>&1; then
 	if command -v apt-get >/dev/null 2>&1; then
 		apt-get update
@@ -91,7 +98,7 @@ fi
 if [ ! -d /var/lib/squid/ssl_db ]; then
 	/usr/lib/squid/security_file_certgen -c -s /var/lib/squid/ssl_db -M 4MB
 fi
-chown -R proxy:proxy /var/lib/squid /var/spool/squid 2>/dev/null || true
+chown -R proxy:proxy /var/lib/squid /var/spool/squid /var/log/squid 2>/dev/null || true
 /usr/sbin/squid -z -f /etc/squid/sand-squid.conf -NYC
 exec /usr/sbin/squid -f /etc/squid/sand-squid.conf -NYC
 `
@@ -209,7 +216,7 @@ func (s *HTTPProxyCacheService) Clear(ctx context.Context) error {
 		return err
 	}
 	if ctr != nil {
-		if err := validateHTTPProxyCacheContainer(ctr); err != nil {
+		if err := validateHTTPProxyCacheContainerForClear(ctr); err != nil {
 			return err
 		}
 		if _, err := s.boxer.ContainerService.Delete(ctx, &hostops.DeleteContainer{Force: true}, HTTPProxyCacheContainerName); err != nil {
@@ -256,6 +263,10 @@ func (s *HTTPProxyCacheService) create(ctx context.Context, localDomain string) 
 	if err := s.boxer.FileOps.MkdirAll(cacheDir, 0o755); err != nil {
 		return fmt.Errorf("create HTTP proxy cache dir: %w", err)
 	}
+	logDir := s.logDir()
+	if err := s.boxer.FileOps.MkdirAll(logDir, 0o755); err != nil {
+		return fmt.Errorf("create HTTP proxy log dir: %w", err)
+	}
 	_, err := s.boxer.ContainerService.Create(ctx, &hostops.CreateContainer{
 		ResourceOptions: hostops.ResourceOptions{
 			CPUs:   1,
@@ -276,6 +287,7 @@ func (s *HTTPProxyCacheService) create(ctx context.Context, localDomain string) 
 				}.String(),
 				httpProxySquidConfigPath(s.boxer.appRoot) + ":/etc/squid/sand-squid.conf:ro",
 				httpProxySquidPEMPath(s.boxer.appRoot) + ":/etc/squid/certs/squid.pem:ro",
+				s.logDir() + ":/var/log/squid",
 			},
 			Entrypoint: "/bin/sh",
 		},
@@ -302,6 +314,10 @@ func (s *HTTPProxyCacheService) inspect(ctx context.Context) (*sandtypes.Contain
 
 func (s *HTTPProxyCacheService) cacheDir() string {
 	return filepath.Join(s.boxer.appRoot, "caches", httpProxyCacheDirName)
+}
+
+func (s *HTTPProxyCacheService) logDir() string {
+	return filepath.Join(s.boxer.appRoot, "logs", httpProxyLogDirName)
 }
 
 func (s *HTTPProxyCacheService) ensureSquidFiles() error {
@@ -489,6 +505,23 @@ func validateHTTPProxyCacheContainer(ctr *sandtypes.Container) error {
 	}
 	if image := ctr.Configuration.Image.Reference; image != "" && !isExpectedHTTPProxyCacheImage(image) {
 		return fmt.Errorf("container %q uses image %q, want %q; run `sand cache http-proxy clear` and start it again", HTTPProxyCacheContainerName, image, HTTPProxyCacheImage)
+	}
+	return nil
+}
+
+func validateHTTPProxyCacheContainerForClear(ctr *sandtypes.Container) error {
+	if ctr == nil {
+		return nil
+	}
+	service, ok := stringLabel(ctr.Configuration.Labels, httpProxyCacheServiceLabel)
+	if !ok {
+		if isExpectedHTTPProxyCacheImage(ctr.Configuration.Image.Reference) {
+			return nil
+		}
+		return fmt.Errorf("container %q already exists but is not managed by sand", HTTPProxyCacheContainerName)
+	}
+	if service != httpProxyCacheServiceValue {
+		return fmt.Errorf("container %q has unexpected %s label %q", HTTPProxyCacheContainerName, httpProxyCacheServiceLabel, service)
 	}
 	return nil
 }

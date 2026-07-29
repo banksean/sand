@@ -11,7 +11,7 @@ It may seem odd for `sand` to have an "observability" package since `sand` is a 
 
 The `sand` and `sandd` executables include OpenTelemetry instrumentation to generate and export traces for some common operations (at time of this writing, it's limited only to gRPC client/server stub call sites).
 
-`sandd` also bridges its `slog` output to an OTLP log exporter, so every log message it writes to its local log file is also exported for collection in Grafana/Loki. This is enabled by the same `OTEL_EXPORTER_OTLP_ENDPOINT` env var used for traces (or `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT`/`OTEL_LOGS_EXPORTER` if you want to configure logs independently of traces) — see [`internal/observability/logging.go`](../internal/observability/logging.go).
+`sandd` also bridges its `slog` output to an OTLP log exporter, so every log message it writes to its local log file is also exported for collection in Grafana/Loki. This is enabled by the same `OTEL_EXPORTER_OTLP_ENDPOINT` env var used for traces (or `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT`/`OTEL_LOGS_EXPORTER` if you want to configure logs independently of traces) — see [`internal/observability/logging.go`](../internal/observability/logging.go). The collector also tails the managed Squid proxy's access and diagnostic logs and sends them to Loki with `service.name=sand-http-cache`.
 
 [`../Taskfile.yaml`](../Taskfile.yaml) includes helper tasks to start a local OpenTelemetry Collector, Tempo, Loki, and Grafana stack. The collector receives OTLP data, forwards traces to Tempo, and forwards logs to Loki.
 
@@ -35,6 +35,8 @@ sand ls
 
 Then navigate to http://grafana.dev.local:3000/a/grafana-exploretraces-app/explore (you can substitute whatever `container system property get dns.domain` returns for `dev.local` in that URL, if it isn't `dev.local`) to verify that the `sand ls` invocation generated a trace. Use Grafana Explore with the Loki datasource to inspect collected logs.
 
+To inspect Squid logs, enable or start the HTTP proxy, generate a proxied request, and query `{service_name="sand-http-cache"}` in Grafana Explore. Squid strips URL query strings and does not log request headers. After upgrading an existing proxy, run `sand cache http-proxy clear` followed by `sand cache http-proxy start` once so its container gets the log mount. The task reads proxy logs from the default Sand app directory, `~/Library/Application Support/Sand`; if Sand uses a custom app base directory, start observability with `SAND_APP_BASE_DIR=/path/to/Sand`.
+
 ## Configuration
 
 The observability configuration should Just Work out of the box, but if you need to modify it the files are:
@@ -56,6 +58,9 @@ These are the `hostdir:containerdir` paths that [`../Taskfile.yaml`](../Taskfile
 - `tempo`: `{{.OBSERVABILITY_DATA_DIR}}/tempo:/var/tempo`
 - `loki`: `{{.OBSERVABILITY_DATA_DIR}}/loki:/loki`
 - `grafana`: `{{.OBSERVABILITY_DATA_DIR}}/grafana:/var/lib/grafana`
+- `otel-collector`: `{{.OBSERVABILITY_DATA_DIR}}/otel-collector:/var/lib/otelcol` for persistent file-tail offsets
+
+The collector also mounts `<sand-app-base-dir>/logs/http-proxy` read-only at `/var/log/squid`.
 
 Note that `OBSERVABILITY_DATA_DIR` is set to `.observability-data` by default (and ignored by git). If you prefer to use an XDG-style base path, you can override it like so:
 

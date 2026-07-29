@@ -5,9 +5,23 @@ receivers:
         endpoint: 0.0.0.0:4317
       http:
         endpoint: 0.0.0.0:4318
+  filelog/squid:
+    include:
+      - /var/log/squid/*.log
+    start_at: beginning
+    storage: file_storage
+
+extensions:
+  file_storage:
+    directory: /var/lib/otelcol
 
 processors:
   batch:
+  resource/squid:
+    attributes:
+      - key: service.name
+        value: sand-http-cache
+        action: upsert
 
 exporters:
   otlp/tempo:
@@ -21,6 +35,7 @@ exporters:
       insecure: true
 
 service:
+  extensions: [file_storage]
   pipelines:
     traces:
       receivers: [otlp]
@@ -30,4 +45,9 @@ service:
     logs:
       receivers: [otlp]
       processors: [batch]
+      exporters: [otlphttp/loki]
+
+    logs/squid:
+      receivers: [filelog/squid]
+      processors: [resource/squid, batch]
       exporters: [otlphttp/loki]

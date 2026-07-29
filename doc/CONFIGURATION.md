@@ -95,11 +95,11 @@ caches:
 
 `http-proxy: true`, or `--caches-http-proxy`, configures new sandboxes to use a shared Squid HTTP/HTTPS proxy cache at `http://sand-http-cache.<container-dns-domain>:3128`. If no container DNS domain is configured, sand uses `dev.local`, so the default proxy URL is `http://sand-http-cache.dev.local:3128`. Sand starts the managed `sand-http-cache` service container on demand; manage it explicitly with `sand cache http-proxy status|start|stop|restart|clear`.
 
-The proxy permits WebSocket upgrades so agents such as Codex can use their preferred transport. After upgrading Sand from a version that did not permit WebSocket upgrades, run `sand cache http-proxy restart` once to reload the managed Squid configuration.
+The proxy permits WebSocket upgrades so agents such as Codex can use their preferred transport. If Sand reports that the managed proxy service version is unsupported after an upgrade, run `sand cache http-proxy clear`, then start it again to recreate the container with the current configuration.
 
 For HTTPS caching, Sand creates a dedicated local proxy CA under the Sand app directory, configures Squid SSL bumping, mounts the CA certificate into new proxy-enabled sandboxes, and runs `update-ca-certificates` during first-start bootstrap. Sand's bundled images include `ca-certificates`; custom images must already provide `update-ca-certificates`, or provide `apk` or `apt-get` so Sand can install the `ca-certificates` package during bootstrap.
 
-If you need to check the squid logs you can tail them with: `container exec sand-http-cache tail -f /var/log/squid/access.log`
+Squid writes its diagnostic and access logs under `<sand-app-base-dir>/logs/http-proxy`. Access log URLs have query strings stripped and request headers are not logged. You can tail the logs directly or use `task start-observability` from the Sand source tree to ingest them into Loki and view them with Grafana Explore. When Sand uses a non-default app base directory, pass the same path to the task as `SAND_APP_BASE_DIR=/path/to/Sand`.
 
 ## Network filtering config
 

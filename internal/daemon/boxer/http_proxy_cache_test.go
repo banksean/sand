@@ -13,14 +13,14 @@ import (
 
 func TestHTTPProxyCacheEnsureCreatesAndStartsMissingContainer(t *testing.T) {
 	var created, started, ready bool
-	var mkdirPath string
+	var mkdirPaths []string
 	inspectCalls := 0
 
 	b := &Boxer{
 		appRoot: "/tmp/sand-app",
 		FileOps: &hostops.MockFileOps{
 			MkdirAllFunc: func(path string, perm os.FileMode) error {
-				mkdirPath = path
+				mkdirPaths = append(mkdirPaths, path)
 				return nil
 			},
 		},
@@ -50,7 +50,7 @@ func TestHTTPProxyCacheEnsureCreatesAndStartsMissingContainer(t *testing.T) {
 				if opts.Label[httpProxyCacheServiceLabel] != httpProxyCacheServiceValue {
 					t.Fatalf("service label = %v", opts.Label)
 				}
-				if len(opts.Volume) != 3 {
+				if len(opts.Volume) != 4 {
 					t.Fatalf("volume = %#v", opts.Volume)
 				}
 				if !strings.Contains(opts.Volume[0], "target=/var/spool/squid") {
@@ -63,6 +63,10 @@ func TestHTTPProxyCacheEnsureCreatesAndStartsMissingContainer(t *testing.T) {
 				wantPEMVolume := "/tmp/sand-app/squid/squid.pem:/etc/squid/certs/squid.pem:ro"
 				if opts.Volume[2] != wantPEMVolume {
 					t.Fatalf("PEM volume = %q, want %q", opts.Volume[2], wantPEMVolume)
+				}
+				wantLogVolume := "/tmp/sand-app/logs/http-proxy:/var/log/squid"
+				if opts.Volume[3] != wantLogVolume {
+					t.Fatalf("log volume = %q, want %q", opts.Volume[3], wantLogVolume)
 				}
 				if opts.Entrypoint != "/bin/sh" {
 					t.Fatalf("entrypoint = %q", opts.Entrypoint)
@@ -93,8 +97,9 @@ func TestHTTPProxyCacheEnsureCreatesAndStartsMissingContainer(t *testing.T) {
 	if !created || !started || !ready {
 		t.Fatalf("created=%v started=%v ready=%v", created, started, ready)
 	}
-	if mkdirPath != "/tmp/sand-app/caches/http-proxy" {
-		t.Fatalf("mkdir path = %q", mkdirPath)
+	wantMkdirPaths := []string{"/tmp/sand-app/squid", "/tmp/sand-app/caches/http-proxy", "/tmp/sand-app/logs/http-proxy"}
+	if strings.Join(mkdirPaths, ",") != strings.Join(wantMkdirPaths, ",") {
+		t.Fatalf("mkdir paths = %q, want %q", mkdirPaths, wantMkdirPaths)
 	}
 }
 
@@ -151,15 +156,13 @@ func TestHTTPProxyCacheEnsureAdoptsExpectedImageWithoutLabels(t *testing.T) {
 }
 
 func TestHTTPProxyCacheClearDeletesContainerAndCacheDir(t *testing.T) {
-	var deleted, removed bool
+	var deleted bool
+	var removed string
 	b := &Boxer{
 		appRoot: "/tmp/sand-app",
 		FileOps: &hostops.MockFileOps{
 			RemoveAllFunc: func(path string) error {
-				removed = true
-				if path != "/tmp/sand-app/caches/http-proxy" {
-					t.Fatalf("remove path = %q", path)
-				}
+				removed = path
 				return nil
 			},
 		},
@@ -183,8 +186,36 @@ func TestHTTPProxyCacheClearDeletesContainerAndCacheDir(t *testing.T) {
 	if err := b.HTTPProxyCacheService().Clear(context.Background()); err != nil {
 		t.Fatalf("Clear: %v", err)
 	}
-	if !deleted || !removed {
-		t.Fatalf("deleted=%v removed=%v", deleted, removed)
+	if !deleted || removed != "/tmp/sand-app/caches/http-proxy" {
+		t.Fatalf("deleted=%v removed=%q", deleted, removed)
+	}
+}
+
+func TestHTTPProxyCacheClearDeletesOlderManagedContainer(t *testing.T) {
+	deleted := false
+	container := httpProxyCacheContainer("stopped")
+	container.Configuration.Labels[httpProxyCacheVersionLabel] = "2"
+	b := &Boxer{
+		appRoot: "/tmp/sand-app",
+		FileOps: &hostops.MockFileOps{
+			RemoveAllFunc: func(string) error { return nil },
+		},
+		ContainerService: &hostops.MockContainerOps{
+			InspectFunc: func(context.Context, string) ([]sandtypes.Container, error) {
+				return []sandtypes.Container{container}, nil
+			},
+			DeleteFunc: func(context.Context, *hostops.DeleteContainer, string) (string, error) {
+				deleted = true
+				return HTTPProxyCacheContainerName, nil
+			},
+		},
+	}
+
+	if err := b.HTTPProxyCacheService().Clear(context.Background()); err != nil {
+		t.Fatalf("Clear older managed container: %v", err)
+	}
+	if !deleted {
+		t.Fatal("expected older managed container to be deleted")
 	}
 }
 
@@ -222,6 +253,16 @@ func TestHTTPProxyCacheEnsureWritesSquidCAAndConfig(t *testing.T) {
 	}
 	if !strings.Contains(string(config), "http_upgrade_request_protocols websocket allow all") {
 		t.Fatalf("squid config missing WebSocket upgrade directive:\n%s", config)
+	}
+	for _, directive := range []string{
+		"strip_query_terms on",
+		"log_mime_hdrs off",
+		"access_log stdio:/var/log/squid/access.log sand",
+		"cache_log /var/log/squid/cache.log",
+	} {
+		if !strings.Contains(string(config), directive) {
+			t.Fatalf("squid config missing %q directive:\n%s", directive, config)
+		}
 	}
 }
 
