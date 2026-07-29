@@ -121,8 +121,6 @@ func main() {
 		}()
 	}
 
-	kongApp := kong.Must(&app)
-
 	predictorMC, err := daemon.NewUnixSocketClient(ctx, appBaseDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create sandd client, error: %v\n", err)
@@ -130,16 +128,20 @@ func main() {
 	}
 	namePredictor := cli.NewSandboxNamePredictor(predictorMC)
 
-	kongcompletion.Register(kongApp, kongcompletion.WithPredictor("sandbox-name", namePredictor))
 	kongConfigPaths := []string{"~/.sand.yaml"}
 	if p := cli.FindProjectConfig(); p != "" {
 		kongConfigPaths = append(kongConfigPaths, p)
 	}
-
-	kongCtx := kong.Parse(&app,
+	kongApp := kong.Must(
+		&app,
 		kong.UsageOnError(),
 		kong.Configuration(kongyaml.Loader, kongConfigPaths...),
-		kong.Description(description))
+		kong.Description(description),
+	)
+	kongcompletion.Register(kongApp, kongcompletion.WithPredictor("sandbox-name", namePredictor))
+
+	kongCtx, err := kongApp.Parse(os.Args[1:])
+	kongApp.FatalIfErrorf(err)
 
 	app.initSlog()
 

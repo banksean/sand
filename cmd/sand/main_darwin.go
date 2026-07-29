@@ -269,7 +269,6 @@ func main() {
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	kongApp := kong.Must(&app)
 	namePredictor := cli.NewLazySandboxNamePredictor(func() (daemon.Client, error) {
 		appBaseDir, err := effectiveAppBaseDir(app.AppBaseDir)
 		if err != nil {
@@ -277,21 +276,23 @@ func main() {
 		}
 		return daemon.NewUnixSocketClient(context.Background(), appBaseDir)
 	})
-	kongcompletion.Register(kongApp, kongcompletion.WithPredictor("sandbox-name", namePredictor))
 	kongConfigPaths := []string{"~/.sand.yaml"}
 	if p := cli.FindProjectConfig(); p != "" {
 		kongConfigPaths = append(kongConfigPaths, p)
 	}
-	if err := cli.ValidateConfigFiles(kongApp, kongConfigPaths...); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-	kongCtx := kong.Parse(
+	kongApp := kong.Must(
 		&app,
 		kong.UsageOnError(),
 		kong.Configuration(kongyaml.Loader, kongConfigPaths...),
 		kong.Description(description),
 	)
+	kongcompletion.Register(kongApp, kongcompletion.WithPredictor("sandbox-name", namePredictor))
+	if err := cli.ValidateConfigFiles(kongApp, kongConfigPaths...); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	kongCtx, err := kongApp.Parse(os.Args[1:])
+	kongApp.FatalIfErrorf(err)
 
 	appBaseDir, err := effectiveAppBaseDir(app.AppBaseDir)
 	if err != nil {
