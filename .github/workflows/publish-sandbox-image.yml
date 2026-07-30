@@ -11,11 +11,25 @@ on:
     paths:
       - 'images/**'
       - '.github/workflows/publish-sandbox-image.yml'
+  # Fires once the Release workflow (.github/workflows/release.yml) has
+  # published a GitHub Release, i.e. after goreleaser has uploaded the
+  # matching innie_linux_*.tar.gz assets that the Dockerfile below downloads.
+  # Triggering on tag-push instead would race those uploads.
+  release:
+    types: [published]
   workflow_dispatch:
+    inputs:
+      sand_cli_version:
+        description: 'sand CLI release tag to bake in (defaults to the fallback version below)'
+        required: false
 
 env:
   REGISTRY: ghcr.io
-  SAND_CLI_VERSION: v0.1.4
+  # Fallback only, used for workflow_dispatch/branch/PR builds that don't
+  # name a release explicitly. Release-triggered builds always use the
+  # published release's own tag instead, so the image version matches the
+  # container-side sand CLI baked into it.
+  FALLBACK_SAND_CLI_VERSION: v0.1.4
 
 jobs:
   build-and-push-base:
@@ -29,6 +43,17 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Determine sand CLI version to bake in
+        id: cli_version
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            echo "version=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+          elif [ -n "${{ github.event.inputs.sand_cli_version }}" ]; then
+            echo "version=${{ github.event.inputs.sand_cli_version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${{ env.FALLBACK_SAND_CLI_VERSION }}" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -49,9 +74,9 @@ jobs:
           tags: |
             type=ref,event=branch
             type=ref,event=pr
-            type=ref,event=tag
             type=sha,prefix={{branch}}-,enable=${{ github.ref_type == 'branch' }}
             type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ steps.cli_version.outputs.version }},enable=${{ github.event_name == 'release' }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -65,5 +90,5 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
-            SAND_CLI_VERSION=${{env.SAND_CLI_VERSION}}
+            SAND_CLI_VERSION=${{ steps.cli_version.outputs.version }}
             TZ=UTC

@@ -101,7 +101,7 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 	}
 
 	if c.ImageName == "" {
-		c.ImageName = DefaultImageName
+		c.ImageName = DefaultImageName()
 	}
 
 	if err := mc.EnsureImage(ctx, c.ImageName, os.Stdout); err != nil {
@@ -151,7 +151,7 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 	}
 
 	if sbox.ImageName == "" {
-		sbox.ImageName = DefaultImageName
+		sbox.ImageName = DefaultImageName()
 	}
 
 	// At this point the sandbox and container exist and are running (created by daemon)

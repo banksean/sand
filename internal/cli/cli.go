@@ -12,6 +12,7 @@ import (
 	"context"
 
 	"github.com/banksean/sand/internal/sandtypes"
+	"github.com/banksean/sand/internal/version"
 
 	"github.com/banksean/sand/internal/daemon"
 )
@@ -27,8 +28,23 @@ type CLIContext struct {
 }
 
 const (
-	DefaultImageName = "ghcr.io/banksean/sand/base:latest"
+	defaultImageRepo = "ghcr.io/banksean/sand/base"
 )
+
+// DefaultImageName returns the base container image reference to fetch when
+// the user hasn't specified one explicitly. Release builds of this CLI pin
+// the image tag to their own release version, so a given CLI build only ever
+// fetches base images that were built with the matching container-side sand
+// CLI baked in (see .github/workflows/publish-sandbox-image.yml, which tags
+// the image with the release's git tag). Dev builds have no fixed release
+// version, so they fall back to the "latest" moving tag.
+func DefaultImageName() string {
+	v := version.Get()
+	if !v.DevBuild && v.GitBranch != "" {
+		return defaultImageRepo + ":" + v.GitBranch
+	}
+	return defaultImageRepo + ":latest"
+}
 
 // ShellFlags are shared by commands that exec a shell inside a container.
 type ShellFlags struct {

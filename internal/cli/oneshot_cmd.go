@@ -65,7 +65,7 @@ func (c *OneshotCmd) Run(cctx *CLIContext) error {
 	}
 
 	if c.ImageName == "" {
-		c.ImageName = DefaultImageName
+		c.ImageName = DefaultImageName()
 	}
 
 	if err := mc.EnsureImage(ctx, c.ImageName, os.Stdout); err != nil {
