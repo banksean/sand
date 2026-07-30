@@ -20,7 +20,11 @@ on:
   workflow_dispatch:
     inputs:
       sand_cli_version:
-        description: 'sand CLI release tag to bake in (defaults to the fallback version below)'
+        description: >-
+          sand CLI release tag to (re-)publish the image under, e.g. v0.1.5.
+          Set this to rebuild and overwrite an existing version's image (for
+          image-only fixes that don't need a new CLI release); leave blank
+          for an untagged test build using the fallback version below.
         required: false
 
 env:
@@ -47,12 +51,21 @@ jobs:
       - name: Determine sand CLI version to bake in
         id: cli_version
         run: |
+          # tag_version=true means this run should (re-)publish the
+          # ghcr.io/.../base:<version> tag itself, not just latest/branch/sha
+          # tags. That only makes sense when a version was named explicitly:
+          # either by the release event, or by an operator manually
+          # re-publishing an existing version's image (e.g. after an
+          # image-only fix that doesn't warrant a new sand CLI release).
           if [ "${{ github.event_name }}" = "release" ]; then
             echo "version=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+            echo "tag_version=true" >> "$GITHUB_OUTPUT"
           elif [ -n "${{ github.event.inputs.sand_cli_version }}" ]; then
             echo "version=${{ github.event.inputs.sand_cli_version }}" >> "$GITHUB_OUTPUT"
+            echo "tag_version=true" >> "$GITHUB_OUTPUT"
           else
             echo "version=${{ env.FALLBACK_SAND_CLI_VERSION }}" >> "$GITHUB_OUTPUT"
+            echo "tag_version=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Set up Docker Buildx
@@ -76,7 +89,7 @@ jobs:
             type=ref,event=pr
             type=sha,prefix={{branch}}-,enable=${{ github.ref_type == 'branch' }}
             type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=${{ steps.cli_version.outputs.version }},enable=${{ github.event_name == 'release' }}
+            type=raw,value=${{ steps.cli_version.outputs.version }},enable=${{ steps.cli_version.outputs.tag_version == 'true' }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
