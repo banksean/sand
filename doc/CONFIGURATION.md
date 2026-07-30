@@ -99,7 +99,7 @@ The proxy permits WebSocket upgrades so agents such as Codex can use their prefe
 
 For HTTPS caching, Sand creates a dedicated local proxy CA under the Sand app directory, configures Squid SSL bumping, mounts the CA certificate into new proxy-enabled sandboxes, and runs `update-ca-certificates` during first-start bootstrap. Sand's bundled images include `ca-certificates`; custom images must already provide `update-ca-certificates`, or provide `apk` or `apt-get` so Sand can install the `ca-certificates` package during bootstrap.
 
-Squid writes its diagnostic and access logs under `<sand-app-base-dir>/logs/http-proxy`. Access log URLs have query strings stripped and request headers are not logged. Each file rotates after reaching approximately 25 MiB, with five old generations retained. You can tail the logs directly or use `task start-observability` from the Sand source tree to ingest them into Loki and view them with Grafana Explore. When Sand uses a non-default app base directory, pass the same path to the task as `SAND_APP_BASE_DIR=/path/to/Sand`.
+Squid writes its diagnostic and access logs under `<sand-app-base-dir>/logs/http-proxy`. Access log URLs have query strings stripped and request headers are not logged. The `squid_code` field contains Squid's internal error code, or `-` when there is none. Each file rotates after reaching approximately 25 MiB, with five old generations retained. You can tail the logs directly or use `task start-observability` from the Sand source tree to ingest them into Loki and view them with Grafana Explore. When Sand uses a non-default app base directory, pass the same path to the task as `SAND_APP_BASE_DIR=/path/to/Sand`.
 
 ## Network filtering config
 

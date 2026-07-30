@@ -265,6 +265,9 @@ func TestHTTPProxyCacheEnsureWritesSquidCAAndConfig(t *testing.T) {
 			t.Fatalf("squid config missing %q directive:\n%s", directive, config)
 		}
 	}
+	if strings.Contains(string(config), " error=%err_code") || !strings.Contains(string(config), " squid_code=%err_code") {
+		t.Fatalf("squid access log format should retain the Squid code without triggering generic error-level detection:\n%s", config)
+	}
 	if !strings.Contains(httpProxyCacheEntrypointScript, `wc -c < "$log_file"`) ||
 		!strings.Contains(httpProxyCacheEntrypointScript, "-ge 26214400") ||
 		!strings.Contains(httpProxyCacheEntrypointScript, "squid -k rotate") {

@@ -54,7 +54,7 @@ cache_mem 256 MB
 
 strip_query_terms on
 log_mime_hdrs off
-logformat sand %ts.%03tu duration_ms=%tr client=%>a cache=%Ss status=%>Hs bytes=%<st method=%rm url=%ru hierarchy=%Sh peer=%<a content_type=%mt dns_ms=%dt error=%err_code
+logformat sand %ts.%03tu duration_ms=%tr client=%>a cache=%Ss status=%>Hs bytes=%<st method=%rm url=%ru hierarchy=%Sh peer=%<a content_type=%mt dns_ms=%dt squid_code=%err_code
 access_log stdio:/var/log/squid/access.log logformat=sand rotate=5
 cache_log /var/log/squid/cache.log
 logfile_rotate 5
