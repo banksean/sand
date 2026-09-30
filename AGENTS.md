@@ -7,7 +7,7 @@ Apple Silicon Macs. It uses APFS copy-on-write clones for filesystem isolation
 and Apple Containerization for process isolation.
 
 The supported host environment is macOS 26 or newer on Apple Silicon with the
-Apple `container` CLI v1.4.1.
+Apple `container` CLI v1.5.0.
 
 ## Build and test commands
 
