@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -e
-CONTAINER_PKG_VERSION=1.4.1
+CONTAINER_PKG_VERSION=1.5.0
 
 if command -v container &> /dev/null; then
 	INSTALLED_VERSION=$(container --version 2>&1)

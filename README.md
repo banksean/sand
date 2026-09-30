@@ -20,7 +20,7 @@ Running an AI coding agent like Claude Code, Codex, Gemini, or opencode directly
 
 - Apple Silicon Mac
 - macOS 26 or later
-- Apple [`container`](https://github.com/apple/container) CLI version `1.4.1`
+- Apple [`container`](https://github.com/apple/container) CLI version `1.5.0`
 
 ## Quickstart
 
