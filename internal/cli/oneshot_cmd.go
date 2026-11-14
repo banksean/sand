@@ -11,6 +11,7 @@ import (
 
 	"github.com/banksean/sand/internal/cli/agentlaunch"
 	"github.com/banksean/sand/internal/daemon"
+	"github.com/banksean/sand/internal/hostops"
 	"github.com/banksean/sand/internal/runtimedeps"
 	"github.com/goombaio/namegenerator"
 )
@@ -32,10 +33,6 @@ func (c *OneshotCmd) Run(cctx *CLIContext) error {
 	ctx := cctx.Context
 	mc := cctx.Daemon
 
-	if err := runtimedeps.Verify(ctx, cctx.AppBaseDir, runtimedeps.GitDir); err != nil {
-		return err
-	}
-
 	cwd, err := os.Getwd()
 	if err != nil {
 		return err
@@ -43,6 +40,7 @@ func (c *OneshotCmd) Run(cctx *CLIContext) error {
 	if c.CloneFromDir == "" {
 		c.CloneFromDir = cwd
 	}
+	checkSandboxSourceGit(ctx, hostops.NewDefaultGitOps(), c.CloneFromDir, os.Stderr)
 
 	userInfo, err := user.Current()
 	if err != nil {

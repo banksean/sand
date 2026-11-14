@@ -60,10 +60,6 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 		})
 	}
 
-	if err := runtimedeps.Verify(ctx, cctx.AppBaseDir, runtimedeps.GitDir); err != nil {
-		return err
-	}
-
 	cwd, err := os.Getwd()
 	if err != nil {
 		slog.ErrorContext(ctx, "os.Getwd", "error", err)
@@ -73,6 +69,8 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 	if c.CloneFromDir == "" {
 		c.CloneFromDir = cwd
 	}
+	gitOps := hostops.NewDefaultGitOps()
+	isGitSource := checkSandboxSourceGit(ctx, gitOps, c.CloneFromDir, os.Stderr)
 	userInfo, err := user.Current()
 	if err != nil {
 		return err
@@ -95,7 +93,7 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 	}
 
 	if c.Branch {
-		if err := validateNewSandboxBranch(ctx, hostops.NewDefaultGitOps(), c.CloneFromDir, c.SandboxName); err != nil {
+		if err := validateNewSandboxBranch(ctx, gitOps, c.CloneFromDir, c.SandboxName, isGitSource); err != nil {
 			return err
 		}
 	}
@@ -252,7 +250,10 @@ func (c *NewCmd) Run(k *kong.Kong, cctx *CLIContext) error {
 	return nil
 }
 
-func validateNewSandboxBranch(ctx context.Context, gitOps hostops.GitOps, cloneFromDir, sandboxName string) error {
+func validateNewSandboxBranch(ctx context.Context, gitOps hostops.GitOps, cloneFromDir, sandboxName string, isGitSource bool) error {
+	if !isGitSource {
+		return fmt.Errorf("--branch requires source directory %q to be inside a git repository", cloneFromDir)
+	}
 	if !gitOps.LocalBranchExists(ctx, cloneFromDir, sandboxName) {
 		return nil
 	}

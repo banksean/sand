@@ -132,7 +132,7 @@ func TestValidateNewSandboxBranch(t *testing.T) {
 			},
 		}
 
-		err := validateNewSandboxBranch(context.Background(), gitOps, "/repo", "sb-123")
+		err := validateNewSandboxBranch(context.Background(), gitOps, "/repo", "sb-123", true)
 		if err != nil {
 			t.Fatalf("validateNewSandboxBranch() error = %v", err)
 		}
@@ -148,12 +148,29 @@ func TestValidateNewSandboxBranch(t *testing.T) {
 			},
 		}
 
-		err := validateNewSandboxBranch(context.Background(), gitOps, "/repo", "sb-123")
+		err := validateNewSandboxBranch(context.Background(), gitOps, "/repo", "sb-123", true)
 		if err == nil {
 			t.Fatal("validateNewSandboxBranch() error = nil, want non-nil")
 		}
 		if !strings.Contains(err.Error(), `branch name "sb-123" is already taken`) {
 			t.Fatalf("validateNewSandboxBranch() error = %v", err)
+		}
+	})
+
+	t.Run("non-git source", func(t *testing.T) {
+		gitOps := &hostops.MockGitOps{
+			LocalBranchExistsFunc: func(context.Context, string, string) bool {
+				t.Fatal("LocalBranchExists should not be called for a non-git source")
+				return false
+			},
+		}
+
+		err := validateNewSandboxBranch(context.Background(), gitOps, "/workspace", "sb-123", false)
+		if err == nil {
+			t.Fatal("validateNewSandboxBranch() error = nil, want non-nil")
+		}
+		if !strings.Contains(err.Error(), `--branch requires source directory "/workspace" to be inside a git repository`) {
+			t.Fatalf("validateNewSandboxBranch() error = %v, want non-git repository context", err)
 		}
 	})
 }
