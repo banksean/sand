@@ -212,18 +212,18 @@ func (c *BaseContainerConfiguration) GetStartHooks(artifacts Artifacts) []sandty
 
 func (c *BaseContainerConfiguration) GetFirstStartHooks(artifacts Artifacts) []sandtypes.ContainerHook {
 	return []sandtypes.ContainerHook{
-		c.defaultContainerHook(artifacts.Username, artifacts.Uid, artifacts.SharedCacheMounts, artifacts.HomeChownExclusions),
+		c.defaultContainerHook(artifacts.Username, artifacts.Uid, artifacts.SharedCacheMounts, artifacts.HomeChownExclusions, artifacts.HostGitMirrorDir != ""),
 	}
 }
 
-func (c *BaseContainerConfiguration) defaultContainerHook(username, uid string, sharedCaches sandtypes.SharedCacheMounts, homeChownExclusions []string) sandtypes.ContainerHook {
+func (c *BaseContainerConfiguration) defaultContainerHook(username, uid string, sharedCaches sandtypes.SharedCacheMounts, homeChownExclusions []string, hasGitOrigin bool) sandtypes.ContainerHook {
 	return sandtypes.NewContainerHook("default container bootstrap", func(ctx context.Context, ctr *sandtypes.Container, exec sandtypes.HookStreamer) error {
 		flavor, err := c.detectBootstrapFlavor(ctx, exec)
 		if err != nil {
 			return err
 		}
 
-		return c.runDefaultContainerHook(ctx, ctr, exec, flavor, username, uid, sharedCaches, homeChownExclusions)
+		return c.runDefaultContainerHook(ctx, ctr, exec, flavor, username, uid, sharedCaches, homeChownExclusions, hasGitOrigin)
 	})
 }
 
@@ -234,7 +234,7 @@ func (c *BaseContainerConfiguration) detectBootstrapFlavor(ctx context.Context, 
 	return ubuntuBootstrapFlavor, nil
 }
 
-func (c *BaseContainerConfiguration) runDefaultContainerHook(ctx context.Context, ctr *sandtypes.Container, exec sandtypes.HookStreamer, bootstrapStrategy containerBootstrapFlavor, username, uid string, sharedCaches sandtypes.SharedCacheMounts, homeChownExclusions []string) error {
+func (c *BaseContainerConfiguration) runDefaultContainerHook(ctx context.Context, ctr *sandtypes.Container, exec sandtypes.HookStreamer, bootstrapStrategy containerBootstrapFlavor, username, uid string, sharedCaches sandtypes.SharedCacheMounts, homeChownExclusions []string, hasGitOrigin bool) error {
 	runner := newContainerHookRunner(ctx, exec, "bootstrapStrategy", username)
 
 	// We create a group and a user with the same name and uid as the the host user.
@@ -313,12 +313,13 @@ func (c *BaseContainerConfiguration) runDefaultContainerHook(ctx context.Context
 		}
 	}
 
-	// Set git origin to țhe bind-mounted read-only dir at ContainerSideGitOrigin
-	runner.run("set git origin", "remove old origin", "git", "remote", "remove", "origin")
-	runner.run("set git origin", "add new origin", "git", "remote", "add", "origin", ContainerSideGitOrigin)
-	// The mounted dir is read-only, but just to make it extra clear in case anyone is unaware that they will
-	// not be pushing to origin from the sandbox:
-	runner.run("set git origin", "disble pushing to origin", "git", "remote", "set-url", "--push", "origin", "DISABLED")
+	if hasGitOrigin {
+		// Set git origin to the bind-mounted read-only dir at ContainerSideGitOrigin.
+		runner.run("set git origin", "remove old origin", "git", "remote", "remove", "origin")
+		runner.run("set git origin", "add new origin", "git", "remote", "add", "origin", ContainerSideGitOrigin)
+		// The mounted dir is read-only, but make it extra clear that pushes are disabled.
+		runner.run("set git origin", "disable pushing to origin", "git", "remote", "set-url", "--push", "origin", "DISABLED")
+	}
 
 	slog.InfoContext(ctx, "bootstrapStrategy completed", "hook", "default container bootstrap")
 	return runner.err()

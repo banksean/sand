@@ -85,7 +85,7 @@ func TestDefaultContainerHook_UsesAlpineFlavorWhenAPKAvailable(t *testing.T) {
 	hook := cfg.defaultContainerHook("sean", "1000", sandtypes.SharedCacheMounts{
 		MiseCacheHostDir: "/host/mise",
 		APKCacheHostDir:  "/host/apk",
-	}, nil)
+	}, nil, true)
 
 	if err := hook.Run(context.Background(), nil, exec); err != nil {
 		t.Fatalf("hook.Run() error = %v", err)
@@ -160,6 +160,25 @@ func TestBaseContainerConfigurationSkipsOriginMountWithoutGitMirror(t *testing.T
 	for _, mount := range mounts {
 		if mount.Target == ContainerSideGitOrigin {
 			t.Fatalf("unexpected origin mount without mirror: %#v", mount)
+		}
+	}
+}
+
+func TestDefaultContainerHookSkipsOriginSetupWithoutGitMirror(t *testing.T) {
+	cfg := NewBaseContainerConfiguration()
+	exec := &fakeHookStreamer{}
+
+	hooks := cfg.GetFirstStartHooks(Artifacts{Username: "sean", Uid: "1000"})
+	if len(hooks) != 1 {
+		t.Fatalf("GetFirstStartHooks() len = %d, want 1", len(hooks))
+	}
+	if err := hooks[0].Run(context.Background(), nil, exec); err != nil {
+		t.Fatalf("hook.Run() error = %v", err)
+	}
+
+	for _, call := range exec.calls {
+		if strings.HasPrefix(call, "exec:git ") {
+			t.Fatalf("hook ran git command without a git mirror: %s", call)
 		}
 	}
 }
@@ -258,7 +277,7 @@ func TestDefaultContainerHook_UsesUbuntuFlavorWhenAPKUnavailable(t *testing.T) {
 
 	hook := cfg.defaultContainerHook("sean", "1000", sandtypes.SharedCacheMounts{
 		MiseCacheHostDir: "/host/mise",
-	}, nil)
+	}, nil, true)
 
 	if err := hook.Run(context.Background(), nil, exec); err != nil {
 		t.Fatalf("hook.Run() error = %v", err)
@@ -308,7 +327,7 @@ func TestDefaultContainerHook_ConfiguresBazelRemoteCacheWhenEnabled(t *testing.T
 
 	hook := cfg.defaultContainerHook("sean", "1000", sandtypes.SharedCacheMounts{
 		BazelRemoteCacheURL: "http://sand-bazel-cache.test.local:8080",
-	}, nil)
+	}, nil, true)
 
 	if err := hook.Run(context.Background(), nil, exec); err != nil {
 		t.Fatalf("hook.Run() error = %v", err)
@@ -343,7 +362,7 @@ func TestDefaultContainerHook_ConfiguresSharedHTTPProxyWhenEnabled(t *testing.T)
 
 	hook := cfg.defaultContainerHook("sean", "1000", sandtypes.SharedCacheMounts{
 		HTTPProxyURL: "http://sand-http-cache.test.local:3128",
-	}, nil)
+	}, nil, true)
 
 	if err := hook.Run(context.Background(), nil, exec); err != nil {
 		t.Fatalf("hook.Run() error = %v", err)
@@ -414,7 +433,7 @@ func TestRunDefaultContainerHook_JoinsStepErrors(t *testing.T) {
 
 	err := cfg.runDefaultContainerHook(context.Background(), nil, exec, alpineBootstrapFlavor, "sean", "1000", sandtypes.SharedCacheMounts{
 		MiseCacheHostDir: "/host/mise",
-	}, nil)
+	}, nil, true)
 	if err == nil {
 		t.Fatal("runDefaultContainerHook() error = nil, want joined error")
 	}
